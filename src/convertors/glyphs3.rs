@@ -1,14 +1,11 @@
-use crate::glyph::GlyphCategory;
-use crate::Shape::{ComponentShape, PathShape};
 use crate::{
+    glyph::GlyphCategory,
     Anchor, Axis, BabelfontError, Component, Font, Glyph, GlyphList, Guide, Layer, Master, Node,
     NodeType, Path, Position, Shape,
+    Shape::{ComponentShape, PathShape},
 };
 use fontdrasil::coords::{DesignCoord, DesignLocation, UserCoord};
-use std::collections::HashMap;
-use std::fs;
-use std::path::PathBuf;
-use std::str::FromStr;
+use std::{collections::HashMap, fs, path::PathBuf, str::FromStr};
 use write_fonts::types::Tag;
 
 pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
@@ -207,13 +204,13 @@ impl From<&glyphslib::glyphs3::Node> for Node {
             x: val.x,
             y: val.y,
             nodetype: match val.node_type {
-                glyphslib::glyphs3::NodeType::Line => NodeType::Line,
-                glyphslib::glyphs3::NodeType::OffCurve => NodeType::OffCurve,
-                glyphslib::glyphs3::NodeType::Curve => NodeType::Curve,
-                glyphslib::glyphs3::NodeType::QCurve => NodeType::QCurve,
-                glyphslib::glyphs3::NodeType::LineSmooth => NodeType::Line,
-                glyphslib::glyphs3::NodeType::CurveSmooth => NodeType::Curve,
-                glyphslib::glyphs3::NodeType::QCurveSmooth => NodeType::QCurve,
+                glyphslib::common::NodeType::Line => NodeType::Line,
+                glyphslib::common::NodeType::OffCurve => NodeType::OffCurve,
+                glyphslib::common::NodeType::Curve => NodeType::Curve,
+                glyphslib::common::NodeType::QCurve => NodeType::QCurve,
+                glyphslib::common::NodeType::LineSmooth => NodeType::Line,
+                glyphslib::common::NodeType::CurveSmooth => NodeType::Curve,
+                glyphslib::common::NodeType::QCurveSmooth => NodeType::QCurve,
             },
         }
     }
