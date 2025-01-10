@@ -3,6 +3,7 @@ use fontdrasil::coords::DesignLocation;
 use crate::common::OTValue;
 use crate::guide::Guide;
 use crate::i18ndictionary::I18NDictionary;
+use crate::MetricType;
 use crate::OTScalar;
 use std::collections::HashMap;
 
@@ -12,7 +13,7 @@ pub struct Master {
     pub id: String,
     pub location: DesignLocation,
     pub guides: Vec<Guide>,
-    pub metrics: HashMap<String, i32>,
+    pub metrics: HashMap<MetricType, i32>,
     pub kerning: HashMap<(String, String), i16>,
     pub custom_ot_values: Vec<OTValue>,
     // lib

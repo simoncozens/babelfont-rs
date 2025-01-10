@@ -4,7 +4,7 @@ use crate::glyph::GlyphList;
 use crate::instance::Instance;
 use crate::master::Master;
 use crate::names::Names;
-use crate::{BabelfontError, Layer};
+use crate::{BabelfontError, Layer, MetricType};
 use chrono::Local;
 use fontdrasil::coords::{
     DesignCoord, DesignLocation, Location, NormalizedLocation, NormalizedSpace, UserCoord,
@@ -132,8 +132,9 @@ impl Font {
     }
 
     pub fn default_metric(&self, name: &str) -> Option<i32> {
+        let metric: MetricType = MetricType::from(name);
         self.default_master()
-            .and_then(|m| m.metrics.get(name))
+            .and_then(|m| m.metrics.get(&metric))
             .copied()
     }
 
@@ -160,4 +161,17 @@ impl Font {
     // fn axis_order(&self) -> Vec<Tag> {
     //     self.axes.iter().map(|ax| ax.tag.clone()).collect()
     // }
+}
+
+#[cfg(feature = "glyphs")]
+mod glyphs {
+    use glyphslib::glyphs3::Glyphs3;
+
+    use super::Font;
+
+    impl Font {
+        pub fn as_glyphs3(&self) -> Glyphs3 {
+            crate::convertors::glyphs3::as_glyphs3(self)
+        }
+    }
 }

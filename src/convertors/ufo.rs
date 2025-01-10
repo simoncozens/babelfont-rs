@@ -1,5 +1,7 @@
 use crate::glyph::GlyphCategory;
-use crate::{BabelfontError, Component, Font, Glyph, Layer, Master, Node, OTScalar, Path, Shape};
+use crate::{
+    BabelfontError, Component, Font, Glyph, Layer, Master, MetricType, Node, OTScalar, Path, Shape,
+};
 use chrono::{DateTime, Local, NaiveDateTime, TimeZone};
 use fontdrasil::coords::Location;
 use std::collections::{HashMap, HashSet};
@@ -99,13 +101,13 @@ pub(crate) fn load_path(c: &norad::Contour) -> Path {
 pub(crate) fn load_master_info(master: &mut Master, info: &norad::FontInfo) {
     let metrics = &mut master.metrics;
     if let Some(v) = info.ascender {
-        metrics.insert("ascender".to_string(), v as i32);
+        metrics.insert(MetricType::Ascender, v as i32);
     }
     if let Some(v) = info.cap_height {
-        metrics.insert("capHeight".to_string(), v as i32);
+        metrics.insert(MetricType::CapHeight, v as i32);
     }
     if let Some(v) = info.descender {
-        metrics.insert("descender".to_string(), v as i32);
+        metrics.insert(MetricType::Descender, v as i32);
     }
     if let Some(v) = &info.guidelines {
         for g in v.iter() {
@@ -113,10 +115,10 @@ pub(crate) fn load_master_info(master: &mut Master, info: &norad::FontInfo) {
         }
     }
     if let Some(v) = info.italic_angle {
-        metrics.insert("italic angle".to_string(), v as i32);
+        metrics.insert(MetricType::ItalicAngle, v as i32); // XXX i32 won't cut it
     }
     if let Some(v) = info.x_height {
-        metrics.insert("xHeight".to_string(), v as i32);
+        metrics.insert(MetricType::XHeight, v as i32);
     }
 }
 

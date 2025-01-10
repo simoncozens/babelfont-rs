@@ -183,3 +183,59 @@ impl Layer {
         Ok(self.width - bounds.max_x() as f32)
     }
 }
+
+#[cfg(feature = "glyphs")]
+mod glyphs {
+    use std::collections::BTreeMap;
+
+    use super::*;
+
+    impl From<&glyphslib::glyphs3::Layer> for Layer {
+        fn from(val: &glyphslib::glyphs3::Layer) -> Self {
+            Layer {
+                id: Some(val.layer_id.clone()),
+                name: val.name.clone(),
+                color: None,
+                shapes: val.shapes.iter().map(Into::into).collect(),
+                width: val.width,
+                guides: val.guides.iter().map(Into::into).collect(),
+                anchors: val.anchors.iter().map(Into::into).collect(),
+                layer_index: None,
+                is_background: false,
+                background_layer_id: None,
+                location: None,
+            }
+        }
+    }
+
+    impl From<&Layer> for glyphslib::glyphs3::Layer {
+        fn from(val: &Layer) -> Self {
+            glyphslib::glyphs3::Layer {
+                layer_id: val.id.clone().unwrap_or_default(),
+                name: val.name.clone(),
+                width: val.width,
+                shapes: val.shapes.iter().map(Into::into).collect(),
+                guides: val.guides.iter().map(Into::into).collect(),
+                anchors: val.anchors.iter().map(Into::into).collect(),
+                annotations: vec![],
+                associated_master_id: None,
+                attr: BTreeMap::new(),
+                background: None,
+                background_image: None,
+                color: None,
+                hints: vec![],
+                metric_bottom: None,
+                metric_left: None,
+                metric_right: None,
+                metric_top: None,
+                metric_vert_width: None,
+                metric_width: None,
+                part_selection: BTreeMap::new(),
+                user_data: BTreeMap::new(),
+                vert_origin: None,
+                vert_width: None,
+                visible: false,
+            }
+        }
+    }
+}

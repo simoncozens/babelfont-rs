@@ -1,9 +1,12 @@
-use serde_json::{Map, Value};
 use write_fonts::types::Tag;
 
-use crate::BabelfontError;
+pub(crate) mod decomposition;
+pub(crate) mod formatspecific;
+mod node;
+pub use node::{Node, NodeType};
 
-pub type FormatSpecific = Map<String, Value>;
+use crate::BabelfontError;
+pub use formatspecific::FormatSpecific;
 
 pub(crate) fn tag_from_string(s: &str) -> Result<Tag, BabelfontError> {
     let mut chars = s.bytes().collect::<Vec<u8>>();
@@ -152,51 +155,4 @@ pub enum Direction {
     LeftToRight,
     RightToLeft,
     TopToBottom,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum NodeType {
-    Move,
-    Line,
-    OffCurve,
-    Curve,
-    QCurve,
-}
-
-#[cfg(feature = "ufo")]
-impl From<&norad::PointType> for NodeType {
-    fn from(p: &norad::PointType) -> Self {
-        match p {
-            norad::PointType::Move => NodeType::Move,
-            norad::PointType::Line => NodeType::Line,
-            norad::PointType::OffCurve => NodeType::OffCurve,
-            norad::PointType::QCurve => NodeType::QCurve,
-            _ => NodeType::Curve,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Node {
-    pub x: f32,
-    pub y: f32,
-    pub nodetype: NodeType,
-    // userData: XXX
-}
-
-impl Node {
-    pub fn to_kurbo(&self) -> kurbo::Point {
-        kurbo::Point::new(self.x as f64, self.y as f64)
-    }
-}
-
-#[cfg(feature = "ufo")]
-impl From<&norad::ContourPoint> for Node {
-    fn from(p: &norad::ContourPoint) -> Self {
-        Node {
-            x: p.x as f32,
-            y: p.y as f32,
-            nodetype: (&p.typ).into(),
-        }
-    }
 }

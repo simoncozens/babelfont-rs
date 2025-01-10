@@ -1,10 +1,6 @@
-use crate::{
-    glyph::GlyphCategory,
-    Anchor, Axis, BabelfontError, Component, Font, Glyph, GlyphList, Guide, Layer, Master, Node,
-    NodeType, Path, Position, Shape,
-    Shape::{ComponentShape, PathShape},
-};
+use crate::{Axis, BabelfontError, Font, GlyphList, Master};
 use fontdrasil::coords::{DesignCoord, DesignLocation, UserCoord};
+use glyphslib::glyphs3;
 use std::{collections::HashMap, fs, path::PathBuf, str::FromStr};
 use write_fonts::types::Tag;
 
@@ -43,7 +39,7 @@ pub fn load_str(s: &str, path: PathBuf) -> Result<Font, BabelfontError> {
     font.masters = glyphs_font
         .masters
         .iter()
-        .map(|master| convert_master(master, glyphs_font, &font))
+        .map(|master| load_master(master, glyphs_font, &font))
         .collect();
     // Copy glyphs
     font.glyphs = GlyphList(glyphs_font.glyphs.iter().map(Into::into).collect());
@@ -59,11 +55,7 @@ pub fn load_str(s: &str, path: PathBuf) -> Result<Font, BabelfontError> {
     Ok(font)
 }
 
-fn convert_master(
-    master: &glyphslib::glyphs3::Master,
-    glyphs_font: &glyphslib::glyphs3::Glyphs3,
-    font: &Font,
-) -> Master {
+fn load_master(master: &glyphs3::Master, glyphs_font: &glyphs3::Glyphs3, font: &Font) -> Master {
     let designspace_to_location = |numbers: &[f32]| -> DesignLocation {
         numbers
             .iter()
@@ -94,126 +86,6 @@ fn convert_master(
         })
         .unwrap_or_default();
     m
-}
-
-impl From<&glyphslib::glyphs3::Guide> for Guide {
-    fn from(val: &glyphslib::glyphs3::Guide) -> Self {
-        Guide {
-            pos: Position {
-                x: val.pos.0,
-                y: val.pos.1,
-                angle: val.angle,
-            },
-            name: None,
-            color: None,
-        }
-    }
-}
-
-impl From<&glyphslib::glyphs3::Glyph> for Glyph {
-    fn from(val: &glyphslib::glyphs3::Glyph) -> Self {
-        Glyph {
-            name: val.name.clone(),
-            production_name: val.production.clone(),
-            category: GlyphCategory::Unknown,
-            codepoints: val.unicode.clone().unwrap_or_default(),
-            layers: val.layers.iter().map(Into::into).collect(),
-            exported: true,
-            direction: None,
-            formatspecific: Default::default(),
-        }
-    }
-}
-
-impl From<&glyphslib::glyphs3::Layer> for Layer {
-    fn from(val: &glyphslib::glyphs3::Layer) -> Self {
-        Layer {
-            id: Some(val.layer_id.clone()),
-            name: val.name.clone(),
-            color: None,
-            shapes: val.shapes.iter().map(Into::into).collect(),
-            width: val.width,
-            guides: val.guides.iter().map(Into::into).collect(),
-            anchors: val.anchors.iter().map(Into::into).collect(),
-            layer_index: None,
-            is_background: false,
-            background_layer_id: None,
-            location: None,
-        }
-    }
-}
-
-impl From<&glyphslib::glyphs3::Anchor> for Anchor {
-    fn from(val: &glyphslib::glyphs3::Anchor) -> Self {
-        Anchor {
-            name: val.name.clone(),
-            x: val.pos.0,
-            y: val.pos.1,
-        }
-    }
-}
-
-impl From<&glyphslib::glyphs3::Shape> for Shape {
-    fn from(val: &glyphslib::glyphs3::Shape) -> Self {
-        match val {
-            glyphslib::glyphs3::Shape::Component(c) => ComponentShape(c.into()),
-            glyphslib::glyphs3::Shape::Path(p) => PathShape(p.into()),
-        }
-    }
-}
-
-impl From<&glyphslib::glyphs3::Component> for Component {
-    fn from(val: &glyphslib::glyphs3::Component) -> Self {
-        // let transform = kurbo::Affine::IDENTITY
-        //     * kurbo::Affine::translate((self.position.0 as f64, self.position.1 as f64))
-        //     * kurbo::Affine::rotate((self.angle as f64).to_radians())
-        //     * kurbo::Affine::scale_non_uniform(self.scale.0 as f64, self.scale.1 as f64);
-        println!("{:?}", val);
-        let transform = kurbo::Affine::new([
-            val.scale.0 as f64,
-            0.0,
-            0.0,
-            val.scale.1 as f64,
-            val.position.0 as f64,
-            val.position.1 as f64,
-        ]);
-        println!("{:?}", transform);
-        Component {
-            reference: val.component_glyph.clone(),
-            transform,
-        }
-    }
-}
-
-impl From<&glyphslib::glyphs3::Path> for Path {
-    fn from(val: &glyphslib::glyphs3::Path) -> Self {
-        let mut nodes = vec![];
-        for node in &val.nodes {
-            nodes.push(node.into());
-        }
-        Path {
-            nodes,
-            closed: val.closed,
-        }
-    }
-}
-
-impl From<&glyphslib::glyphs3::Node> for Node {
-    fn from(val: &glyphslib::glyphs3::Node) -> Self {
-        Node {
-            x: val.x,
-            y: val.y,
-            nodetype: match val.node_type {
-                glyphslib::common::NodeType::Line => NodeType::Line,
-                glyphslib::common::NodeType::OffCurve => NodeType::OffCurve,
-                glyphslib::common::NodeType::Curve => NodeType::Curve,
-                glyphslib::common::NodeType::QCurve => NodeType::QCurve,
-                glyphslib::common::NodeType::LineSmooth => NodeType::Line,
-                glyphslib::common::NodeType::CurveSmooth => NodeType::Curve,
-                glyphslib::common::NodeType::QCurveSmooth => NodeType::QCurve,
-            },
-        }
-    }
 }
 
 fn interpret_axes(font: &mut Font) {
@@ -263,14 +135,142 @@ fn interpret_axes(font: &mut Font) {
         }
     }
 }
+
+pub(crate) fn as_glyphs3(font: &Font) -> glyphs3::Glyphs3 {
+    let axes = font
+        .axes
+        .iter()
+        .map(|ax| glyphs3::Axis {
+            hidden: false,
+            name: ax.name(),
+            tag: ax.tag.to_string(),
+        })
+        .collect();
+
+    let mut our_metrics: Vec<crate::MetricType> = vec![];
+    for master in font.masters.iter() {
+        for key in master.metrics.keys() {
+            if key.as_str().ends_with(" overshoot") {
+                continue;
+            }
+            if !our_metrics.contains(key) {
+                our_metrics.push(key.clone());
+            }
+        }
+    }
+
+    let glyphs_font = glyphs3::Glyphs3 {
+        format_version: 3,
+        family_name: font
+            .names
+            .family_name
+            .get_default()
+            .map(|x| x.to_string())
+            .unwrap_or_default(),
+        axes,
+        metrics: our_metrics.iter().map(Into::into).collect(),
+        masters: font
+            .masters
+            .iter()
+            .map(|x| save_master(x, &font.axes, &our_metrics))
+            .collect(),
+        glyphs: font.glyphs.iter().map(Into::into).collect(),
+        instances: font
+            .instances
+            .iter()
+            .map(|x| save_instance(x, &font.axes))
+            .collect(),
+        date: font.date.format("%Y-%m-%d %H:%M:%S +0000").to_string(),
+        keep_alternates_together: false,
+        units_per_em: font.upm.into(),
+        version: glyphslib::common::Version {
+            major: font.version.0.into(),
+            minor: font.version.1.into(),
+        },
+        ..Default::default() // Stuff we should probably get to one day
+    };
+    // Save kerning
+    // Save custom parameters
+    // Save metadata
+    // Save features
+    glyphs_font
+}
+
+fn save_master(master: &Master, axes: &[Axis], metrics: &[crate::MetricType]) -> glyphs3::Master {
+    let mut axes_values = vec![];
+    for axis in axes {
+        axes_values.push(
+            master
+                .location
+                .get(axis.tag)
+                .map(|x| x.to_f32())
+                .unwrap_or(0.0),
+        );
+    }
+
+    let mut metric_values: Vec<glyphs3::MetricValue> = vec![];
+    for metric in metrics {
+        let position = master.metrics.get(metric).copied().unwrap_or(0);
+        let over = master
+            .metrics
+            .get(&crate::MetricType::Custom(format!(
+                "{} overshoot",
+                metric.as_str()
+            )))
+            .copied()
+            .unwrap_or(0);
+        metric_values.push(glyphs3::MetricValue {
+            over: over as f32,
+            pos: position as f32,
+        });
+    }
+
+    glyphs3::Master {
+        id: master.id.clone(),
+        name: master
+            .name
+            .get_default()
+            .map(|x| x.to_string())
+            .unwrap_or_default(),
+        axes_values,
+        guides: master.guides.iter().map(Into::into).collect(),
+        metric_values,
+        ..Default::default()
+    }
+}
+
+fn save_instance(instance: &crate::Instance, axes: &[Axis]) -> glyphs3::Instance {
+    let mut axes_values = vec![];
+    for axis in axes {
+        axes_values.push(
+            instance
+                .location
+                .get(axis.tag)
+                .map(|x| x.to_f32())
+                .unwrap_or(0.0),
+        );
+    }
+    glyphs3::Instance {
+        name: instance
+            .name
+            .get_default()
+            .map(|x| x.to_string())
+            .unwrap_or_default(),
+        axes_values,
+        ..Default::default()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used)]
+    use crate::Shape;
+
     use super::*;
 
     #[test]
     fn test_transform() {
-        let f = load("../glyphslib/resources/RadioCanadaDisplay.glyphs".into()).unwrap();
+        let f = load("resources/RadioCanadaDisplay.glyphs".into()).unwrap();
         let shape = f
             .glyphs
             .iter()
@@ -286,10 +286,21 @@ mod tests {
             assert_eq!(p.reference, "acutecomb");
             assert_eq!(
                 p.transform,
-                kurbo::Affine::new([1.0, 10.0, 0.0, 1.0, 0.0, 0.0])
+                kurbo::Affine::new([1.0, 0.0, 0.0, 1.0, 152.0, 0.0])
             );
         } else {
             panic!("Expected a component shape");
         }
+    }
+
+    #[test]
+    fn test_roundtrip() {
+        let there = load("resources/RadioCanadaDisplay.glyphs".into()).unwrap();
+        let backagain = glyphslib::Font::Glyphs3(as_glyphs3(&there));
+        fs::write(
+            "resources/output/RadioCanadaDisplay.glyphs",
+            backagain.to_string().unwrap(),
+        )
+        .unwrap();
     }
 }

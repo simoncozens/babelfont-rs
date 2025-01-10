@@ -7,7 +7,6 @@ use fontdrasil::coords::DesignLocation;
 pub struct Instance {
     pub name: I18NDictionary,
     pub location: DesignLocation,
-    pub style_name: I18NDictionary,
     pub custom_names: Names,
     pub variable: bool,
     // lib

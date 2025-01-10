@@ -46,3 +46,35 @@ impl From<&norad::Guideline> for Guide {
         out
     }
 }
+
+#[cfg(feature = "glyphs")]
+mod glyphs {
+    use glyphslib::{common::GuideAlignment, glyphs3::Guide as G3Guide};
+
+    use super::*;
+    impl From<&G3Guide> for Guide {
+        fn from(val: &G3Guide) -> Self {
+            Guide {
+                pos: Position {
+                    x: val.pos.0,
+                    y: val.pos.1,
+                    angle: val.angle,
+                },
+                name: None,
+                color: None,
+            }
+        }
+    }
+
+    impl From<&Guide> for G3Guide {
+        fn from(val: &Guide) -> Self {
+            G3Guide {
+                pos: (val.pos.x, val.pos.y),
+                angle: val.pos.angle,
+                alignment: GuideAlignment::Left,
+                locked: false,
+                scale: (1.0, 1.0),
+            }
+        }
+    }
+}

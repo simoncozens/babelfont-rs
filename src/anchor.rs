@@ -19,3 +19,27 @@ impl From<&norad::Anchor> for Anchor {
         }
     }
 }
+
+#[cfg(feature = "glyphs")]
+mod glyphs {
+    use super::*;
+
+    impl From<&glyphslib::glyphs3::Anchor> for Anchor {
+        fn from(val: &glyphslib::glyphs3::Anchor) -> Self {
+            Anchor {
+                name: val.name.clone(),
+                x: val.pos.0,
+                y: val.pos.1,
+            }
+        }
+    }
+
+    impl From<&Anchor> for glyphslib::glyphs3::Anchor {
+        fn from(val: &Anchor) -> Self {
+            glyphslib::glyphs3::Anchor {
+                name: val.name.clone(),
+                pos: (val.x, val.y),
+            }
+        }
+    }
+}

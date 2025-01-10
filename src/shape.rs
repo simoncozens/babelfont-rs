@@ -1,4 +1,4 @@
-use crate::common::{Node, NodeType};
+use crate::common::{decomposition::DecomposedAffine, Node, NodeType};
 use crate::BabelfontError;
 
 #[derive(Debug, Clone)]
@@ -79,4 +79,92 @@ impl Path {
 pub enum Shape {
     ComponentShape(Component),
     PathShape(Path),
+}
+
+#[cfg(feature = "glyphs")]
+mod glyphs {
+    use super::*;
+
+    impl From<&glyphslib::glyphs3::Shape> for Shape {
+        fn from(val: &glyphslib::glyphs3::Shape) -> Self {
+            match val {
+                glyphslib::glyphs3::Shape::Component(c) => Shape::ComponentShape(c.into()),
+                glyphslib::glyphs3::Shape::Path(p) => Shape::PathShape(p.into()),
+            }
+        }
+    }
+
+    impl From<&Shape> for glyphslib::glyphs3::Shape {
+        fn from(val: &Shape) -> Self {
+            match val {
+                Shape::ComponentShape(c) => glyphslib::glyphs3::Shape::Component(c.into()),
+                Shape::PathShape(p) => glyphslib::glyphs3::Shape::Path(p.into()),
+            }
+        }
+    }
+
+    impl From<&glyphslib::glyphs3::Component> for Component {
+        fn from(val: &glyphslib::glyphs3::Component) -> Self {
+            let transform = kurbo::Affine::IDENTITY
+                * kurbo::Affine::translate((val.position.0 as f64, val.position.1 as f64))
+                * kurbo::Affine::rotate((val.angle as f64).to_radians())
+                * kurbo::Affine::scale_non_uniform(val.scale.0 as f64, val.scale.1 as f64);
+            // let transform = kurbo::Affine::new([
+            //     val.scale.0 as f64,
+            //     0.0, // XXX
+            //     0.0, // XXX
+            //     val.scale.1 as f64,
+            //     val.position.0 as f64,
+            //     val.position.1 as f64,
+            // ]);
+            Component {
+                reference: val.component_glyph.clone(),
+                transform,
+            }
+        }
+    }
+
+    impl From<&Component> for glyphslib::glyphs3::Component {
+        fn from(val: &Component) -> Self {
+            let decomposed: DecomposedAffine = val.transform.into();
+            glyphslib::glyphs3::Component {
+                component_glyph: val.reference.clone(),
+                position: (
+                    decomposed.translation.0 as f32,
+                    decomposed.translation.1 as f32,
+                ),
+                scale: (decomposed.scale.0 as f32, decomposed.scale.1 as f32),
+                angle: decomposed.rotation as f32,
+                // For now
+                ..Default::default()
+            }
+        }
+    }
+
+    impl From<&glyphslib::glyphs3::Path> for Path {
+        fn from(val: &glyphslib::glyphs3::Path) -> Self {
+            let mut nodes = vec![];
+            for node in &val.nodes {
+                nodes.push(node.into());
+            }
+            Path {
+                nodes,
+                closed: val.closed,
+            }
+        }
+    }
+
+    impl From<&Path> for glyphslib::glyphs3::Path {
+        fn from(val: &Path) -> Self {
+            let mut nodes = vec![];
+            for node in &val.nodes {
+                nodes.push(node.into());
+            }
+            glyphslib::glyphs3::Path {
+                nodes,
+                closed: val.closed,
+                attr: Default::default(),
+            }
+        }
+    }
 }

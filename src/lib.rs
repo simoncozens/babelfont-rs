@@ -12,6 +12,7 @@ mod i18ndictionary;
 mod instance;
 mod layer;
 mod master;
+mod metrics;
 pub mod names;
 mod shape;
 
@@ -25,6 +26,7 @@ pub use crate::guide::Guide;
 pub use crate::instance::Instance;
 pub use crate::layer::Layer;
 pub use crate::master::Master;
+pub use crate::metrics::MetricType;
 pub use crate::shape::{Component, Path, Shape};
 pub use fontdrasil::coords::{
     DesignCoord, DesignLocation, NormalizedCoord, NormalizedLocation, UserCoord, UserLocation,
