@@ -1,6 +1,4 @@
-use crate::common::FormatSpecific;
-use crate::i18ndictionary::I18NDictionary;
-use crate::BabelfontError;
+use crate::{common::FormatSpecific, i18ndictionary::I18NDictionary, BabelfontError};
 use fontdrasil::coords::{CoordConverter, DesignCoord, NormalizedCoord, UserCoord};
 use uuid::Uuid;
 pub use write_fonts::types::Tag;
@@ -139,6 +137,26 @@ impl TryInto<fontdrasil::types::Axis> for &Axis {
             hidden: self.hidden,
             converter,
         })
+    }
+}
+
+#[cfg(feature = "fontra")]
+mod fontra {
+    use super::Axis;
+    use crate::convertors::fontra;
+
+    impl From<&Axis> for fontra::Axis {
+        fn from(value: &Axis) -> Self {
+            fontra::Axis {
+                name: value.tag.to_string(), // XXX: This should be the name, but for expediency
+                label: "".to_string(),
+                tag: value.tag.to_string(),
+                min_value: value.min.map(|x| x.to_f32()).unwrap_or(0.0),
+                max_value: value.max.map(|x| x.to_f32()).unwrap_or(0.0),
+                default_value: value.default.map(|x| x.to_f32()).unwrap_or(0.0),
+                hidden: value.hidden,
+            }
+        }
     }
 }
 

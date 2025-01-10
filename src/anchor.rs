@@ -43,3 +43,29 @@ mod glyphs {
         }
     }
 }
+
+#[cfg(feature = "fontra")]
+mod fontra {
+    use super::*;
+    use crate::convertors::fontra;
+
+    impl From<&fontra::Anchor> for Anchor {
+        fn from(val: &fontra::Anchor) -> Self {
+            Anchor {
+                name: val.name.clone(),
+                x: val.x,
+                y: val.y,
+            }
+        }
+    }
+
+    impl From<&Anchor> for fontra::Anchor {
+        fn from(val: &Anchor) -> Self {
+            fontra::Anchor {
+                name: val.name.clone(),
+                x: val.x,
+                y: val.y,
+            }
+        }
+    }
+}

@@ -3,7 +3,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize)]
-pub(crate) struct Axis {
+pub struct Axis {
     pub name: String,
     pub label: String,
     pub tag: String,
@@ -12,11 +12,11 @@ pub(crate) struct Axis {
     #[serde(rename = "maxValue")]
     pub max_value: f32,
     #[serde(rename = "defaultValue")]
-    pub default_values: f32,
+    pub default_value: f32,
     pub hidden: bool,
 }
 #[derive(Serialize, Deserialize, Default)]
-pub(crate) struct Axes {
+pub struct Axes {
     pub axes: Vec<Axis>,
     pub mappings: Vec<String>, // Should be a cross-axis mapping
     #[serde(rename = "elidedFallBackname")]
@@ -24,7 +24,7 @@ pub(crate) struct Axes {
 }
 
 #[derive(Serialize, Deserialize, Default)]
-pub(crate) struct Guideline {
+pub struct Guideline {
     pub name: Option<String>,
     pub x: f32,
     pub y: f32,
@@ -33,7 +33,7 @@ pub(crate) struct Guideline {
 }
 
 #[derive(Serialize, Deserialize, Default)]
-pub(crate) struct Source {
+pub struct Source {
     pub name: String,
     #[serde(rename = "isSparse")]
     pub is_sparse: String,
@@ -46,17 +46,17 @@ pub(crate) struct Source {
 }
 
 #[derive(Serialize, Deserialize, Default)]
-pub(crate) struct BackendInfo {
+pub struct BackendInfo {
     pub features: Vec<String>,
     #[serde(rename = "projectManagerFeatures")]
     pub project_manager_features: Value,
 }
 
 #[derive(Serialize, Deserialize, Default)]
-pub(crate) struct GlyphAxis {}
+pub struct GlyphAxis {}
 
 #[derive(Serialize, Deserialize, Default)]
-pub(crate) struct GlyphSource {
+pub struct GlyphSource {
     pub name: String,
     #[serde(rename = "layerName")]
     pub layer_name: String,
@@ -64,12 +64,12 @@ pub(crate) struct GlyphSource {
 }
 
 #[derive(Serialize, Deserialize, Default)]
-pub(crate) struct Layer {
+pub struct Layer {
     pub glyph: StaticGlyph,
 }
 
 #[derive(Serialize, Deserialize, Default)]
-pub(crate) struct StaticGlyph {
+pub struct StaticGlyph {
     pub path: PackedPath,
     pub components: Vec<Component>,
     #[serde(rename = "xAdvance")]
@@ -81,21 +81,21 @@ pub(crate) struct StaticGlyph {
 }
 
 #[derive(Serialize, Deserialize, Default)]
-pub(crate) struct Component {
+pub struct Component {
     pub name: String,
     pub transformation: DecomposedTransform,
     pub location: HashMap<String, f32>,
 }
 
 #[derive(Serialize, Deserialize, Default)]
-pub(crate) struct Anchor {
+pub struct Anchor {
     pub name: String,
     pub x: f32,
     pub y: f32,
 }
 
 #[derive(Serialize, Deserialize, Default)]
-pub(crate) struct DecomposedTransform {
+pub struct DecomposedTransform {
     #[serde(rename = "translateX")]
     pub translate_x: f32,
     #[serde(rename = "translateY")]
@@ -116,7 +116,7 @@ pub(crate) struct DecomposedTransform {
 }
 
 #[derive(Serialize, Deserialize, Default)]
-pub(crate) struct ContourInfo {
+pub struct ContourInfo {
     #[serde(rename = "endPoint")]
     pub end_point: usize,
     #[serde(rename = "isClosed")]
@@ -124,7 +124,7 @@ pub(crate) struct ContourInfo {
 }
 
 #[derive(Serialize, Deserialize, Default)]
-pub(crate) struct PackedPath {
+pub struct PackedPath {
     pub coordinates: Vec<f32>,
     #[serde(rename = "pointTypes")]
     pub point_types: Vec<i32>,
@@ -133,7 +133,7 @@ pub(crate) struct PackedPath {
 }
 
 impl PackedPath {
-    pub(crate) fn push_path(&mut self, babelfont: &crate::Path) {
+    pub fn push_path(&mut self, babelfont: &crate::Path) {
         for node in babelfont.nodes.iter() {
             self.coordinates.push(node.x);
             self.coordinates.push(node.y);
@@ -151,7 +151,7 @@ impl PackedPath {
 }
 
 #[derive(Serialize, Deserialize, Default)]
-pub(crate) struct Glyph {
+pub struct Glyph {
     pub name: String,
     pub axes: Vec<GlyphAxis>,
     pub sources: Vec<GlyphSource>,
@@ -159,7 +159,7 @@ pub(crate) struct Glyph {
 }
 
 #[derive(Serialize, Deserialize, Default)]
-pub(crate) struct FontInfo {
+pub struct FontInfo {
     #[serde(rename = "familyName")]
     pub family_name: Option<String>,
     #[serde(rename = "versionMajor")]

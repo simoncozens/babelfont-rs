@@ -1,5 +1,7 @@
-use crate::common::{decomposition::DecomposedAffine, Node, NodeType};
-use crate::BabelfontError;
+use crate::{
+    common::{decomposition::DecomposedAffine, Node, NodeType},
+    BabelfontError,
+};
 
 #[derive(Debug, Clone)]
 pub struct Component {
@@ -164,6 +166,25 @@ mod glyphs {
                 nodes,
                 closed: val.closed,
                 attr: Default::default(),
+            }
+        }
+    }
+}
+
+#[cfg(feature = "fontra")]
+mod fontra {
+    use std::collections::HashMap;
+
+    use super::*;
+    use crate::convertors::fontra;
+
+    impl From<&Component> for fontra::Component {
+        fn from(val: &Component) -> Self {
+            let decomposed: DecomposedAffine = val.transform.into();
+            fontra::Component {
+                name: val.reference.clone(),
+                transformation: decomposed.into(),
+                location: HashMap::new(),
             }
         }
     }

@@ -72,3 +72,33 @@ mod glyphs {
         }
     }
 }
+
+#[cfg(feature = "fontra")]
+mod fontra {
+    use super::*;
+    use crate::convertors::fontra::DecomposedTransform as FontraTransform;
+    impl From<DecomposedAffine> for FontraTransform {
+        fn from(t: DecomposedAffine) -> Self {
+            FontraTransform {
+                translate_x: t.translation.0 as f32,
+                translate_y: t.translation.1 as f32,
+                rotation: t.rotation as f32,
+                scale_x: t.scale.0 as f32,
+                scale_y: t.scale.1 as f32,
+                skew_x: 0.0,
+                skew_y: 0.0,
+                t_center_x: 0.0,
+                t_center_y: 0.0,
+            }
+        }
+    }
+    impl From<FontraTransform> for DecomposedAffine {
+        fn from(t: FontraTransform) -> Self {
+            DecomposedAffine {
+                translation: (t.translate_x as f64, t.translate_y as f64),
+                scale: (t.scale_x as f64, t.scale_y as f64),
+                rotation: t.rotation as f64,
+            }
+        }
+    }
+}

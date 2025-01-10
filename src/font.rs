@@ -1,10 +1,12 @@
-use crate::axis::Axis;
-use crate::common::{OTScalar, OTValue};
-use crate::glyph::GlyphList;
-use crate::instance::Instance;
-use crate::master::Master;
-use crate::names::Names;
-use crate::{BabelfontError, Layer, MetricType};
+use crate::{
+    axis::Axis,
+    common::{OTScalar, OTValue},
+    glyph::GlyphList,
+    instance::Instance,
+    master::Master,
+    names::Names,
+    BabelfontError, Layer, MetricType,
+};
 use chrono::Local;
 use fontdrasil::coords::{
     DesignCoord, DesignLocation, Location, NormalizedLocation, NormalizedSpace, UserCoord,
@@ -165,13 +167,82 @@ impl Font {
 
 #[cfg(feature = "glyphs")]
 mod glyphs {
-    use glyphslib::glyphs3::Glyphs3;
-
     use super::Font;
 
     impl Font {
-        pub fn as_glyphs3(&self) -> Glyphs3 {
-            crate::convertors::glyphs3::as_glyphs3(self)
+        pub fn as_glyphslib(&self) -> glyphslib::Font {
+            glyphslib::Font::Glyphs3(crate::convertors::glyphs3::as_glyphs3(self))
+        }
+    }
+}
+
+#[cfg(feature = "fontra")]
+mod fontra {
+    use std::collections::HashMap;
+
+    use fontdrasil::coords::DesignLocation;
+
+    use super::Font;
+    use crate::convertors::fontra;
+    impl Font {
+        pub fn as_fontra_info(&self) -> fontra::FontInfo {
+            fontra::FontInfo {
+                family_name: self.names.family_name.get_default().cloned(),
+                version_major: Some(self.version.0),
+                version_minor: Some(self.version.1),
+                copyright: self.names.copyright.get_default().cloned(),
+                trademark: self.names.trademark.get_default().cloned(),
+                description: self.names.description.get_default().cloned(),
+                sample_text: self.names.sample_text.get_default().cloned(),
+                designer: self.names.designer.get_default().cloned(),
+                designer_url: self.names.designer_url.get_default().cloned(),
+                manufacturer: self.names.manufacturer.get_default().cloned(),
+                manufacturer_url: self.names.manufacturer_url.get_default().cloned(),
+                license_description: self.names.license.get_default().cloned(),
+                license_info_url: self.names.license_url.get_default().cloned(),
+                vendor_id: None,
+                custom_data: HashMap::new(),
+            }
+        }
+
+        pub fn as_fontra_axes(&self) -> fontra::Axes {
+            fontra::Axes {
+                axes: self.axes.iter().map(Into::into).collect(),
+                mappings: vec![],
+                elided_fall_backname: "".to_string(),
+            }
+        }
+
+        pub fn get_fontra_glyph(&self, glyphname: &str) -> Option<fontra::Glyph> {
+            let our_glyph = self.glyphs.get(glyphname)?;
+            let mut glyph = fontra::Glyph {
+                name: our_glyph.name.clone(),
+                axes: vec![],
+                sources: vec![],
+                layers: HashMap::new(),
+            };
+            let master_locations: HashMap<String, &DesignLocation> = self
+                .masters
+                .iter()
+                .map(|m| (m.id.clone(), &m.location))
+                .collect::<HashMap<String, _>>();
+            for layer in our_glyph.layers.iter() {
+                let layer_id = layer.id.clone().unwrap_or("Unknown layer".to_string());
+                glyph.layers.insert(layer_id.clone(), layer.into());
+                glyph.sources.push(fontra::GlyphSource {
+                    name: layer_id.clone(),
+                    layer_name: layer_id.clone(),
+                    location: master_locations
+                        .get(&layer_id.clone())
+                        .map(|loc| {
+                            loc.iter()
+                                .map(|(k, v)| (k.to_string(), v.to_f32()))
+                                .collect::<HashMap<String, f32>>()
+                        })
+                        .unwrap_or_default(),
+                })
+            }
+            Some(glyph)
         }
     }
 }

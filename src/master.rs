@@ -1,10 +1,6 @@
 use fontdrasil::coords::DesignLocation;
 
-use crate::common::OTValue;
-use crate::guide::Guide;
-use crate::i18ndictionary::I18NDictionary;
-use crate::MetricType;
-use crate::OTScalar;
+use crate::{common::OTValue, guide::Guide, i18ndictionary::I18NDictionary, MetricType, OTScalar};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
@@ -51,5 +47,38 @@ impl Master {
             field: field.to_string(),
             value,
         })
+    }
+}
+
+mod fontra {
+    use super::*;
+    use crate::convertors::fontra;
+
+    impl From<&Master> for fontra::Source {
+        fn from(val: &Master) -> Self {
+            fontra::Source {
+                name: val.id.clone(),
+                // name: val
+                //     .name
+                //     .get_default()
+                //     .map(|x| x.as_str())
+                //     .unwrap_or("Unnamed master")
+                //     .to_string(),
+                is_sparse: "False".to_string(),
+                // Location really ought to use axis *name*
+                location: val
+                    .location
+                    .iter()
+                    .map(|(k, v)| (k.to_string(), v.to_f32()))
+                    .collect(),
+                italic_angle: 0.0,
+                guidelines: val
+                    .guides
+                    .iter()
+                    .map(|g| g.into())
+                    .collect::<Vec<fontra::Guideline>>(),
+                custom_data: HashMap::new(),
+            }
+        }
     }
 }

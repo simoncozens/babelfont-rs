@@ -1,8 +1,7 @@
-use crate::anchor::Anchor;
-use crate::common::Color;
-use crate::guide::Guide;
-use crate::shape::Shape;
-use crate::{BabelfontError, Component, Font, Node, Path};
+use crate::{
+    anchor::Anchor, common::Color, guide::Guide, shape::Shape, BabelfontError, Component, Font,
+    Node, Path,
+};
 use fontdrasil::coords::DesignLocation;
 use kurbo::Shape as KurboShape;
 
@@ -235,6 +234,32 @@ mod glyphs {
                 vert_origin: None,
                 vert_width: None,
                 visible: false,
+            }
+        }
+    }
+}
+
+#[cfg(feature = "fontra")]
+mod fontra {
+    use super::*;
+    use crate::convertors::fontra;
+
+    impl From<&Layer> for fontra::Layer {
+        fn from(val: &Layer) -> Self {
+            let mut path = fontra::PackedPath::default();
+            for p in val.paths() {
+                path.push_path(p);
+            }
+
+            fontra::Layer {
+                glyph: fontra::StaticGlyph {
+                    path,
+                    components: val.components().map(|c| c.into()).collect(),
+                    x_advance: val.width,
+                    y_advance: 0.0,
+                    anchors: val.anchors.iter().map(|a| a.into()).collect(),
+                    guides: vec![],
+                },
             }
         }
     }
