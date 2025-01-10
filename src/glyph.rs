@@ -75,7 +75,7 @@ mod glyphs {
                 name: val.name.clone(),
                 production_name: val.production.clone(),
                 category: GlyphCategory::Unknown, // XXX
-                codepoints: val.unicode.clone().unwrap_or_default(),
+                codepoints: val.unicode.clone(),
                 layers: val.layers.iter().map(Into::into).collect(),
                 exported: val.export,
                 direction: None,
@@ -89,7 +89,7 @@ mod glyphs {
             G3Glyph {
                 name: val.name.clone(),
                 production: val.production_name.clone(),
-                unicode: Some(val.codepoints.clone()),
+                unicode: val.codepoints.clone(),
                 layers: val.layers.iter().map(Into::into).collect(),
                 export: val.exported,
                 case: val.formatspecific.get_string("case"),
