@@ -4,6 +4,9 @@ pub mod designspace;
 #[cfg(feature = "fontlab")]
 /// Fontlab convertor
 pub mod fontlab;
+#[cfg(feature = "fontra")]
+/// Fontra convertor
+pub mod fontra;
 #[cfg(feature = "glyphs")]
 /// Glyphs 3 convertor
 pub mod glyphs3;

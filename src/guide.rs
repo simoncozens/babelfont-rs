@@ -78,3 +78,21 @@ mod glyphs {
         }
     }
 }
+
+#[cfg(feature = "fontra")]
+mod fontra {
+    use super::*;
+    use crate::convertors::fontra::Guideline as FontraGuideline;
+
+    impl From<&Guide> for FontraGuideline {
+        fn from(val: &Guide) -> Self {
+            FontraGuideline {
+                name: val.name.clone(),
+                x: val.pos.x,
+                y: val.pos.y,
+                angle: val.pos.angle,
+                locked: false,
+            }
+        }
+    }
+}

@@ -9,9 +9,10 @@ uuid = { version = "1.11.0", features = ["v4"] }
 uuid = { version = "1.11.0", features = ["v4", "js"] }
 
 [features]
-default = ["glyphs", "ufo", "fontlab"]
+default = ["glyphs", "ufo", "fontlab", "fontra"]
 glyphs = ["dep:glyphslib"]
 ufo = ["dep:norad"]
+fontra = []
 fontlab = []
 
 [dependencies]

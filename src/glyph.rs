@@ -1,7 +1,9 @@
 use std::ops::{Deref, DerefMut};
 
-use crate::common::{Direction, FormatSpecific};
-use crate::layer::Layer;
+use crate::{
+    common::{Direction, FormatSpecific},
+    layer::Layer,
+};
 
 #[derive(Debug, Clone)]
 pub struct GlyphList(pub Vec<Glyph>);
