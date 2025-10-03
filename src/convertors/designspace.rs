@@ -69,13 +69,13 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
 fn load_axes(font: &mut Font, axes: &[DSAxis]) -> Result<(), BabelfontError> {
     for dsax in axes {
         let mut ax = Axis::new(dsax.name.clone(), tag_from_string(&dsax.tag)?);
-        ax.min = dsax.minimum.map(UserCoord::new);
-        ax.max = dsax.maximum.map(UserCoord::new);
-        ax.default = Some(UserCoord::new(dsax.default));
+        ax.min = dsax.minimum.map(|x| x as f64).map(UserCoord::new);
+        ax.max = dsax.maximum.map(|x| x as f64).map(UserCoord::new);
+        ax.default = Some(UserCoord::new(dsax.default as f64));
         if let Some(map) = &dsax.map {
             ax.map = Some(
                 map.iter()
-                    .map(|x| (UserCoord::new(x.input), DesignCoord::new(x.output)))
+                    .map(|x| (UserCoord::new(x.input as f64), DesignCoord::new(x.output as f64)))
                     .collect(),
             );
         }
@@ -109,7 +109,7 @@ fn load_master(
                     *axis_names_to_tags
                         .get(dimension.name.as_str())
                         .unwrap_or_else(|| panic!("Axis name not found: {}", dimension.name)),
-                    DesignCoord::new(dimension.uservalue.unwrap_or_default()),
+                    DesignCoord::new(dimension.uservalue.map(|x| x as f64).unwrap_or_default()),
                 )
             })
             .collect::<Vec<_>>(),
@@ -184,7 +184,7 @@ fn default_master<'a>(ds: &'a DesignSpaceDocument, axes: &[Axis]) -> Option<&'a 
     for source in ds.sources.iter() {
         let mut maybe = true;
         for loc in source.location.iter() {
-            if defaults.get(&loc.name) != loc.xvalue.map(DesignCoord::new).as_ref() {
+            if defaults.get(&loc.name) != loc.xvalue.map(|x| x as f64).map(DesignCoord::new).as_ref() {
                 maybe = false;
                 break;
             }

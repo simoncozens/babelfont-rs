@@ -94,7 +94,7 @@ pub(crate) fn load_path(c: &norad::Contour) -> Path {
         closed: c
             .points
             .first()
-            .map_or(true, |v| v.typ != norad::PointType::Move),
+            .is_none_or(|v| v.typ != norad::PointType::Move),
     }
 }
 

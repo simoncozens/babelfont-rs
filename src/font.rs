@@ -8,9 +8,9 @@ use crate::{
     BabelfontError, Layer, MetricType,
 };
 use chrono::Local;
-use fontdrasil::coords::{
+use fontdrasil::{coords::{
     DesignCoord, DesignLocation, Location, NormalizedLocation, NormalizedSpace, UserCoord,
-};
+}, types::Axes};
 use std::collections::{BTreeMap, HashMap};
 use write_fonts::types::Tag;
 
@@ -148,16 +148,15 @@ impl Font {
     where
         Space: fontdrasil::coords::ConvertSpace<NormalizedSpace>,
     {
-        let axes: Result<HashMap<Tag, fontdrasil::types::Axis>, _> = self
+        let axes: Result<Vec<fontdrasil::types::Axis>, _> = self
             .axes
             .iter()
             .map(|ax| {
-                let fds_ax: Result<fontdrasil::types::Axis, _> = ax.clone().try_into();
-                fds_ax.map(|fds_ax| (ax.tag, fds_ax))
+               ax.clone().try_into()
             })
             .collect();
-        let axes = axes?;
-        Ok(loc.convert(&axes.iter().map(|(k, v)| (*k, v)).collect()))
+        let fontrdasil_axes = Axes::new(axes?);
+        Ok(loc.convert(&fontrdasil_axes))
     }
 
     // fn axis_order(&self) -> Vec<Tag> {
@@ -236,8 +235,8 @@ mod fontra {
                         .get(&layer_id.clone())
                         .map(|loc| {
                             loc.iter()
-                                .map(|(k, v)| (k.to_string(), v.to_f32()))
-                                .collect::<HashMap<String, f32>>()
+                                .map(|(k, v)| (k.to_string(), v.to_f64()))
+                                .collect::<HashMap<String, f64>>()
                         })
                         .unwrap_or_default(),
                 })

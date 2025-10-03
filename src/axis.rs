@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::{common::FormatSpecific, i18ndictionary::I18NDictionary, BabelfontError};
 use fontdrasil::coords::{CoordConverter, DesignCoord, NormalizedCoord, UserCoord};
 use uuid::Uuid;
@@ -110,6 +112,7 @@ impl TryInto<fontdrasil::types::Axis> for Axis {
             max,
             default,
             hidden: self.hidden,
+            localized_names: HashMap::new(),
             converter,
         })
     }
@@ -136,6 +139,7 @@ impl TryInto<fontdrasil::types::Axis> for &Axis {
             default,
             hidden: self.hidden,
             converter,
+            localized_names: HashMap::new(),
         })
     }
 }
@@ -151,9 +155,9 @@ mod fontra {
                 name: value.tag.to_string(), // XXX: This should be the name, but for expediency
                 label: "".to_string(),
                 tag: value.tag.to_string(),
-                min_value: value.min.map(|x| x.to_f32()).unwrap_or(0.0),
-                max_value: value.max.map(|x| x.to_f32()).unwrap_or(0.0),
-                default_value: value.default.map(|x| x.to_f32()).unwrap_or(0.0),
+                min_value: value.min.map(|x| x.to_f64()).unwrap_or(0.0),
+                max_value: value.max.map(|x| x.to_f64()).unwrap_or(0.0),
+                default_value: value.default.map(|x| x.to_f64()).unwrap_or(0.0),
                 hidden: value.hidden,
             }
         }

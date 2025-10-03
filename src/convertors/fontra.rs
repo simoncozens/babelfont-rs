@@ -8,11 +8,11 @@ pub struct Axis {
     pub label: String,
     pub tag: String,
     #[serde(rename = "minValue")]
-    pub min_value: f32,
+    pub min_value: f64,
     #[serde(rename = "maxValue")]
-    pub max_value: f32,
+    pub max_value: f64,
     #[serde(rename = "defaultValue")]
-    pub default_value: f32,
+    pub default_value: f64,
     pub hidden: bool,
 }
 #[derive(Serialize, Deserialize, Default)]
@@ -37,7 +37,7 @@ pub struct Source {
     pub name: String,
     #[serde(rename = "isSparse")]
     pub is_sparse: String,
-    pub location: HashMap<String, f32>,
+    pub location: HashMap<String, f64>,
     #[serde(rename = "italicAngle")]
     pub italic_angle: f32,
     pub guidelines: Vec<Guideline>,
@@ -60,7 +60,7 @@ pub struct GlyphSource {
     pub name: String,
     #[serde(rename = "layerName")]
     pub layer_name: String,
-    pub location: HashMap<String, f32>,
+    pub location: HashMap<String, f64>,
 }
 
 #[derive(Serialize, Deserialize, Default)]

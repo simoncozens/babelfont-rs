@@ -56,17 +56,18 @@ pub fn load_str(s: &str, path: PathBuf) -> Result<Font, BabelfontError> {
 }
 
 fn load_master(master: &glyphs3::Master, glyphs_font: &glyphs3::Glyphs3, font: &Font) -> Master {
-    let designspace_to_location = |numbers: &[f32]| -> DesignLocation {
+    let designspace_to_location = |numbers: &[f64]| -> DesignLocation {
         numbers
             .iter()
             .zip(font.axes.iter())
             .map(|(number, axis)| (axis.tag, DesignCoord::new(*number)))
             .collect()
     };
+    let f64_axes: Vec<f64> = master.axes_values.iter().map(|x| *x as f64).collect();
     let mut m = Master {
         name: master.name.clone().into(),
         id: master.id.clone(),
-        location: designspace_to_location(&master.axes_values),
+        location: designspace_to_location(&f64_axes),
         guides: master.guides.iter().map(Into::into).collect(),
         metrics: HashMap::new(),
         kerning: HashMap::new(),
@@ -101,17 +102,17 @@ fn interpret_axes(font: &mut Font) {
                     .get(axis.tag)
                     .unwrap_or(DesignCoord::default());
                 axis.min = if axis.min.is_none() {
-                    Some(UserCoord::new(loc.to_f32()))
+                    Some(UserCoord::new(loc.to_f64()))
                 } else {
-                    axis.min.map(|v| v.min(UserCoord::new(loc.to_f32())))
+                    axis.min.map(|v| v.min(UserCoord::new(loc.to_f64())))
                 };
                 axis.max = if axis.max.is_none() {
-                    Some(UserCoord::new(loc.to_f32()))
+                    Some(UserCoord::new(loc.to_f64()))
                 } else {
-                    axis.max.map(|v| v.max(UserCoord::new(loc.to_f32())))
+                    axis.max.map(|v| v.max(UserCoord::new(loc.to_f64())))
                 };
                 if master.id == origin.id {
-                    axis.default = Some(UserCoord::new(loc.to_f32()));
+                    axis.default = Some(UserCoord::new(loc.to_f64()));
                 }
             }
         }
@@ -120,16 +121,16 @@ fn interpret_axes(font: &mut Font) {
         for axis in font.axes.iter_mut() {
             axis.default = Some(
                 axis.designspace_to_userspace(DesignCoord::new(
-                    axis.default.map(|v| v.to_f32()).unwrap_or(0.0),
+                    axis.default.map(|v| v.to_f64()).unwrap_or(0.0),
                 ))
                 .unwrap_or(UserCoord::default()),
             );
             axis.min = axis.min.map(|v| {
-                axis.designspace_to_userspace(DesignCoord::new(v.to_f32()))
+                axis.designspace_to_userspace(DesignCoord::new(v.to_f64()))
                     .unwrap_or(UserCoord::default())
             });
             axis.max = axis.max.map(|v| {
-                axis.designspace_to_userspace(DesignCoord::new(v.to_f32()))
+                axis.designspace_to_userspace(DesignCoord::new(v.to_f64()))
                     .unwrap_or(UserCoord::default())
             });
         }
@@ -203,7 +204,8 @@ fn save_master(master: &Master, axes: &[Axis], metrics: &[crate::MetricType]) ->
             master
                 .location
                 .get(axis.tag)
-                .map(|x| x.to_f32())
+                .map(|x| x.to_f64())
+                .map(|x| x as f32)
                 .unwrap_or(0.0),
         );
     }
@@ -246,7 +248,8 @@ fn save_instance(instance: &crate::Instance, axes: &[Axis]) -> glyphs3::Instance
             instance
                 .location
                 .get(axis.tag)
-                .map(|x| x.to_f32())
+                .map(|x| x.to_f64())
+                .map(|x| x as f32)
                 .unwrap_or(0.0),
         );
     }

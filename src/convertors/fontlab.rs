@@ -4,6 +4,7 @@ use crate::{
     NodeType, Path, Shape,
 };
 use fontdrasil::coords::{DesignCoord, DesignLocation, Location, UserCoord};
+use fontdrasil::types::Axes;
 use kurbo::Affine;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -260,10 +261,10 @@ struct FontlabAxis {
     tag: String,
     designMinimum: f32,
     designMaximum: f32,
-    minimum: Option<f32>,
-    maximum: Option<f32>,
-    default: Option<f32>,
-    axisGraph: Option<HashMap<String, f32>>,
+    minimum: Option<f64>,
+    maximum: Option<f64>,
+    default: Option<f64>,
+    axisGraph: Option<HashMap<String, f64>>,
 }
 
 impl From<FontlabAxis> for Axis {
@@ -278,8 +279,8 @@ impl From<FontlabAxis> for Axis {
         if let Some(map) = val.axisGraph {
             let mut axismap = vec![];
             for (left, right) in map.iter() {
-                if let Ok(l_f32) = left.parse::<f32>() {
-                    axismap.push((UserCoord::new(*right), DesignCoord::new(l_f32)));
+                if let Ok(l_f64) = left.parse::<f64>() {
+                    axismap.push((UserCoord::new(*right), DesignCoord::new(l_f64)));
                 }
             }
             axismap.sort();
@@ -332,7 +333,7 @@ struct FontlabMaster {
     lineGap: Option<i32>,
     underlineThickness: Option<i32>,
     underlinePosition: Option<i32>,
-    location: HashMap<String, f32>,
+    location: HashMap<String, f64>,
     otherData: HashMap<String, serde_json::Value>, // coward
     kerning: FontlabKerning,
 }
@@ -406,7 +407,7 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
             .push(master.fontMaster.into(&axes_short_name_to_tag));
     }
     if let Some(default_master) = fontlab.defaultMaster.and_then(|name| font.master(&name)) {
-        let new_loc = default_master.location.to_user(&HashMap::new()); // XXX Mapping
+        let new_loc = default_master.location.to_user(&Axes::new(vec![])); // XXX Mapping
         for axis in font.axes.iter_mut() {
             if let Some(val) = new_loc.get(axis.tag) {
                 axis.default = Some(val);

@@ -69,7 +69,7 @@ mod fontra {
                 location: val
                     .location
                     .iter()
-                    .map(|(k, v)| (k.to_string(), v.to_f32()))
+                    .map(|(k, v)| (k.to_string(), v.to_f64()))
                     .collect(),
                 italic_angle: 0.0,
                 guidelines: val

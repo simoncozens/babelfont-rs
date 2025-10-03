@@ -25,5 +25,5 @@ serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0.37"
 regex = "1.5.5"
-fontdrasil = "0.0.1"
-write-fonts = { version = "0.25.0" }                                           # Must use version fontdrasil uses
+fontdrasil = "0.2.3"
+write-fonts = { version = "0.43.0" }                                           # Must use version fontdrasil uses
