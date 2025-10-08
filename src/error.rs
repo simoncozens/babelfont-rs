@@ -48,8 +48,8 @@ pub enum BabelfontError {
     #[error("Could not find default master in {path}")]
     NoDefaultMaster { path: PathBuf },
 
-    #[error("Ill-defined axis!: {axis_name}")]
-    IllDefinedAxis { axis_name: String },
+    #[error("Ill-defined axis {axis_name}!: {reason}")]
+    IllDefinedAxis { axis_name: String, reason: String },
 
     #[error("Ill-constructed path")]
     BadPath,
@@ -66,3 +66,47 @@ pub enum BabelfontError {
 //         BabelfontError::General { msg: e.to_string() }
 //     }
 // }
+
+impl From<BabelfontError> for fontir::error::Error {
+    fn from(val: BabelfontError) -> Self {
+        match val {
+            BabelfontError::UnknownFileType { path } => fontir::error::BadSource::new(
+                path,
+                fontir::error::BadSourceKind::UnrecognizedExtension,
+            )
+            .into(),
+            BabelfontError::WrongConvertor { path } => fontir::error::BadSource::new(
+                path,
+                fontir::error::BadSourceKind::Custom("Wrong convertor".to_string()),
+            )
+            .into(),
+            BabelfontError::General { msg } => {
+                fontir::error::BadSource::new("Unknown", fontir::error::BadSourceKind::Custom(msg))
+                    .into()
+            }
+            BabelfontError::IO { path, source } => {
+                fontir::error::BadSource::new(path, fontir::error::BadSourceKind::Io(source)).into()
+            }
+            BabelfontError::XMLParse { orig: _, path: _ } => todo!(),
+            BabelfontError::PlistParse { source: _, path: _ } => todo!(),
+            BabelfontError::LoadingUFO { orig: _, path: _ } => todo!(),
+            BabelfontError::NoDefaultMaster { path } => fontir::error::BadSource::new(
+                path,
+                fontir::error::BadSourceKind::Custom("No default master".into()),
+            )
+            .into(),
+            BabelfontError::IllDefinedAxis {
+                axis_name,
+                reason: _,
+            } => fontir::error::Error::NoAxisDefinitions(axis_name),
+            BabelfontError::BadPath => fontir::error::BadGlyph::new(
+                fontdrasil::types::GlyphName::from("<unknown>"),
+                fontir::error::BadGlyphKind::PathConversion(
+                    fontir::error::PathConversionError::Parse("Bad path".into()),
+                ),
+            )
+            .into(),
+            BabelfontError::NeedsDecomposition => todo!(),
+        }
+    }
+}

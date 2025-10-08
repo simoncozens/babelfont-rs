@@ -5,7 +5,7 @@ use crate::{
     layer::Layer,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct GlyphList(pub Vec<Glyph>);
 impl GlyphList {
     pub fn get(&self, g: &str) -> Option<&Glyph> {

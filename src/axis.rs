@@ -31,7 +31,7 @@ impl Axis {
         }
     }
 
-    fn _converter(&self) -> Result<CoordConverter, BabelfontError> {
+    pub(crate) fn _converter(&self) -> Result<CoordConverter, BabelfontError> {
         if let Some(map) = self.map.as_ref() {
             // Find default
             let default_idx = map
@@ -39,6 +39,7 @@ impl Axis {
                 .position(|(coord, _)| Some(coord) == self.default.as_ref())
                 .ok_or_else(|| BabelfontError::IllDefinedAxis {
                     axis_name: self.name(),
+                    reason: "Default value not in map".to_string(),
                 })?;
             Ok(CoordConverter::new(map.to_vec(), default_idx))
         } else {
@@ -46,6 +47,7 @@ impl Axis {
                 self.bounds()
                     .ok_or_else(|| BabelfontError::IllDefinedAxis {
                         axis_name: self.name(),
+                        reason: "Missing min, default, or max".to_string(),
                     })?;
             Ok(CoordConverter::unmapped(min, default, max))
         }
@@ -103,6 +105,7 @@ impl TryInto<fontdrasil::types::Axis> for Axis {
                     .get_default()
                     .unwrap_or(&"Unnamed axis".to_string())
                     .to_string(),
+                reason: "Missing min, default, or max".to_string(),
             })?;
         let converter = self._converter()?;
         Ok(fontdrasil::types::Axis {
@@ -129,6 +132,7 @@ impl TryInto<fontdrasil::types::Axis> for &Axis {
                     .get_default()
                     .unwrap_or(&"Unnamed axis".to_string())
                     .to_string(),
+                reason: "Missing min, default, or max".to_string(),
             })?;
         let converter = self._converter()?;
         Ok(fontdrasil::types::Axis {

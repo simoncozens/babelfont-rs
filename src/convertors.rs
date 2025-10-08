@@ -1,3 +1,7 @@
+#[cfg(feature = "fontir")]
+/// fontc's Font Intermediate Representation (FIR) convertor
+pub mod fontir;
+
 #[cfg(feature = "ufo")]
 /// Designspace/UFO convertor
 pub mod designspace;

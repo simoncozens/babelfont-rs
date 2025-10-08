@@ -75,7 +75,12 @@ fn load_axes(font: &mut Font, axes: &[DSAxis]) -> Result<(), BabelfontError> {
         if let Some(map) = &dsax.map {
             ax.map = Some(
                 map.iter()
-                    .map(|x| (UserCoord::new(x.input as f64), DesignCoord::new(x.output as f64)))
+                    .map(|x| {
+                        (
+                            UserCoord::new(x.input as f64),
+                            DesignCoord::new(x.output as f64),
+                        )
+                    })
                     .collect(),
             );
         }
@@ -184,7 +189,9 @@ fn default_master<'a>(ds: &'a DesignSpaceDocument, axes: &[Axis]) -> Option<&'a 
     for source in ds.sources.iter() {
         let mut maybe = true;
         for loc in source.location.iter() {
-            if defaults.get(&loc.name) != loc.xvalue.map(|x| x as f64).map(DesignCoord::new).as_ref() {
+            if defaults.get(&loc.name)
+                != loc.xvalue.map(|x| x as f64).map(DesignCoord::new).as_ref()
+            {
                 maybe = false;
                 break;
             }

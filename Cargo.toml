@@ -9,15 +9,16 @@ uuid = { version = "1.11.0", features = ["v4"] }
 uuid = { version = "1.11.0", features = ["v4", "js"] }
 
 [features]
-default = ["glyphs", "ufo", "fontlab", "fontra"]
+default = ["glyphs", "ufo", "fontlab", "fontra", "fontir"]
 glyphs = ["dep:glyphslib"]
 ufo = ["dep:norad"]
 fontra = []
 fontlab = []
+fontir = ["dep:fontir", "dep:smol_str"]
 
 [dependencies]
 chrono = { version = "0.4.3" }
-kurbo = "0.8"
+kurbo = "0.12"
 glyphslib = { git = "https://github.com/simoncozens/glyphslib-rs", optional = true }
 norad = { version = "0.14.0", features = ["rayon", "kurbo"], optional = true }
 log = "0.4.14"
@@ -25,5 +26,8 @@ serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0.37"
 regex = "1.5.5"
-fontdrasil = "0.2.3"
+fontdrasil = {version = "0.2.3", path = "/home/simon/others-repos/fontc/fontdrasil" }
+fontir = { version = "0.3.1", optional = true ,path = "/home/simon/others-repos/fontc/fontir" }
 write-fonts = { version = "0.43.0" }                                           # Must use version fontdrasil uses
+smol_str = { version = "0.2.0", features = ["serde"], optional = true }
+ordered-float = "4.6.0"
