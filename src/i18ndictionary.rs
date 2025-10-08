@@ -18,6 +18,10 @@ impl I18NDictionary {
     pub fn set_default(&mut self, s: String) {
         self.0.insert(DFLT.to_string(), s);
     }
+
+    pub fn insert(&mut self, lang: String, s: String) {
+        self.0.insert(lang, s);
+    }
 }
 
 impl Debug for I18NDictionary {
@@ -54,5 +58,11 @@ impl From<&String> for I18NDictionary {
         let mut f = I18NDictionary::new();
         f.0.insert(DFLT.to_string(), val.to_string());
         f
+    }
+}
+
+impl From<I18NDictionary> for HashMap<String, String> {
+    fn from(dict: I18NDictionary) -> Self {
+        dict.0
     }
 }
