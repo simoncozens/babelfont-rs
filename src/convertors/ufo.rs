@@ -27,10 +27,9 @@ pub(crate) fn stat(path: &std::path::Path) -> Option<DateTime<chrono::Local>> {
 pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
     let mut font = Font::new();
     let created_time: Option<DateTime<Local>> = stat(&path);
-    #[warn(clippy::unwrap_used)]
     let ufo = norad::Font::load(&path).map_err(|e| BabelfontError::LoadingUFO {
         orig: Box::new(e),
-        path: path.into_os_string().into_string().unwrap(),
+        path: path.into_os_string().into_string().unwrap_or_default(),
     })?;
     load_glyphs(&mut font, &ufo);
     let info = &ufo.font_info;

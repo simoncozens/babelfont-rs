@@ -1,7 +1,7 @@
-use crate::{Component, Font, Layer, MetricType, NodeType, Path, Shape};
+use crate::{Component, Font, Layer, MetricType, NodeType, Shape};
 use fontdrasil::{
     coords::NormalizedCoord,
-    coords::{DesignCoord, DesignLocation, NormalizedLocation, UserCoord},
+    coords::NormalizedLocation,
     orchestration::{Access, AccessBuilder, Work},
     types::GlyphName,
 };
@@ -105,7 +105,7 @@ impl Source for BabelfontIrSource {
         &self,
     ) -> Result<Box<fontir::orchestration::IrWork>, fontir::error::Error> {
         Ok(Box::new(ColorPaletteWork {
-            font_info: self.font_info.clone(),
+            _font_info: self.font_info.clone(),
         }))
     }
 
@@ -782,6 +782,7 @@ impl Work<Context, WorkId, Error> for FeatureWork {
         let font_info = self.font_info.as_ref();
         let font = &font_info.font;
 
+        #[warn(clippy::unwrap_used)]
         context.features.set(to_ir_features(
             &font.features,
             self.font_file_path.as_ref().map(|path| {
@@ -866,13 +867,13 @@ impl Work<Context, WorkId, Error> for KerningGroupWork {
         for (group, members) in font.first_kern_groups.iter() {
             groups.groups.insert(
                 KernGroup::Side1(group.into()),
-                members.iter().map(|m| GlyphName::new(&m)).collect(),
+                members.iter().map(GlyphName::new).collect(),
             );
         }
         for (group, members) in font.second_kern_groups.iter() {
             groups.groups.insert(
                 KernGroup::Side2(group.into()),
-                members.iter().map(|m| GlyphName::new(&m)).collect(),
+                members.iter().map(GlyphName::new).collect(),
             );
         }
 
@@ -1134,7 +1135,7 @@ impl Work<Context, WorkId, Error> for GlyphIrWork {
         let master_ids = font.masters.iter().map(|m| (m.id.clone(), m)).collect::<HashMap<_,_>>();
         for layer in layers.iter() {
             let master_id = &layer.id;
-            let master = master_id.as_ref().map(|id| master_ids.get(id)).flatten();
+            let master = master_id.as_ref().and_then(|id| master_ids.get(id));
             let Some(design_location) = layer.location.as_ref().or_else(|| {
                 master.map(|m| &m.location)
             }) else { continue };
@@ -1253,7 +1254,7 @@ fn process_layer(
 
 #[derive(Debug)]
 struct ColorPaletteWork {
-    font_info: Arc<FontInfo>,
+    _font_info: Arc<FontInfo>,
 }
 
 impl Work<Context, WorkId, Error> for ColorPaletteWork {
@@ -1365,14 +1366,15 @@ fn to_ir_path(
 
     // First is a delicate butterfly
     if !src_path.closed {
-        let first = src_path.nodes.first().unwrap();
-        if first.nodetype == NodeType::OffCurve {
-            return Err(PathConversionError::Parse(
-                "Open path starts with off-curve points".into(),
-            ));
+        if let Some(first) = src_path.nodes.first() {
+            if first.nodetype == NodeType::OffCurve {
+                return Err(PathConversionError::Parse(
+                    "Open path starts with off-curve points".into(),
+                ));
+            }
+            path_builder.move_to((first.x, first.y))?;
+            add_to_path(&mut path_builder, src_path.nodes[1..].iter())?;
         }
-        path_builder.move_to((first.x, first.y))?;
-        add_to_path(&mut path_builder, src_path.nodes[1..].iter())?;
     } else if src_path
         .nodes
         .iter()

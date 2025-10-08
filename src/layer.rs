@@ -127,8 +127,11 @@ impl Layer {
                     Some(g) => g,
                     None => continue,
                 };
-                #[warn(clippy::unwrap_used)]
-                let new_outline = match referenced_glyph.get_layer(self.id.as_ref().unwrap()) {
+                let new_outline = match self
+                    .id
+                    .as_ref()
+                    .and_then(|id| referenced_glyph.get_layer(id))
+                {
                     Some(g) => g,
                     None => continue,
                 };

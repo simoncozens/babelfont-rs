@@ -121,7 +121,7 @@ impl From<FontlabShape> for Vec<Shape> {
     }
 }
 
-#[allow(non_snake_case)]
+#[allow(non_snake_case, dead_code)]
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
 enum FontlabTransform {

@@ -89,6 +89,7 @@ fn load_axes(font: &mut Font, axes: &[DSAxis]) -> Result<(), BabelfontError> {
     Ok(())
 }
 
+#[allow(dead_code)]
 pub(crate) fn load_instances(_font: &mut Font, _instances: &[DSInstance]) {
     // unimplemented!()
 }
