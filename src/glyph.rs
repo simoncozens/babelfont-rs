@@ -73,15 +73,59 @@ mod glyphs {
 
     impl From<&G3Glyph> for Glyph {
         fn from(val: &G3Glyph) -> Self {
+            let mut formatspecific = FormatSpecific::default();
+            formatspecific.insert("case".to_string(), val.case.clone().into());
+            formatspecific.insert("kern_direction".to_string(), val.direction.clone().into());
+            formatspecific.insert("kern_bottom".to_string(), val.kern_bottom.clone().into());
+            formatspecific.insert("kern_left".to_string(), val.kern_left.clone().into());
+            formatspecific.insert("kern_right".to_string(), val.kern_right.clone().into());
+            formatspecific.insert("kern_top".to_string(), val.kern_top.clone().into());
+            formatspecific.insert("last_change".to_string(), val.last_change.clone().into());
+            formatspecific.insert("locked".to_string(), val.locked.into());
+            formatspecific.insert(
+                "metric_bottom".to_string(),
+                val.metric_bottom.clone().into(),
+            );
+            formatspecific.insert("metric_left".to_string(), val.metric_left.clone().into());
+            formatspecific.insert("metric_right".to_string(), val.metric_right.clone().into());
+            formatspecific.insert("metric_top".to_string(), val.metric_top.clone().into());
+            formatspecific.insert(
+                "metric_vert_width".to_string(),
+                val.metric_vert_width.clone().into(),
+            );
+            formatspecific.insert("metric_width".to_string(), val.metric_width.clone().into());
+            formatspecific.insert("note".to_string(), val.note.clone().into());
+            formatspecific.insert("script".to_string(), val.script.clone().into());
+            formatspecific.insert("subcategory".to_string(), val.subcategory.clone().into());
+            formatspecific.insert(
+                "tags".to_string(),
+                serde_json::value::to_value(&val.tags).unwrap_or_default(),
+            );
+            let category = if let Some(cat) = &val.category {
+                match cat.as_str() {
+                    "Base" => GlyphCategory::Base,
+                    "Mark" => {
+                        if val.subcategory == Some("Nonspacing".to_string()) {
+                            GlyphCategory::Mark
+                        } else {
+                            GlyphCategory::Base
+                        }
+                    }
+                    "Ligature" => GlyphCategory::Ligature,
+                    _ => GlyphCategory::Unknown,
+                }
+            } else {
+                GlyphCategory::Unknown
+            };
             Glyph {
                 name: val.name.clone(),
                 production_name: val.production.clone(),
-                category: GlyphCategory::Unknown, // XXX
+                category,
                 codepoints: val.unicode.clone(),
                 layers: val.layers.iter().map(Into::into).collect(),
                 exported: val.export,
                 direction: None,
-                formatspecific: Default::default(), // XXX
+                formatspecific,
             }
         }
     }

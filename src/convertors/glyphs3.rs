@@ -58,7 +58,20 @@ pub fn load_str(s: &str, path: PathBuf) -> Result<Font, BabelfontError> {
         .collect();
     // Copy metadata
     load_metadata(&mut font, glyphs_font);
-    // Copy kerning
+    // Copy kern groups
+    for glyph in font.glyphs.iter() {
+        let left_group = glyph.formatspecific.get_string("kern_left");
+        font.second_kern_groups
+            .entry(left_group)
+            .or_default()
+            .push(glyph.name.clone());
+
+        let right_group = glyph.formatspecific.get_string("kern_right");
+        font.first_kern_groups
+            .entry(right_group)
+            .or_default()
+            .push(glyph.name.clone());
+    }
     // Interpret metrics
     // Interpret axes
     interpret_axes(&mut font);
