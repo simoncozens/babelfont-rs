@@ -1,6 +1,6 @@
 use crate::{
     axis::Axis,
-    common::{OTScalar, OTValue},
+    common::{FormatSpecific, OTScalar, OTValue},
     glyph::GlyphList,
     instance::Instance,
     master::Master,
@@ -8,9 +8,9 @@ use crate::{
     BabelfontError, Layer, MetricType,
 };
 use chrono::Local;
-use fontdrasil::{coords::{
+use fontdrasil::coords::{
     DesignCoord, DesignLocation, Location, NormalizedLocation, NormalizedSpace, UserCoord,
-}, types::Axes};
+};
 use std::collections::{BTreeMap, HashMap};
 use write_fonts::types::Tag;
 
@@ -32,6 +32,8 @@ pub struct Font {
     pub features: Option<String>,
     pub first_kern_groups: HashMap<String, Vec<String>>,
     pub second_kern_groups: HashMap<String, Vec<String>>,
+
+    pub format_specific: FormatSpecific,
 }
 impl Default for Font {
     fn default() -> Self {
@@ -56,6 +58,7 @@ impl Font {
             first_kern_groups: HashMap::new(),
             second_kern_groups: HashMap::new(),
             features: None,
+            format_specific: FormatSpecific::default(),
         }
     }
 
@@ -140,6 +143,12 @@ impl Font {
             .copied()
     }
 
+    pub(crate) fn fontdrasil_axes(&self) -> Result<fontdrasil::types::Axes, BabelfontError> {
+        let axes: Result<Vec<fontdrasil::types::Axis>, _> =
+            self.axes.iter().map(|ax| ax.clone().try_into()).collect();
+        Ok(fontdrasil::types::Axes::new(axes?))
+    }
+
     /// Normalizes a location between -1.0 and 1.0
     pub fn normalize_location<Space>(
         &self,
@@ -148,15 +157,7 @@ impl Font {
     where
         Space: fontdrasil::coords::ConvertSpace<NormalizedSpace>,
     {
-        let axes: Result<Vec<fontdrasil::types::Axis>, _> = self
-            .axes
-            .iter()
-            .map(|ax| {
-               ax.clone().try_into()
-            })
-            .collect();
-        let fontrdasil_axes = Axes::new(axes?);
-        Ok(loc.convert(&fontrdasil_axes))
+        Ok(loc.convert(&self.fontdrasil_axes()?))
     }
 
     // fn axis_order(&self) -> Vec<Tag> {

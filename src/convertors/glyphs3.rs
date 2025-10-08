@@ -1,4 +1,10 @@
-use crate::{Axis, BabelfontError, Font, GlyphList, Master};
+use crate::{
+    common::{FormatSpecific, OTValue},
+    i18ndictionary::I18NDictionary,
+    names::Names,
+    Axis, BabelfontError, Font, GlyphList, Master,
+};
+use chrono::Local;
 use fontdrasil::coords::{DesignCoord, DesignLocation, UserCoord};
 use glyphslib::glyphs3;
 use std::{collections::HashMap, fs, path::PathBuf, str::FromStr};
@@ -45,14 +51,131 @@ pub fn load_str(s: &str, path: PathBuf) -> Result<Font, BabelfontError> {
     font.glyphs = GlyphList(glyphs_font.glyphs.iter().map(Into::into).collect());
 
     // Copy instances
+    font.instances = glyphs_font
+        .instances
+        .iter()
+        .map(|i| load_instance(&font, i))
+        .collect();
     // Copy metadata
-    font.names.family_name = glyphs_font.family_name.clone().into();
+    load_metadata(&mut font, glyphs_font);
     // Copy kerning
     // Interpret metrics
     // Interpret axes
     interpret_axes(&mut font);
 
     Ok(font)
+}
+
+fn load_instance(font: &Font, instance: &glyphs3::Instance) -> crate::Instance {
+    let designspace_to_location = |numbers: &[f32]| -> DesignLocation {
+        numbers
+            .iter()
+            .zip(font.axes.iter())
+            .map(|(number, axis)| (axis.tag, DesignCoord::new(*number as f64)))
+            .collect()
+    };
+    let mut format_specific = FormatSpecific::default();
+    if let Some(weight_class) = instance.weight_class.as_ref().and_then(|x| x.as_i64()) {
+        format_specific.insert("weightClass".into(), weight_class.into());
+    }
+    if let Some(width_class) = instance.width_class.as_ref().and_then(|x| x.as_i64()) {
+        format_specific.insert("widthClass".into(), width_class.into());
+    }
+    crate::Instance {
+        name: I18NDictionary::from(&instance.name),
+        location: designspace_to_location(&instance.axes_values),
+        custom_names: Names::new(), // TODO instance.custom_names.clone().into(),
+        variable: instance.export_type == glyphslib::glyphs3::ExportType::Variable,
+        format_specific,
+    }
+}
+
+fn load_metadata(font: &mut Font, glyphs_font: &glyphs3::Glyphs3) {
+    font.names.family_name = glyphs_font.family_name.clone().into();
+    font.upm = glyphs_font.units_per_em as u16;
+    font.version = (
+        glyphs_font.version.major as u16,
+        glyphs_font.version.minor as u16,
+    );
+    for property in glyphs_font.properties.iter() {
+        match property {
+            glyphs3::Property::SingularProperty { key, value } => {
+                match key {
+                    glyphs3::SingularPropertyKey::Designer => {
+                        font.names.designer = I18NDictionary::from(value)
+                    }
+                    glyphs3::SingularPropertyKey::Manufacturer => {
+                        font.names.manufacturer = I18NDictionary::from(value)
+                    }
+                    glyphs3::SingularPropertyKey::DesignerUrl => {
+                        font.names.designer_url = I18NDictionary::from(value)
+                    }
+                    glyphs3::SingularPropertyKey::ManufacturerUrl => {
+                        font.names.manufacturer_url = I18NDictionary::from(value);
+                    }
+                    glyphs3::SingularPropertyKey::LicenseUrl => {
+                        font.names.license_url = I18NDictionary::from(value)
+                    }
+                    glyphs3::SingularPropertyKey::PostscriptFullName => {
+                        font.names.postscript_name = I18NDictionary::from(value)
+                    }
+                    glyphs3::SingularPropertyKey::PostscriptFontName => {
+                        //     font.names.postscript_font_name = I18NDictionary::from(value)
+                    }
+                    glyphs3::SingularPropertyKey::WwsFamilyName => {
+                        font.names.wws_family_name = I18NDictionary::from(value)
+                    }
+                    glyphs3::SingularPropertyKey::VersionString => {
+                        font.names.version = I18NDictionary::from(value)
+                    }
+                    glyphs3::SingularPropertyKey::VendorID => font.custom_ot_values.push(OTValue {
+                        table: "OS/2".into(),
+                        field: "achVendID".into(),
+                        value: crate::OTScalar::StringType(value.clone()),
+                    }),
+                    glyphs3::SingularPropertyKey::UniqueID => {
+                        font.names.unique_id = I18NDictionary::from(value)
+                    }
+                }
+            }
+            glyphs3::Property::LocalizedProperty { key, values } => {
+                let value = I18NDictionary::new();
+                for _localized_value in values.iter() {
+                    // value.insert(
+                    //     localized_value.language.clone(),
+                    //     localized_value.value.clone(),
+                    // );
+                }
+                match key {
+                    glyphs3::LocalizedPropertyKey::FamilyNames => font.names.family_name = value,
+                    glyphs3::LocalizedPropertyKey::Copyrights => font.names.copyright = value,
+                    glyphs3::LocalizedPropertyKey::Designers => font.names.designer = value,
+                    glyphs3::LocalizedPropertyKey::Manufacturers => font.names.manufacturer = value,
+                    glyphs3::LocalizedPropertyKey::Licenses => font.names.license = value,
+                    glyphs3::LocalizedPropertyKey::Trademarks => font.names.trademark = value,
+                    glyphs3::LocalizedPropertyKey::Descriptions => font.names.description = value,
+                    glyphs3::LocalizedPropertyKey::SampleTexts => font.names.sample_text = value,
+                    glyphs3::LocalizedPropertyKey::CompatibleFullNames => {
+                        font.names.compatible_full_name = value
+                    }
+                    glyphs3::LocalizedPropertyKey::StyleNames => {
+                        font.names.typographic_subfamily = value;
+                    }
+                }
+            }
+            glyphs3::Property::Junk(_plist) => unreachable!(),
+        }
+
+        font.note = Some(glyphs_font.note.clone());
+        font.date = glyphs_font.date.parse().unwrap_or_else(|_| Local::now());
+
+        // Copy custom parameters
+        for cp in glyphs_font.custom_parameters.iter() {
+            if let Ok(value) = serde_json::to_value(&cp.value) {
+                font.format_specific.insert(cp.name.clone(), value);
+            }
+        }
+    }
 }
 
 fn load_master(master: &glyphs3::Master, glyphs_font: &glyphs3::Glyphs3, font: &Font) -> Master {
@@ -93,46 +216,139 @@ fn interpret_axes(font: &mut Font) {
     // This is going to look very wrong, but after much trial and error I can confirm
     // it works. First: load the axes assuming that userspace=designspace. Then
     // work out the axis mappings. Then apply the mappings to the axis locations.
-    if let Some(origin) = font.masters.first() {
-        // XXX *or* custom parameter Variable Font Origin
-        for master in font.masters.iter() {
-            for axis in font.axes.iter_mut() {
-                let loc = master
-                    .location
-                    .get(axis.tag)
-                    .unwrap_or(DesignCoord::default());
-                axis.min = if axis.min.is_none() {
-                    Some(UserCoord::new(loc.to_f64()))
-                } else {
-                    axis.min.map(|v| v.min(UserCoord::new(loc.to_f64())))
-                };
-                axis.max = if axis.max.is_none() {
-                    Some(UserCoord::new(loc.to_f64()))
-                } else {
-                    axis.max.map(|v| v.max(UserCoord::new(loc.to_f64())))
-                };
-                if master.id == origin.id {
-                    axis.default = Some(UserCoord::new(loc.to_f64()));
+
+    let origin: &Master = font.masters.first().unwrap_or_else(|| {
+        font.format_specific
+            .get("Variable Font Origin")
+            .and_then(|x| x.as_str())
+            .and_then(|id| font.masters.iter().find(|m| m.id == id))
+            .unwrap_or(&font.masters[0])
+    });
+    for master in font.masters.iter() {
+        for axis in font.axes.iter_mut() {
+            let loc = master
+                .location
+                .get(axis.tag)
+                .unwrap_or(DesignCoord::default());
+            axis.min = if axis.min.is_none() {
+                Some(UserCoord::new(loc.to_f64()))
+            } else {
+                axis.min.map(|v| v.min(UserCoord::new(loc.to_f64())))
+            };
+            axis.max = if axis.max.is_none() {
+                Some(UserCoord::new(loc.to_f64()))
+            } else {
+                axis.max.map(|v| v.max(UserCoord::new(loc.to_f64())))
+            };
+            if master.id == origin.id {
+                axis.default = Some(UserCoord::new(loc.to_f64()));
+            }
+        }
+    }
+    interpret_axis_mappings(font);
+
+    // Now treat as designspace and to userspace
+    for axis in font.axes.iter_mut() {
+        if let Some(map) = &axis.map {
+            axis.default = map
+                .iter()
+                .find(|(_, design)| Some(design.to_f64()) == axis.default.map(|x| x.to_f64()))
+                .map(|(user, _)| *user);
+            axis.min = map.iter().map(|(user, _)| *user).min();
+            axis.max = map.iter().map(|(user, _)| *user).max();
+        }
+    }
+}
+
+fn interpret_axis_mappings(font: &mut Font) {
+    if let Some(mappings) = font
+        .format_specific
+        .get("Axis Mappings")
+        .and_then(|x| x.as_object())
+    {
+        for (tagstr, map) in mappings {
+            if let Ok(tag) = Tag::from_str(tagstr) {
+                if let Some(axis) = font.axes.iter_mut().find(|a| a.tag == tag) {
+                    if let Some(map) = map.as_array() {
+                        let mut axis_map: Vec<(UserCoord, DesignCoord)> = vec![];
+                        for pair in map {
+                            if let Some(pair) = pair.as_array() {
+                                if pair.len() == 2 {
+                                    if let (Some(user), Some(design)) =
+                                        (pair[0].as_f64(), pair[1].as_f64())
+                                    {
+                                        axis_map
+                                            .push((UserCoord::new(user), DesignCoord::new(design)));
+                                    }
+                                }
+                            }
+                        }
+                        axis.map = Some(axis_map);
+                    }
                 }
             }
         }
-        // XXX find axis mappings here
+    }
+    for instance in font.instances.iter() {
+        // The Axis Location custom parameter is in userspace, use this to make the map
+        let c = instance
+            .format_specific
+            .get("Axis Location")
+            .and_then(|x| x.as_array());
+        let empty = &vec![];
+        let c = c.unwrap_or(empty);
+        let mut c_pairs: Vec<(&str, f64)> = vec![];
+        for pair in c {
+            if let Some(pair) = pair.as_object() {
+                if let (Some(axis), Some(location)) = (
+                    pair.get("Axis").and_then(|x| x.as_str()),
+                    pair.get("Location").and_then(|x| x.as_f64()),
+                ) {
+                    c_pairs.push((axis, location));
+                }
+            }
+        }
+        if c_pairs.is_empty() {
+            if let Some(weightclass) = instance
+                .format_specific
+                .get("weightClass")
+                .and_then(|x| x.as_f64())
+            {
+                c_pairs.push(("Weight", weightclass));
+            }
+            if let Some(widthclass) = instance
+                .format_specific
+                .get("widthClass")
+                .and_then(|x| x.as_f64())
+            {
+                c_pairs.push(("Width", widthclass));
+            }
+        }
+        if c_pairs.is_empty() {
+            if instance.name.get_default() == Some(&"Regular".to_string()) {
+                c_pairs.push(("Weight", 400.0));
+                c_pairs.push(("Width", 100.0));
+            } else if instance.name.get_default() == Some(&"Bold".to_string()) {
+                c_pairs.push(("Weight", 700.0));
+                c_pairs.push(("Width", 100.0));
+            }
+        }
 
-        for axis in font.axes.iter_mut() {
-            axis.default = Some(
-                axis.designspace_to_userspace(DesignCoord::new(
-                    axis.default.map(|v| v.to_f64()).unwrap_or(0.0),
-                ))
-                .unwrap_or(UserCoord::default()),
-            );
-            axis.min = axis.min.map(|v| {
-                axis.designspace_to_userspace(DesignCoord::new(v.to_f64()))
-                    .unwrap_or(UserCoord::default())
-            });
-            axis.max = axis.max.map(|v| {
-                axis.designspace_to_userspace(DesignCoord::new(v.to_f64()))
-                    .unwrap_or(UserCoord::default())
-            });
+        for (axis_name, user_location) in c_pairs {
+            if let Some(axis) = font
+                .axes
+                .iter_mut()
+                .find(|a| a.name.get_default().map(|x| x.as_str()) == Some(axis_name))
+            {
+                if let Some(design_location) = instance.location.get(axis.tag) {
+                    if axis.map.is_none() {
+                        axis.map = Some(vec![]);
+                    }
+                    if let Some(axis_map) = &mut axis.map {
+                        axis_map.push((UserCoord::new(user_location), design_location));
+                    }
+                }
+            }
         }
     }
 }
@@ -305,5 +521,62 @@ mod tests {
             backagain.to_string().unwrap(),
         )
         .unwrap();
+    }
+
+    #[test]
+    fn test_load_open_shape() {
+        let font = load("resources/GlyphsFileFormatv3.glyphs".into()).unwrap();
+        let shape = &font.glyphs.get("A").unwrap().layers[1].shapes[0];
+        match shape {
+            Shape::PathShape(p) => assert!(!p.closed),
+            _ => panic!("Expected a path shape"),
+        }
+    }
+
+    #[test]
+    fn test_designspace() {
+        let font = load("resources/Designspace.glyphs".into()).unwrap();
+        assert_eq!(font.axes.len(), 1);
+        assert_eq!(font.axes[0].name.get_default().unwrap(), "Weight");
+        assert_eq!(font.axes[0].tag, Tag::new(b"wght"));
+
+        assert!(font.axes[0].map.is_some());
+        // Axes values are in userspace units
+        assert_eq!(font.axes[0].min.unwrap().to_f64(), 100.0);
+        assert_eq!(font.axes[0].max.unwrap().to_f64(), 600.0);
+        // Master locations are in designspace units
+        assert_eq!(
+            font.masters[0]
+                .location
+                .get(Tag::new(b"wght"))
+                .unwrap()
+                .to_f64(),
+            1.0
+        );
+        assert_eq!(
+            font.masters[1]
+                .location
+                .get(Tag::new(b"wght"))
+                .unwrap()
+                .to_f64(),
+            199.0
+        );
+        // Instance locations are in designspace units
+        assert_eq!(
+            font.instances[0]
+                .location
+                .get(Tag::new(b"wght"))
+                .unwrap()
+                .to_f64(),
+            1.0
+        );
+        assert_eq!(
+            font.instances[1]
+                .location
+                .get(Tag::new(b"wght"))
+                .unwrap()
+                .to_f64(),
+            7.0
+        );
     }
 }
