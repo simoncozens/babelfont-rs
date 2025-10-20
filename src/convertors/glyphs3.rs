@@ -497,6 +497,8 @@ fn save_instance(instance: &crate::Instance, axes: &[Axis]) -> glyphs3::Instance
 mod tests {
     #![allow(clippy::unwrap_used)]
     use crate::Shape;
+    use pretty_assertions::assert_eq;
+    use similar::TextDiff;
 
     use super::*;
 
@@ -529,11 +531,26 @@ mod tests {
     fn test_roundtrip() {
         let there = load("resources/RadioCanadaDisplay.glyphs".into()).unwrap();
         let backagain = glyphslib::Font::Glyphs3(as_glyphs3(&there));
-        fs::write(
-            "resources/output/RadioCanadaDisplay.glyphs",
-            backagain.to_string().unwrap(),
+        let orig = glyphslib::Font::load_str(
+            &fs::read_to_string("resources/RadioCanadaDisplay.glyphs").unwrap(),
         )
         .unwrap();
+        let old_string = orig.to_string().unwrap();
+        let new_string = backagain.to_string().unwrap();
+        let diff = TextDiff::from_lines(&old_string, &new_string);
+        let text_diff = diff.unified_diff().to_string();
+        println!("Diff between original and roundtrip:\n{}", text_diff);
+        // for change in diff.iter_all_changes() {
+        //     let sign = match change.tag() {
+        //         ChangeTag::Delete => "-",
+        //         ChangeTag::Insert => "+",
+        //         ChangeTag::Equal => " ",
+        //     };
+        //     print!("{}{}", sign, change);
+        // }
+        if diff.ratio() < 1.0 {
+            panic!("Roundtrip produced different output");
+        }
     }
 
     #[test]
