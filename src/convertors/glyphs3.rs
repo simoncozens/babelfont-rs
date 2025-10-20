@@ -7,8 +7,18 @@ use crate::{
 use chrono::Local;
 use fontdrasil::coords::{DesignCoord, DesignLocation, UserCoord};
 use glyphslib::glyphs3;
-use std::{collections::HashMap, fs, path::PathBuf, str::FromStr};
+use smol_str::SmolStr;
+use std::{
+    collections::{BTreeMap, HashMap},
+    fs,
+    path::PathBuf,
+    str::FromStr,
+};
 use write_fonts::types::Tag;
+
+pub(crate) type UserData = BTreeMap<SmolStr, glyphslib::Plist>;
+
+const KEY_PREFIX: &str = "com.schriftgestalt.Glyphs.";
 
 pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
     log::debug!("Reading to string");
@@ -93,6 +103,9 @@ fn load_instance(font: &Font, instance: &glyphs3::Instance) -> crate::Instance {
     }
     if let Some(width_class) = instance.width_class.as_ref().and_then(|x| x.as_i64()) {
         format_specific.insert("widthClass".into(), width_class.into());
+    }
+    if !instance.exports {
+        format_specific.insert("exports".into(), serde_json::Value::Bool(false));
     }
     crate::Instance {
         name: I18NDictionary::from(&instance.name),
@@ -187,6 +200,18 @@ fn load_metadata(font: &mut Font, glyphs_font: &glyphs3::Glyphs3) {
             if let Ok(value) = serde_json::to_value(&cp.value) {
                 font.format_specific.insert(cp.name.clone(), value);
             }
+        }
+        if !glyphs_font.user_data.is_empty() {
+            font.format_specific.insert(
+                "userData".into(),
+                serde_json::to_value(&glyphs_font.user_data).unwrap_or(serde_json::Value::Null),
+            );
+        }
+        if !glyphs_font.stems.is_empty() {
+            font.format_specific.insert(
+                "stems".into(),
+                serde_json::to_value(&glyphs_font.stems).unwrap_or(serde_json::Value::Null),
+            );
         }
     }
 }
@@ -417,6 +442,16 @@ pub(crate) fn as_glyphs3(font: &Font) -> glyphs3::Glyphs3 {
             major: font.version.0.into(),
             minor: font.version.1.into(),
         },
+        user_data: font
+            .format_specific
+            .get("userData")
+            .and_then(|x| serde_json::from_value::<UserData>(x.clone()).ok())
+            .unwrap_or_default(),
+        stems: font
+            .format_specific
+            .get("stems")
+            .and_then(|x| serde_json::from_value::<Vec<glyphs3::Stem>>(x.clone()).ok())
+            .unwrap_or_default(),
         ..Default::default() // Stuff we should probably get to one day
     };
     // Save kerning
@@ -482,6 +517,7 @@ fn save_instance(instance: &crate::Instance, axes: &[Axis]) -> glyphs3::Instance
                 .unwrap_or(0.0),
         );
     }
+    let formatspecific = &instance.format_specific;
     glyphs3::Instance {
         name: instance
             .name
@@ -489,6 +525,18 @@ fn save_instance(instance: &crate::Instance, axes: &[Axis]) -> glyphs3::Instance
             .map(|x| x.to_string())
             .unwrap_or_default(),
         axes_values,
+        weight_class: formatspecific
+            .get("weightClass")
+            .and_then(|x| x.as_i64())
+            .map(glyphslib::Plist::Integer),
+        width_class: formatspecific
+            .get("widthClass")
+            .and_then(|x| x.as_i64())
+            .map(glyphslib::Plist::Integer),
+        exports: formatspecific
+            .get("exports")
+            .and_then(|x| x.as_bool())
+            .unwrap_or(true),
         ..Default::default()
     }
 }

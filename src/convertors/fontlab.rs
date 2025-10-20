@@ -1,18 +1,15 @@
-use crate::common::tag_from_string;
 use crate::{
-    Anchor, Axis, BabelfontError, Component, Font, Glyph, GlyphCategory, Layer, Master, Node,
-    NodeType, Path, Shape,
+    common::tag_from_string, Anchor, Axis, BabelfontError, Component, Font, Glyph, GlyphCategory,
+    Layer, Master, Node, NodeType, Path, Shape,
 };
-use fontdrasil::coords::{DesignCoord, DesignLocation, Location, UserCoord};
-use fontdrasil::types::Axes;
+use fontdrasil::{
+    coords::{DesignCoord, DesignLocation, Location, UserCoord},
+    types::Axes,
+};
 use kurbo::Affine;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::convert::TryInto;
-use std::fs;
-use std::path::PathBuf;
-use std::sync::LazyLock;
+use std::{collections::HashMap, convert::TryInto, fs, path::PathBuf, sync::LazyLock};
 use write_fonts::types::Tag;
 
 fn to_point(s: String) -> Result<(f32, f32), BabelfontError> {
@@ -73,6 +70,7 @@ fn nodestring_to_nodes(s: String) -> Vec<Node> {
                     x: mat[1].parse().unwrap(),
                     y: mat[2].parse().unwrap(),
                     nodetype,
+                    smooth: false, // XXX
                 })
             } else {
                 None
@@ -208,6 +206,7 @@ impl FontlabLayer {
             is_background: false,
             background_layer_id: None,
             location: None,
+            format_specific: Default::default(),
         })
     }
 }

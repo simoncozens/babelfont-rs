@@ -1,11 +1,14 @@
 use crate::{
-    anchor::Anchor, common::Color, guide::Guide, shape::Shape, BabelfontError, Component, Font,
-    Node, Path,
+    anchor::Anchor,
+    common::{Color, FormatSpecific},
+    guide::Guide,
+    shape::Shape,
+    BabelfontError, Component, Font, Node, Path,
 };
 use fontdrasil::coords::DesignLocation;
 use kurbo::Shape as KurboShape;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Layer {
     pub width: f32,
     pub name: Option<String>,
@@ -18,22 +21,14 @@ pub struct Layer {
     pub is_background: bool,
     pub background_layer_id: Option<String>,
     pub location: Option<DesignLocation>,
+    pub format_specific: FormatSpecific,
 }
 
 impl Layer {
     pub fn new(width: f32) -> Layer {
         Layer {
             width,
-            name: None,
-            id: None,
-            guides: vec![],
-            shapes: vec![],
-            anchors: vec![],
-            color: None,
-            layer_index: None,
-            is_background: false,
-            background_layer_id: None,
-            location: None,
+            ..Default::default()
         }
     }
 
@@ -113,6 +108,7 @@ impl Layer {
                 .cloned()
                 .chain(decomposed_shapes)
                 .collect(),
+            format_specific: self.format_specific.clone(),
         }
     }
 
@@ -144,6 +140,7 @@ impl Layer {
                             x: new_point.x as f32,
                             y: new_point.y as f32,
                             nodetype: node.nodetype,
+                            smooth: node.smooth,
                         })
                     }
                     decomposed_contour.closed = contour.closed;
@@ -190,10 +187,25 @@ impl Layer {
 mod glyphs {
     use std::collections::BTreeMap;
 
+    use crate::convertors::glyphs3::UserData;
+
     use super::*;
 
     impl From<&glyphslib::glyphs3::Layer> for Layer {
         fn from(val: &glyphslib::glyphs3::Layer) -> Self {
+            let format_specific = {
+                let mut fs = FormatSpecific::default();
+                if !val.visible {
+                    fs.insert("visible".into(), serde_json::Value::Bool(false));
+                }
+                if !val.user_data.is_empty() {
+                    fs.insert(
+                        "userData".into(),
+                        serde_json::to_value(&val.user_data).unwrap_or_default(),
+                    );
+                }
+                fs
+            };
             Layer {
                 id: Some(val.layer_id.clone()),
                 name: val.name.clone(),
@@ -206,6 +218,7 @@ mod glyphs {
                 is_background: false,
                 background_layer_id: None,
                 location: None,
+                format_specific,
             }
         }
     }
@@ -233,10 +246,18 @@ mod glyphs {
                 metric_vert_width: None,
                 metric_width: None,
                 part_selection: BTreeMap::new(),
-                user_data: BTreeMap::new(),
+                user_data: val
+                    .format_specific
+                    .get("userData")
+                    .and_then(|x| serde_json::from_value::<UserData>(x.clone()).ok())
+                    .unwrap_or_default(),
                 vert_origin: None,
                 vert_width: None,
-                visible: false,
+                visible: val
+                    .format_specific
+                    .get("visible")
+                    .and_then(|x| x.as_bool())
+                    .unwrap_or(true),
             }
         }
     }

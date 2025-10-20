@@ -66,7 +66,7 @@ impl Glyph {
 
 #[cfg(feature = "glyphs")]
 mod glyphs {
-    use std::collections::BTreeMap;
+    use crate::convertors::glyphs3::UserData;
 
     use super::*;
     use glyphslib::glyphs3::Glyph as G3Glyph;
@@ -75,6 +75,10 @@ mod glyphs {
         fn from(val: &G3Glyph) -> Self {
             let mut formatspecific = FormatSpecific::default();
             formatspecific.insert("case".to_string(), val.case.clone().into());
+            formatspecific.insert(
+                "color".to_string(),
+                serde_json::to_value(&val.color).unwrap_or_default(),
+            );
             formatspecific.insert("kern_direction".to_string(), val.direction.clone().into());
             formatspecific.insert("kern_bottom".to_string(), val.kern_bottom.clone().into());
             formatspecific.insert("kern_left".to_string(), val.kern_left.clone().into());
@@ -117,12 +121,29 @@ mod glyphs {
             } else {
                 GlyphCategory::Unknown
             };
+            let mut layers = vec![];
+            for layer in &val.layers {
+                let mut bf_layer = Layer::from(layer);
+                if let Some(bg_layer) = &layer.background {
+                    let mut background = Layer::from(bg_layer.deref());
+                    background.is_background = true;
+                    if !background.id.is_some() {
+                        background.id =
+                            Some(format!("{}.bg", bf_layer.id.as_deref().unwrap_or("layer")));
+                    }
+                    bf_layer.background_layer_id = background.id.clone();
+                    layers.push(bf_layer);
+                    layers.push(background);
+                } else {
+                    layers.push(bf_layer);
+                }
+            }
             Glyph {
                 name: val.name.clone(),
                 production_name: val.production.clone(),
                 category,
                 codepoints: val.unicode.clone(),
-                layers: val.layers.iter().map(Into::into).collect(),
+                layers,
                 exported: val.export,
                 direction: None,
                 formatspecific,
@@ -132,11 +153,26 @@ mod glyphs {
 
     impl From<&Glyph> for G3Glyph {
         fn from(val: &Glyph) -> Self {
+            let mut g3_layers = vec![];
+            for layer in &val.layers {
+                if layer.is_background {
+                    continue;
+                }
+                let mut g3_layer = glyphslib::glyphs3::Layer::from(layer);
+                if let Some(bg_id) = &layer.background_layer_id {
+                    if let Some(bg_layer) = val.get_layer(bg_id) {
+                        g3_layer.background =
+                            Some(Box::new(glyphslib::glyphs3::Layer::from(bg_layer)));
+                    }
+                }
+                g3_layers.push(g3_layer);
+            }
+
             G3Glyph {
                 name: val.name.clone(),
                 production: val.production_name.clone(),
                 unicode: val.codepoints.clone(),
-                layers: val.layers.iter().map(Into::into).collect(),
+                layers: g3_layers,
                 export: val.exported,
                 case: val.formatspecific.get_string("case"),
                 category: val.formatspecific.get_optionstring("category"),
@@ -168,8 +204,26 @@ mod glyphs {
                             .collect()
                     })
                     .unwrap_or_default(),
-                user_data: BTreeMap::new(), // Plist<->JSON magic required here
-                color: None,
+                user_data: val
+                    .formatspecific
+                    .get("userData")
+                    .and_then(|x| serde_json::from_value::<UserData>(x.clone()).ok())
+                    .unwrap_or_default(),
+                color: val.formatspecific.get("color").and_then(|x|
+                    // either a tuple -> ColorTuple or an int -> ColorInt
+                    if x.is_number() {
+                        Some(glyphslib::common::Color::ColorInt(x.as_i64().unwrap_or(0) as u8))
+                    } else if x.is_array() {
+                        Some(glyphslib::common::Color::ColorTuple(
+                            x.as_array()
+                                .unwrap_or(&vec![])
+                                .iter()
+                                .filter_map(|v| v.as_u64())
+                                .map(|v| v as u8)
+                                .collect(),
+                        ))
+                    } else { None }
+                ),
             }
         }
     }
