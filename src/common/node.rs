@@ -12,6 +12,7 @@ pub struct Node {
     pub x: f32,
     pub y: f32,
     pub nodetype: NodeType,
+    pub smooth: bool,
     // userData: XXX
 }
 
@@ -55,6 +56,7 @@ mod ufo {
                 x: p.x as f32,
                 y: p.y as f32,
                 nodetype: (&p.typ).into(),
+                smooth: p.smooth,
             }
         }
     }
@@ -65,7 +67,7 @@ mod ufo {
                 p.x as f64,
                 p.y as f64,
                 p.nodetype.into(),
-                false,
+                p.smooth,
                 None,
                 None,
                 None,
@@ -77,8 +79,7 @@ mod ufo {
 #[cfg(feature = "glyphs")]
 mod glyphs {
     use super::*;
-    use glyphslib::glyphs2::Node as G2Node;
-    use glyphslib::glyphs3::Node as G3Node;
+    use glyphslib::{glyphs2::Node as G2Node, glyphs3::Node as G3Node};
 
     impl From<glyphslib::common::NodeType> for NodeType {
         fn from(p: glyphslib::common::NodeType) -> Self {
@@ -112,6 +113,12 @@ mod glyphs {
                 x: val.x,
                 y: val.y,
                 nodetype: val.node_type.into(),
+                smooth: matches!(
+                    val.node_type,
+                    glyphslib::common::NodeType::LineSmooth
+                        | glyphslib::common::NodeType::CurveSmooth
+                        | glyphslib::common::NodeType::QCurveSmooth
+                ),
             }
         }
     }
@@ -121,7 +128,12 @@ mod glyphs {
             G3Node {
                 x: val.x,
                 y: val.y,
-                node_type: val.nodetype.into(),
+                node_type: match (val.nodetype, val.smooth) {
+                    (NodeType::Line, true) => glyphslib::common::NodeType::LineSmooth,
+                    (NodeType::Curve, true) => glyphslib::common::NodeType::CurveSmooth,
+                    (NodeType::QCurve, true) => glyphslib::common::NodeType::QCurveSmooth,
+                    (nt, _) => nt.into(),
+                },
                 user_data: None,
             }
         }
@@ -133,6 +145,12 @@ mod glyphs {
                 x: val.x,
                 y: val.y,
                 nodetype: val.node_type.into(),
+                smooth: match val.node_type {
+                    glyphslib::common::NodeType::LineSmooth
+                    | glyphslib::common::NodeType::CurveSmooth
+                    | glyphslib::common::NodeType::QCurveSmooth => true,
+                    _ => false,
+                },
             }
         }
     }
