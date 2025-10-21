@@ -5,7 +5,7 @@ pub struct Guide {
     pub pos: Position,
     pub name: Option<String>,
     pub color: Option<Color>,
-    // lib
+    pub format_specific: crate::common::FormatSpecific,
 }
 
 impl Guide {
@@ -15,35 +15,66 @@ impl Guide {
 }
 
 #[cfg(feature = "ufo")]
-impl From<&norad::Guideline> for Guide {
-    fn from(g: &norad::Guideline) -> Self {
-        let mut out = Guide::new();
-        out.name = g.name.as_ref().map(|x| x.to_string());
-        out.color = g.color.as_ref().map(|x| x.into());
-        match g.line {
-            norad::Line::Angle { x, y, degrees } => {
-                out.pos = Position {
-                    x: x as f32,
-                    y: y as f32,
-                    angle: degrees as f32,
+mod ufo {
+    use crate::{convertors::ufo::KEY_LIB, BabelfontError};
+
+    use super::*;
+    impl From<&norad::Guideline> for Guide {
+        fn from(g: &norad::Guideline) -> Self {
+            let mut out = Guide::new();
+            out.name = g.name.as_ref().map(|x| x.to_string());
+            out.color = g.color.as_ref().map(|x| x.into());
+            match g.line {
+                norad::Line::Angle { x, y, degrees } => {
+                    out.pos = Position {
+                        x: x as f32,
+                        y: y as f32,
+                        angle: degrees as f32,
+                    }
                 }
-            }
-            norad::Line::Horizontal(y) => {
-                out.pos = Position {
-                    x: 0.0,
-                    y: y as f32,
-                    angle: 0.0,
+                norad::Line::Horizontal(y) => {
+                    out.pos = Position {
+                        x: 0.0,
+                        y: y as f32,
+                        angle: 0.0,
+                    }
                 }
-            }
-            norad::Line::Vertical(x) => {
-                out.pos = Position {
-                    y: 0.0,
-                    x: x as f32,
-                    angle: 90.0,
+                norad::Line::Vertical(x) => {
+                    out.pos = Position {
+                        y: 0.0,
+                        x: x as f32,
+                        angle: 90.0,
+                    }
                 }
-            }
-        };
-        out
+            };
+            out
+        }
+    }
+    impl TryFrom<&Guide> for norad::Guideline {
+        type Error = BabelfontError;
+
+        fn try_from(g: &Guide) -> Result<Self, BabelfontError> {
+            let name = g.name.as_ref().map(|x| norad::Name::new(x)).transpose()?;
+            let color = g.color.as_ref().map(|x| x.try_into()).transpose()?;
+            let line = match (g.pos.x, g.pos.y, g.pos.angle) {
+                (_, y, 0.0) => norad::Line::Horizontal(y as f64),
+                (x, _, 90.0) => norad::Line::Vertical(x as f64),
+                (x, y, angle) => norad::Line::Angle {
+                    x: x as f64,
+                    y: y as f64,
+                    degrees: angle as f64,
+                },
+            };
+            Ok(norad::Guideline::new(
+                line,
+                name,
+                color,
+                None,
+                g.format_specific
+                    .get(KEY_LIB)
+                    .and_then(|x| serde_json::from_value(x.clone()).ok()),
+            ))
+        }
     }
 }
 
@@ -54,6 +85,12 @@ mod glyphs {
     use super::*;
     impl From<&G3Guide> for Guide {
         fn from(val: &G3Guide) -> Self {
+            let mut format_specific = crate::common::FormatSpecific::default();
+            format_specific.insert(
+                "locked".to_string(),
+                serde_json::to_value(val.locked).unwrap_or_default(),
+            );
+
             Guide {
                 pos: Position {
                     x: val.pos.0,
@@ -62,6 +99,7 @@ mod glyphs {
                 },
                 name: None,
                 color: None,
+                format_specific,
             }
         }
     }
@@ -72,7 +110,11 @@ mod glyphs {
                 pos: (val.pos.x, val.pos.y),
                 angle: val.pos.angle,
                 alignment: GuideAlignment::Left,
-                locked: false,
+                locked: val
+                    .format_specific
+                    .get("locked")
+                    .and_then(|x| serde_json::from_value(x.clone()).ok())
+                    .unwrap_or(false),
                 scale: (1.0, 1.0),
             }
         }

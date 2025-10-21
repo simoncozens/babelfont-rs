@@ -1,6 +1,7 @@
 use crate::{
     axis::Axis,
     common::{FormatSpecific, OTScalar, OTValue},
+    features::Features,
     glyph::GlyphList,
     instance::Instance,
     master::Master,
@@ -18,19 +19,32 @@ use write_fonts::types::Tag;
 pub struct Font {
     pub upm: u16,
     pub version: (u16, u16),
+    /// A list of axes, in the case of variable/multiple master font.
+    ///
+    /// May be empty.
     pub axes: Vec<Axis>,
+    /// A list of named/static instances
     pub instances: Vec<Instance>,
+    /// A list of the font's masters
     pub masters: Vec<Master>,
     pub glyphs: GlyphList,
     pub note: Option<String>,
     pub date: chrono::DateTime<Local>,
     pub names: Names,
+    /// Any values to be placed in OpenType tables on export to override defaults
+    ///
+    /// These must be font-wide. Metrics which may vary by master should be placed in the `metrics` field of a Master
     pub custom_ot_values: Vec<OTValue>,
     pub variation_sequences: BTreeMap<(u32, u32), String>,
-    // features: ????
-    // The below is temporary
-    pub features: Option<String>,
+    /// A representation of the font's OpenType features
+    pub features: Features,
+    /// A dictionary of kerning groups
+    ///
+    /// The key is the group name and the value is a list of glyph names in the group
     pub first_kern_groups: HashMap<String, Vec<String>>,
+    // A dictionary of kerning groups
+    ///
+    /// The key is the group name and the value is a list of glyph names in the group
     pub second_kern_groups: HashMap<String, Vec<String>>,
 
     pub format_specific: FormatSpecific,
@@ -57,7 +71,7 @@ impl Font {
             variation_sequences: BTreeMap::new(),
             first_kern_groups: HashMap::new(),
             second_kern_groups: HashMap::new(),
-            features: None,
+            features: Features::default(),
             format_specific: FormatSpecific::default(),
         }
     }

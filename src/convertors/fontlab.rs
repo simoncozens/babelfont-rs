@@ -14,18 +14,18 @@ use write_fonts::types::Tag;
 
 fn to_point(s: String) -> Result<(f32, f32), BabelfontError> {
     let mut i = s.split(' ');
-    let x_str = i.next().ok_or(BabelfontError::General {
-        msg: "Couldn't read X coordinate".to_string(),
-    })?;
-    let x = x_str.parse::<f32>().map_err(|_| BabelfontError::General {
-        msg: format!("Couldn't parse X coordinate {:}", x_str),
-    })?;
-    let y_str = i.next().ok_or(BabelfontError::General {
-        msg: "Couldn't read Y coordinate".to_string(),
-    })?;
-    let y = y_str.parse::<f32>().map_err(|_| BabelfontError::General {
-        msg: format!("Couldn't parse Y coordinate {:}", y_str),
-    })?;
+    let x_str = i.next().ok_or(BabelfontError::General(
+        "Couldn't read X coordinate".to_string(),
+    ))?;
+    let x = x_str
+        .parse::<f32>()
+        .map_err(|_| BabelfontError::General(format!("Couldn't parse X coordinate {:}", x_str)))?;
+    let y_str = i.next().ok_or(BabelfontError::General(
+        "Couldn't read Y coordinate".to_string(),
+    ))?;
+    let y = y_str
+        .parse::<f32>()
+        .map_err(|_| BabelfontError::General(format!("Couldn't parse Y coordinate {:}", y_str)))?;
     Ok((x, y))
 }
 
@@ -40,6 +40,7 @@ impl From<FontlabComponent> for Shape {
         Shape::ComponentShape(Component {
             reference: val.glyphName,
             transform: Affine::IDENTITY,
+            format_specific: Default::default(),
         })
     }
 }
@@ -86,6 +87,7 @@ impl From<FontlabContour> for Shape {
                 .into_iter()
                 .flat_map(nodestring_to_nodes)
                 .collect(),
+            format_specific: Default::default(),
             closed: true,
         })
     }
@@ -191,6 +193,7 @@ impl FontlabLayer {
             width: self.advanceWidth as f32,
             name: self.name.clone(),
             id: self.name,
+            master_id: None,
             guides: vec![],
             shapes: self
                 .elements
@@ -384,15 +387,11 @@ struct FontlabFontWrapper {
 pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
     let mut axes_short_name_to_tag: HashMap<String, _> = HashMap::new();
     log::debug!("Reading to string");
-    let s = fs::read_to_string(&path).map_err(|source| BabelfontError::IO {
-        path: path.clone(),
-        source,
-    })?;
+    let s = fs::read_to_string(&path)?;
     log::debug!("Parsing to internal structs");
     let mut font = Font::new();
-    let p: FontlabFontWrapper = serde_json::from_str(&s).map_err(|e| BabelfontError::General {
-        msg: format!("Couldn't parse VFJ: {:}", e),
-    })?;
+    let p: FontlabFontWrapper = serde_json::from_str(&s)
+        .map_err(|e| BabelfontError::General(format!("Couldn't parse VFJ: {:}", e)))?;
     let fontlab = p.font;
     // log::debug!("{:#?}", fontlab);
     for axis in fontlab.axes {

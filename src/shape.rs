@@ -7,12 +7,14 @@ use crate::{
 pub struct Component {
     pub reference: String,
     pub transform: kurbo::Affine,
+    pub format_specific: crate::common::FormatSpecific,
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct Path {
     pub nodes: Vec<Node>,
     pub closed: bool,
+    pub format_specific: crate::common::FormatSpecific,
 }
 
 impl Path {
@@ -85,6 +87,8 @@ pub enum Shape {
 
 #[cfg(feature = "glyphs")]
 mod glyphs {
+    use crate::convertors::glyphs3::KEY_ATTR;
+
     use super::*;
 
     impl From<&glyphslib::glyphs3::Shape> for Shape {
@@ -122,6 +126,7 @@ mod glyphs {
             Component {
                 reference: val.component_glyph.clone(),
                 transform,
+                format_specific: Default::default(),
             }
         }
     }
@@ -149,9 +154,17 @@ mod glyphs {
             for node in &val.nodes {
                 nodes.push(node.into());
             }
+            let mut format_specific = crate::common::FormatSpecific::default();
+            if !val.attr.is_empty() {
+                format_specific.insert(
+                    KEY_ATTR.into(),
+                    serde_json::to_value(&val.attr).unwrap_or_default(),
+                );
+            }
             Path {
                 nodes,
                 closed: val.closed,
+                format_specific,
             }
         }
     }
@@ -165,7 +178,11 @@ mod glyphs {
             glyphslib::glyphs3::Path {
                 nodes,
                 closed: val.closed,
-                attr: Default::default(),
+                attr: val
+                    .format_specific
+                    .get(KEY_ATTR)
+                    .and_then(|x| serde_json::from_value(x.clone()).ok())
+                    .unwrap_or_default(),
             }
         }
     }

@@ -784,7 +784,7 @@ impl Work<Context, WorkId, Error> for FeatureWork {
 
         #[warn(clippy::unwrap_used)]
         context.features.set(to_ir_features(
-            &font.features,
+            &Some(font.features.to_fea()),
             self.font_file_path.as_ref().map(|path| {
                 path.canonicalize()
                     .expect("path cannot be canonicalized")

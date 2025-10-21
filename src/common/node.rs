@@ -145,12 +145,12 @@ mod glyphs {
                 x: val.x,
                 y: val.y,
                 nodetype: val.node_type.into(),
-                smooth: match val.node_type {
+                smooth: matches!(
+                    val.node_type,
                     glyphslib::common::NodeType::LineSmooth
-                    | glyphslib::common::NodeType::CurveSmooth
-                    | glyphslib::common::NodeType::QCurveSmooth => true,
-                    _ => false,
-                },
+                        | glyphslib::common::NodeType::CurveSmooth
+                        | glyphslib::common::NodeType::QCurveSmooth
+                ),
             }
         }
     }

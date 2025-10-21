@@ -1,6 +1,12 @@
 use fontdrasil::coords::DesignLocation;
+use indexmap::IndexMap;
 
-use crate::{common::OTValue, guide::Guide, i18ndictionary::I18NDictionary, MetricType, OTScalar};
+use crate::{
+    common::{FormatSpecific, OTValue},
+    guide::Guide,
+    i18ndictionary::I18NDictionary,
+    MetricType, OTScalar,
+};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
@@ -9,10 +15,10 @@ pub struct Master {
     pub id: String,
     pub location: DesignLocation,
     pub guides: Vec<Guide>,
-    pub metrics: HashMap<MetricType, i32>,
+    pub metrics: IndexMap<MetricType, i32>,
     pub kerning: HashMap<(String, String), i16>,
     pub custom_ot_values: Vec<OTValue>,
-    // lib
+    pub format_specific: FormatSpecific,
 }
 
 impl Master {
@@ -26,9 +32,10 @@ impl Master {
             id: id.into(),
             location,
             guides: vec![],
-            metrics: HashMap::new(),
+            metrics: IndexMap::new(),
             kerning: HashMap::new(),
             custom_ot_values: vec![],
+            format_specific: FormatSpecific::default(),
         }
     }
 

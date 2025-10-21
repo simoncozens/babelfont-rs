@@ -31,6 +31,7 @@ fontir = { version = "0.3.1", optional = true }
 write-fonts = { version = "0.43.0" }                                           # Must use version fontdrasil uses
 smol_str = { version = "0.3.0", features = ["serde"], optional = true }
 ordered-float = "4.6.0"
+indexmap = "2.12.0"
 
 [dev-dependencies]
 pretty_assertions = "1.4.1"

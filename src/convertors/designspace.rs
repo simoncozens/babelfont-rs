@@ -1,5 +1,6 @@
 use crate::common::tag_from_string;
 use crate::convertors::ufo::stat;
+use crate::features::Features;
 use crate::glyph::GlyphList;
 use crate::Layer;
 use fontdrasil::coords::{DesignCoord, DesignLocation, UserCoord};
@@ -24,11 +25,7 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
     //     path: path.clone(),
     //     source,
     // })?;
-    let ds: DesignSpaceDocument = norad::designspace::DesignSpaceDocument::load(path.clone())
-        .map_err(|orig| BabelfontError::XMLParse {
-            path: path.clone(),
-            orig,
-        })?;
+    let ds: DesignSpaceDocument = norad::designspace::DesignSpaceDocument::load(path.clone())?;
     let relative = path.parent();
     let mut font = Font::new();
     load_axes(&mut font, &ds.axes)?;
@@ -42,12 +39,7 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
     } else {
         default_master.filename.clone().into()
     };
-    let default_ufo = norad::Font::load(relative_path_to_default_master).map_err(|e| {
-        BabelfontError::LoadingUFO {
-            orig: Box::new(e),
-            path: default_master.filename.clone(),
-        }
-    })?;
+    let default_ufo = norad::Font::load(relative_path_to_default_master)?;
     load_glyphs(&mut font, &default_ufo);
     let res: Vec<(Master, Vec<Vec<Layer>>)> = ds
         .sources
@@ -62,7 +54,7 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
     }
     let info = default_ufo.font_info;
     load_font_info(&mut font, &info, created_time);
-    font.features = Some(default_ufo.features);
+    font.features = Features::from_fea(&default_ufo.features);
     Ok(font)
 }
 
@@ -137,11 +129,7 @@ fn load_master(
         source.filename.clone().into()
     };
 
-    let source_font =
-        norad::Font::load(relative_path_to_master).map_err(|e| BabelfontError::LoadingUFO {
-            path: source.filename.clone(),
-            orig: Box::new(e),
-        })?;
+    let source_font = norad::Font::load(relative_path_to_master)?;
     let info = &source_font.font_info;
     load_master_info(&mut master, info);
     let kerning = &source_font.kerning;
@@ -166,7 +154,16 @@ fn load_master(
             }
 
             if let Some(norad_glyph) = layer.get_glyph(g.name.as_str()) {
-                glyph_layer_list.push(norad_glyph_to_babelfont_layer(norad_glyph, &master.id))
+                let layer_name = if layer.is_default() {
+                    master.id.as_str()
+                } else {
+                    layer.name()
+                };
+                glyph_layer_list.push(norad_glyph_to_babelfont_layer(
+                    norad_glyph,
+                    layer_name,
+                    &master.id,
+                ))
             }
         }
         bf_layer_list.push(glyph_layer_list)

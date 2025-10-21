@@ -14,9 +14,7 @@ pub(crate) fn tag_from_string(s: &str) -> Result<Tag, BabelfontError> {
         chars.push(b' ');
     }
     Ok(Tag::new(&chars[0..4].try_into().map_err(|_| {
-        BabelfontError::General {
-            msg: format!("Bad tag: '{}'", s),
-        }
+        BabelfontError::General(format!("Bad tag: '{}'", s))
     })?))
 }
 #[derive(Debug, Copy, Clone, Default)]
@@ -46,14 +44,28 @@ pub struct Color {
 }
 
 #[cfg(feature = "ufo")]
-impl From<&norad::Color> for Color {
-    fn from(c: &norad::Color) -> Self {
-        let (red, green, blue, alpha) = c.channels();
-        Color {
-            r: (red * 255.0) as i32,
-            g: (green * 255.0) as i32,
-            b: (blue * 255.0) as i32,
-            a: (alpha * 255.0) as i32,
+mod ufo {
+    use super::*;
+    impl From<&norad::Color> for Color {
+        fn from(c: &norad::Color) -> Self {
+            let (red, green, blue, alpha) = c.channels();
+            Color {
+                r: (red * 255.0) as i32,
+                g: (green * 255.0) as i32,
+                b: (blue * 255.0) as i32,
+                a: (alpha * 255.0) as i32,
+            }
+        }
+    }
+    impl TryFrom<&Color> for norad::Color {
+        type Error = BabelfontError;
+        fn try_from(c: &Color) -> Result<Self, BabelfontError> {
+            Ok(norad::Color::new(
+                c.r as f64 / 255.0,
+                c.g as f64 / 255.0,
+                c.b as f64 / 255.0,
+                c.a as f64 / 255.0,
+            )?)
         }
     }
 }

@@ -1,6 +1,7 @@
 use crate::{
     anchor::Anchor,
     common::{Color, FormatSpecific},
+    convertors::glyphs3::copy_user_data,
     guide::Guide,
     shape::Shape,
     BabelfontError, Component, Font, Node, Path,
@@ -13,6 +14,7 @@ pub struct Layer {
     pub width: f32,
     pub name: Option<String>,
     pub id: Option<String>,
+    pub master_id: Option<String>,
     pub guides: Vec<Guide>,
     pub shapes: Vec<Shape>,
     pub anchors: Vec<Anchor>,
@@ -94,6 +96,7 @@ impl Layer {
             width: self.width,
             name: self.name.clone(),
             id: self.id.clone(),
+            master_id: self.master_id.clone(),
             guides: self.guides.clone(),
             anchors: self.anchors.clone(),
             color: self.color,
@@ -174,7 +177,7 @@ impl Layer {
     }
 
     pub fn lsb(&self) -> Result<f32, BabelfontError> {
-        let bounds = self.bounds()?;
+        let bounds: kurbo::Rect = self.bounds()?;
         Ok(bounds.min_x() as f32)
     }
     pub fn rsb(&self) -> Result<f32, BabelfontError> {
@@ -187,7 +190,10 @@ impl Layer {
 mod glyphs {
     use std::collections::BTreeMap;
 
-    use crate::convertors::glyphs3::UserData;
+    use glyphslib::Plist;
+    use smol_str::SmolStr;
+
+    use crate::convertors::glyphs3::{UserData, KEY_ANNOTATIONS, KEY_LAYER_HINTS, KEY_USER_DATA};
 
     use super::*;
 
@@ -198,16 +204,24 @@ mod glyphs {
                 if !val.visible {
                     fs.insert("visible".into(), serde_json::Value::Bool(false));
                 }
-                if !val.user_data.is_empty() {
+                if !val.hints.is_empty() {
                     fs.insert(
-                        "userData".into(),
-                        serde_json::to_value(&val.user_data).unwrap_or_default(),
+                        KEY_LAYER_HINTS.into(),
+                        serde_json::to_value(&val.hints).unwrap_or(serde_json::Value::Null),
                     );
                 }
+                if !val.annotations.is_empty() {
+                    fs.insert(
+                        KEY_ANNOTATIONS.into(),
+                        serde_json::to_value(&val.annotations).unwrap_or(serde_json::Value::Null),
+                    );
+                }
+                copy_user_data(&mut fs, &val.user_data);
                 fs
             };
             Layer {
                 id: Some(val.layer_id.clone()),
+                master_id: val.associated_master_id.clone(),
                 name: val.name.clone(),
                 color: None,
                 shapes: val.shapes.iter().map(Into::into).collect(),
@@ -232,13 +246,25 @@ mod glyphs {
                 shapes: val.shapes.iter().map(Into::into).collect(),
                 guides: val.guides.iter().map(Into::into).collect(),
                 anchors: val.anchors.iter().map(Into::into).collect(),
-                annotations: vec![],
-                associated_master_id: None,
+                annotations: val
+                    .format_specific
+                    .get(KEY_ANNOTATIONS)
+                    .and_then(|x| {
+                        serde_json::from_value::<Vec<BTreeMap<SmolStr, Plist>>>(x.clone()).ok()
+                    })
+                    .unwrap_or_default(),
+                associated_master_id: val.master_id.clone(),
                 attr: BTreeMap::new(),
                 background: None,
                 background_image: None,
                 color: None,
-                hints: vec![],
+                hints: val
+                    .format_specific
+                    .get(KEY_LAYER_HINTS)
+                    .and_then(|x| {
+                        serde_json::from_value::<Vec<BTreeMap<SmolStr, Plist>>>(x.clone()).ok()
+                    })
+                    .unwrap_or_default(),
                 metric_bottom: None,
                 metric_left: None,
                 metric_right: None,
@@ -248,7 +274,7 @@ mod glyphs {
                 part_selection: BTreeMap::new(),
                 user_data: val
                     .format_specific
-                    .get("userData")
+                    .get(KEY_USER_DATA)
                     .and_then(|x| serde_json::from_value::<UserData>(x.clone()).ok())
                     .unwrap_or_default(),
                 vert_origin: None,

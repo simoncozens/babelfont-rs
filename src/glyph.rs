@@ -66,7 +66,7 @@ impl Glyph {
 
 #[cfg(feature = "glyphs")]
 mod glyphs {
-    use crate::convertors::glyphs3::UserData;
+    use crate::convertors::glyphs3::{copy_user_data, UserData, KEY_USER_DATA};
 
     use super::*;
     use glyphslib::glyphs3::Glyph as G3Glyph;
@@ -121,13 +121,14 @@ mod glyphs {
             } else {
                 GlyphCategory::Unknown
             };
+            copy_user_data(&mut formatspecific, &val.user_data);
             let mut layers = vec![];
             for layer in &val.layers {
                 let mut bf_layer = Layer::from(layer);
                 if let Some(bg_layer) = &layer.background {
                     let mut background = Layer::from(bg_layer.deref());
                     background.is_background = true;
-                    if !background.id.is_some() {
+                    if background.id.is_none() {
                         background.id =
                             Some(format!("{}.bg", bf_layer.id.as_deref().unwrap_or("layer")));
                     }
@@ -206,7 +207,7 @@ mod glyphs {
                     .unwrap_or_default(),
                 user_data: val
                     .formatspecific
-                    .get("userData")
+                    .get(KEY_USER_DATA)
                     .and_then(|x| serde_json::from_value::<UserData>(x.clone()).ok())
                     .unwrap_or_default(),
                 color: val.formatspecific.get("color").and_then(|x|

@@ -1,7 +1,8 @@
-use serde_json::{Map, Value};
+use indexmap::IndexMap;
+use serde_json::Value;
 
 #[derive(Debug, Clone, PartialEq, Default)]
-pub struct FormatSpecific(Map<String, Value>);
+pub struct FormatSpecific(IndexMap<String, Value>);
 
 impl FormatSpecific {
     pub fn get(&self, key: &str) -> Option<&Value> {
@@ -36,5 +37,9 @@ impl FormatSpecific {
             .get(key)
             .and_then(|x| x.as_bool())
             .unwrap_or_default()
+    }
+
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (&String, &Value)> {
+        self.0.iter()
     }
 }

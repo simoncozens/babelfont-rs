@@ -6,16 +6,36 @@ pub struct Anchor {
 }
 
 #[cfg(feature = "ufo")]
-impl From<&norad::Anchor> for Anchor {
-    fn from(a: &norad::Anchor) -> Self {
-        Anchor {
-            x: a.x as f32,
-            y: a.y as f32,
-            name: a
-                .name
-                .as_ref()
-                .map(|x| x.to_string())
-                .unwrap_or_else(|| "<Unnamed anchor>".to_string()),
+mod ufo {
+    use crate::BabelfontError;
+
+    use super::*;
+    impl From<&norad::Anchor> for Anchor {
+        fn from(a: &norad::Anchor) -> Self {
+            Anchor {
+                x: a.x as f32,
+                y: a.y as f32,
+                name: a
+                    .name
+                    .as_ref()
+                    .map(|x| x.to_string())
+                    .unwrap_or_else(|| "<Unnamed anchor>".to_string()),
+            }
+        }
+    }
+
+    impl TryFrom<&Anchor> for norad::Anchor {
+        type Error = BabelfontError;
+
+        fn try_from(a: &Anchor) -> Result<Self, BabelfontError> {
+            Ok(norad::Anchor::new(
+                a.x as f64,
+                a.y as f64,
+                Some(norad::Name::new(&a.name)?),
+                None,
+                None,
+                None,
+            ))
         }
     }
 }
