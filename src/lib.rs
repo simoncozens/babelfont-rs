@@ -53,7 +53,7 @@ pub fn load(filename: &str) -> Result<Font, BabelfontError> {
 
         #[cfg(not(feature = "ufo"))]
         Err(BabelfontError::UnknownFileType { path: pb })
-    } else if filename.ends_with(".glyphs") {
+    } else if filename.ends_with(".glyphs") || filename.ends_with(".glyphspackage") {
         #[cfg(feature = "glyphs")]
         return crate::convertors::glyphs3::load(pb);
         #[cfg(not(feature = "glyphs"))]

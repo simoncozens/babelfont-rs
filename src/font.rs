@@ -177,6 +177,20 @@ impl Font {
     // fn axis_order(&self) -> Vec<Tag> {
     //     self.axes.iter().map(|ax| ax.tag.clone()).collect()
     // }
+
+    pub fn save<T: Into<std::path::PathBuf>>(&self, path: T) -> Result<(), BabelfontError> {
+        let path = path.into();
+        #[cfg(feature = "glyphs")]
+        {
+            if path.extension().and_then(|x| x.to_str()) == Some("glyphs") {
+                let glyphs3_font = self.as_glyphslib();
+                return glyphs3_font.save(&path).map_err(BabelfontError::PlistParse);
+            }
+        }
+        Err(BabelfontError::UnknownFileType {
+            path: path.to_path_buf(),
+        })
+    }
 }
 
 #[cfg(feature = "glyphs")]

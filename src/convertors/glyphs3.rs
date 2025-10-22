@@ -90,14 +90,23 @@ pub(crate) fn copy_user_data(
 }
 
 pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
-    log::debug!("Reading to string");
+    if path.extension().and_then(|x| x.to_str()) == Some("glyphspackage") {
+        return _load(
+            &glyphslib::Font::load(&path).map_err(BabelfontError::PlistParse)?,
+            path,
+        );
+    }
     let s = fs::read_to_string(&path)?;
     load_str(&s, path.clone())
 }
 
 pub fn load_str(s: &str, path: PathBuf) -> Result<Font, BabelfontError> {
-    let mut font = Font::new();
     let glyphs_font = glyphslib::Font::load_str(s).map_err(BabelfontError::PlistParse)?;
+    _load(&glyphs_font, path)
+}
+
+fn _load(glyphs_font: &glyphslib::Font, path: PathBuf) -> Result<Font, BabelfontError> {
+    let mut font = Font::new();
     let glyphs_font = glyphs_font
         .as_glyphs3()
         .ok_or_else(|| BabelfontError::WrongConvertor { path })?;
