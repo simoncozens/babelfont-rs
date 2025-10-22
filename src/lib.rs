@@ -11,6 +11,7 @@ mod glyph;
 mod guide;
 mod i18ndictionary;
 mod instance;
+mod interpolate;
 mod layer;
 mod master;
 mod metrics;

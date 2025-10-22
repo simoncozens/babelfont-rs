@@ -10,7 +10,8 @@ use crate::{
 };
 use chrono::Local;
 use fontdrasil::coords::{
-    DesignCoord, DesignLocation, Location, NormalizedLocation, NormalizedSpace, UserCoord,
+    DesignCoord, DesignLocation, DesignSpace, Location, NormalizedLocation, NormalizedSpace,
+    UserCoord,
 };
 use std::collections::{BTreeMap, HashMap};
 use write_fonts::types::Tag;
@@ -190,6 +191,47 @@ impl Font {
         Err(BabelfontError::UnknownFileType {
             path: path.to_path_buf(),
         })
+    }
+
+    pub fn interpolate_glyph(
+        &self,
+        glyphname: &str,
+        location: &Location<DesignSpace>,
+    ) -> Result<crate::Layer, BabelfontError> {
+        let glyph = self
+            .glyphs
+            .get(glyphname)
+            .ok_or_else(|| BabelfontError::GlyphNotFound {
+                glyph: glyphname.to_string(),
+            })?;
+        let axes = self.fontdrasil_axes()?;
+        let target_location = location.to_normalized(&axes);
+
+        let mut layers: Vec<(DesignLocation, &Layer)> = vec![];
+        for layer in &glyph.layers {
+            if let Some(master) = self
+                .masters
+                .iter()
+                .find(|m| Some(&m.id) == layer.id.as_ref())
+            {
+                layers.push((master.location.clone(), layer));
+            } else if let Some(loc) = &layer.location {
+                // Intermediate layer
+                layers.push((loc.clone(), layer));
+            }
+        }
+        // Put default master first, if we can find it
+        if let Some(default_master_index) = self.default_master_index() {
+            let default_master = &self.masters[default_master_index];
+            layers.sort_by_key(|(loc, _)| {
+                if *loc == default_master.location {
+                    0
+                } else {
+                    1
+                }
+            });
+        }
+        crate::interpolate::interpolate_layer(glyphname, &layers, &axes, &target_location)
     }
 }
 

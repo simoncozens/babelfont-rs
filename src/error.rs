@@ -43,6 +43,18 @@ pub enum BabelfontError {
     #[error("Ill-constructed path")]
     BadPath,
 
+    #[error("Glyph {glyph} not interpolatable: {reason}")]
+    GlyphNotInterpolatable { glyph: String, reason: String },
+
+    #[error("Glyph {glyph} not found")]
+    GlyphNotFound { glyph: String },
+
+    #[error("Variation model error: {0}")]
+    VariationModel(#[from] fontdrasil::variations::VariationModelError),
+
+    #[error("Delta error: {0}")]
+    Delta(#[from] fontdrasil::variations::DeltaError),
+
     #[error("Called a method which requires a decomposed layer on a layer which had components")]
     NeedsDecomposition,
 }
@@ -115,6 +127,24 @@ impl From<BabelfontError> for fontir::error::Error {
             )
             .into(),
             BabelfontError::NeedsDecomposition => todo!(),
+            BabelfontError::GlyphNotInterpolatable { glyph, reason: _ } => {
+                fontir::error::BadGlyph::new(
+                    fontdrasil::types::GlyphName::from(glyph),
+                    fontir::error::BadGlyphKind::NoInstances,
+                )
+                .into()
+            }
+            BabelfontError::GlyphNotFound { glyph } => fontir::error::BadGlyph::new(
+                fontdrasil::types::GlyphName::from(glyph),
+                fontir::error::BadGlyphKind::NoInstances,
+            )
+            .into(),
+            BabelfontError::VariationModel(e) => e.into(),
+            BabelfontError::Delta(e) => fontir::error::BadSource::new(
+                "Unknown",
+                fontir::error::BadSourceKind::Custom(e.to_string()),
+            )
+            .into(),
         }
     }
 }
