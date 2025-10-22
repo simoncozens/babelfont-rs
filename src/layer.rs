@@ -36,7 +36,7 @@ impl Layer {
 
     pub fn components(&self) -> impl DoubleEndedIterator<Item = &Component> {
         self.shapes.iter().filter_map(|x| {
-            if let Shape::ComponentShape(c) = x {
+            if let Shape::Component(c) = x {
                 Some(c)
             } else {
                 None
@@ -46,7 +46,7 @@ impl Layer {
 
     pub fn paths(&self) -> impl DoubleEndedIterator<Item = &Path> {
         self.shapes.iter().filter_map(|x| {
-            if let Shape::PathShape(p) = x {
+            if let Shape::Path(p) = x {
                 Some(p)
             } else {
                 None
@@ -55,35 +55,33 @@ impl Layer {
     }
 
     pub fn clear_components(&mut self) {
-        self.shapes.retain(|sh| matches!(sh, Shape::PathShape(_)));
+        self.shapes.retain(|sh| matches!(sh, Shape::Path(_)));
     }
 
     pub fn push_component(&mut self, c: Component) {
-        self.shapes.push(Shape::ComponentShape(c))
+        self.shapes.push(Shape::Component(c))
     }
 
     pub fn push_path(&mut self, p: Path) {
-        self.shapes.push(Shape::PathShape(p))
+        self.shapes.push(Shape::Path(p))
     }
 
     pub fn has_components(&self) -> bool {
         self.shapes
             .iter()
-            .any(|sh| matches!(sh, Shape::ComponentShape(_)))
+            .any(|sh| matches!(sh, Shape::Component(_)))
     }
 
     pub fn has_paths(&self) -> bool {
-        self.shapes
-            .iter()
-            .any(|sh| matches!(sh, Shape::PathShape(_)))
+        self.shapes.iter().any(|sh| matches!(sh, Shape::Path(_)))
     }
 
     pub fn decompose(&mut self, font: &Font) {
         let decomposed_shapes = self
             .decomposed_components(font)
             .into_iter()
-            .map(Shape::PathShape);
-        self.shapes.retain(|sh| matches!(sh, Shape::PathShape(_)));
+            .map(Shape::Path);
+        self.shapes.retain(|sh| matches!(sh, Shape::Path(_)));
         self.shapes.extend(decomposed_shapes);
     }
 
@@ -91,7 +89,7 @@ impl Layer {
         let decomposed_shapes = self
             .decomposed_components(font)
             .into_iter()
-            .map(Shape::PathShape);
+            .map(Shape::Path);
         Layer {
             width: self.width,
             name: self.name.clone(),
@@ -107,7 +105,7 @@ impl Layer {
             shapes: self
                 .shapes
                 .iter()
-                .filter(|sh| matches!(sh, Shape::PathShape(_)))
+                .filter(|sh| matches!(sh, Shape::Path(_)))
                 .cloned()
                 .chain(decomposed_shapes)
                 .collect(),

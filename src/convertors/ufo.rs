@@ -132,10 +132,10 @@ fn babelfont_layer_to_norad_glyph(
 
     for shape in &layer.shapes {
         match shape {
-            Shape::PathShape(p) => {
+            Shape::Path(p) => {
                 norad_glyph.contours.push(save_path(p));
             }
-            Shape::ComponentShape(c) => {
+            Shape::Component(c) => {
                 norad_glyph.components.push(save_component(c)?);
             }
         }
@@ -167,10 +167,10 @@ pub(crate) fn norad_glyph_to_babelfont_layer(
     l.guides = glyph.guidelines.iter().map(|x| x.into()).collect();
     l.anchors = glyph.anchors.iter().map(|x| x.into()).collect();
     for comp in &glyph.components {
-        l.shapes.push(Shape::ComponentShape(load_component(comp)));
+        l.shapes.push(Shape::Component(load_component(comp)));
     }
     for contour in &glyph.contours {
-        l.shapes.push(Shape::PathShape(load_path(contour)));
+        l.shapes.push(Shape::Path(load_path(contour)));
     }
     l
 }

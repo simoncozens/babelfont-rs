@@ -37,7 +37,7 @@ struct FontlabComponent {
 
 impl From<FontlabComponent> for Shape {
     fn from(val: FontlabComponent) -> Self {
-        Shape::ComponentShape(Component {
+        Shape::Component(Component {
             reference: val.glyphName,
             transform: Affine::IDENTITY,
             format_specific: Default::default(),
@@ -81,7 +81,7 @@ fn nodestring_to_nodes(s: String) -> Vec<Node> {
 }
 impl From<FontlabContour> for Shape {
     fn from(val: FontlabContour) -> Self {
-        Shape::PathShape(Path {
+        Shape::Path(Path {
             nodes: val
                 .nodes
                 .into_iter()

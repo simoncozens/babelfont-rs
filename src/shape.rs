@@ -81,8 +81,8 @@ impl Path {
 
 #[derive(Debug, Clone)]
 pub enum Shape {
-    ComponentShape(Component),
-    PathShape(Path),
+    Component(Component),
+    Path(Path),
 }
 
 #[cfg(feature = "glyphs")]
@@ -94,8 +94,8 @@ mod glyphs {
     impl From<&glyphslib::glyphs3::Shape> for Shape {
         fn from(val: &glyphslib::glyphs3::Shape) -> Self {
             match val {
-                glyphslib::glyphs3::Shape::Component(c) => Shape::ComponentShape(c.into()),
-                glyphslib::glyphs3::Shape::Path(p) => Shape::PathShape(p.into()),
+                glyphslib::glyphs3::Shape::Component(c) => Shape::Component(c.into()),
+                glyphslib::glyphs3::Shape::Path(p) => Shape::Path(p.into()),
             }
         }
     }
@@ -103,8 +103,8 @@ mod glyphs {
     impl From<&Shape> for glyphslib::glyphs3::Shape {
         fn from(val: &Shape) -> Self {
             match val {
-                Shape::ComponentShape(c) => glyphslib::glyphs3::Shape::Component(c.into()),
-                Shape::PathShape(p) => glyphslib::glyphs3::Shape::Path(p.into()),
+                Shape::Component(c) => glyphslib::glyphs3::Shape::Component(c.into()),
+                Shape::Path(p) => glyphslib::glyphs3::Shape::Path(p.into()),
             }
         }
     }

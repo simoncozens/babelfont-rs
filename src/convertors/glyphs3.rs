@@ -870,7 +870,7 @@ mod tests {
             .shapes
             .get(1)
             .unwrap();
-        if let Shape::ComponentShape(p) = shape {
+        if let Shape::Component(p) = shape {
             assert_eq!(p.reference, "acutecomb");
             assert_eq!(
                 p.transform,
@@ -917,7 +917,7 @@ mod tests {
         let font = load("resources/GlyphsFileFormatv3.glyphs".into()).unwrap();
         let shape = &font.glyphs.get("A").unwrap().layers[1].shapes[0];
         match shape {
-            Shape::PathShape(p) => assert!(!p.closed),
+            Shape::Path(p) => assert!(!p.closed),
             _ => panic!("Expected a path shape"),
         }
     }

@@ -1310,10 +1310,10 @@ pub(crate) fn to_ir_contours_and_components(
 
     for shape in shapes.iter() {
         match shape {
-            Shape::ComponentShape(component) => {
+            Shape::Component(component) => {
                 components.push(to_ir_component(glyph_name.clone(), component))
             }
-            Shape::PathShape(path) => contours.push(
+            Shape::Path(path) => contours.push(
                 to_ir_path(glyph_name.clone(), path)
                     .map_err(|e| BadGlyph::new(glyph_name.clone(), e))?,
             ),
