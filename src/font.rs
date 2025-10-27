@@ -13,10 +13,11 @@ use fontdrasil::coords::{
     DesignCoord, DesignLocation, DesignSpace, Location, NormalizedLocation, NormalizedSpace,
     UserCoord,
 };
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use write_fonts::types::Tag;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Font {
     pub upm: u16,
     pub version: (u16, u16),

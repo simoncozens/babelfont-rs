@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use write_fonts::types::Tag;
 
 pub(crate) mod decomposition;
@@ -17,7 +18,7 @@ pub(crate) fn tag_from_string(s: &str) -> Result<Tag, BabelfontError> {
         BabelfontError::General(format!("Bad tag: '{}'", s))
     })?))
 }
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Debug, Copy, Clone, Default, Serialize, Deserialize)]
 pub struct Position {
     pub x: f32,
     pub y: f32,
@@ -35,7 +36,7 @@ impl Position {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Default, Serialize, Deserialize)]
 pub struct Color {
     r: i32,
     g: i32,
@@ -70,7 +71,7 @@ mod ufo {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum OTScalar {
     StringType(String),
     Bool(bool),
@@ -155,14 +156,14 @@ impl From<OTScalar> for String {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OTValue {
     pub table: String,
     pub field: String,
     pub value: OTScalar,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Direction {
     LeftToRight,
     RightToLeft,

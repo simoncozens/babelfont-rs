@@ -1,7 +1,8 @@
 use indexmap::IndexMap;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct FormatSpecific(IndexMap<String, Value>);
 
 impl FormatSpecific {

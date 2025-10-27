@@ -1,4 +1,6 @@
-#[derive(Debug, Clone, PartialEq, Hash, Eq)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, PartialEq, Hash, Eq, Serialize, Deserialize)]
 pub enum MetricType {
     XHeight,
     CapHeight,
@@ -105,8 +107,7 @@ impl MetricType {
 
 mod glyphs {
     use super::MetricType;
-    use glyphslib::glyphs3::Metric as G3Metric;
-    use glyphslib::glyphs3::MetricType as G3MetricType;
+    use glyphslib::glyphs3::{Metric as G3Metric, MetricType as G3MetricType};
     impl From<&G3MetricType> for MetricType {
         fn from(value: &G3MetricType) -> Self {
             match value {

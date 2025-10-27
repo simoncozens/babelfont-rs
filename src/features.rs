@@ -1,7 +1,8 @@
 use indexmap::IndexMap;
+use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Features {
     /// Opentype classes classes
     ///

@@ -8,8 +8,9 @@ use crate::{
 };
 use fontdrasil::coords::DesignLocation;
 use kurbo::Shape as KurboShape;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Layer {
     pub width: f32,
     pub name: Option<String>,

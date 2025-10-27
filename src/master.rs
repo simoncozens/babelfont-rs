@@ -7,9 +7,10 @@ use crate::{
     i18ndictionary::I18NDictionary,
     MetricType, OTScalar,
 };
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Master {
     pub name: I18NDictionary,
     pub id: String,

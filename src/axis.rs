@@ -2,10 +2,11 @@ use std::collections::HashMap;
 
 use crate::{common::FormatSpecific, i18ndictionary::I18NDictionary, BabelfontError};
 use fontdrasil::coords::{CoordConverter, DesignCoord, NormalizedCoord, UserCoord};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 pub use write_fonts::types::Tag;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Axis {
     pub name: I18NDictionary,
     pub tag: Tag,
@@ -15,6 +16,7 @@ pub struct Axis {
     pub default: Option<UserCoord>,
     pub map: Option<Vec<(UserCoord, DesignCoord)>>,
     pub hidden: bool,
+    pub values: Vec<UserCoord>,
     pub formatspecific: FormatSpecific,
 }
 

@@ -2,15 +2,16 @@ use crate::{
     common::{decomposition::DecomposedAffine, Node, NodeType},
     BabelfontError,
 };
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Component {
     pub reference: String,
     pub transform: kurbo::Affine,
     pub format_specific: crate::common::FormatSpecific,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Path {
     pub nodes: Vec<Node>,
     pub closed: bool,
@@ -79,7 +80,7 @@ impl Path {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Shape {
     Component(Component),
     Path(Path),

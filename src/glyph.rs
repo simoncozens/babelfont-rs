@@ -1,11 +1,11 @@
-use std::ops::{Deref, DerefMut};
-
 use crate::{
     common::{Direction, FormatSpecific},
     layer::Layer,
 };
+use serde::{Deserialize, Serialize};
+use std::ops::{Deref, DerefMut};
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct GlyphList(pub Vec<Glyph>);
 impl GlyphList {
     pub fn get(&self, g: &str) -> Option<&Glyph> {
@@ -35,7 +35,7 @@ impl DerefMut for GlyphList {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum GlyphCategory {
     Base,
     Mark,
@@ -43,7 +43,7 @@ pub enum GlyphCategory {
     Ligature,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Glyph {
     pub name: String,
     pub production_name: Option<String>,

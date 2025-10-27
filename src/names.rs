@@ -1,8 +1,9 @@
+use serde::{Deserialize, Serialize};
 use write_fonts::read::tables::name::NameId;
 
 use crate::i18ndictionary::I18NDictionary;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum StyleMapStyle {
     BoldItalic,
     Bold,
@@ -10,7 +11,7 @@ pub enum StyleMapStyle {
     Italic,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Names {
     pub copyright: I18NDictionary,
     pub family_name: I18NDictionary,

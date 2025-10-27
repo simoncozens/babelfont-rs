@@ -1,9 +1,13 @@
-use std::collections::HashMap;
-use std::fmt::{Debug, Formatter};
+use std::{
+    collections::HashMap,
+    fmt::{Debug, Formatter},
+};
+
+use serde::{Deserialize, Serialize};
 
 static DFLT: &str = "dflt";
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Serialize, Deserialize)]
 pub struct I18NDictionary(pub HashMap<String, String>);
 
 impl I18NDictionary {
