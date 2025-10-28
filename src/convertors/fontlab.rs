@@ -12,19 +12,19 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, convert::TryInto, fs, path::PathBuf, sync::LazyLock};
 use write_fonts::types::Tag;
 
-fn to_point(s: String) -> Result<(f32, f32), BabelfontError> {
+fn to_point(s: String) -> Result<(f64, f64), BabelfontError> {
     let mut i = s.split(' ');
     let x_str = i.next().ok_or(BabelfontError::General(
         "Couldn't read X coordinate".to_string(),
     ))?;
     let x = x_str
-        .parse::<f32>()
+        .parse::<f64>()
         .map_err(|_| BabelfontError::General(format!("Couldn't parse X coordinate {:}", x_str)))?;
     let y_str = i.next().ok_or(BabelfontError::General(
         "Couldn't read Y coordinate".to_string(),
     ))?;
     let y = y_str
-        .parse::<f32>()
+        .parse::<f64>()
         .map_err(|_| BabelfontError::General(format!("Couldn't parse Y coordinate {:}", y_str)))?;
     Ok((x, y))
 }

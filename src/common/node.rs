@@ -11,8 +11,8 @@ pub enum NodeType {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Node {
-    pub x: f32,
-    pub y: f32,
+    pub x: f64,
+    pub y: f64,
     pub nodetype: NodeType,
     pub smooth: bool,
     // userData: XXX
@@ -55,8 +55,8 @@ mod ufo {
     impl From<&norad::ContourPoint> for Node {
         fn from(p: &norad::ContourPoint) -> Self {
             Node {
-                x: p.x as f32,
-                y: p.y as f32,
+                x: p.x,
+                y: p.y,
                 nodetype: (&p.typ).into(),
                 smooth: p.smooth,
             }
@@ -65,15 +65,7 @@ mod ufo {
 
     impl From<&Node> for norad::ContourPoint {
         fn from(p: &Node) -> Self {
-            norad::ContourPoint::new(
-                p.x as f64,
-                p.y as f64,
-                p.nodetype.into(),
-                p.smooth,
-                None,
-                None,
-                None,
-            )
+            norad::ContourPoint::new(p.x, p.y, p.nodetype.into(), p.smooth, None, None, None)
         }
     }
 }
@@ -112,8 +104,8 @@ mod glyphs {
     impl From<&G3Node> for Node {
         fn from(val: &G3Node) -> Self {
             Node {
-                x: val.x,
-                y: val.y,
+                x: val.x as f64,
+                y: val.y as f64,
                 nodetype: val.node_type.into(),
                 smooth: matches!(
                     val.node_type,
@@ -128,8 +120,8 @@ mod glyphs {
     impl From<&Node> for G3Node {
         fn from(val: &Node) -> Self {
             G3Node {
-                x: val.x,
-                y: val.y,
+                x: val.x as f32,
+                y: val.y as f32,
                 node_type: match (val.nodetype, val.smooth) {
                     (NodeType::Line, true) => glyphslib::common::NodeType::LineSmooth,
                     (NodeType::Curve, true) => glyphslib::common::NodeType::CurveSmooth,
@@ -144,8 +136,8 @@ mod glyphs {
     impl From<&G2Node> for Node {
         fn from(val: &G2Node) -> Self {
             Node {
-                x: val.x,
-                y: val.y,
+                x: val.x as f64,
+                y: val.y as f64,
                 nodetype: val.node_type.into(),
                 smooth: matches!(
                     val.node_type,
@@ -160,8 +152,8 @@ mod glyphs {
     impl From<&Node> for G2Node {
         fn from(val: &Node) -> Self {
             G2Node {
-                x: val.x,
-                y: val.y,
+                x: val.x as f32,
+                y: val.y as f32,
                 node_type: val.nodetype.into(),
             }
         }

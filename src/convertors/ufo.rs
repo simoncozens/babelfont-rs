@@ -167,6 +167,9 @@ fn babelfont_layer_to_norad_glyph(
             .map(norad::Guideline::try_from)
             .collect::<Result<Vec<_>, BabelfontError>>()?;
     }
+    if let Some(lib) = layer.format_specific.get(KEY_LIB) {
+        norad_glyph.lib = serde_json::from_value::<norad::Plist>(lib.clone()).unwrap_or_default();
+    }
     Ok(norad_glyph)
 }
 
@@ -178,6 +181,9 @@ pub(crate) fn norad_glyph_to_babelfont_layer(
     let mut l = Layer::new(glyph.width as f32);
     l.master_id = Some(master_id.to_string());
     l.name = Some(layer_name.to_string());
+    if !glyph.lib.is_empty() {
+        l.format_specific = stash_lib(Some(&glyph.lib));
+    }
 
     l.guides = glyph.guidelines.iter().map(|x| x.into()).collect();
     l.anchors = glyph.anchors.iter().map(|x| x.into()).collect();
@@ -735,7 +741,14 @@ mod tests {
             backagain.default_layer().len(),
             once_more.default_layer().len()
         );
-        // assert_eq!(backagain.layers, once_more.layers);
+        let backagain_layer = backagain.default_layer();
+        let once_more_layer = once_more.default_layer();
+        for name in there.glyphs.iter().map(|x| x.name.as_str()) {
+            let g1 = backagain_layer.get_glyph(name).unwrap();
+            let g2 = once_more_layer.get_glyph(name).unwrap();
+            assert_eq!(g1, g2, "Glyph {} differs", name);
+        }
+
         // assert_eq!(backagain.lib, once_more.lib);
         // assert_eq!(backagain.groups, once_more.groups);
         assert_eq!(backagain.kerning, once_more.kerning);

@@ -2,8 +2,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Anchor {
-    pub x: f32,
-    pub y: f32,
+    pub x: f64,
+    pub y: f64,
     pub name: String,
 }
 
@@ -15,8 +15,8 @@ mod ufo {
     impl From<&norad::Anchor> for Anchor {
         fn from(a: &norad::Anchor) -> Self {
             Anchor {
-                x: a.x as f32,
-                y: a.y as f32,
+                x: a.x as f64,
+                y: a.y as f64,
                 name: a
                     .name
                     .as_ref()
@@ -50,8 +50,8 @@ mod glyphs {
         fn from(val: &glyphslib::glyphs3::Anchor) -> Self {
             Anchor {
                 name: val.name.clone(),
-                x: val.pos.0,
-                y: val.pos.1,
+                x: val.pos.0 as f64,
+                y: val.pos.1 as f64,
             }
         }
     }
@@ -60,7 +60,7 @@ mod glyphs {
         fn from(val: &Anchor) -> Self {
             glyphslib::glyphs3::Anchor {
                 name: val.name.clone(),
-                pos: (val.x, val.y),
+                pos: (val.x as f32, val.y as f32),
             }
         }
     }
@@ -75,8 +75,8 @@ mod fontra {
         fn from(val: &fontra::Anchor) -> Self {
             Anchor {
                 name: val.name.clone(),
-                x: val.x,
-                y: val.y,
+                x: val.x as f64,
+                y: val.y as f64,
             }
         }
     }
@@ -85,8 +85,8 @@ mod fontra {
         fn from(val: &Anchor) -> Self {
             fontra::Anchor {
                 name: val.name.clone(),
-                x: val.x,
-                y: val.y,
+                x: val.x as f32,
+                y: val.y as f32,
             }
         }
     }

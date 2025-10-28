@@ -139,8 +139,8 @@ impl Layer {
                     for node in &contour.nodes {
                         let new_point = transform * kurbo::Point::new(node.x as f64, node.y as f64);
                         decomposed_contour.nodes.push(Node {
-                            x: new_point.x as f32,
-                            y: new_point.y as f32,
+                            x: new_point.x,
+                            y: new_point.y,
                             nodetype: node.nodetype,
                             smooth: node.smooth,
                         })

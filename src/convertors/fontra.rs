@@ -135,8 +135,8 @@ pub struct PackedPath {
 impl PackedPath {
     pub fn push_path(&mut self, babelfont: &crate::Path) {
         for node in babelfont.nodes.iter() {
-            self.coordinates.push(node.x);
-            self.coordinates.push(node.y);
+            self.coordinates.push(node.x as f32);
+            self.coordinates.push(node.y as f32);
             if node.nodetype != crate::NodeType::OffCurve {
                 self.point_types.push(0);
             } else {

@@ -98,8 +98,8 @@ pub(crate) fn interpolate_layer(
         let interpolated_pos = model.interpolate_from_deltas(target_location, &deltas);
         new_layer.anchors.push(crate::anchor::Anchor {
             name: anchor_name,
-            x: interpolated_pos[0] as f32,
-            y: interpolated_pos[1] as f32,
+            x: interpolated_pos[0],
+            y: interpolated_pos[1],
         });
     }
 
@@ -239,8 +239,8 @@ impl Path {
     fn from_coordinate_list_and_signature(&self, coords: &[f64]) -> Path {
         let mut new_path = Path::default();
         for (i, node) in self.nodes.iter().enumerate() {
-            let x = coords[i * 2] as f32;
-            let y = coords[i * 2 + 1] as f32;
+            let x = coords[i * 2];
+            let y = coords[i * 2 + 1];
             new_path.nodes.push(crate::common::Node {
                 x,
                 y,
