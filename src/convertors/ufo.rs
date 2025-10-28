@@ -1,17 +1,18 @@
-use crate::glyph::GlyphCategory;
 use crate::{
-    features::Features, BabelfontError, Component, Font, Glyph, Layer, Master, MetricType, Node,
-    OTScalar, Path, Shape,
+    features::Features, glyph::GlyphCategory, BabelfontError, Component, Font, Glyph, Layer,
+    Master, MetricType, Node, OTScalar, Path, Shape,
 };
 use chrono::{DateTime, Local, NaiveDateTime, TimeZone};
 use fontdrasil::coords::Location;
-use std::collections::{HashMap, HashSet};
-use std::fs;
-use std::time::SystemTime;
+use std::{
+    collections::{HashMap, HashSet},
+    fs,
+    time::SystemTime,
+};
 
 pub const KEY_LIB: &str = "norad_lib";
 
-fn stash_lib(lib: Option<&norad::Plist>) -> crate::common::FormatSpecific {
+pub(crate) fn stash_lib(lib: Option<&norad::Plist>) -> crate::common::FormatSpecific {
     let mut fs = crate::common::FormatSpecific::default();
     if let Some(lib) = lib {
         fs.insert(
@@ -355,6 +356,9 @@ pub(crate) fn load_master_info(master: &mut Master, info: &norad::FontInfo) {
     }
 }
 
+// The distinction between this and load_master_info is that this is font-wide info;
+// in a .designspace loader, this would be called once per font, while load_master_info
+// would be called once per source.
 pub(crate) fn load_font_info(
     font: &mut Font,
     info: &norad::FontInfo,
@@ -430,16 +434,23 @@ pub(crate) fn load_kerning(master: &mut Master, kerning: &norad::Kerning) {
 }
 
 pub(crate) fn load_kern_groups(
-    _groups: &norad::Groups,
+    groups: &norad::Groups,
 ) -> (HashMap<String, Vec<String>>, HashMap<String, Vec<String>>) {
-    let first: HashMap<String, Vec<String>> = HashMap::new();
-    let second: HashMap<String, Vec<String>> = HashMap::new();
-    // for (name, members) in groups.iter() {
-    //     hm.insert(
-    //         name.to_string(),
-    //         members.iter().map(|x| x.to_string()).collect(),
-    //     );
-    // }
+    let mut first: HashMap<String, Vec<String>> = HashMap::new();
+    let mut second: HashMap<String, Vec<String>> = HashMap::new();
+    for (name, members) in groups.iter() {
+        if let Some(first_name) = name.strip_prefix("public.kern1.") {
+            first.insert(
+                first_name.to_string(),
+                members.iter().map(|x| x.to_string()).collect(),
+            );
+        } else if let Some(second_name) = name.strip_prefix("public.kern2.") {
+            second.insert(
+                second_name.to_string(),
+                members.iter().map(|x| x.to_string()).collect(),
+            );
+        }
+    }
     (first, second)
 }
 

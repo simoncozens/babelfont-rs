@@ -18,19 +18,22 @@ mod metrics;
 pub mod names;
 mod shape;
 
-pub use crate::anchor::Anchor;
-pub use crate::axis::Axis;
-pub use crate::common::{Node, NodeType, OTScalar, Position};
-pub use crate::error::BabelfontError;
-pub use crate::features::Features;
-pub use crate::font::Font;
-pub use crate::glyph::{Glyph, GlyphCategory, GlyphList};
-pub use crate::guide::Guide;
-pub use crate::instance::Instance;
-pub use crate::layer::Layer;
-pub use crate::master::Master;
-pub use crate::metrics::MetricType;
-pub use crate::shape::{Component, Path, Shape};
+pub use crate::{
+    anchor::Anchor,
+    axis::Axis,
+    common::{Node, NodeType, OTScalar, Position},
+    error::BabelfontError,
+    features::Features,
+    font::Font,
+    glyph::{Glyph, GlyphCategory, GlyphList},
+    guide::Guide,
+    i18ndictionary::I18NDictionary,
+    instance::Instance,
+    layer::Layer,
+    master::Master,
+    metrics::MetricType,
+    shape::{Component, Path, Shape},
+};
 pub use fontdrasil::coords::{
     DesignCoord, DesignLocation, NormalizedCoord, NormalizedLocation, UserCoord, UserLocation,
 };

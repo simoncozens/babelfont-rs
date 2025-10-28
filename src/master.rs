@@ -56,6 +56,19 @@ impl Master {
             value,
         })
     }
+
+    pub fn is_sparse(&self, font: &crate::Font) -> bool {
+        for glyph in font.glyphs.iter() {
+            let has_layer = glyph
+                .layers
+                .iter()
+                .any(|layer| layer.id.as_deref() == Some(&self.id));
+            if !has_layer {
+                return true;
+            }
+        }
+        false
+    }
 }
 
 mod fontra {

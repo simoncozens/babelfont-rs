@@ -248,6 +248,7 @@ fn load_instance(font: &Font, instance: &glyphs3::Instance) -> crate::Instance {
     };
     let mut format_specific = FormatSpecific::default();
     copy_custom_parameters(&mut format_specific, &instance.custom_parameters);
+    copy_user_data(&mut format_specific, &instance.user_data);
     if let Some(weight_class) = instance.weight_class.as_ref().and_then(|x| x.as_i64()) {
         format_specific.insert(KEY_WEIGHT_CLASS.into(), weight_class.into());
     }
@@ -258,10 +259,12 @@ fn load_instance(font: &Font, instance: &glyphs3::Instance) -> crate::Instance {
         format_specific.insert(KEY_INSTANCE_EXPORTS.into(), serde_json::Value::Bool(false));
     }
     crate::Instance {
+        id: instance.name.clone(),
         name: I18NDictionary::from(&instance.name),
         location: designspace_to_location(&instance.axes_values),
         custom_names: Names::new(), // TODO instance.custom_names.clone().into(),
         variable: instance.export_type == glyphslib::glyphs3::ExportType::Variable,
+        linked_style: instance.link_style.clone(),
         format_specific,
     }
 }
@@ -843,6 +846,7 @@ fn save_instance(instance: &crate::Instance, axes: &[Axis]) -> glyphs3::Instance
             .get(KEY_USER_DATA)
             .and_then(|x| serde_json::from_value::<UserData>(x.clone()).ok())
             .unwrap_or_default(),
+        link_style: instance.linked_style.clone(),
         ..Default::default()
     }
 }
@@ -881,36 +885,36 @@ mod tests {
         }
     }
 
-    // #[test]
-    // fn test_roundtrip() {
-    //     let there = load("resources/GlyphsFileFormatv3.glyphs".into()).unwrap();
-    //     let backagain = glyphslib::Font::Glyphs3(as_glyphs3(&there));
-    //     let orig = glyphslib::Font::load_str(
-    //         &fs::read_to_string("resources/GlyphsFileFormatv3.glyphs").unwrap(),
-    //     )
-    //     .unwrap();
+    #[test]
+    fn test_roundtrip() {
+        let there = load("resources/GlyphsFileFormatv3.glyphs".into()).unwrap();
+        let backagain = glyphslib::Font::Glyphs3(as_glyphs3(&there));
+        let orig = glyphslib::Font::load_str(
+            &fs::read_to_string("resources/GlyphsFileFormatv3.glyphs").unwrap(),
+        )
+        .unwrap();
 
-    //     assert!(there.format_specific.get(KEY_STEMS).is_some());
-    //     println!("Original stems: {:?}", there.format_specific.get(KEY_STEMS));
-    //     assert!(!backagain.as_glyphs3().unwrap().stems.is_empty());
+        assert!(there.format_specific.get(KEY_STEMS).is_some());
+        println!("Original stems: {:?}", there.format_specific.get(KEY_STEMS));
+        assert!(!backagain.as_glyphs3().unwrap().stems.is_empty());
 
-    //     let old_string = orig.to_string().unwrap();
-    //     let new_string = backagain.to_string().unwrap();
-    //     let diff = TextDiff::from_lines(&old_string, &new_string);
-    //     let text_diff = diff.unified_diff().to_string();
-    //     println!("Diff between original and roundtrip:\n{}", text_diff);
-    //     // for change in diff.iter_all_changes() {
-    //     //     let sign = match change.tag() {
-    //     //         ChangeTag::Delete => "-",
-    //     //         ChangeTag::Insert => "+",
-    //     //         ChangeTag::Equal => " ",
-    //     //     };
-    //     //     print!("{}{}", sign, change);
-    //     // }
-    //     if diff.ratio() < 1.0 {
-    //         panic!("Roundtrip produced different output");
-    //     }
-    // }
+        let old_string = orig.to_string().unwrap();
+        let new_string = backagain.to_string().unwrap();
+        let diff = TextDiff::from_lines(&old_string, &new_string);
+        let text_diff = diff.unified_diff().to_string();
+        println!("Diff between original and roundtrip:\n{}", text_diff);
+        // for change in diff.iter_all_changes() {
+        //     let sign = match change.tag() {
+        //         ChangeTag::Delete => "-",
+        //         ChangeTag::Insert => "+",
+        //         ChangeTag::Equal => " ",
+        //     };
+        //     print!("{}{}", sign, change);
+        // }
+        if diff.ratio() < 1.0 {
+            panic!("Roundtrip produced different output");
+        }
+    }
 
     #[test]
     fn test_load_open_shape() {

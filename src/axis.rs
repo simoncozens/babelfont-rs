@@ -170,6 +170,66 @@ mod fontra {
     }
 }
 
+#[cfg(feature = "ufo")]
+mod ufo {
+    use fontdrasil::coords::{DesignCoord, UserCoord};
+
+    use crate::{common::tag_from_string, BabelfontError};
+
+    use super::Axis;
+    impl TryFrom<&norad::designspace::Axis> for Axis {
+        type Error = BabelfontError;
+        fn try_from(dsax: &norad::designspace::Axis) -> Result<Self, BabelfontError> {
+            let mut ax = Axis::new(dsax.name.clone(), tag_from_string(&dsax.tag)?);
+            ax.min = dsax.minimum.map(|x| x as f64).map(UserCoord::new);
+            ax.max = dsax.maximum.map(|x| x as f64).map(UserCoord::new);
+            ax.default = Some(UserCoord::new(dsax.default as f64));
+            if let Some(map) = &dsax.map {
+                ax.map = Some(
+                    map.iter()
+                        .map(|x| {
+                            (
+                                UserCoord::new(x.input as f64),
+                                DesignCoord::new(x.output as f64),
+                            )
+                        })
+                        .collect(),
+                );
+            }
+            ax.hidden = dsax.hidden;
+            Ok(ax)
+        }
+    }
+
+    impl From<&Axis> for norad::designspace::Axis {
+        fn from(ax: &Axis) -> Self {
+            norad::designspace::Axis {
+                name: ax
+                    .name
+                    .get_default()
+                    .unwrap_or(&"Unnamed axis".to_string())
+                    .clone(),
+                tag: ax.tag.to_string(),
+                minimum: ax.min.map(|x| x.to_f64() as f32),
+                maximum: ax.max.map(|x| x.to_f64() as f32),
+                default: ax.default.map(|x| x.to_f64() as f32).unwrap_or(0.0),
+                map: ax.map.as_ref().map(|mapping| {
+                    mapping
+                        .iter()
+                        .map(|(input, output)| norad::designspace::AxisMapping {
+                            input: input.to_f64() as f32,
+                            output: output.to_f64() as f32,
+                        })
+                        .collect()
+                }),
+                hidden: ax.hidden,
+                values: (!ax.values.is_empty())
+                    .then(|| ax.values.iter().map(|v| v.to_f64() as f32).collect()),
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used)]

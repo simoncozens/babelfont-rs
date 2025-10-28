@@ -1,5 +1,4 @@
-use std::io;
-use std::path::PathBuf;
+use std::{io, path::PathBuf};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -19,6 +18,10 @@ pub enum BabelfontError {
     #[cfg(feature = "ufo")]
     #[error("Error parsing designspace file: {0}")]
     DesignSpaceLoad(#[from] norad::error::DesignSpaceLoadError),
+
+    #[cfg(feature = "ufo")]
+    #[error("Error saving designspace file: {0}")]
+    DesignSpaceSave(#[from] norad::error::DesignSpaceSaveError),
 
     #[cfg(feature = "glyphs")]
     #[error("Error parsing Glyphs file: {0}")]
@@ -82,6 +85,12 @@ impl From<BabelfontError> for fontir::error::Error {
             }
             #[cfg(feature = "ufo")]
             BabelfontError::DesignSpaceLoad(orig) => fontir::error::BadSource::new(
+                "Unknown",
+                fontir::error::BadSourceKind::Custom(orig.to_string()),
+            )
+            .into(),
+            #[cfg(feature = "ufo")]
+            BabelfontError::DesignSpaceSave(orig) => fontir::error::BadSource::new(
                 "Unknown",
                 fontir::error::BadSourceKind::Custom(orig.to_string()),
             )

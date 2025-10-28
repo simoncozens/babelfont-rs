@@ -1,10 +1,18 @@
-use crate::common::tag_from_string;
-use crate::convertors::ufo::stat;
-use crate::features::Features;
-use crate::glyph::GlyphList;
-use crate::Layer;
+use crate::{
+    common::tag_from_string,
+    convertors::ufo::{stash_lib, stat, KEY_LIB},
+    features::Features,
+    glyph::GlyphList,
+    names::Names,
+    Instance, Layer,
+};
 use fontdrasil::coords::{DesignCoord, DesignLocation, UserCoord};
-use norad::designspace::Source;
+use norad::{
+    designspace::{
+        Axis as DSAxis, DesignSpaceDocument, Instance as DSInstance, RuleProcessing, Rules, Source,
+    },
+    Plist,
+};
 use std::collections::{BTreeMap, HashMap};
 use write_fonts::types::Tag;
 // use rayon::prelude::*;
@@ -12,99 +20,133 @@ use std::path::PathBuf;
 
 use uuid::Uuid;
 
-use crate::convertors::ufo::{
-    load_font_info, load_glyphs, load_master_info, norad_glyph_to_babelfont_layer,
-};
-use crate::{Axis, BabelfontError, Font, Master};
+pub const FORMAT_KEY: &str = "norad.designspace.format";
+pub const FILENAME_KEY: &str = "norad.designspace.filename";
 
-use norad::designspace::{Axis as DSAxis, DesignSpaceDocument, Instance as DSInstance};
+use crate::{
+    convertors::ufo::{
+        load_font_info, load_glyphs, load_master_info, norad_glyph_to_babelfont_layer,
+    },
+    Axis, BabelfontError, Font, Master,
+};
 
 pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
-    let created_time = stat(&path);
-    // let ds_file = File::open(path.clone()).map_err(|source| BabelfontError::IO {
-    //     path: path.clone(),
-    //     source,
-    // })?;
     let ds: DesignSpaceDocument = norad::designspace::DesignSpaceDocument::load(path.clone())?;
     let relative = path.parent();
-    let mut font = Font::new();
-    load_axes(&mut font, &ds.axes)?;
-    // if let Some(instances) = &ds.instances {
-    //     load_instances(&mut font, &instances.instance);
-    // }
-    let default_master = default_master(&ds, &font.axes)
+    let axes: Vec<Axis> = ds
+        .axes
+        .iter()
+        .filter_map(|dsax| dsax.try_into().ok())
+        .collect();
+    #[allow(clippy::unwrap_used)] // We put a default there
+    let axis_name_tag_map = axes
+        .iter()
+        .map(|ax| (ax.name.get_default().unwrap().clone(), ax.tag))
+        .collect();
+    let default_master = default_master(&ds, &axes)
         .ok_or_else(|| BabelfontError::NoDefaultMaster { path: path.clone() })?;
     let relative_path_to_default_master = if let Some(r) = relative {
         r.join(default_master.filename.clone())
     } else {
         default_master.filename.clone().into()
     };
-    let default_ufo = norad::Font::load(relative_path_to_default_master)?;
-    load_glyphs(&mut font, &default_ufo);
+    let mut font = crate::convertors::ufo::load(relative_path_to_default_master)?;
+
+    load_instances(&mut font, &axis_name_tag_map, &ds.instances);
     let res: Vec<(Master, Vec<Vec<Layer>>)> = ds
         .sources
         .iter()
-        .filter_map(|source| load_master(&font.glyphs, &ds, source, relative).ok())
+        .filter_map(|source| load_master(&font.glyphs, source, relative, &axis_name_tag_map).ok())
         .collect();
+    // Drop the default master loaded from the UFO above
+    font.masters.clear();
     for (master, mut layerset) in res {
         font.masters.push(master);
         for (g, l) in font.glyphs.iter_mut().zip(layerset.iter_mut()) {
             g.layers.append(l);
         }
     }
-    let info = default_ufo.font_info;
-    load_font_info(&mut font, &info, created_time);
-    font.features = Features::from_fea(&default_ufo.features);
     Ok(font)
 }
 
-fn load_axes(font: &mut Font, axes: &[DSAxis]) -> Result<(), BabelfontError> {
-    for dsax in axes {
-        let mut ax = Axis::new(dsax.name.clone(), tag_from_string(&dsax.tag)?);
-        ax.min = dsax.minimum.map(|x| x as f64).map(UserCoord::new);
-        ax.max = dsax.maximum.map(|x| x as f64).map(UserCoord::new);
-        ax.default = Some(UserCoord::new(dsax.default as f64));
-        if let Some(map) = &dsax.map {
-            ax.map = Some(
-                map.iter()
-                    .map(|x| {
+pub(crate) fn load_instances(
+    font: &mut Font,
+    axis_name_tag_map: &HashMap<String, Tag>,
+    instances: &[DSInstance],
+) {
+    for instance in instances {
+        let mut custom_names = Names::new();
+        if let Some(familyname) = &instance.familyname {
+            custom_names.family_name = familyname.into();
+        }
+        if let Some(stylename) = &instance.stylename {
+            custom_names.preferred_subfamily_name = stylename.into(); // ?
+        }
+        if let Some(psname) = &instance.postscriptfontname {
+            custom_names.postscript_name = psname.into();
+        }
+        if let Some(stylemapfamilyname) = &instance.stylemapfamilyname {
+            custom_names.typographic_family = stylemapfamilyname.into(); // ???
+        }
+        if let Some(stylemapstylename) = &instance.stylemapstylename {
+            custom_names.typographic_subfamily = stylemapstylename.into(); // ???
+        }
+        let mut inst = Instance {
+            id: instance
+                .name
+                .as_ref()
+                .unwrap_or(&"Unnamed instance".to_string())
+                .clone(),
+            name: instance
+                .name
+                .as_ref()
+                .unwrap_or(&"Unnamed instance".to_string())
+                .into(),
+            location: DesignLocation::from(
+                instance
+                    .location
+                    .iter()
+                    .map(|dimension| {
                         (
-                            UserCoord::new(x.input as f64),
-                            DesignCoord::new(x.output as f64),
+                            *axis_name_tag_map
+                                .get(&dimension.name)
+                                .unwrap_or(&Tag::new(b"unkn")),
+                            DesignCoord::new(
+                                dimension.uservalue.map(|x| x as f64).unwrap_or_default(),
+                            ),
                         )
                     })
-                    .collect(),
+                    .collect::<Vec<_>>(),
+            ),
+            custom_names,
+            variable: false,
+            format_specific: stash_lib(Some(&instance.lib)),
+            linked_style: None,
+            // We should also stash the file name
+        };
+        if let Some(filename) = &instance.filename {
+            inst.format_specific.insert(
+                FILENAME_KEY.to_string(),
+                serde_json::Value::String(filename.into()),
             );
         }
-        font.axes.push(ax);
+        font.instances.push(inst);
     }
-    Ok(())
-}
-
-#[allow(dead_code)]
-pub(crate) fn load_instances(_font: &mut Font, _instances: &[DSInstance]) {
-    // unimplemented!()
 }
 
 fn load_master(
     glyphs: &GlyphList,
-    ds: &DesignSpaceDocument,
     source: &Source,
     relative: Option<&std::path::Path>,
+    axis_name_tag_map: &HashMap<String, Tag>,
 ) -> Result<(Master, Vec<Vec<Layer>>), BabelfontError> {
-    #[warn(clippy::unwrap_used)] // XXX I am in a hurry
-    let axis_names_to_tags: HashMap<String, Tag> = ds
-        .axes
-        .iter()
-        .map(|x| (x.name.clone(), tag_from_string(&x.tag).unwrap()))
-        .collect();
     let location = DesignLocation::from(
         source
             .location
             .iter()
             .map(|dimension| {
                 (
-                    *axis_names_to_tags
+                    *axis_name_tag_map
                         .get(dimension.name.as_str())
                         .unwrap_or_else(|| panic!("Axis name not found: {}", dimension.name)),
                     DesignCoord::new(dimension.uservalue.map(|x| x as f64).unwrap_or_default()),
@@ -112,6 +154,7 @@ fn load_master(
             })
             .collect::<Vec<_>>(),
     );
+    println!("Master location: {:?}", source.location);
     let required_layer = &source.layer;
     let uuid = Uuid::new_v4().to_string();
 
@@ -199,4 +242,66 @@ fn default_master<'a>(ds: &'a DesignSpaceDocument, axes: &[Axis]) -> Option<&'a 
         }
     }
     None
+}
+
+fn save_designspace(font: &Font, path: PathBuf) -> Result<(), BabelfontError> {
+    let axis_tag_name_map: HashMap<Tag, String> = font
+        .axes
+        .iter()
+        .map(|ax| {
+            (
+                ax.tag,
+                ax.name
+                    .get_default()
+                    .unwrap_or(&"Unnamed axis".to_string())
+                    .to_string(),
+            )
+        })
+        .collect();
+    let ds = DesignSpaceDocument {
+        format: font
+            .format_specific
+            .get(FORMAT_KEY)
+            .and_then(|v| v.as_f64())
+            .unwrap_or(3.0) as f32,
+        axes: font.axes.iter().map(|x| x.into()).collect(),
+        rules: Rules {
+            processing: RuleProcessing::First,
+            rules: vec![],
+        },
+        sources: font
+            .masters
+            .iter()
+            .map(|m| to_source(m, &axis_tag_name_map))
+            .collect(),
+        instances: font.instances.iter().map(|i| i.into()).collect(),
+        lib: Plist::new(),
+    };
+    Ok(ds.save(path)?)
+}
+
+fn to_source(
+    master: &Master,
+    axis_tag_name_map: &HashMap<Tag, String>,
+) -> norad::designspace::Source {
+    norad::designspace::Source {
+        familyname: todo!(),
+        stylename: todo!(),
+        name: master.name.get_default().map(|x| x.to_string()),
+        filename: todo!(),
+        layer: todo!(),
+        location: master
+            .location
+            .iter()
+            .map(|(tag, coord)| norad::designspace::Dimension {
+                name: axis_tag_name_map
+                    .get(tag)
+                    .cloned()
+                    .unwrap_or_else(|| tag.to_string()),
+                uservalue: Some(coord.to_f64() as f32),
+                xvalue: None,
+                yvalue: None,
+            })
+            .collect(),
+    }
 }
