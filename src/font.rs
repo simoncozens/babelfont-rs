@@ -189,6 +189,13 @@ impl Font {
                 return glyphs3_font.save(&path).map_err(BabelfontError::PlistParse);
             }
         }
+        #[cfg(feature = "ufo")]
+        {
+            if path.extension().and_then(|x| x.to_str()) == Some("designspace") {
+                crate::convertors::designspace::save_designspace(self, &path)?;
+            }
+        }
+
         Err(BabelfontError::UnknownFileType {
             path: path.to_path_buf(),
         })

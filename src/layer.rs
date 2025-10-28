@@ -192,7 +192,9 @@ mod glyphs {
     use glyphslib::Plist;
     use smol_str::SmolStr;
 
-    use crate::convertors::glyphs3::{UserData, KEY_ANNOTATIONS, KEY_LAYER_HINTS, KEY_USER_DATA};
+    use crate::convertors::glyphs3::{
+        UserData, KEY_ANNOTATIONS, KEY_LAYER_HINTS, KEY_LAYER_IMAGE, KEY_USER_DATA,
+    };
 
     use super::*;
 
@@ -213,6 +215,12 @@ mod glyphs {
                     fs.insert(
                         KEY_ANNOTATIONS.into(),
                         serde_json::to_value(&val.annotations).unwrap_or(serde_json::Value::Null),
+                    );
+                }
+                if let Some(bg_image) = &val.background_image {
+                    fs.insert(
+                        KEY_LAYER_IMAGE.into(),
+                        serde_json::to_value(bg_image).unwrap_or(serde_json::Value::Null),
                     );
                 }
                 copy_user_data(&mut fs, &val.user_data);
@@ -255,7 +263,14 @@ mod glyphs {
                 associated_master_id: val.master_id.clone(),
                 attr: BTreeMap::new(),
                 background: None,
-                background_image: None,
+                background_image: val
+                    .format_specific
+                    .get(KEY_LAYER_IMAGE)
+                    .map(|x| {
+                        serde_json::from_value::<glyphslib::glyphs3::BackgroundImage>(x.clone())
+                            .ok()
+                    })
+                    .unwrap_or_default(),
                 color: None,
                 hints: val
                     .format_specific

@@ -1,16 +1,7 @@
-use crate::{
-    common::tag_from_string,
-    convertors::ufo::{stash_lib, stat, KEY_LIB},
-    features::Features,
-    glyph::GlyphList,
-    names::Names,
-    Instance, Layer,
-};
-use fontdrasil::coords::{DesignCoord, DesignLocation, UserCoord};
+use crate::{convertors::ufo::stash_lib, glyph::GlyphList, names::Names, Instance, Layer};
+use fontdrasil::coords::{DesignCoord, DesignLocation};
 use norad::{
-    designspace::{
-        Axis as DSAxis, DesignSpaceDocument, Instance as DSInstance, RuleProcessing, Rules, Source,
-    },
+    designspace::{DesignSpaceDocument, Instance as DSInstance, RuleProcessing, Rules, Source},
     Plist,
 };
 use std::collections::{BTreeMap, HashMap};
@@ -24,9 +15,7 @@ pub const FORMAT_KEY: &str = "norad.designspace.format";
 pub const FILENAME_KEY: &str = "norad.designspace.filename";
 
 use crate::{
-    convertors::ufo::{
-        load_font_info, load_glyphs, load_master_info, norad_glyph_to_babelfont_layer,
-    },
+    convertors::ufo::{load_master_info, norad_glyph_to_babelfont_layer},
     Axis, BabelfontError, Font, Master,
 };
 
@@ -244,7 +233,7 @@ fn default_master<'a>(ds: &'a DesignSpaceDocument, axes: &[Axis]) -> Option<&'a 
     None
 }
 
-fn save_designspace(font: &Font, path: PathBuf) -> Result<(), BabelfontError> {
+pub fn save_designspace(font: &Font, path: &PathBuf) -> Result<(), BabelfontError> {
     let axis_tag_name_map: HashMap<Tag, String> = font
         .axes
         .iter()
@@ -256,6 +245,27 @@ fn save_designspace(font: &Font, path: PathBuf) -> Result<(), BabelfontError> {
                     .unwrap_or(&"Unnamed axis".to_string())
                     .to_string(),
             )
+        })
+        .collect();
+    let master_filenames: Vec<String> = font
+        .masters
+        .iter()
+        .map(|m| {
+            m.format_specific
+                .get(FILENAME_KEY)
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+                .unwrap_or(format!(
+                    "{}-{}.ufo",
+                    font.names
+                        .family_name
+                        .get_default()
+                        .unwrap_or(&"Unnamed font".to_string()),
+                    m.name
+                        .get_default()
+                        .map(|x| x.as_str())
+                        .unwrap_or(m.id.as_str())
+                ))
         })
         .collect();
     let ds = DesignSpaceDocument {
@@ -272,7 +282,8 @@ fn save_designspace(font: &Font, path: PathBuf) -> Result<(), BabelfontError> {
         sources: font
             .masters
             .iter()
-            .map(|m| to_source(m, &axis_tag_name_map))
+            .zip(master_filenames)
+            .map(|(m, f)| to_source(m, f, &axis_tag_name_map))
             .collect(),
         instances: font.instances.iter().map(|i| i.into()).collect(),
         lib: Plist::new(),
@@ -282,14 +293,15 @@ fn save_designspace(font: &Font, path: PathBuf) -> Result<(), BabelfontError> {
 
 fn to_source(
     master: &Master,
+    filename: String,
     axis_tag_name_map: &HashMap<Tag, String>,
 ) -> norad::designspace::Source {
     norad::designspace::Source {
-        familyname: todo!(),
-        stylename: todo!(),
+        familyname: None, // Maybe we want custom names for masters?
+        stylename: None,  // ???
         name: master.name.get_default().map(|x| x.to_string()),
-        filename: todo!(),
-        layer: todo!(),
+        // We know we have one
+        filename,
         location: master
             .location
             .iter()
@@ -303,5 +315,6 @@ fn to_source(
                 yvalue: None,
             })
             .collect(),
+        layer: None, // XXX
     }
 }

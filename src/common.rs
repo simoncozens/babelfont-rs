@@ -79,6 +79,7 @@ pub enum OTScalar {
     Signed(i32),
     Float(f32),
     BitField(Vec<u8>),
+    Array(Vec<f64>),
 }
 
 impl OTScalar {
@@ -152,6 +153,7 @@ impl From<OTScalar> for String {
             OTScalar::Bool(p) => format!("{}", p),
             OTScalar::Float(p) => format!("{}", p),
             OTScalar::BitField(p) => format!("{:?}", p),
+            OTScalar::Array(p) => format!("{:?}", p),
         }
     }
 }
