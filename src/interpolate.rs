@@ -88,10 +88,7 @@ pub(crate) fn interpolate_layer(
                     .iter()
                     .find(|a| a.name == anchor_name)
                     .unwrap();
-                Ok((
-                    loc.to_normalized(axes),
-                    vec![anchor.x as f64, anchor.y as f64],
-                ))
+                Ok((loc.to_normalized(axes), vec![anchor.x, anchor.y]))
             })
             .collect::<Result<HashMap<Location<NormalizedSpace>, Vec<f64>>, BabelfontError>>()?;
         let deltas = model.deltas(&anchor_positions)?;
@@ -229,8 +226,8 @@ impl Path {
     fn to_coordinate_list(&self) -> Vec<f64> {
         let mut coords = vec![];
         for node in &self.nodes {
-            coords.push(node.x as f64);
-            coords.push(node.y as f64);
+            coords.push(node.x);
+            coords.push(node.y);
         }
         coords
     }

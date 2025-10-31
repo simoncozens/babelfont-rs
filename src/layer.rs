@@ -137,7 +137,7 @@ impl Layer {
                 for contour in new_outline.paths() {
                     let mut decomposed_contour = Path::default();
                     for node in &contour.nodes {
-                        let new_point = transform * kurbo::Point::new(node.x as f64, node.y as f64);
+                        let new_point = transform * kurbo::Point::new(node.x, node.y);
                         decomposed_contour.nodes.push(Node {
                             x: new_point.x,
                             y: new_point.y,

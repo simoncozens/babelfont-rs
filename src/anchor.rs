@@ -15,8 +15,8 @@ mod ufo {
     impl From<&norad::Anchor> for Anchor {
         fn from(a: &norad::Anchor) -> Self {
             Anchor {
-                x: a.x as f64,
-                y: a.y as f64,
+                x: a.x,
+                y: a.y,
                 name: a
                     .name
                     .as_ref()
@@ -31,8 +31,8 @@ mod ufo {
 
         fn try_from(a: &Anchor) -> Result<Self, BabelfontError> {
             Ok(norad::Anchor::new(
-                a.x as f64,
-                a.y as f64,
+                a.x,
+                a.y,
                 Some(norad::Name::new(&a.name)?),
                 None,
                 None,
