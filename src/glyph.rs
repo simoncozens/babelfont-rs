@@ -21,6 +21,10 @@ impl GlyphList {
     pub fn get_by_index_mut(&mut self, id: usize) -> Option<&mut Glyph> {
         self.0.get_mut(id)
     }
+
+    pub fn iter(&self) -> std::slice::Iter<'_, Glyph> {
+        self.0.iter()
+    }
 }
 
 impl Deref for GlyphList {
