@@ -4,10 +4,10 @@ use smol_str::SmolStr;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Features {
-    /// Opentype classes classes
+    /// Opentype classes
     ///
-    /// Each group is a list of glyph names or class names. The key should not start with @.
-    pub classes: IndexMap<SmolStr, Vec<String>>,
+    /// EThe key should not start with @.
+    pub classes: IndexMap<SmolStr, String>,
     /// Opentype prefixes
     ///
     /// A dictionary of OpenType lookups and other feature code to be placed before features are defined.
@@ -23,7 +23,7 @@ impl Features {
     pub fn to_fea(&self) -> String {
         let mut fea = String::new();
         for (name, glyphs) in &self.classes {
-            fea.push_str(&format!("@{} = [{}];\n", name, glyphs.join(" ")));
+            fea.push_str(&format!("@{} = [{}];\n", name, glyphs));
         }
         for (prefix, code) in &self.prefixes {
             if prefix != "anonymous" {

@@ -138,12 +138,7 @@ fn _load(glyphs_font: &glyphslib::Font, path: PathBuf) -> Result<Font, Babelfont
     font.features.classes = glyphs_font
         .classes
         .iter()
-        .map(|c| {
-            (
-                SmolStr::new(&c.name),
-                c.code.split_whitespace().map(|s| s.to_string()).collect(),
-            )
-        })
+        .map(|c| (SmolStr::new(&c.name), c.code.clone()))
         .collect();
     // Custom parameters
     copy_custom_parameters(&mut font.format_specific, &glyphs_font.custom_parameters);
@@ -617,7 +612,7 @@ pub(crate) fn as_glyphs3(font: &Font) -> glyphs3::Glyphs3 {
         .iter()
         .map(|(name, members)| glyphslib::common::FeatureClass {
             name: name.to_string(),
-            code: members.join(" "),
+            code: members.clone(),
             disabled: false,
             automatic: false,
             notes: None,

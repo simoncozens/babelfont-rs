@@ -120,11 +120,7 @@ pub fn as_norad(font: &Font) -> Result<norad::Font, BabelfontError> {
             layer.insert_glyph(norad_layer);
         }
     }
-    for (class_name, class) in font.features.classes.iter() {
-        let class_ufo: Result<Vec<norad::Name>, norad::error::NamingError> =
-            class.iter().map(|x| norad::Name::new(x)).collect();
-        ufo.groups.insert(norad::Name::new(class_name)?, class_ufo?);
-    }
+
     save_kerning(&mut ufo.kerning, &first_master.kerning)?;
     save_info(&mut ufo.font_info, font);
     ufo.groups = font
