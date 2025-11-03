@@ -153,12 +153,18 @@ fn _load(glyphs_font: &glyphslib::Font, path: PathBuf) -> Result<Font, Babelfont
     font.names.family_name = glyphs_font.family_name.clone().into();
     // Feature prefixes
     for prefix in glyphs_font.feature_prefixes.iter() {
+        if prefix.disabled {
+            continue;
+        } // XXX Store as comment or something?
         font.features
             .prefixes
             .insert(SmolStr::new(&prefix.name), prefix.code.clone());
     }
     // Features
     for feature in glyphs_font.features.iter() {
+        if feature.disabled {
+            continue;
+        } // XXX Store as comment or something?
         font.features
             .features
             .push((SmolStr::new(&feature.tag), feature.code.clone()));
