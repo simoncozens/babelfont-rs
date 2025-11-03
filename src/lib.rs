@@ -39,31 +39,34 @@ pub use fontdrasil::coords::{
 };
 use std::path::PathBuf;
 
-pub fn load(filename: &str) -> Result<Font, BabelfontError> {
-    let pb = PathBuf::from(filename);
-    if filename.ends_with(".designspace") {
-        #[cfg(feature = "ufo")]
-        return crate::convertors::designspace::load(pb);
-        #[cfg(not(feature = "ufo"))]
-        Err(BabelfontError::UnknownFileType { path: pb })
-    } else if filename.ends_with(".vfj") {
-        #[cfg(feature = "fontlab")]
-        return crate::convertors::fontlab::load(pb);
-        #[cfg(not(feature = "fontlab"))]
-        Err(BabelfontError::UnknownFileType { path: pb })
-    } else if filename.ends_with(".ufo") {
-        #[cfg(feature = "ufo")]
-        return crate::convertors::ufo::load(pb);
-
-        #[cfg(not(feature = "ufo"))]
-        Err(BabelfontError::UnknownFileType { path: pb })
-    } else if filename.ends_with(".glyphs") || filename.ends_with(".glyphspackage") {
-        #[cfg(feature = "glyphs")]
-        return crate::convertors::glyphs3::load(pb);
-        #[cfg(not(feature = "glyphs"))]
-        Err(BabelfontError::UnknownFileType { path: pb })
-    } else {
-        Err(BabelfontError::UnknownFileType { path: pb })
+pub fn load(filename: impl Into<PathBuf>) -> Result<Font, BabelfontError> {
+    let pb = filename.into();
+    match pb.extension() {
+        Some(ext) if ext == "designspace" => {
+            #[cfg(feature = "ufo")]
+            return crate::convertors::designspace::load(pb);
+            #[cfg(not(feature = "ufo"))]
+            Err(BabelfontError::UnknownFileType { path: pb })
+        }
+        Some(ext) if ext == "vfj" => {
+            #[cfg(feature = "fontlab")]
+            return crate::convertors::fontlab::load(pb);
+            #[cfg(not(feature = "fontlab"))]
+            Err(BabelfontError::UnknownFileType { path: pb })
+        }
+        Some(ext) if ext == "ufo" => {
+            #[cfg(feature = "ufo")]
+            return crate::convertors::ufo::load(pb);
+            #[cfg(not(feature = "ufo"))]
+            Err(BabelfontError::UnknownFileType { path: pb })
+        }
+        Some(ext) if ext == "glyphs" || ext == "glyphspackage" => {
+            #[cfg(feature = "glyphs")]
+            return crate::convertors::glyphs3::load(pb);
+            #[cfg(not(feature = "glyphs"))]
+            Err(BabelfontError::UnknownFileType { path: pb })
+        }
+        _ => Err(BabelfontError::UnknownFileType { path: pb }),
     }
 }
 
