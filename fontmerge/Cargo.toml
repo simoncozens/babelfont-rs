@@ -1,0 +1,21 @@
+[package]
+name = "fontmerge"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+babelfont = { version = "0.1.1", path = "../babelfont-rs" }
+clap = { version = "4.5.50", features = ["derive"] }
+log = "0.4"
+env_logger = "0.10"
+thiserror = "2.0.17"
+indexmap = "2.12.0"
+clap-verbosity-flag = "3.0.4"
+fea-rs = { version = "0.20.3", path = "/home/simon/others-repos/fontc/fea-rs" }
+fontdrasil = { version = "0.2.3", path = "/home/simon/others-repos/fontc/fontdrasil" } # Must use same version as babelfont
+regex = "1.12.2"
+itertools = "0.14.0"
+
+[lints.clippy]
+unwrap_used = "deny"
+indexing_slicing = "deny"

@@ -1,0 +1,218 @@
+use clap::Parser;
+use indexmap::IndexSet;
+mod args;
+mod designspace;
+mod error;
+mod glyphset;
+mod layout;
+mod merge;
+
+use crate::args::{DuplicateLookupHandling, ExistingGlyphHandling, LayoutHandling};
+use crate::designspace::{fontdrasil_axes, map_designspaces};
+use crate::layout::lookupgatherer::LookupGathererVisitor;
+use crate::layout::subsetter::LayoutSubsetter;
+use crate::layout::visitor::LayoutVisitor;
+use crate::merge::merge_glyph;
+use babelfont::load;
+use regex::Regex;
+
+use std::path::PathBuf;
+use std::sync::LazyLock;
+
+#[allow(clippy::unwrap_used)] // Static regex is safe to unwrap
+static GLYPH_CLASS_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"\b(@[^\s,@]+)"#).unwrap());
+
+fn discover_hidden_classes(font: &babelfont::Font) -> IndexSet<String> {
+    let mut hidden_classes = IndexSet::new();
+    for glyph in font.glyphs.iter() {
+        for layer in glyph.layers.iter() {
+            for anchor in layer.anchors.iter() {
+                // GPOS context is either stored in ["com.schriftgestalt.Glyphs.userData"]["GPOS_Context"]
+                // or in ["norad.lib"]["GPOS_Context"] depending on source format.
+                let context_root = anchor.format_specific.get("norad.lib").or_else(|| {
+                    anchor
+                        .format_specific
+                        .get("com.schriftgestalt.Glyphs.userData")
+                });
+                if let Some(context) = context_root
+                    .and_then(|v| v.get("GPOS_Context"))
+                    .and_then(|v| v.as_str())
+                {
+                    // parse out anything that looks like a glyph class
+                    for cap in GLYPH_CLASS_REGEX.captures_iter(context) {
+                        hidden_classes.insert(cap[1].to_string());
+                    }
+                }
+            }
+        }
+    }
+    hidden_classes
+}
+
+fn main() {
+    let args = args::Args::parse();
+    env_logger::Builder::new()
+        .filter_level(args.verbosity.into())
+        .init();
+    let mut font1 = load(&args.font_1).expect("Failed to load font 1");
+    let mut font2 = load(&args.font_2).expect("Failed to load font 2");
+    let font1_root = PathBuf::from(args.font_1)
+        .parent()
+        .unwrap_or_else(|| std::path::Path::new("."))
+        .to_path_buf();
+    let font2_root = PathBuf::from(args.font_2)
+        .parent()
+        .unwrap_or_else(|| std::path::Path::new("."))
+        .to_path_buf();
+    let mut glyphset_filter = glyphset::GlyphsetFilter::new(
+        args.glyph_selection
+            .get_include_glyphs()
+            .expect("Failed to get include glyphs"),
+        args.glyph_selection
+            .get_exclude_glyphs()
+            .expect("Failed to get exclude glyphs"),
+        args.glyph_selection
+            .get_codepoints()
+            .expect("Failed to get codepoints"),
+        &font1,
+        &font2,
+        args.existing_handling,
+    );
+    glyphset_filter.de_encode(&mut font1);
+    glyphset_filter.check_for_presence(&font2);
+
+    if args.layout_handling == LayoutHandling::Closure {
+        let mut font2_glyphnames = font2
+            .glyphs
+            .iter()
+            .map(|g| g.name.as_str())
+            .collect::<Vec<&str>>();
+        font2_glyphnames.sort();
+        glyphset_filter
+            .perform_layout_closure(&font2.features, &font2_glyphnames, &font2_root)
+            .expect("Failed to perform layout closure");
+    }
+    if args.layout_handling != LayoutHandling::Ignore {
+        let final_glyphset: Vec<String> = glyphset_filter.final_glyphset();
+        // Create a layout subsetter
+        let pre_existing_lookups = if args.duplicate_lookups == DuplicateLookupHandling::First {
+            // Preseed the subsetter with existing lookups from font1
+            let font1_glyphnames = font1
+                .glyphs
+                .iter()
+                .map(|g| g.name.as_str())
+                .collect::<Vec<&str>>();
+            let font1_parse_tree =
+                crate::layout::get_parse_tree(&font1.features, &font1_glyphnames, &font1_root)
+                    .expect("Failed to get parse tree for font 1");
+            let mut visitor = LookupGathererVisitor::new(&font1_parse_tree);
+            visitor.visit();
+            visitor.lookup_names
+        } else {
+            IndexSet::new()
+        };
+        let hidden_classes = discover_hidden_classes(&font2);
+        let mut layout_subsetter = LayoutSubsetter::new(
+            &font2.features,
+            &final_glyphset,
+            &hidden_classes,
+            &pre_existing_lookups,
+        );
+        let subsetted_features = layout_subsetter
+            .subset()
+            .expect("Failed to subset layout features");
+        // merge_features(&mut font1, &subsetted_features);
+    }
+    // Parse feature file here
+
+    if font1.upm != font2.upm {
+        log::warn!(
+            "Font units per em differ: font1={} font2={}",
+            font1.upm,
+            font2.upm
+        );
+        // scale font2 glyphs here
+    }
+
+    let mapping =
+        map_designspaces(&font1, &font2).expect("Could not find a designspace mapping strategy");
+    log::info!("Designspace mapping strategies:");
+    for (strategy, master) in mapping.iter().zip(font1.masters.iter()) {
+        log::info!(
+            "  Master '{}': {}",
+            master.name.get_default().unwrap_or(&master.id),
+            strategy
+        );
+    }
+
+    glyphset_filter.close_components(&font2);
+    glyphset_filter.sort_glyphset(&mut font2);
+
+    log::debug!(
+        "Final glyphset to include from font 2: {:?}",
+        glyphset_filter.incoming_glyphset
+    );
+
+    let f2_axes = fontdrasil_axes(&font2.axes).expect("Could not interpret font 2 axes");
+
+    // Merge kerning here
+
+    for glyph in glyphset_filter.incoming_glyphset.iter() {
+        if args.existing_handling == ExistingGlyphHandling::Skip
+            && font1.glyphs.iter().any(|g| &g.name == glyph)
+        {
+            log::info!("Skipping existing glyph '{}'", glyph);
+            continue;
+        }
+        set_layer_locations(glyph, &mut font2);
+        if let Some(g) = font2.glyphs.get(glyph) {
+            merge_glyph(&mut font1, g, &f2_axes, &font2, &mapping).expect("Failed to merge glyph");
+        }
+    }
+
+    // Handle dotted circle anchors
+
+    if let Some(output) = &args.output {
+        font1.save(output).expect("Failed to save merged font");
+    }
+}
+
+fn set_layer_locations(glyph_name: &String, font: &mut babelfont::Font) {
+    let Some(glyph) = font.glyphs.get_mut(glyph_name) else {
+        log::warn!(
+            "Glyph '{}' not found in font when setting layer locations",
+            glyph_name
+        );
+        return;
+    };
+    for layer in glyph.layers.iter_mut() {
+        if layer.location.is_none() {
+            let id = layer.id.as_ref().or(layer.master_id.as_ref());
+            if let Some(mid) = id {
+                if let Some(master) = font.masters.iter().find(|m| &m.id == mid) {
+                    layer.location = Some(master.location.clone());
+                    log::debug!(
+                        "Set layer location for glyph '{}' to {:?}",
+                        glyph.name,
+                        layer.location
+                    );
+                } else {
+                    log::warn!(
+                        "Master ID '{}' for glyph '{}' layer not found in font masters",
+                        mid,
+                        glyph.name
+                    );
+                }
+            } else {
+                log::warn!("Layer for glyph '{}' does not have a master ID", glyph.name);
+            }
+        } else {
+            log::debug!(
+                "Layer location for glyph '{}' already set to {:?}",
+                glyph.name,
+                layer.location
+            );
+        }
+    }
+}
