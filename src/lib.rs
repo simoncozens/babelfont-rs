@@ -21,7 +21,7 @@ mod shape;
 pub use crate::{
     anchor::Anchor,
     axis::Axis,
-    common::{Node, NodeType, OTScalar, Position},
+    common::{Direction, Node, NodeType, OTScalar, Position},
     error::BabelfontError,
     features::Features,
     font::Font,
