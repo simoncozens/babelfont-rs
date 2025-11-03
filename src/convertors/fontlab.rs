@@ -165,6 +165,7 @@ impl TryInto<Option<Anchor>> for FontlabAnchor {
                 x,
                 y,
                 name: self.name,
+                format_specific: Default::default(),
             }))
         } else {
             Ok(None)

@@ -97,6 +97,7 @@ pub(crate) fn interpolate_layer(
             name: anchor_name,
             x: interpolated_pos[0],
             y: interpolated_pos[1],
+            format_specific: Default::default(), // Anything better here?
         });
     }
 
