@@ -6,8 +6,10 @@ use std::{
 use fea_rs::{
     compile::NopVariationInfo,
     parse::{FileSystemResolver, SourceResolver},
-    GlyphMap, ParseTree,
+    typed::{AstNode, GlyphOrClass},
+    GlyphMap, Kind, ParseTree,
 };
+use itertools::Either;
 
 use crate::error::FontmergeError;
 
@@ -17,11 +19,10 @@ pub(crate) mod subsetter;
 pub(crate) mod visitor;
 
 pub(crate) fn get_parse_tree(
-    features: &babelfont::Features,
+    features: &str,
     glyph_names: &[&str],
     project_root: impl Into<PathBuf>,
 ) -> Result<ParseTree, FontmergeError> {
-    let features = features.to_fea();
     let glyph_map = glyph_names
         .iter()
         .map(fontdrasil::types::GlyphName::new)
@@ -52,4 +53,53 @@ pub(crate) fn get_parse_tree(
         return Err(FontmergeError::LayoutClosureError);
     }
     Ok(parse_tree)
+}
+
+pub(crate) fn find_first_glyph_or_class(
+    node: &fea_rs::Node,
+    after: Option<Kind>,
+) -> Option<GlyphOrClass> {
+    let iter = if let Some(kind) = after {
+        Either::Left(
+            node.iter_children()
+                .skip_while(move |c| c.kind() != kind)
+                .skip(1),
+        )
+    } else {
+        Either::Right(node.iter_children())
+    };
+    for child in iter {
+        match child.kind() {
+            fea_rs::Kind::GlyphClass => {
+                if let Some(gc) = GlyphOrClass::cast(child) {
+                    return Some(gc);
+                }
+            }
+            fea_rs::Kind::GlyphName => {
+                if let Some(g) = GlyphOrClass::cast(child) {
+                    return Some(g);
+                }
+            }
+            // One day handle literal glyph classes
+            _ => {}
+        }
+    }
+    None
+}
+
+pub(crate) fn glyph_names(gc: &GlyphOrClass) -> Vec<String> {
+    match gc {
+        GlyphOrClass::Glyph(name) => vec![name.text().to_string()],
+        GlyphOrClass::Class(names) => names
+            .iter()
+            .filter_map(|n| {
+                if n.is_glyph_or_glyph_class() {
+                    n.token_text().map(|t| t.to_string())
+                } else {
+                    None
+                }
+            })
+            .collect(),
+        _ => vec![],
+    }
 }

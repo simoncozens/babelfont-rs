@@ -227,7 +227,8 @@ impl GlyphsetFilter {
         glyph_names: &[&str],
         project_root: impl Into<std::path::PathBuf>,
     ) -> Result<(), FontmergeError> {
-        let parse_tree = crate::layout::get_parse_tree(features, glyph_names, project_root)?;
+        let parse_tree =
+            crate::layout::get_parse_tree(&features.to_fea(), glyph_names, project_root)?;
         let mut count = self.incoming_glyphset.len();
         let mut rounds = 0;
         loop {

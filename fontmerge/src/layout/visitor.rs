@@ -1,36 +1,46 @@
 use fea_rs::{
-    NodeOrToken, ParseTree,
-    typed::{self, AstNode, Gsub1, Gsub2, Gsub3, Gsub4, LookupBlock},
+    typed::{self, AstNode, Feature, Gsub1, Gsub2, Gsub3, Gsub4, LookupBlock},
+    Node, NodeOrToken,
 };
+
+// Use constants as documentation
+pub(crate) const STOP: bool = false;
+pub(crate) const CONTINUE: bool = true;
 
 #[allow(unused_variables)]
 pub trait LayoutVisitor {
-    fn get_root(&self) -> ParseTree;
-    fn visit_node(&mut self, node: &NodeOrToken) -> bool {
+    fn get_root(&self) -> &Node;
+    fn depth_first(&self) -> bool {
         true
+    }
+    fn visit_node(&mut self, node: &NodeOrToken) -> bool {
+        CONTINUE
     }
     fn visit_gsub1(&mut self, node: &Gsub1) -> bool {
-        true
+        CONTINUE
     }
     fn visit_gsub2(&mut self, node: &Gsub2) -> bool {
-        true
+        CONTINUE
     }
     fn visit_gsub3(&mut self, node: &Gsub3) -> bool {
-        true
+        CONTINUE
     }
     fn visit_gsub4(&mut self, node: &Gsub4) -> bool {
-        true
+        CONTINUE
     }
     fn visit_lookupblock(&mut self, lookup: &LookupBlock) -> bool {
-        true
+        CONTINUE
+    }
+    fn visit_feature(&mut self, features: &Feature) -> bool {
+        CONTINUE
     }
     fn visit(&mut self) {
-        let tree = self.get_root();
-        let root_node = tree.root();
+        let root_node = self.get_root();
         self._visit_impl(&NodeOrToken::Node(root_node.clone()));
     }
     fn _visit_impl(&mut self, node: &NodeOrToken) {
-        if !self.visit_node(node) {
+        // Pre-order visit: visit the node and return if we're told to stop
+        if !self.depth_first() && self.visit_node(node) == STOP {
             return;
         }
         let keep_going = if let Some(node) = typed::Gsub1::cast(node) {
@@ -43,8 +53,10 @@ pub trait LayoutVisitor {
             self.visit_gsub4(&node)
         } else if let Some(lookup) = typed::LookupBlock::cast(node) {
             self.visit_lookupblock(&lookup)
+        } else if let Some(features) = typed::Feature::cast(node) {
+            self.visit_feature(&features)
         } else {
-            true
+            CONTINUE
         };
         if !keep_going {
             return;
@@ -56,6 +68,11 @@ pub trait LayoutVisitor {
                 }
             }
             fea_rs::NodeOrToken::Token(token) => {}
+        }
+
+        // Post-order visit: now we've visited the children, visit the node
+        if self.depth_first() {
+            self.visit_node(node);
         }
     }
 }

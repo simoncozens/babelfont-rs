@@ -18,8 +18,8 @@ impl<'a> LookupGathererVisitor<'a> {
 }
 
 impl LayoutVisitor for LookupGathererVisitor<'_> {
-    fn get_root(&self) -> ParseTree {
-        self.parse_tree.clone()
+    fn get_root(&self) -> &fea_rs::Node {
+        self.parse_tree.root()
     }
 
     fn visit_lookupblock(&mut self, lookup: &fea_rs::typed::LookupBlock) -> bool {

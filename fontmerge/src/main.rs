@@ -82,13 +82,12 @@ fn main() {
     glyphset_filter.de_encode(&mut font1);
     glyphset_filter.check_for_presence(&font2);
 
+    let mut font2_glyphnames = font2
+        .glyphs
+        .iter()
+        .map(|g| g.name.as_str())
+        .collect::<Vec<&str>>();
     if args.layout_handling == LayoutHandling::Closure {
-        let mut font2_glyphnames = font2
-            .glyphs
-            .iter()
-            .map(|g| g.name.as_str())
-            .collect::<Vec<&str>>();
-        font2_glyphnames.sort();
         glyphset_filter
             .perform_layout_closure(&font2.features, &font2_glyphnames, &font2_root)
             .expect("Failed to perform layout closure");
@@ -103,9 +102,12 @@ fn main() {
                 .iter()
                 .map(|g| g.name.as_str())
                 .collect::<Vec<&str>>();
-            let font1_parse_tree =
-                crate::layout::get_parse_tree(&font1.features, &font1_glyphnames, &font1_root)
-                    .expect("Failed to get parse tree for font 1");
+            let font1_parse_tree = crate::layout::get_parse_tree(
+                &font1.features.to_fea(),
+                &font1_glyphnames,
+                &font1_root,
+            )
+            .expect("Failed to get parse tree for font 1");
             let mut visitor = LookupGathererVisitor::new(&font1_parse_tree);
             visitor.visit();
             visitor.lookup_names
@@ -113,15 +115,25 @@ fn main() {
             IndexSet::new()
         };
         let hidden_classes = discover_hidden_classes(&font2);
+        let final_glyphset_refs = final_glyphset
+            .iter()
+            .map(|s| s.as_str())
+            .collect::<Vec<&str>>();
         let mut layout_subsetter = LayoutSubsetter::new(
             &font2.features,
-            &final_glyphset,
+            &font2_glyphnames,
+            &final_glyphset_refs,
             &hidden_classes,
             &pre_existing_lookups,
+            &font2_root,
         );
         let subsetted_features = layout_subsetter
             .subset()
             .expect("Failed to subset layout features");
+        font1
+            .features
+            .prefixes
+            .insert("anonymous".into(), subsetted_features.to_fea());
         // merge_features(&mut font1, &subsetted_features);
     }
     // Parse feature file here

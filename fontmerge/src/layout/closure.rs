@@ -2,30 +2,13 @@ use fea_rs::Kind;
 use fea_rs::parse::ParseTree;
 use fea_rs::typed::{AstNode as _, GlyphOrClass, Gsub1, Gsub2, Gsub3};
 use indexmap::IndexSet;
-use itertools::Either;
 
+use crate::layout::{find_first_glyph_or_class, glyph_names};
 use crate::layout::visitor::LayoutVisitor;
 
 pub(crate) struct LayoutClosureVisitor<'a> {
     parse_tree: &'a ParseTree,
     pub glyphset: IndexSet<String>,
-}
-
-pub fn glyph_names(gc: &GlyphOrClass) -> Vec<String> {
-    match gc {
-        GlyphOrClass::Glyph(name) => vec![name.text().to_string()],
-        GlyphOrClass::Class(names) => names
-            .iter()
-            .filter_map(|n| {
-                if n.is_glyph_or_glyph_class() {
-                    n.token_text().map(|t| t.to_string())
-                } else {
-                    None
-                }
-            })
-            .collect(),
-        _ => vec![],
-    }
 }
 
 impl<'a> LayoutClosureVisitor<'a> {
@@ -43,8 +26,8 @@ impl<'a> LayoutClosureVisitor<'a> {
 }
 
 impl LayoutVisitor for LayoutClosureVisitor<'_> {
-    fn get_root(&self) -> ParseTree {
-        self.parse_tree.clone()
+    fn get_root(&self) -> &fea_rs::Node {
+        self.parse_tree.root()
     }
 
     fn visit_gsub1(&mut self, node: &Gsub1) -> bool {
@@ -163,33 +146,4 @@ impl LayoutVisitor for LayoutClosureVisitor<'_> {
         }
         true
     }
-}
-
-fn find_first_glyph_or_class(node: &fea_rs::Node, after: Option<Kind>) -> Option<GlyphOrClass> {
-    let iter = if let Some(kind) = after {
-        Either::Left(
-            node.iter_children()
-                .skip_while(move |c| c.kind() != kind)
-                .skip(1),
-        )
-    } else {
-        Either::Right(node.iter_children())
-    };
-    for child in iter {
-        match child.kind() {
-            fea_rs::Kind::GlyphClass => {
-                if let Some(gc) = GlyphOrClass::cast(child) {
-                    return Some(gc);
-                }
-            }
-            fea_rs::Kind::GlyphName => {
-                if let Some(g) = GlyphOrClass::cast(child) {
-                    return Some(g);
-                }
-            }
-            // One day handle literal glyph classes
-            _ => {}
-        }
-    }
-    None
 }
