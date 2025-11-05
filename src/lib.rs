@@ -16,6 +16,7 @@ mod layer;
 mod master;
 mod metrics;
 pub mod names;
+mod serde_helpers;
 mod shape;
 
 pub use crate::{

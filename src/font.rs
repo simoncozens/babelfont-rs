@@ -24,31 +24,40 @@ pub struct Font {
     /// A list of axes, in the case of variable/multiple master font.
     ///
     /// May be empty.
+#[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub axes: Vec<Axis>,
     /// A list of named/static instances
+#[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub instances: Vec<Instance>,
     /// A list of the font's masters
+#[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub masters: Vec<Master>,
     pub glyphs: GlyphList,
+#[serde(default, skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
     pub date: chrono::DateTime<Local>,
     pub names: Names,
     /// Any values to be placed in OpenType tables on export to override defaults
     ///
     /// These must be font-wide. Metrics which may vary by master should be placed in the `metrics` field of a Master
+#[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub custom_ot_values: Vec<OTValue>,
+#[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub variation_sequences: BTreeMap<(u32, u32), String>,
     /// A representation of the font's OpenType features
     pub features: Features,
     /// A dictionary of kerning groups
     ///
     /// The key is the group name and the value is a list of glyph names in the group
+#[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub first_kern_groups: HashMap<String, Vec<String>>,
     // A dictionary of kerning groups
     ///
     /// The key is the group name and the value is a list of glyph names in the group
+#[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub second_kern_groups: HashMap<String, Vec<String>>,
 
+#[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
     pub format_specific: FormatSpecific,
 }
 impl Default for Font {
