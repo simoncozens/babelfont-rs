@@ -17,6 +17,7 @@ pub struct Master {
     pub location: DesignLocation,
     pub guides: Vec<Guide>,
     pub metrics: IndexMap<MetricType, i32>,
+    #[serde(serialize_with = "crate::serde_helpers::kerning_map")]
     pub kerning: HashMap<(String, String), i16>,
     pub custom_ot_values: Vec<OTValue>,
     pub format_specific: FormatSpecific,

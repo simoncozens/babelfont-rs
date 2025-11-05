@@ -50,12 +50,17 @@ pub enum GlyphCategory {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Glyph {
     pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub production_name: Option<String>,
     pub category: GlyphCategory,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub codepoints: Vec<u32>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub layers: Vec<Layer>,
     pub exported: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub direction: Option<Direction>,
+    #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
     pub formatspecific: FormatSpecific,
 }
 

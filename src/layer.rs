@@ -14,16 +14,26 @@ use serde::{Deserialize, Serialize};
 pub struct Layer {
     pub width: f32,
     pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub master_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub guides: Vec<Guide>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub shapes: Vec<Shape>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub anchors: Vec<Anchor>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub color: Option<Color>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub layer_index: Option<i32>,
     pub is_background: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub background_layer_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub location: Option<DesignLocation>,
+    #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
     pub format_specific: FormatSpecific,
 }
 

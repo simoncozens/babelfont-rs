@@ -43,4 +43,8 @@ impl FormatSpecific {
     pub(crate) fn iter(&self) -> impl Iterator<Item = (&String, &Value)> {
         self.0.iter()
     }
+
+    pub fn is_empty(value: &FormatSpecific) -> bool {
+        value.0.is_empty()
+    }
 }
