@@ -20,7 +20,7 @@ pub struct Node {
 
 impl Node {
     pub fn to_kurbo(&self) -> kurbo::Point {
-        kurbo::Point::new(self.x as f64, self.y as f64)
+        kurbo::Point::new(self.x, self.y)
     }
 }
 
