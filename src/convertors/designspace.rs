@@ -143,7 +143,7 @@ fn load_master(
             })
             .collect::<Vec<_>>(),
     );
-    println!("Master location: {:?}", source.location);
+    //println!("Master location: {:?}", source.location);
     let required_layer = &source.layer;
     let uuid = Uuid::new_v4().to_string();
 
