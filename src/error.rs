@@ -1,5 +1,7 @@
 use std::{io, path::PathBuf};
 use thiserror::Error;
+#[cfg(feature = "cli")]
+extern crate serde_json_path_to_error as serde_json;
 
 #[derive(Debug, Error)]
 pub enum BabelfontError {
@@ -60,6 +62,9 @@ pub enum BabelfontError {
 
     #[error("Called a method which requires a decomposed layer on a layer which had components")]
     NeedsDecomposition,
+
+    #[error("JSON serialization error: {0}")]
+    JsonSerialize(#[from] serde_json::Error),
 }
 
 impl From<BabelfontError> for fontir::error::Error {
@@ -150,6 +155,11 @@ impl From<BabelfontError> for fontir::error::Error {
             .into(),
             BabelfontError::VariationModel(e) => e.into(),
             BabelfontError::Delta(e) => fontir::error::BadSource::new(
+                "Unknown",
+                fontir::error::BadSourceKind::Custom(e.to_string()),
+            )
+            .into(),
+            BabelfontError::JsonSerialize(e) => fontir::error::BadSource::new(
                 "Unknown",
                 fontir::error::BadSourceKind::Custom(e.to_string()),
             )
