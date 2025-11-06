@@ -63,7 +63,7 @@ pub enum BabelfontError {
     #[error("Called a method which requires a decomposed layer on a layer which had components")]
     NeedsDecomposition,
 
-    #[error("JSON serialization error: {0}")]
+    #[error("JSON conversion error: {0}")]
     JsonSerialize(#[from] serde_json::Error),
 
     #[error("Filter error: {0}")]

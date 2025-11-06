@@ -1,5 +1,8 @@
 #![deny(clippy::unwrap_used, clippy::expect_used)]
 
+#[cfg(feature = "cli")]
+extern crate serde_json_path_to_error as serde_json;
+
 mod anchor;
 mod axis;
 mod common;
@@ -44,6 +47,11 @@ use std::path::PathBuf;
 pub fn load(filename: impl Into<PathBuf>) -> Result<Font, BabelfontError> {
     let pb = filename.into();
     match pb.extension() {
+        Some(ext) if ext == "babelfont" => {
+            let buffered = std::io::BufReader::new(std::fs::File::open(&pb)?);
+            Ok(serde_json::from_reader(buffered)?)
+        }
+
         Some(ext) if ext == "designspace" => {
             #[cfg(feature = "ufo")]
             return crate::convertors::designspace::load(pb);
