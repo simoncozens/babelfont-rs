@@ -1,3 +1,4 @@
+use babelfont::filters::FontFilter as _;
 use clap::Parser;
 use indexmap::IndexSet;
 mod args;
@@ -55,7 +56,9 @@ fn main() {
     env_logger::Builder::new()
         .filter_level(args.verbosity.into())
         .init();
+    log::debug!("Loading font 1");
     let mut font1 = load(&args.font_1).expect("Failed to load font 1");
+    log::debug!("Loading font 2");
     let mut font2 = load(&args.font_2).expect("Failed to load font 2");
     let font1_root = PathBuf::from(args.font_1)
         .parent()
@@ -145,10 +148,13 @@ fn main() {
             font2.upm
         );
         // scale font2 glyphs here
+        babelfont::filters::ScaleUpem::new(font1.upm)
+            .apply(&mut font2)
+            .expect("Failed to scale font2 to match font1 units per em");
     }
 
-    let mapping =
-        map_designspaces(&font1, &font2).expect("Could not find a designspace mapping strategy");
+    let mapping = map_designspaces(&font1, &font2, args.allow_clamping)
+        .expect("Could not find a designspace mapping strategy");
     log::info!("Designspace mapping strategies:");
     for (strategy, master) in mapping.iter().zip(font1.masters.iter()) {
         log::info!(
@@ -200,11 +206,15 @@ fn set_layer_locations(glyph_name: &String, font: &mut babelfont::Font) {
     };
     for layer in glyph.layers.iter_mut() {
         if layer.location.is_none() {
-            let id = layer.id.as_ref().or(layer.master_id.as_ref());
+            let id = layer.id.as_ref().or(match &layer.master {
+                babelfont::LayerType::DefaultForMaster(m) => Some(m),
+                babelfont::LayerType::AssociatedWithMaster(m) => Some(m),
+                babelfont::LayerType::FreeFloating => None,
+            });
             if let Some(mid) = id {
                 if let Some(master) = font.masters.iter().find(|m| &m.id == mid) {
                     layer.location = Some(master.location.clone());
-                    log::debug!(
+                    log::trace!(
                         "Set layer location for glyph '{}' to {:?}",
                         glyph.name,
                         layer.location

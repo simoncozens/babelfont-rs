@@ -11,8 +11,8 @@ env_logger = "0.10"
 thiserror = "2.0.17"
 indexmap = "2.12.0"
 clap-verbosity-flag = "3.0.4"
-fea-rs = { version = "0.20.3", path = "/home/simon/others-repos/fontc/fea-rs" }
-fontdrasil = { version = "0.2.3", path = "/home/simon/others-repos/fontc/fontdrasil" } # Must use same version as babelfont
+fea-rs = { git = "https://github.com/googlefonts/fontc.git", branch = "edit-edits" }
+fontdrasil = { git = "https://github.com/googlefonts/fontc.git", branch = "edit-edits" }
 regex = "1.12.2"
 itertools = "0.14.0"
 

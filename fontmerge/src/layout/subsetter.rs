@@ -123,7 +123,6 @@ impl LayoutSubsetVisitor<'_> {
         // Apply deletions to the parse tree and reconstruct features
         let edits = std::mem::take(&mut self.replacement_list);
         let mut new_tree = self.parse_tree.root().edit(edits, false);
-        new_tree.update_positions_from_root();
         // let _: Vec<_> = new_tree.iter_tokens().collect();
 
         // Now the parse tree does not have correct range information.
@@ -134,7 +133,6 @@ impl LayoutSubsetVisitor<'_> {
             replacement_list: Vec::new(),
         };
         cleanup.visit();
-        println!("Replacement list: {:?}", cleanup.replacement_list);
         let new_tree = cleanup.root.edit(cleanup.replacement_list, false);
 
         let result = new_tree
@@ -291,6 +289,9 @@ impl LayoutVisitor for LayoutSubsetVisitor<'_> {
         }
         false
     }
+
+    fn visit_gsub5(&mut self, node: &fea_rs::typed::Gsub5) -> bool {
+    true}
 }
 
 struct CleanupVisitor {

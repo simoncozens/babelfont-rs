@@ -1,5 +1,5 @@
 use fea_rs::{
-    typed::{self, AstNode, Feature, Gsub1, Gsub2, Gsub3, Gsub4, LookupBlock},
+    typed::{self, AstNode, Feature, Gsub1, Gsub2, Gsub3, Gsub4, Gsub5, Gsub6, LookupBlock},
     Node, NodeOrToken,
 };
 
@@ -28,6 +28,12 @@ pub trait LayoutVisitor {
     fn visit_gsub4(&mut self, node: &Gsub4) -> bool {
         CONTINUE
     }
+    fn visit_gsub5(&mut self, node: &Gsub5) -> bool {
+        CONTINUE
+    }
+    fn visit_gsub6(&mut self, node: &Gsub6) -> bool {
+        CONTINUE
+    }
     fn visit_lookupblock(&mut self, lookup: &LookupBlock) -> bool {
         CONTINUE
     }
@@ -51,6 +57,10 @@ pub trait LayoutVisitor {
             self.visit_gsub3(&node)
         } else if let Some(node) = typed::Gsub4::cast(node) {
             self.visit_gsub4(&node)
+        } else if let Some(node) = typed::Gsub5::cast(node) {
+            self.visit_gsub5(&node)
+        } else if let Some(node) = typed::Gsub6::cast(node) {
+            self.visit_gsub6(&node)
         } else if let Some(lookup) = typed::LookupBlock::cast(node) {
             self.visit_lookupblock(&lookup)
         } else if let Some(features) = typed::Feature::cast(node) {
