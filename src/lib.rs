@@ -6,6 +6,7 @@ mod common;
 pub mod convertors;
 mod error;
 mod features;
+pub mod filters;
 mod font;
 mod glyph;
 mod guide;
