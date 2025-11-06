@@ -40,6 +40,7 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
         default_master.filename.clone().into()
     };
     let mut font = crate::convertors::ufo::load(relative_path_to_default_master)?;
+    font.axes = axes;
 
     load_instances(&mut font, &axis_name_tag_map, &ds.instances);
     let res: Vec<(Master, Vec<Vec<Layer>>)> = ds
@@ -101,7 +102,7 @@ pub(crate) fn load_instances(
                                 .get(&dimension.name)
                                 .unwrap_or(&Tag::new(b"unkn")),
                             DesignCoord::new(
-                                dimension.uservalue.map(|x| x as f64).unwrap_or_default(),
+                                dimension.xvalue.map(|x| x as f64).unwrap_or_default(),
                             ),
                         )
                     })
@@ -134,25 +135,22 @@ fn load_master(
             .location
             .iter()
             .map(|dimension| {
+                // XXX We may have uservalues in DS5 sources
                 (
                     *axis_name_tag_map
                         .get(dimension.name.as_str())
                         .unwrap_or_else(|| panic!("Axis name not found: {}", dimension.name)),
-                    DesignCoord::new(dimension.uservalue.map(|x| x as f64).unwrap_or_default()),
+                    DesignCoord::new(dimension.xvalue.map(|x| x as f64).unwrap_or_default()),
                 )
             })
             .collect::<Vec<_>>(),
     );
-    //println!("Master location: {:?}", source.location);
     let required_layer = &source.layer;
     let uuid = Uuid::new_v4().to_string();
 
     let mut master = Master::new(
-        source
-            .name
-            .as_ref()
-            .unwrap_or(&"Unnamed master".to_string()),
-        source.name.as_ref().unwrap_or(&uuid),
+        source.name.as_ref().unwrap_or(&source.filename),
+        uuid,
         location,
     );
     let relative_path_to_master = if let Some(r) = relative {
@@ -177,8 +175,6 @@ fn load_master(
         let mut glyph_layer_list = vec![];
         for layer in source_font.iter_layers() {
             let layername = layer.name().to_string();
-            // We should probably keep all layers for interchange purposes,
-            // but this is correct for compilation purposes
             if let Some(wanted) = &required_layer {
                 if &layername != wanted {
                     continue;
@@ -186,16 +182,10 @@ fn load_master(
             }
 
             if let Some(norad_glyph) = layer.get_glyph(g.name.as_str()) {
-                let layer_name = if layer.is_default() {
-                    master.id.as_str()
-                } else {
-                    layer.name()
-                };
-                glyph_layer_list.push(norad_glyph_to_babelfont_layer(
-                    norad_glyph,
-                    layer_name,
-                    &master.id,
-                ))
+                let mut our_layer = norad_glyph_to_babelfont_layer(norad_glyph, layer, &master.id);
+                // Even if this is non-default in the UFO, it is the default layer for this master
+                our_layer.master = crate::LayerType::DefaultForMaster(master.id.to_string());
+                glyph_layer_list.push(our_layer);
             }
         }
         bf_layer_list.push(glyph_layer_list)

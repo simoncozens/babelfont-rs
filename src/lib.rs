@@ -31,7 +31,7 @@ pub use crate::{
     guide::Guide,
     i18ndictionary::I18NDictionary,
     instance::Instance,
-    layer::Layer,
+    layer::{Layer, LayerType},
     master::Master,
     metrics::MetricType,
     shape::{Component, Path, Shape},

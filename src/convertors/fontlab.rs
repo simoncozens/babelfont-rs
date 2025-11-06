@@ -1,6 +1,6 @@
 use crate::{
     common::tag_from_string, Anchor, Axis, BabelfontError, Component, Font, Glyph, GlyphCategory,
-    Layer, Master, Node, NodeType, Path, Shape,
+    Layer, LayerType, Master, Node, NodeType, Path, Shape,
 };
 use fontdrasil::{
     coords::{DesignCoord, DesignLocation, Location, UserCoord},
@@ -194,7 +194,7 @@ impl FontlabLayer {
             width: self.advanceWidth as f32,
             name: self.name.clone(),
             id: self.name,
-            master_id: None,
+            master: LayerType::FreeFloating,
             guides: vec![],
             shapes: self
                 .elements

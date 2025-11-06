@@ -10,14 +10,27 @@ use fontdrasil::coords::DesignLocation;
 use kurbo::Shape as KurboShape;
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub enum LayerType {
+    DefaultForMaster(String),
+    AssociatedWithMaster(String),
+    #[default]
+    FreeFloating,
+}
+impl LayerType {
+    pub fn is_default(&self) -> bool {
+        matches!(self, LayerType::FreeFloating)
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Layer {
     pub width: f32,
     pub name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub master_id: Option<String>,
+    #[serde(default, skip_serializing_if = "LayerType::is_default")]
+    pub master: LayerType,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub guides: Vec<Guide>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -105,7 +118,7 @@ impl Layer {
             width: self.width,
             name: self.name.clone(),
             id: self.id.clone(),
-            master_id: self.master_id.clone(),
+            master: self.master.clone(),
             guides: self.guides.clone(),
             anchors: self.anchors.clone(),
             color: self.color,
@@ -196,9 +209,10 @@ impl Layer {
 }
 
 #[cfg(feature = "glyphs")]
-mod glyphs {
+pub(crate) mod glyphs {
     use std::collections::BTreeMap;
 
+    use fontdrasil::types::Tag;
     use glyphslib::Plist;
     use smol_str::SmolStr;
 
@@ -238,7 +252,10 @@ mod glyphs {
             };
             Layer {
                 id: Some(val.layer_id.clone()),
-                master_id: val.associated_master_id.clone(),
+                master: match &val.associated_master_id {
+                    Some(m) => LayerType::AssociatedWithMaster(m.clone()),
+                    None => LayerType::DefaultForMaster(val.layer_id.clone()),
+                },
                 name: val.name.clone(),
                 color: None,
                 shapes: val.shapes.iter().map(Into::into).collect(),
@@ -254,61 +271,72 @@ mod glyphs {
         }
     }
 
-    impl From<&Layer> for glyphslib::glyphs3::Layer {
-        fn from(val: &Layer) -> Self {
-            glyphslib::glyphs3::Layer {
-                layer_id: val.id.clone().unwrap_or_default(),
-                name: val.name.clone(),
-                width: val.width,
-                shapes: val.shapes.iter().map(Into::into).collect(),
-                guides: val.guides.iter().map(Into::into).collect(),
-                anchors: val.anchors.iter().map(Into::into).collect(),
-                annotations: val
-                    .format_specific
-                    .get(KEY_ANNOTATIONS)
-                    .and_then(|x| {
-                        serde_json::from_value::<Vec<BTreeMap<SmolStr, Plist>>>(x.clone()).ok()
-                    })
-                    .unwrap_or_default(),
-                associated_master_id: val.master_id.clone(),
-                attr: BTreeMap::new(),
-                background: None,
-                background_image: val
-                    .format_specific
-                    .get(KEY_LAYER_IMAGE)
-                    .map(|x| {
-                        serde_json::from_value::<glyphslib::glyphs3::BackgroundImage>(x.clone())
-                            .ok()
-                    })
-                    .unwrap_or_default(),
-                color: None,
-                hints: val
-                    .format_specific
-                    .get(KEY_LAYER_HINTS)
-                    .and_then(|x| {
-                        serde_json::from_value::<Vec<BTreeMap<SmolStr, Plist>>>(x.clone()).ok()
-                    })
-                    .unwrap_or_default(),
-                metric_bottom: None,
-                metric_left: None,
-                metric_right: None,
-                metric_top: None,
-                metric_vert_width: None,
-                metric_width: None,
-                part_selection: BTreeMap::new(),
-                user_data: val
-                    .format_specific
-                    .get(KEY_USER_DATA)
-                    .and_then(|x| serde_json::from_value::<UserData>(x.clone()).ok())
-                    .unwrap_or_default(),
-                vert_origin: None,
-                vert_width: None,
-                visible: val
-                    .format_specific
-                    .get("visible")
-                    .and_then(|x| x.as_bool())
-                    .unwrap_or(true),
-            }
+    pub(crate) fn layer_to_glyphs(val: &Layer, axes_order: &[Tag]) -> glyphslib::glyphs3::Layer {
+        let mut attr: BTreeMap<SmolStr, _> = BTreeMap::new();
+        if let Some(coords) = &val.location {
+            attr.insert(
+                "location".into(),
+                axes_order
+                    .iter()
+                    .map(|axis_tag| coords.get(*axis_tag).map(|x| x.to_f64()).unwrap_or(0.0))
+                    .collect::<Vec<_>>()
+                    .into(),
+            );
+        }
+        glyphslib::glyphs3::Layer {
+            layer_id: val.id.clone().unwrap_or_default(),
+            name: val.name.clone(),
+            width: val.width,
+            shapes: val.shapes.iter().map(Into::into).collect(),
+            guides: val.guides.iter().map(Into::into).collect(),
+            anchors: val.anchors.iter().map(Into::into).collect(),
+            annotations: val
+                .format_specific
+                .get(KEY_ANNOTATIONS)
+                .and_then(|x| {
+                    serde_json::from_value::<Vec<BTreeMap<SmolStr, Plist>>>(x.clone()).ok()
+                })
+                .unwrap_or_default(),
+            associated_master_id: match val.master {
+                LayerType::AssociatedWithMaster(ref m) => Some(m.clone()),
+                _ => None,
+            },
+            attr,
+            background: None,
+            background_image: val
+                .format_specific
+                .get(KEY_LAYER_IMAGE)
+                .map(|x| {
+                    serde_json::from_value::<glyphslib::glyphs3::BackgroundImage>(x.clone()).ok()
+                })
+                .unwrap_or_default(),
+            color: None,
+            hints: val
+                .format_specific
+                .get(KEY_LAYER_HINTS)
+                .and_then(|x| {
+                    serde_json::from_value::<Vec<BTreeMap<SmolStr, Plist>>>(x.clone()).ok()
+                })
+                .unwrap_or_default(),
+            metric_bottom: None,
+            metric_left: None,
+            metric_right: None,
+            metric_top: None,
+            metric_vert_width: None,
+            metric_width: None,
+            part_selection: BTreeMap::new(),
+            user_data: val
+                .format_specific
+                .get(KEY_USER_DATA)
+                .and_then(|x| serde_json::from_value::<UserData>(x.clone()).ok())
+                .unwrap_or_default(),
+            vert_origin: None,
+            vert_width: None,
+            visible: val
+                .format_specific
+                .get("visible")
+                .and_then(|x| x.as_bool())
+                .unwrap_or(true),
         }
     }
 }

@@ -195,12 +195,33 @@ impl Font {
     pub fn save<T: Into<std::path::PathBuf>>(&self, path: T) -> Result<(), BabelfontError> {
         let path = path.into();
         if path.extension().and_then(|x| x.to_str()) == Some("babelfont") {
-            serde_json::to_writer_pretty(
-                std::fs::File::create(&path).map_err(BabelfontError::IO)?,
-                &self,
-            )
-            .map_err(BabelfontError::JsonSerialize)?;
+            let file = std::fs::File::create(&path).map_err(BabelfontError::IO)?;
+            let mut buffer = std::io::BufWriter::new(file);
+            serde_json::to_writer_pretty(&mut buffer, &self)
+                .map_err(BabelfontError::JsonSerialize)?;
             return Ok(());
+        }
+
+        #[cfg(feature = "fontir")]
+        {
+            if path.extension().and_then(|x| x.to_str()) == Some("ttf") {
+                let source =
+                    crate::convertors::fontir::BabelfontIrSource::new_from_memory(self.clone())
+                        .map_err(|e| {
+                            BabelfontError::General(format!("FontIR conversion error: {}", e))
+                        })?;
+                let bytes = fontc::generate_font(
+                    Box::new(source),
+                    std::path::Path::new("build"),
+                    None,
+                    fontc::Flags::default(),
+                    false,
+                )
+                .map_err(|e| BabelfontError::General(format!("Font generation error: {}", e)))?;
+                let out_path = std::path::PathBuf::from("output.ttf");
+                std::fs::write(&out_path, bytes)?;
+                return Ok(());
+            }
         }
 
         #[cfg(feature = "glyphs")]

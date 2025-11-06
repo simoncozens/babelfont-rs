@@ -74,10 +74,14 @@ impl Glyph {
 }
 
 #[cfg(feature = "glyphs")]
-mod glyphs {
-    use crate::convertors::glyphs3::{copy_user_data, UserData, KEY_USER_DATA};
+pub(crate) mod glyphs {
+    use crate::{
+        convertors::glyphs3::{copy_user_data, UserData, KEY_USER_DATA},
+        layer::glyphs::layer_to_glyphs,
+    };
 
     use super::*;
+    use fontdrasil::types::Tag;
     use glyphslib::glyphs3::Glyph as G3Glyph;
 
     impl From<&G3Glyph> for Glyph {
@@ -161,65 +165,63 @@ mod glyphs {
         }
     }
 
-    impl From<&Glyph> for G3Glyph {
-        fn from(val: &Glyph) -> Self {
-            let mut g3_layers = vec![];
-            for layer in &val.layers {
-                if layer.is_background {
-                    continue;
-                }
-                let mut g3_layer = glyphslib::glyphs3::Layer::from(layer);
-                if let Some(bg_id) = &layer.background_layer_id {
-                    if let Some(bg_layer) = val.get_layer(bg_id) {
-                        g3_layer.background =
-                            Some(Box::new(glyphslib::glyphs3::Layer::from(bg_layer)));
-                    }
-                }
-                g3_layers.push(g3_layer);
+    pub(crate) fn glyph_to_glyphs(val: &Glyph, axis_order: &[Tag]) -> glyphslib::glyphs3::Glyph {
+        let mut g3_layers = vec![];
+        for layer in &val.layers {
+            if layer.is_background {
+                continue;
             }
+            let mut g3_layer = layer_to_glyphs(layer, axis_order);
+            if let Some(bg_id) = &layer.background_layer_id {
+                if let Some(bg_layer) = val.get_layer(bg_id) {
+                    g3_layer.background = Some(Box::new(layer_to_glyphs(bg_layer, axis_order)));
+                }
+            }
+            g3_layers.push(g3_layer);
+        }
 
-            G3Glyph {
-                name: val.name.clone(),
-                production: val.production_name.clone(),
-                unicode: val.codepoints.clone(),
-                layers: g3_layers,
-                export: val.exported,
-                case: val.formatspecific.get_string("case"),
-                category: val.formatspecific.get_optionstring("category"),
-                direction: val.formatspecific.get_optionstring("kern_direction"),
-                kern_bottom: val.formatspecific.get_optionstring("kern_bottom"),
-                kern_left: val.formatspecific.get_optionstring("kern_left"),
-                kern_right: val.formatspecific.get_optionstring("kern_right"),
-                kern_top: val.formatspecific.get_optionstring("kern_top"),
-                last_change: val.formatspecific.get_optionstring("last_change"),
-                locked: val.formatspecific.get_bool("locked"),
-                metric_bottom: val.formatspecific.get_optionstring("metric_bottom"),
-                metric_left: val.formatspecific.get_optionstring("metric_left"),
-                metric_right: val.formatspecific.get_optionstring("metric_right"),
-                metric_top: val.formatspecific.get_optionstring("metric_top"),
-                metric_vert_width: val.formatspecific.get_optionstring("metric_vert_width"),
-                metric_width: val.formatspecific.get_optionstring("metric_width"),
-                note: val.formatspecific.get_string("note"),
-                smart_component_settings: vec![], // XXX
-                script: val.formatspecific.get_optionstring("script"),
-                subcategory: val.formatspecific.get_optionstring("subcategory"),
-                tags: val
-                    .formatspecific
-                    .get("tags")
-                    .and_then(|x| x.as_array())
-                    .map(|x| {
-                        x.iter()
-                            .filter_map(|x| x.as_str())
-                            .map(|x| x.to_string())
-                            .collect()
-                    })
-                    .unwrap_or_default(),
-                user_data: val
-                    .formatspecific
-                    .get(KEY_USER_DATA)
-                    .and_then(|x| serde_json::from_value::<UserData>(x.clone()).ok())
-                    .unwrap_or_default(),
-                color: val.formatspecific.get("color").and_then(|x|
+        G3Glyph {
+            name: val.name.clone(),
+            production: val.production_name.clone(),
+            unicode: val.codepoints.clone(),
+            layers: g3_layers,
+            export: val.exported,
+            case: val.formatspecific.get_string("case"),
+            category: val.formatspecific.get_optionstring("category"),
+            direction: val.formatspecific.get_optionstring("kern_direction"),
+            kern_bottom: val.formatspecific.get_optionstring("kern_bottom"),
+            kern_left: val.formatspecific.get_optionstring("kern_left"),
+            kern_right: val.formatspecific.get_optionstring("kern_right"),
+            kern_top: val.formatspecific.get_optionstring("kern_top"),
+            last_change: val.formatspecific.get_optionstring("last_change"),
+            locked: val.formatspecific.get_bool("locked"),
+            metric_bottom: val.formatspecific.get_optionstring("metric_bottom"),
+            metric_left: val.formatspecific.get_optionstring("metric_left"),
+            metric_right: val.formatspecific.get_optionstring("metric_right"),
+            metric_top: val.formatspecific.get_optionstring("metric_top"),
+            metric_vert_width: val.formatspecific.get_optionstring("metric_vert_width"),
+            metric_width: val.formatspecific.get_optionstring("metric_width"),
+            note: val.formatspecific.get_string("note"),
+            smart_component_settings: vec![], // XXX
+            script: val.formatspecific.get_optionstring("script"),
+            subcategory: val.formatspecific.get_optionstring("subcategory"),
+            tags: val
+                .formatspecific
+                .get("tags")
+                .and_then(|x| x.as_array())
+                .map(|x| {
+                    x.iter()
+                        .filter_map(|x| x.as_str())
+                        .map(|x| x.to_string())
+                        .collect()
+                })
+                .unwrap_or_default(),
+            user_data: val
+                .formatspecific
+                .get(KEY_USER_DATA)
+                .and_then(|x| serde_json::from_value::<UserData>(x.clone()).ok())
+                .unwrap_or_default(),
+            color: val.formatspecific.get("color").and_then(|x|
                     // either a tuple -> ColorTuple or an int -> ColorInt
                     if x.is_number() {
                         Some(glyphslib::common::Color::ColorInt(x.as_i64().unwrap_or(0) as u8))
@@ -234,7 +236,6 @@ mod glyphs {
                         ))
                     } else { None }
                 ),
-            }
         }
     }
 }

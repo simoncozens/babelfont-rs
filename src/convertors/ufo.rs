@@ -1,6 +1,6 @@
 use crate::{
     features::Features, glyph::GlyphCategory, BabelfontError, Component, Font, Glyph, Layer,
-    Master, MetricType, Node, OTScalar, Path, Shape,
+    LayerType, Master, MetricType, Node, OTScalar, Path, Shape,
 };
 use chrono::{DateTime, Local, NaiveDateTime, TimeZone};
 use fontdrasil::coords::Location;
@@ -67,14 +67,9 @@ pub fn load<T: AsRef<std::path::Path>>(path: T) -> Result<Font, BabelfontError> 
     for layer in ufo.iter_layers() {
         for g in font.glyphs.iter_mut() {
             if let Some(norad_glyph) = layer.get_glyph(g.name.as_str()) {
-                let layer_id = if layer.is_default() {
-                    master.id.as_str()
-                } else {
-                    layer.name()
-                };
                 g.layers.push(norad_glyph_to_babelfont_layer(
                     norad_glyph,
-                    layer_id,
+                    &layer,
                     &master.id,
                 ))
             }
@@ -171,12 +166,18 @@ fn babelfont_layer_to_norad_glyph(
 
 pub(crate) fn norad_glyph_to_babelfont_layer(
     glyph: &norad::Glyph,
-    layer_name: &str,
+    layer: &norad::Layer,
     master_id: &str,
 ) -> Layer {
     let mut l = Layer::new(glyph.width as f32);
-    l.master_id = Some(master_id.to_string());
-    l.name = Some(layer_name.to_string());
+    if layer.is_default() {
+        l.name = None;
+        l.master = LayerType::DefaultForMaster(master_id.to_string());
+    } else {
+        l.name = Some(layer.name().to_string());
+        l.master = LayerType::AssociatedWithMaster(layer.name().to_string());
+    }
+    l.id = Some(master_id.to_string());
     if !glyph.lib.is_empty() {
         l.format_specific = stash_lib(Some(&glyph.lib));
     }

@@ -65,6 +65,9 @@ pub enum BabelfontError {
 
     #[error("JSON serialization error: {0}")]
     JsonSerialize(#[from] serde_json::Error),
+
+    #[error("Filter error: {0}")]
+    FilterError(String),
 }
 
 impl From<BabelfontError> for fontir::error::Error {
@@ -164,6 +167,10 @@ impl From<BabelfontError> for fontir::error::Error {
                 fontir::error::BadSourceKind::Custom(e.to_string()),
             )
             .into(),
+            BabelfontError::FilterError(msg) => {
+                fontir::error::BadSource::new("Unknown", fontir::error::BadSourceKind::Custom(msg))
+                    .into()
+            }
         }
     }
 }

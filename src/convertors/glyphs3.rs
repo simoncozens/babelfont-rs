@@ -1,5 +1,7 @@
 use crate::{
     common::{FormatSpecific, OTValue},
+    filters::{DropSparseMasters, FontFilter as _},
+    glyph::glyphs::glyph_to_glyphs,
     i18ndictionary::I18NDictionary,
     names::Names,
     Axis, BabelfontError, Font, GlyphList, Master,
@@ -571,6 +573,11 @@ fn interpret_axis_mappings(font: &mut Font) {
 }
 
 pub(crate) fn as_glyphs3(font: &Font) -> glyphs3::Glyphs3 {
+    // Do some cleanups.
+    let mut font = font.clone();
+    #[allow(clippy::expect_used)] // Surely this can't fail
+    DropSparseMasters.apply(&mut font).unwrap();
+
     let axes = font
         .axes
         .iter()
@@ -698,6 +705,8 @@ pub(crate) fn as_glyphs3(font: &Font) -> glyphs3::Glyphs3 {
         })
         .collect();
 
+    let axes_order = font.axes.iter().map(|a| a.tag).collect::<Vec<_>>();
+
     let properties = save_properties(&font.names);
     let glyphs_font = glyphs3::Glyphs3 {
         app_version,
@@ -711,7 +720,11 @@ pub(crate) fn as_glyphs3(font: &Font) -> glyphs3::Glyphs3 {
         family_name,
         feature_prefixes,
         features,
-        glyphs: font.glyphs.iter().map(Into::into).collect(),
+        glyphs: font
+            .glyphs
+            .iter()
+            .map(|g| glyph_to_glyphs(g, &axes_order))
+            .collect(),
         instances: font
             .instances
             .iter()
