@@ -10,10 +10,15 @@ impl ScaleUpem {
 
 impl FontFilter for ScaleUpem {
     fn apply(&self, font: &mut crate::Font) -> Result<(), crate::BabelfontError> {
-        log::info!("Scaling UPEM from {} to {}", font.upm, self.0);
         let old_upem = font.upm as f64;
         let newupem = self.0 as f64;
         let scale_factor = newupem / old_upem;
+        log::info!(
+            "Scaling UPEM from {} to {}, scale factor {}",
+            font.upm,
+            self.0,
+            scale_factor
+        );
 
         // Scale all metrics
         for master in font.masters.iter_mut() {
@@ -47,12 +52,19 @@ impl FontFilter for ScaleUpem {
                             }
                         }
                         crate::Shape::Component(comp) => {
-                            comp.transform = comp.transform.pre_scale(scale_factor);
+                            // Just scale any translations in the transform
+                            let coeffs = comp.transform.as_coeffs();
+                            let new_tx = coeffs[4] * scale_factor;
+                            let new_ty = coeffs[5] * scale_factor;
+                            comp.transform = kurbo::Affine::new([
+                                coeffs[0], coeffs[1], coeffs[2], coeffs[3], new_tx, new_ty,
+                            ]);
                         }
                     }
                 }
             }
         }
+        font.upm = self.0;
         Ok(())
     }
 }
