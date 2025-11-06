@@ -34,6 +34,12 @@ impl FontFilter for RetainGlyphs {
         // Retain only the specified glyphs
         font.glyphs.retain(|g| self.0.contains(&g.name));
         // Filter kerning
+        for master in font.masters.iter_mut() {
+            // XXX or groups!
+            master
+                .kerning
+                .retain(|(left, right), _| self.0.contains(left) && self.0.contains(right));
+        }
         // Filter features!
         Ok(())
     }
