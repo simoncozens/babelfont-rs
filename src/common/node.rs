@@ -14,6 +14,7 @@ pub struct Node {
     pub x: f64,
     pub y: f64,
     pub nodetype: NodeType,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub smooth: bool,
     // userData: XXX
 }

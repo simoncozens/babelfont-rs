@@ -11,12 +11,35 @@ pub struct Axis {
     pub name: I18NDictionary,
     pub tag: Tag,
     pub id: Uuid,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "crate::serde_helpers::usercoord_option_ser",
+        deserialize_with = "crate::serde_helpers::usercoord_option_de"
+    )]
     pub min: Option<UserCoord>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "crate::serde_helpers::usercoord_option_ser",
+        deserialize_with = "crate::serde_helpers::usercoord_option_de"
+    )]
     pub max: Option<UserCoord>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "crate::serde_helpers::usercoord_option_ser",
+        deserialize_with = "crate::serde_helpers::usercoord_option_de"
+    )]
     pub default: Option<UserCoord>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "crate::serde_helpers::axismap_ser",
+        deserialize_with = "crate::serde_helpers::axismap_de"
+    )]
     pub map: Option<Vec<(UserCoord, DesignCoord)>>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub hidden: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub values: Vec<UserCoord>,
+    #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
     pub formatspecific: FormatSpecific,
 }
 

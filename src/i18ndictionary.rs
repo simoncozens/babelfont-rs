@@ -26,6 +26,10 @@ impl I18NDictionary {
     pub fn insert(&mut self, lang: String, s: String) {
         self.0.insert(lang, s);
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
 }
 
 impl Debug for I18NDictionary {

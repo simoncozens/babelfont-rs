@@ -60,6 +60,9 @@ impl FontFilter for DropAxis {
         }
         font.masters
             .retain(|master| !droppable_master_ids.iter().any(|m| m == &master.id));
+        for instance in font.instances.iter_mut() {
+            instance.location.retain(|tag, _| tag != &self.0);
+        }
         font.axes.retain(|axis| axis.tag != self.0);
         Ok(())
     }

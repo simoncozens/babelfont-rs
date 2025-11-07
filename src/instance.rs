@@ -8,9 +8,11 @@ pub struct Instance {
     pub name: I18NDictionary,
     pub location: DesignLocation,
     pub custom_names: Names,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub variable: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub linked_style: Option<String>,
-    // lib
+    #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
     pub format_specific: FormatSpecific,
 }
 

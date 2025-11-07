@@ -20,6 +20,9 @@ const KEY_SKIP_EXPORT: &str = "public.skipExportGlyphs";
 pub(crate) fn stash_lib(lib: Option<&norad::Plist>) -> crate::common::FormatSpecific {
     let mut fs = crate::common::FormatSpecific::default();
     if let Some(lib) = lib {
+        if lib.is_empty() {
+            return fs;
+        }
         fs.insert(
             KEY_LIB.into(),
             serde_json::to_value(lib).unwrap_or_default(),

@@ -13,28 +13,51 @@ pub enum StyleMapStyle {
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Names {
+    #[serde(default, skip_serializing_if = "I18NDictionary::is_empty")]
     pub copyright: I18NDictionary,
+    #[serde(default, skip_serializing_if = "I18NDictionary::is_empty")]
     pub family_name: I18NDictionary,
+    #[serde(default, skip_serializing_if = "I18NDictionary::is_empty")]
     pub preferred_subfamily_name: I18NDictionary,
+    #[serde(default, skip_serializing_if = "I18NDictionary::is_empty")]
     pub unique_id: I18NDictionary,
+    #[serde(default, skip_serializing_if = "I18NDictionary::is_empty")]
     pub full_name: I18NDictionary,
+    #[serde(default, skip_serializing_if = "I18NDictionary::is_empty")]
     pub version: I18NDictionary,
+    #[serde(default, skip_serializing_if = "I18NDictionary::is_empty")]
     pub postscript_name: I18NDictionary,
+    #[serde(default, skip_serializing_if = "I18NDictionary::is_empty")]
     pub trademark: I18NDictionary,
+    #[serde(default, skip_serializing_if = "I18NDictionary::is_empty")]
     pub manufacturer: I18NDictionary,
+    #[serde(default, skip_serializing_if = "I18NDictionary::is_empty")]
     pub designer: I18NDictionary,
+    #[serde(default, skip_serializing_if = "I18NDictionary::is_empty")]
     pub description: I18NDictionary,
+    #[serde(default, skip_serializing_if = "I18NDictionary::is_empty")]
     pub manufacturer_url: I18NDictionary,
+    #[serde(default, skip_serializing_if = "I18NDictionary::is_empty")]
     pub designer_url: I18NDictionary,
+    #[serde(default, skip_serializing_if = "I18NDictionary::is_empty")]
     pub license: I18NDictionary,
+    #[serde(default, skip_serializing_if = "I18NDictionary::is_empty")]
     pub license_url: I18NDictionary,
+    #[serde(default, skip_serializing_if = "I18NDictionary::is_empty")]
     pub reserved: I18NDictionary,
+    #[serde(default, skip_serializing_if = "I18NDictionary::is_empty")]
     pub typographic_family: I18NDictionary,
+    #[serde(default, skip_serializing_if = "I18NDictionary::is_empty")]
     pub typographic_subfamily: I18NDictionary,
+    #[serde(default, skip_serializing_if = "I18NDictionary::is_empty")]
     pub compatible_full_name: I18NDictionary,
+    #[serde(default, skip_serializing_if = "I18NDictionary::is_empty")]
     pub sample_text: I18NDictionary,
+    #[serde(default, skip_serializing_if = "I18NDictionary::is_empty")]
     pub postscript_cid_name: I18NDictionary, // XXX?
+    #[serde(default, skip_serializing_if = "I18NDictionary::is_empty")]
     pub wws_family_name: I18NDictionary,
+    #[serde(default, skip_serializing_if = "I18NDictionary::is_empty")]
     pub wws_subfamily_name: I18NDictionary,
 }
 
