@@ -275,7 +275,7 @@ pub(crate) mod glyphs {
         let mut attr: BTreeMap<SmolStr, _> = BTreeMap::new();
         if let Some(coords) = &val.location {
             attr.insert(
-                "location".into(),
+                "coordinates".into(),
                 axes_order
                     .iter()
                     .map(|axis_tag| coords.get(*axis_tag).map(|x| x.to_f64()).unwrap_or(0.0))
@@ -284,7 +284,10 @@ pub(crate) mod glyphs {
             );
         }
         glyphslib::glyphs3::Layer {
-            layer_id: val.id.clone().unwrap_or_default(),
+            layer_id: match val.master {
+                LayerType::DefaultForMaster(ref m) => m.clone(),
+                _ => val.id.clone().unwrap_or_default(),
+            },
             name: val.name.clone(),
             width: val.width,
             shapes: val.shapes.iter().map(Into::into).collect(),
