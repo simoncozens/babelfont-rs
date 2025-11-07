@@ -1,4 +1,5 @@
 use babelfont::{Font, Glyph, LayerType};
+use fontdrasil::coords::{Location, UserSpace};
 use fontdrasil::types::Axes;
 use indexmap::IndexSet;
 
@@ -35,6 +36,11 @@ pub(crate) fn merge_glyph(
     font2: &Font,
     strategies: &[Strategy],
 ) -> Result<(), FontmergeError> {
+    let font1_nonsparse_masters = font1
+        .masters
+        .iter()
+        .filter(|m| !m.is_sparse(font1))
+        .collect::<Vec<_>>();
     let font1_axes = fontdrasil_axes(&font1.axes)?;
     if font1.glyphs.get(&font2_glyph.name).is_none() {
         font1.glyphs.push(font2_glyph.clone());
@@ -49,8 +55,9 @@ pub(crate) fn merge_glyph(
             layer.id = Some(format!("{}_layer_{}", glyph.name, i));
         }
     }
+    log::debug!("Existing locations for this glyph: {:?}", layers.iter().filter_map(|l| l.location.as_ref()).collect::<Vec<_>>());
     let mut drop_layers = IndexSet::new();
-    for (master, strategy) in font1.masters.iter().zip(strategies.iter()) {
+    for (master, strategy) in font1_nonsparse_masters.iter().zip(strategies.iter()) {
         let new_layer = match strategy {
             Strategy::Exact(id) => {
                 // Find a layer in layers with this master ID, either in master_id or layer id
@@ -145,6 +152,7 @@ pub(crate) fn merge_glyph(
         })
         .collect::<Vec<_>>();
     let first_master = font1.masters.first();
+    #[allow(clippy::unwrap_used)] // We check above
     for layer in remaining_layers.iter_mut() {
         // Set to associated with master
         if let Some(master) = first_master {
@@ -152,6 +160,32 @@ pub(crate) fn merge_glyph(
         } else {
             layer.master = LayerType::FreeFloating;
         }
+        // These locations are in the design space of font2. We're going to move them into font1, so what
+        // we need to do is:
+        // * Convert them to user space,
+        // * Then fill in any missing axes with defaults from font1 and remove any axes not in font1,
+        // * Then convert to design space of font1.
+        let loc_in_user = layer
+            .location
+            .as_ref()
+            .unwrap()
+            .to_user(font2_axes);
+        let new_userspace: Location<UserSpace> = font1_axes
+            .iter()
+            .map(|axis| {
+                if let Some(value) = loc_in_user.get(axis.tag) {
+                    (axis.tag, value)
+                } else {
+                    (axis.tag, axis.default)
+                }
+            })
+            .collect();
+        layer.location = Some(new_userspace.to_design(&font1_axes));
+        log::debug!(
+            "Adding remaining layer at location {:?} to glyph '{}' as intermediate layer",
+            layer.location.as_ref().unwrap(),
+            glyph.name
+        );
     }
     glyph.layers.extend(remaining_layers);
 

@@ -115,8 +115,8 @@ pub(crate) fn map_designspaces(
         .map(|m| (m.id.clone(), remove_not_in_f1(m.location.to_user(&ds2))))
         .collect::<Vec<_>>();
 
-    // For each master in font1, we need to find something in font2 at that location
-    for master in f1_masters.iter() {
+    // For each non-sparse master in font1, we need to find something in font2 at that location
+    for master in f1_masters.iter().filter(|m| !m.is_sparse(font1)) {
         // Master location is in designspace, we need it in userspace
         let loc1 = &master.location.to_user(&ds1);
         // Remove all axes not in font 2 from loc1

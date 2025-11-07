@@ -1,5 +1,6 @@
 use babelfont::filters::FontFilter as _;
 use clap::Parser;
+use fontdrasil::coords::Location;
 use indexmap::IndexSet;
 mod args;
 mod designspace;
