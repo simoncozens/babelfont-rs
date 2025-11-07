@@ -66,6 +66,12 @@ fn convert_filters(filter: &[String]) -> Vec<Box<dyn FontFilter>> {
                     fontdrasil::types::Tag::from_str(&parts[1]).expect("Invalid axis tag");
                 result.push(Box::new(babelfont::filters::DropAxis::new(axis_tag)));
             }
+            "dropfeatures" => {
+                result.push(Box::new(babelfont::filters::DropFeatures::new()));
+            }
+            "dropkerning" => {
+                result.push(Box::new(babelfont::filters::DropKerning::new()));
+            }
             _ => {
                 log::warn!("Unknown filter: {}", parts[0]);
             }
