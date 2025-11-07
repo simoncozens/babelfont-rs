@@ -50,6 +50,10 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
         .collect();
     // Drop the default master loaded from the UFO above
     font.masters.clear();
+    // Clear all layers
+    for g in font.glyphs.iter_mut() {
+        g.layers.clear();
+    }
     for (master, mut layerset) in res {
         font.masters.push(master);
         for (g, l) in font.glyphs.iter_mut().zip(layerset.iter_mut()) {

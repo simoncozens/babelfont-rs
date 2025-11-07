@@ -55,9 +55,7 @@ pub fn load<T: AsRef<std::path::Path>>(path: T) -> Result<Font, BabelfontError> 
         info.family_name
             .as_ref()
             .unwrap_or(&"Unnamed master".to_string()),
-        info.family_name
-            .as_ref()
-            .unwrap_or(&"Unnamed master".to_string()),
+        uuid::Uuid::new_v4().to_string(),
         Location::new(),
     );
     load_master_info(&mut master, info);
@@ -69,7 +67,7 @@ pub fn load<T: AsRef<std::path::Path>>(path: T) -> Result<Font, BabelfontError> 
             if let Some(norad_glyph) = layer.get_glyph(g.name.as_str()) {
                 g.layers.push(norad_glyph_to_babelfont_layer(
                     norad_glyph,
-                    &layer,
+                    layer,
                     &master.id,
                 ))
             }
