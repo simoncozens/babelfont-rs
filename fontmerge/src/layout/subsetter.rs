@@ -1,8 +1,8 @@
 use std::{ops::Range, path::PathBuf};
 
 use fea_rs::{
-    typed::{AstNode as _, Feature, GlyphOrClass, LookupBlock},
     Kind, NodeOrToken,
+    typed::{AstNode as _, Feature, GlyphOrClass, LookupBlock},
 };
 use indexmap::IndexSet;
 
@@ -291,7 +291,8 @@ impl LayoutVisitor for LayoutSubsetVisitor<'_> {
     }
 
     fn visit_gsub5(&mut self, node: &fea_rs::typed::Gsub5) -> bool {
-    true}
+        true
+    }
 }
 
 struct CleanupVisitor {

@@ -4,10 +4,10 @@ use std::{
 };
 
 use fea_rs::{
+    GlyphMap, Kind, ParseTree,
     compile::NopVariationInfo,
     parse::{FileSystemResolver, SourceResolver},
     typed::{AstNode, GlyphOrClass},
-    GlyphMap, Kind, ParseTree,
 };
 use itertools::Either;
 

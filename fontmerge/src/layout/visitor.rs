@@ -1,6 +1,6 @@
 use fea_rs::{
-    typed::{self, AstNode, Feature, Gsub1, Gsub2, Gsub3, Gsub4, Gsub5, Gsub6, LookupBlock},
     Node, NodeOrToken,
+    typed::{self, AstNode, Feature, Gsub1, Gsub2, Gsub3, Gsub4, Gsub5, Gsub6, LookupBlock},
 };
 
 // Use constants as documentation
