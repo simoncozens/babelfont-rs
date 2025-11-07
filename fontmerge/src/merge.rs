@@ -3,7 +3,7 @@ use fontdrasil::coords::{Location, UserSpace};
 use fontdrasil::types::Axes;
 use indexmap::IndexSet;
 
-use crate::designspace::{compatible_location, fontdrasil_axes, Strategy};
+use crate::designspace::{Strategy, compatible_location, fontdrasil_axes};
 use crate::error::FontmergeError;
 
 fn within_bounds(
@@ -11,20 +11,20 @@ fn within_bounds(
     axes: &fontdrasil::types::Axes,
 ) -> bool {
     for axis in axes.iter() {
-        if let Some(value) = loc.get(axis.tag) && (
-            value < axis.min.to_design(&axis.converter)
-                || value > axis.max.to_design(&axis.converter)
-        ){
-                log::trace!(
-                    "Location {:?} out of bounds on axis '{}': {} not in [{}, {}]",
-                    loc,
-                    axis.tag,
-                    value.to_f64(),
-                    axis.min.to_f64(),
-                    axis.max.to_f64()
-                );
-                return false;
-            }
+        if let Some(value) = loc.get(axis.tag)
+            && (value < axis.min.to_design(&axis.converter)
+                || value > axis.max.to_design(&axis.converter))
+        {
+            log::trace!(
+                "Location {:?} out of bounds on axis '{}': {} not in [{}, {}]",
+                loc,
+                axis.tag,
+                value.to_f64(),
+                axis.min.to_f64(),
+                axis.max.to_f64()
+            );
+            return false;
+        }
     }
     true
 }
@@ -55,11 +55,21 @@ pub(crate) fn merge_glyph(
             layer.id = Some(format!("{}_layer_{}", glyph.name, i));
         }
     }
-    log::debug!("Existing locations for this glyph: {:?}", layers.iter().filter_map(|l| l.location.as_ref()).collect::<Vec<_>>());
+    log::debug!(
+        "Existing locations for this glyph: {:?}",
+        layers
+            .iter()
+            .filter_map(|l| l.location.as_ref())
+            .collect::<Vec<_>>()
+    );
     let mut drop_layers = IndexSet::new();
     for (master, strategy) in font1_nonsparse_masters.iter().zip(strategies.iter()) {
         let new_layer = match strategy {
-            Strategy::Exact(id) => {
+            Strategy::Exact {
+                layer: id,
+                master_name: _,
+                clamped,
+            } => {
                 // Find a layer in layers with this master ID, either in master_id or layer id
                 let layer = layers.iter().find(|l| {
                     l.master == LayerType::DefaultForMaster(id.to_string())
@@ -68,8 +78,10 @@ pub(crate) fn merge_glyph(
                 });
                 if let Some(l) = layer {
                     // We can unwrap here because we set IDs above
-                    #[allow(clippy::unwrap_used)]
-                    drop_layers.insert(l.id.clone().unwrap());
+                    if !clamped {
+                        #[allow(clippy::unwrap_used)]
+                        drop_layers.insert(l.id.clone().unwrap());
+                    }
                     Some(l.clone())
                 } else {
                     log::warn!(
@@ -80,29 +92,37 @@ pub(crate) fn merge_glyph(
                     None
                 }
             }
-            Strategy::InterpolateOrIntermediate(loc) => {
+            Strategy::InterpolateOrIntermediate { location, clamped } => {
                 // We have set locations on all layers, but they're not in the right coordinate system
                 let layer = layers.iter().find(|l| {
                     l.location
                         .as_ref()
                         .map(|l| l.to_user(font2_axes))
-                        .map(|l| compatible_location(loc, &l))
+                        .map(|l| compatible_location(location, &l))
                         .unwrap_or(false)
                 });
                 if let Some(l) = layer {
                     // This was an intermediate layer there, but will be a master layer here.
-                    #[allow(clippy::unwrap_used)] // I think?
-                    drop_layers.insert(l.id.clone().unwrap());
-                    Some(l.clone())
+                    if !clamped {
+                        #[allow(clippy::unwrap_used)] // We ensured all layers have an ID above
+                        drop_layers.insert(l.id.clone().unwrap());
+                    }
+                    let mut l = l.clone();
+                    l.master = LayerType::DefaultForMaster(master.id.clone());
+                    Some(l)
                 } else {
-                    log::info!("Interpolating glyph '{}' at location {:?}", glyph.name, loc);
+                    log::info!(
+                        "Interpolating glyph '{}' at location {:?}",
+                        glyph.name,
+                        location
+                    );
                     Some(
                         font2
-                            .interpolate_glyph(&glyph.name, &loc.to_design(font2_axes))
+                            .interpolate_glyph(&glyph.name, &location.to_design(font2_axes))
                             .map_err(|e| {
                                 FontmergeError::Interpolation(format!(
                                     "Failed to interpolate glyph '{}' at location {:?}: {}",
-                                    glyph.name, loc, e
+                                    glyph.name, location, e
                                 ))
                             })?,
                     )
@@ -131,8 +151,7 @@ pub(crate) fn merge_glyph(
     // Remove used layers, let's see what's left
     let remaining_layers = layers
         .into_iter()
-    // XXX We should not drop layers if there was clamping involved
-    //     .filter(|l| l.id.as_ref().is_some_and(|id| !drop_layers.contains(id)))
+        .filter(|l| l.id.as_ref().is_some_and(|id| !drop_layers.contains(id)))
         .collect::<Vec<_>>();
     log::debug!(
         "After merging, glyph still '{}' has {} layers remaining (dropped {})",
@@ -165,11 +184,7 @@ pub(crate) fn merge_glyph(
         // * Convert them to user space,
         // * Then fill in any missing axes with defaults from font1 and remove any axes not in font1,
         // * Then convert to design space of font1.
-        let loc_in_user = layer
-            .location
-            .as_ref()
-            .unwrap()
-            .to_user(font2_axes);
+        let loc_in_user = layer.location.as_ref().unwrap().to_user(font2_axes);
         let new_userspace: Location<UserSpace> = font1_axes
             .iter()
             .map(|axis| {
@@ -181,13 +196,23 @@ pub(crate) fn merge_glyph(
             })
             .collect();
         layer.location = Some(new_userspace.to_design(&font1_axes));
+
+        // Check we haven't already added a layer at this location.
+        let loc = layer.location.as_ref().unwrap();
+        let already_exists = glyph
+            .layers
+            .iter()
+            .any(|l| l.location.as_ref().is_some_and(|l2| l2 == loc));
+        if already_exists {
+            continue;
+        }
         log::debug!(
             "Adding remaining layer at location {:?} to glyph '{}' as intermediate layer",
             layer.location.as_ref().unwrap(),
             glyph.name
         );
+        glyph.layers.push(layer.clone());
     }
-    glyph.layers.extend(remaining_layers);
 
     Ok(())
 }

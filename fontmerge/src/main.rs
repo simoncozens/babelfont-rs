@@ -159,7 +159,7 @@ fn main() {
     log::info!("Designspace mapping strategies:");
     for (strategy, master) in mapping.iter().zip(font1.masters.iter()) {
         log::info!(
-            "  Master '{}': {}",
+            "  For font1's master '{}', we will {}",
             master.name.get_default().unwrap_or(&master.id),
             strategy
         );

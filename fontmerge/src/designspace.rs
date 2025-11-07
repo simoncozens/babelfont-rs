@@ -17,21 +17,39 @@ pub(crate) fn fontdrasil_axes(
 }
 
 pub enum Strategy {
-    Exact(String),
-    InterpolateOrIntermediate(Location<UserSpace>),
+    Exact {
+        layer: String,
+        master_name: String,
+        clamped: bool,
+    },
+    InterpolateOrIntermediate {
+        location: Location<UserSpace>,
+        clamped: bool,
+    },
     Failed(String),
 }
 
 impl Display for Strategy {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Strategy::Exact(id) => write!(f, "Exact master with ID '{}'", id),
-            Strategy::InterpolateOrIntermediate(loc) => write!(
+            Strategy::Exact {
+                layer,
+                master_name,
+                clamped,
+            } => write!(
                 f,
-                "Interpolate at location {:?} (or try intermediate layer)",
-                loc
+                "use font 2's layer '{}' from master {} {}",
+                layer,
+                master_name,
+                if *clamped { " (clamped)" } else { "" }
             ),
-            Strategy::Failed(reason) => write!(f, "Failed: {}", reason),
+            Strategy::InterpolateOrIntermediate { location, clamped } => write!(
+                f,
+                "interpolate at location {:?} (or try an intermediate layer){}",
+                location,
+                if *clamped { " (clamped)" } else { "" }
+            ),
+            Strategy::Failed(reason) => write!(f, "give up: {}", reason),
         }
     }
 }
@@ -80,7 +98,11 @@ pub(crate) fn map_designspaces(
     if !f1_axes_not_in_f2.is_empty() {
         log::warn!(
             "Font 1 has axes not present in Font 2: {}. These will be ignored when matching masters, and no variation will be present on these glyphs.",
-            f1_axes_not_in_f2.iter().map(|a| a.tag.to_string()).collect::<Vec<String>>().join(", ")
+            f1_axes_not_in_f2
+                .iter()
+                .map(|a| a.tag.to_string())
+                .collect::<Vec<String>>()
+                .join(", ")
         );
     }
     let f2_axes_not_in_f1 = font2
@@ -91,7 +113,11 @@ pub(crate) fn map_designspaces(
     if !f2_axes_not_in_f1.is_empty() {
         log::warn!(
             "Font 2 has axes not present in Font 1: {}. These will be ignored when matching masters; the default location will be used.",
-            f2_axes_not_in_f1.iter().map(|a| a.tag.to_string()).collect::<Vec<String>>().join(", ")
+            f2_axes_not_in_f1
+                .iter()
+                .map(|a| a.tag.to_string())
+                .collect::<Vec<String>>()
+                .join(", ")
         );
     }
 
@@ -159,7 +185,21 @@ pub(crate) fn map_designspaces(
             .iter()
             .find(|(_, loc2)| compatible_location(&loc1, loc2))
         {
-            results.push(Strategy::Exact(exact.0.clone()));
+            #[allow(clippy::unwrap_used)] // We found it
+            let master_name = font2
+                .masters
+                .iter()
+                .find(|m| m.id == exact.0)
+                .unwrap()
+                .name
+                .get_default()
+                .unwrap_or(&exact.0)
+                .to_string();
+            results.push(Strategy::Exact {
+                layer: exact.0.clone(),
+                master_name,
+                clamped: has_clamp,
+            });
             continue;
         }
         // No exact match. If this location is strictly within the designspace bounds of font2, we can interpolate
@@ -190,7 +230,10 @@ pub(crate) fn map_designspaces(
                     full_loc1.insert(axis.tag, default);
                 }
             }
-            results.push(Strategy::InterpolateOrIntermediate(full_loc1));
+            results.push(Strategy::InterpolateOrIntermediate {
+                location: full_loc1,
+                clamped: has_clamp,
+            });
         } else {
             results.push(Strategy::Failed(format!(
                 "No compatible master found in font2 for font1 master at location {:?}",
