@@ -54,10 +54,6 @@ pub struct Args {
     )]
     pub duplicate_lookups: DuplicateLookupHandling,
 
-    /// Allow clamping of font 2 master locations when mapping designspaces
-    #[arg(long, default_value_t = false)]
-    pub allow_clamping: bool,
-
     #[command(flatten)]
     pub fixups: Fixups,
 }

@@ -1,16 +1,18 @@
 use babelfont::filters::FontFilter as _;
 use clap::Parser;
-use fontdrasil::coords::Location;
 use indexmap::IndexSet;
+use indicatif::ProgressIterator;
 mod args;
 mod designspace;
 mod error;
 mod glyphset;
+mod kerning;
 mod layout;
 mod merge;
 
 use crate::args::{DuplicateLookupHandling, ExistingGlyphHandling, LayoutHandling};
-use crate::designspace::{fontdrasil_axes, map_designspaces};
+use crate::designspace::{add_needed_masters, fontdrasil_axes, map_designspaces};
+use crate::kerning::merge_kerning;
 use crate::layout::lookupgatherer::LookupGathererVisitor;
 use crate::layout::subsetter::LayoutSubsetter;
 use crate::layout::visitor::LayoutVisitor;
@@ -79,14 +81,13 @@ fn main() {
         args.glyph_selection
             .get_codepoints()
             .expect("Failed to get codepoints"),
-        &font1,
+        &mut font1,
         &font2,
         args.existing_handling,
     );
-    glyphset_filter.de_encode(&mut font1);
     glyphset_filter.check_for_presence(&font2);
 
-    let mut font2_glyphnames = font2
+    let font2_glyphnames = font2
         .glyphs
         .iter()
         .map(|g| g.name.as_str())
@@ -96,6 +97,12 @@ fn main() {
             .perform_layout_closure(&font2.features, &font2_glyphnames, &font2_root)
             .expect("Failed to perform layout closure");
     }
+
+    if glyphset_filter.incoming_glyphset.is_empty() {
+        log::warn!("No glyphs selected for merging from font 2; exiting");
+        return;
+    }
+
     if args.layout_handling != LayoutHandling::Ignore {
         let final_glyphset: Vec<String> = glyphset_filter.final_glyphset();
         // Create a layout subsetter
@@ -154,7 +161,24 @@ fn main() {
             .expect("Failed to scale font2 to match font1 units per em");
     }
 
-    let mapping = map_designspaces(&font1, &font2, args.allow_clamping)
+    glyphset_filter.close_components(&font2);
+    glyphset_filter.sort_glyphset(&mut font2);
+    glyphset_filter.de_encode(&mut font1, &mut font2);
+
+    add_needed_masters(&mut font1, &font2)
+        .expect("Failed to add needed masters from font2 to font1");
+
+    // Compute the list of master IDs here first because checking if a master is sparse or not is
+    // expensive, we don't want to do it every time. We use IDs rather than masters because we're
+    // going to be borrowing f1 both mutably and immutably below.
+    let f1_nonsparse_master_ids: Vec<String> = font1
+        .masters
+        .iter()
+        .filter(|m| !m.is_sparse(&font1))
+        .map(|m| m.id.clone())
+        .collect();
+
+    let mapping = map_designspaces(&font1, &f1_nonsparse_master_ids, &font2)
         .expect("Could not find a designspace mapping strategy");
     log::info!("Designspace mapping strategies:");
     for (strategy, master) in mapping.iter().zip(font1.masters.iter()) {
@@ -165,9 +189,6 @@ fn main() {
         );
     }
 
-    glyphset_filter.close_components(&font2);
-    glyphset_filter.sort_glyphset(&mut font2);
-
     log::debug!(
         "Final glyphset to include from font 2: {:?}",
         glyphset_filter.incoming_glyphset
@@ -176,8 +197,10 @@ fn main() {
     let f2_axes = fontdrasil_axes(&font2.axes).expect("Could not interpret font 2 axes");
 
     // Merge kerning here
+    merge_kerning(&mut font1, &mut font2, &glyphset_filter, &mapping);
 
-    for glyph in glyphset_filter.incoming_glyphset.iter() {
+    log::info!("Merging glyphs");
+    for glyph in glyphset_filter.incoming_glyphset.iter().progress() {
         if args.existing_handling == ExistingGlyphHandling::Skip
             && font1.glyphs.iter().any(|g| &g.name == glyph)
         {
@@ -186,11 +209,23 @@ fn main() {
         }
         set_layer_locations(glyph, &mut font2);
         if let Some(g) = font2.glyphs.get(glyph) {
-            merge_glyph(&mut font1, g, &f2_axes, &font2, &mapping).expect("Failed to merge glyph");
+            merge_glyph(
+                &mut font1,
+                &f1_nonsparse_master_ids,
+                g,
+                &f2_axes,
+                &font2,
+                &mapping,
+            )
+            .expect("Failed to merge glyph");
         }
     }
 
     // Handle dotted circle anchors
+    log::info!(
+        "Saving merged font to {}",
+        args.output.as_deref().unwrap_or("stdout")
+    );
 
     if let Some(output) = &args.output {
         font1.save(output).expect("Failed to save merged font");

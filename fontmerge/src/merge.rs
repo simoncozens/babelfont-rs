@@ -31,16 +31,12 @@ fn within_bounds(
 
 pub(crate) fn merge_glyph(
     font1: &mut Font,
+    font1_nonsparse_master_ids: &[String],
     font2_glyph: &Glyph,
     font2_axes: &Axes,
     font2: &Font,
     strategies: &[Strategy],
 ) -> Result<(), FontmergeError> {
-    let font1_nonsparse_masters = font1
-        .masters
-        .iter()
-        .filter(|m| !m.is_sparse(font1))
-        .collect::<Vec<_>>();
     let font1_axes = fontdrasil_axes(&font1.axes)?;
     if font1.glyphs.get(&font2_glyph.name).is_none() {
         font1.glyphs.push(font2_glyph.clone());
@@ -63,7 +59,12 @@ pub(crate) fn merge_glyph(
             .collect::<Vec<_>>()
     );
     let mut drop_layers = IndexSet::new();
-    for (master, strategy) in font1_nonsparse_masters.iter().zip(strategies.iter()) {
+    for (master_id, strategy) in font1_nonsparse_master_ids.iter().zip(strategies.iter()) {
+        let master = font1
+            .masters
+            .iter()
+            .find(|m| &m.id == master_id)
+            .expect("Master ID from non-sparse list not found in font1 masters");
         let new_layer = match strategy {
             Strategy::Exact {
                 layer: id,

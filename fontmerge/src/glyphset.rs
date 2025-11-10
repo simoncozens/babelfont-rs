@@ -24,7 +24,7 @@ impl GlyphsetFilter {
         include_glyphs: Vec<String>,
         exclude_glyphs: Vec<String>,
         include_codepoints: Vec<char>,
-        font1: &babelfont::Font,
+        font1: &mut babelfont::Font,
         font2: &babelfont::Font,
         existing_glyph_handling: ExistingGlyphHandling,
     ) -> Self {
@@ -36,11 +36,9 @@ impl GlyphsetFilter {
             .map(|g| g.name.clone())
             .collect::<IndexSet<String>>();
         let mut mappings_to_delete: IndexMap<String, Vec<char>> = IndexMap::new();
-        if !include_codepoints.is_empty() {
-            for glyph in font1.glyphs.iter() {
-                for cp in glyph.codepoints.iter().flat_map(|cp| char::from_u32(*cp)) {
-                    existing_map.insert(cp, glyph.name.clone());
-                }
+        for glyph in font1.glyphs.iter() {
+            for cp in glyph.codepoints.iter().flat_map(|cp| char::from_u32(*cp)) {
+                existing_map.insert(cp, glyph.name.clone());
             }
         }
         // If there are no include glyphs and no include codepoints, include all glyphs from font2
@@ -64,7 +62,10 @@ impl GlyphsetFilter {
                 continue;
             }
             for cp in glyph.codepoints.iter().flat_map(|cp| char::from_u32(*cp)) {
-                if !include_codepoints.contains(&cp) {
+                if include_codepoints.contains(&cp) {
+                    incoming_glyphset.insert(glyph.name.clone());
+                }
+                if !incoming_glyphset.contains(&glyph.name) {
                     continue;
                 }
                 if existing_map.contains_key(&cp) {
@@ -84,7 +85,6 @@ impl GlyphsetFilter {
                             .push(cp);
                     }
                 }
-                incoming_glyphset.insert(glyph.name.clone());
             }
         }
 
@@ -92,7 +92,6 @@ impl GlyphsetFilter {
         for glyph_name in blacklist.iter() {
             incoming_glyphset.shift_remove(glyph_name);
         }
-
         GlyphsetFilter {
             // include_glyphs,
             // exclude_glyphs,
@@ -105,7 +104,8 @@ impl GlyphsetFilter {
         }
     }
 
-    pub(crate) fn de_encode(&self, font_1: &mut Font) {
+    pub(crate) fn de_encode(&self, font_1: &mut Font, font_2: &mut Font) {
+        let mut existing_codepoints: IndexSet<u32> = IndexSet::new();
         for glyph in font_1.glyphs.iter_mut() {
             if let Some(codepoints) = self.mappings_to_delete.get(&glyph.name) {
                 let codepoints_u32 = codepoints
@@ -118,6 +118,17 @@ impl GlyphsetFilter {
                     codepoints_u32,
                     glyph.name
                 );
+            }
+            existing_codepoints.extend(glyph.codepoints.iter());
+        }
+        // Any glyphs which have got picked up via e.g. layout closure or component closure
+        // should not have codepoints in font2 if they already have codepoints in font1. So
+        // check though the incoming glyphset again.
+        for glyph in self.incoming_glyphset.iter() {
+            if let Some(glyph_in_font2) = font_2.glyphs.get_mut(glyph) {
+                glyph_in_font2
+                    .codepoints
+                    .retain(|cp| !existing_codepoints.contains(cp));
             }
         }
     }
