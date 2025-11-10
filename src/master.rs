@@ -5,7 +5,7 @@ use crate::{
     common::{FormatSpecific, OTValue},
     guide::Guide,
     i18ndictionary::I18NDictionary,
-    MetricType, OTScalar,
+    LayerType, MetricType, OTScalar,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -15,14 +15,22 @@ pub struct Master {
     pub name: I18NDictionary,
     pub id: String,
     pub location: DesignLocation,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub guides: Vec<Guide>,
     pub metrics: IndexMap<MetricType, i32>,
+    /// Kerning for this master.
+    ///
+    /// (Kerning pairs are (left glyph name, right glyph name) -> value)
+    /// Groups are represented as `@<groupname>`; whether they are first or second
+    /// groups is determined by position in the tuple.
     #[serde(
         serialize_with = "crate::serde_helpers::kerning_map",
         deserialize_with = "crate::serde_helpers::kerning_unmap"
     )]
     pub kerning: HashMap<(String, String), i16>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub custom_ot_values: Vec<OTValue>,
+    #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
     pub format_specific: FormatSpecific,
 }
 
@@ -66,7 +74,7 @@ impl Master {
             let has_layer = glyph
                 .layers
                 .iter()
-                .any(|layer| layer.id.as_deref() == Some(&self.id));
+                .any(|layer| layer.master == LayerType::DefaultForMaster(self.id.clone()));
             if !has_layer {
                 return true;
             }

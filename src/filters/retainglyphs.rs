@@ -33,6 +33,17 @@ impl FontFilter for RetainGlyphs {
         }
         // Retain only the specified glyphs
         font.glyphs.retain(|g| self.0.contains(&g.name));
+        for (_group, members) in font.first_kern_groups.iter_mut() {
+            members.retain(|g| self.0.contains(g));
+        }
+        for (_group, members) in font.second_kern_groups.iter_mut() {
+            members.retain(|g| self.0.contains(g));
+        }
+        // Drop dead groups
+        font.first_kern_groups
+            .retain(|_group, members| !members.is_empty());
+        font.second_kern_groups
+            .retain(|_group, members| !members.is_empty());
         // Filter kerning
         for master in font.masters.iter_mut() {
             // XXX or groups!

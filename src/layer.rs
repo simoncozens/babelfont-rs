@@ -41,6 +41,7 @@ pub struct Layer {
     pub color: Option<Color>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub layer_index: Option<i32>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub is_background: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub background_layer_id: Option<String>,

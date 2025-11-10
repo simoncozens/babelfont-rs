@@ -797,18 +797,6 @@ impl Work<Context, WorkId, Error> for FeatureWork {
     }
 }
 
-fn parse_kern_group(name: &str) -> Option<KernGroup> {
-    name.strip_prefix(SIDE1_PREFIX)
-        .map(|name| KernGroup::Side1(name.into()))
-        .or_else(|| {
-            name.strip_prefix(SIDE2_PREFIX)
-                .map(|name| KernGroup::Side2(name.into()))
-        })
-}
-
-const SIDE1_PREFIX: &str = "@MMK_L_";
-const SIDE2_PREFIX: &str = "@MMK_R_";
-
 #[derive(Debug)]
 struct KerningGroupWork(Arc<FontInfo>);
 
@@ -822,16 +810,13 @@ struct KerningInstanceWork {
 fn kern_participant(
     glyph_order: &GlyphOrder,
     groups: &BTreeMap<KernGroup, BTreeSet<GlyphName>>,
-    expect_prefix: &str,
     raw_side: &str,
+    first: bool,
 ) -> Option<KernSide> {
-    if let Some(group) = parse_kern_group(raw_side) {
-        if !raw_side.starts_with(expect_prefix) {
-            warn!("Invalid kern side: {raw_side}, should have prefix {expect_prefix}",);
-            return None;
-        }
-        if groups.contains_key(&group) {
-            Some(KernSide::Group(group))
+    if let Some(group) = raw_side.strip_prefix('@') {
+        let key = if first { KernGroup::Side1(group.into()) } else {  KernGroup::Side2(group.into()) };
+        if groups.contains_key(&key) {
+            Some(KernSide::Group(key))
         } else {
             warn!("Invalid kern side: {raw_side}, no group {group:?}");
             None
@@ -857,7 +842,7 @@ impl Work<Context, WorkId, Error> for KerningGroupWork {
     }
 
     fn exec(&self, context: &Context) -> Result<(), Error> {
-        trace!("Generate IR for kerning");
+        trace!("Generate IR for kerning groups");
         let font_info = self.0.as_ref();
         let font = &font_info.font;
         let axes = font.fontdrasil_axes()?;
@@ -923,8 +908,8 @@ impl Work<Context, WorkId, Error> for KerningInstanceWork {
         kern_pairs
             .iter()
             .filter_map(|((side1, side2), pos_adjust)| {
-                let side1 = kern_participant(glyph_order, groups, SIDE1_PREFIX, side1);
-                let side2 = kern_participant(glyph_order, groups, SIDE2_PREFIX, side2);
+                let side1 = kern_participant(glyph_order, groups, side1, true);
+                let side2 = kern_participant(glyph_order, groups, side2, false);
                 side1.zip(side2).map(|side| (side, *pos_adjust))
             })
             // .flat_map(|(participants, value)| {

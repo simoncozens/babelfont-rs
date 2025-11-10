@@ -165,7 +165,12 @@ pub(crate) mod glyphs {
         }
     }
 
-    pub(crate) fn glyph_to_glyphs(val: &Glyph, axis_order: &[Tag]) -> glyphslib::glyphs3::Glyph {
+    pub(crate) fn glyph_to_glyphs(
+        val: &Glyph,
+        axis_order: &[Tag],
+        kern_left: Option<&String>,
+        kern_right: Option<&String>,
+    ) -> glyphslib::glyphs3::Glyph {
         let mut g3_layers = vec![];
         for layer in &val.layers {
             if layer.is_background {
@@ -190,8 +195,8 @@ pub(crate) mod glyphs {
             category: val.formatspecific.get_optionstring("category"),
             direction: val.formatspecific.get_optionstring("kern_direction"),
             kern_bottom: val.formatspecific.get_optionstring("kern_bottom"),
-            kern_left: val.formatspecific.get_optionstring("kern_left"),
-            kern_right: val.formatspecific.get_optionstring("kern_right"),
+            kern_left: kern_left.cloned(),
+            kern_right: kern_right.cloned(),
             kern_top: val.formatspecific.get_optionstring("kern_top"),
             last_change: val.formatspecific.get_optionstring("last_change"),
             locked: val.formatspecific.get_bool("locked"),

@@ -41,6 +41,8 @@ pub enum BabelfontError {
     UfoColor(#[from] norad::error::ColorError),
     #[error("Could not find default master in {path:?}")]
     NoDefaultMaster { path: PathBuf },
+    #[error("Master not found: {0}")]
+    MasterNotFound(String),
 
     #[error("Ill-defined axis {axis_name}!: {reason}")]
     IllDefinedAxis { axis_name: String, reason: String },
@@ -171,6 +173,11 @@ impl From<BabelfontError> for fontir::error::Error {
                 fontir::error::BadSource::new("Unknown", fontir::error::BadSourceKind::Custom(msg))
                     .into()
             }
+            BabelfontError::MasterNotFound(master_name) => fontir::error::BadSource::new(
+                "Unknown",
+                fontir::error::BadSourceKind::Custom(format!("Master not found: {}", master_name)),
+            )
+            .into(),
         }
     }
 }

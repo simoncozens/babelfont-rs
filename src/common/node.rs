@@ -15,8 +15,8 @@ pub struct Node {
     pub y: f64,
     pub nodetype: NodeType,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub smooth: bool,
-    // userData: XXX
+    pub smooth: bool, // Not keen on the idea that we can have a smooth OffCurve node, may change
+                      // userData: XXX
 }
 
 impl Node {

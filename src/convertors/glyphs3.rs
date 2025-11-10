@@ -406,7 +406,19 @@ fn load_master(master: &glyphs3::Master, glyphs_font: &glyphs3::Glyphs3, font: &
         .map(|kerndict| {
             let mut kerns = HashMap::new();
             for (first, items) in kerndict {
+                // Replace "@MMK_L_"/"@MMK_R_" prefix in group names with "@"
+                let first = if let Some(stripped) = first.strip_prefix("@MMK_L_") {
+                    format!("@{}", stripped)
+                } else {
+                    first.clone()
+                };
                 for (second, kern) in items {
+                    let second = if let Some(stripped) = second.strip_prefix("@MMK_R_") {
+                        format!("@{}", stripped)
+                    } else {
+                        second.clone()
+                    };
+
                     kerns.insert((first.clone(), second.clone()), *kern as i16);
                 }
             }
@@ -575,7 +587,7 @@ fn interpret_axis_mappings(font: &mut Font) {
 pub(crate) fn as_glyphs3(font: &Font) -> glyphs3::Glyphs3 {
     // Do some cleanups.
     let mut font = font.clone();
-    #[allow(clippy::expect_used)] // Surely this can't fail
+    #[allow(clippy::unwrap_used)] // Surely this can't fail
     DropSparseMasters.apply(&mut font).unwrap();
 
     let axes = font
@@ -690,11 +702,22 @@ pub(crate) fn as_glyphs3(font: &Font) -> glyphs3::Glyphs3 {
     let kerning = font
         .masters
         .iter()
+        .filter(|m| !m.is_sparse(&font))
         .flat_map(|m| {
             let expanded_kerning: BTreeMap<String, BTreeMap<String, f32>> =
                 m.kerning
                     .iter()
                     .fold(BTreeMap::new(), |mut acc, ((first, second), value)| {
+                        let first = if let Some(stripped) = first.strip_prefix("@") {
+                            format!("@MMK_L_{}", stripped)
+                        } else {
+                            first.clone()
+                        };
+                        let second = if let Some(stripped) = second.strip_prefix("@") {
+                            format!("@MMK_R_{}", stripped)
+                        } else {
+                            second.clone()
+                        };
                         acc.entry(first.clone())
                             .or_default()
                             .insert(second.clone(), *value as f32);
@@ -708,6 +731,32 @@ pub(crate) fn as_glyphs3(font: &Font) -> glyphs3::Glyphs3 {
     let axes_order = font.axes.iter().map(|a| a.tag).collect::<Vec<_>>();
 
     let properties = save_properties(&font.names);
+    let mut glyph_to_first_kern_group = HashMap::new();
+    let mut glyph_to_second_kern_group = HashMap::new();
+    for (group, glyph) in font.first_kern_groups.iter() {
+        for glyph_name in glyph.iter() {
+            if glyph_to_first_kern_group.contains_key(glyph_name) {
+                log::warn!(
+                    "Glyph {} is in multiple first kerning groups, skipping assignment",
+                    glyph_name
+                );
+                continue;
+            }
+            glyph_to_first_kern_group.insert(glyph_name.clone(), group.clone());
+        }
+    }
+    for (group, glyph) in font.second_kern_groups.iter() {
+        for glyph_name in glyph.iter() {
+            if glyph_to_second_kern_group.contains_key(glyph_name) {
+                log::warn!(
+                    "Glyph {} is in multiple second kerning groups, skipping assignment",
+                    glyph_name
+                );
+                continue;
+            }
+            glyph_to_second_kern_group.insert(glyph_name.clone(), group.clone());
+        }
+    }
     let glyphs_font = glyphs3::Glyphs3 {
         app_version,
         format_version: 3,
@@ -723,7 +772,14 @@ pub(crate) fn as_glyphs3(font: &Font) -> glyphs3::Glyphs3 {
         glyphs: font
             .glyphs
             .iter()
-            .map(|g| glyph_to_glyphs(g, &axes_order))
+            .map(|g| {
+                glyph_to_glyphs(
+                    g,
+                    &axes_order,
+                    glyph_to_second_kern_group.get(&g.name), // Glyph groups are backwards in Glyphs
+                    glyph_to_first_kern_group.get(&g.name),
+                )
+            })
             .collect(),
         instances: font
             .instances

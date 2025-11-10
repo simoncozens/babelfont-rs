@@ -52,11 +52,13 @@ pub struct Font {
     /// A dictionary of kerning groups
     ///
     /// The key is the group name and the value is a list of glyph names in the group
+    /// Group names are *not* prefixed with "@" here
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub first_kern_groups: HashMap<String, Vec<String>>,
     // A dictionary of kerning groups
     ///
     /// The key is the group name and the value is a list of glyph names in the group
+    /// Group names are *not* prefixed with "@" here
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub second_kern_groups: HashMap<String, Vec<String>>,
 
@@ -218,8 +220,7 @@ impl Font {
                     false,
                 )
                 .map_err(|e| BabelfontError::General(format!("Font generation error: {}", e)))?;
-                let out_path = std::path::PathBuf::from("output.ttf");
-                std::fs::write(&out_path, bytes)?;
+                std::fs::write(&path, bytes)?;
                 return Ok(());
             }
         }

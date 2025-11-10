@@ -1,5 +1,5 @@
 use crate::{
-    common::{decomposition::DecomposedAffine, Node, NodeType},
+    common::{decomposition::DecomposedAffine, FormatSpecific, Node, NodeType},
     BabelfontError,
 };
 use serde::{Deserialize, Serialize};
@@ -7,15 +7,25 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Component {
     pub reference: String,
+    #[serde(
+        default = "kurbo::Affine::default",
+        skip_serializing_if = "crate::serde_helpers::affine_is_identity"
+    )]
     pub transform: kurbo::Affine,
-    pub format_specific: crate::common::FormatSpecific,
+    #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
+    pub format_specific: FormatSpecific,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Path {
+    #[serde(
+        serialize_with = "crate::serde_helpers::serialize_nodes",
+        deserialize_with = "crate::serde_helpers::deserialize_nodes"
+    )]
     pub nodes: Vec<Node>,
     pub closed: bool,
-    pub format_specific: crate::common::FormatSpecific,
+    #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
+    pub format_specific: FormatSpecific,
 }
 
 impl Path {
@@ -204,6 +214,127 @@ mod fontra {
                 transformation: decomposed.into(),
                 location: HashMap::new(),
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_path_serde_roundtrip() {
+        let path = Path {
+            nodes: vec![
+                Node {
+                    x: 744.0,
+                    y: 1249.0,
+                    nodetype: NodeType::Line,
+                    smooth: true,
+                },
+                Node {
+                    x: 744.0,
+                    y: 1249.0,
+                    nodetype: NodeType::OffCurve,
+                    smooth: false,
+                },
+                Node {
+                    x: 744.0,
+                    y: 1249.0,
+                    nodetype: NodeType::OffCurve,
+                    smooth: false,
+                },
+                Node {
+                    x: 744.0,
+                    y: 1249.0,
+                    nodetype: NodeType::QCurve,
+                    smooth: true,
+                },
+                Node {
+                    x: 538.0,
+                    y: 1470.0,
+                    nodetype: NodeType::Line,
+                    smooth: false,
+                },
+                Node {
+                    x: 538.0,
+                    y: 1470.0,
+                    nodetype: NodeType::OffCurve,
+                    smooth: false,
+                },
+                Node {
+                    x: 538.0,
+                    y: 1470.0,
+                    nodetype: NodeType::OffCurve,
+                    smooth: false,
+                },
+                Node {
+                    x: 538.0,
+                    y: 1470.0,
+                    nodetype: NodeType::QCurve,
+                    smooth: true,
+                },
+                Node {
+                    x: -744.0,
+                    y: 181.0,
+                    nodetype: NodeType::Line,
+                    smooth: true,
+                },
+                Node {
+                    x: -744.0,
+                    y: 181.0,
+                    nodetype: NodeType::OffCurve,
+                    smooth: false,
+                },
+                Node {
+                    x: -744.0,
+                    y: 181.0,
+                    nodetype: NodeType::OffCurve,
+                    smooth: false,
+                },
+                Node {
+                    x: -744.0,
+                    y: 181.0,
+                    nodetype: NodeType::QCurve,
+                    smooth: true,
+                },
+                Node {
+                    x: -538.0,
+                    y: -40.0,
+                    nodetype: NodeType::Line,
+                    smooth: false,
+                },
+                Node {
+                    x: -538.0,
+                    y: -40.0,
+                    nodetype: NodeType::OffCurve,
+                    smooth: false,
+                },
+                Node {
+                    x: -538.0,
+                    y: -40.0,
+                    nodetype: NodeType::OffCurve,
+                    smooth: false,
+                },
+                Node {
+                    x: -538.0,
+                    y: -40.0,
+                    nodetype: NodeType::QCurve,
+                    smooth: true,
+                },
+            ],
+            closed: false,
+            format_specific: FormatSpecific::default(),
+        };
+        let serialized = serde_json::to_string(&path).unwrap();
+        let deserialized: Path = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized.nodes.len(), path.nodes.len());
+        for (a, b) in deserialized.nodes.iter().zip(path.nodes.iter()) {
+            assert_eq!(a.x, b.x);
+            assert_eq!(a.y, b.y);
+            assert_eq!(a.nodetype, b.nodetype);
+            assert_eq!(a.smooth, b.smooth);
         }
     }
 }

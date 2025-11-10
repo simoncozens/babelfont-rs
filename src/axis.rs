@@ -12,24 +12,28 @@ pub struct Axis {
     pub tag: Tag,
     pub id: Uuid,
     #[serde(
+        default,
         skip_serializing_if = "Option::is_none",
         serialize_with = "crate::serde_helpers::usercoord_option_ser",
         deserialize_with = "crate::serde_helpers::usercoord_option_de"
     )]
     pub min: Option<UserCoord>,
     #[serde(
+        default,
         skip_serializing_if = "Option::is_none",
         serialize_with = "crate::serde_helpers::usercoord_option_ser",
         deserialize_with = "crate::serde_helpers::usercoord_option_de"
     )]
     pub max: Option<UserCoord>,
     #[serde(
+        default,
         skip_serializing_if = "Option::is_none",
         serialize_with = "crate::serde_helpers::usercoord_option_ser",
         deserialize_with = "crate::serde_helpers::usercoord_option_de"
     )]
     pub default: Option<UserCoord>,
     #[serde(
+        default,
         skip_serializing_if = "Option::is_none",
         serialize_with = "crate::serde_helpers::axismap_ser",
         deserialize_with = "crate::serde_helpers::axismap_de"

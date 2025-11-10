@@ -78,12 +78,6 @@ pub fn load<T: AsRef<std::path::Path>>(path: T) -> Result<Font, BabelfontError> 
     }
     font.features = Features::from_fea(&ufo.features);
 
-    // Groups are just used for kerning in UFOs, so we don't need to load them here;
-    // store them in format-specific.
-    font.format_specific.insert(
-        KEY_GROUPS.into(),
-        serde_json::to_value(&ufo.groups).unwrap_or_default(),
-    );
     font.masters.push(master);
 
     Ok(font)
@@ -119,11 +113,8 @@ pub fn as_norad(font: &Font) -> Result<norad::Font, BabelfontError> {
 
     save_kerning(&mut ufo.kerning, &first_master.kerning)?;
     save_info(&mut ufo.font_info, font);
-    ufo.groups = font
-        .format_specific
-        .get(KEY_GROUPS)
-        .and_then(|x| serde_json::from_value::<norad::Groups>(x.clone()).ok())
-        .unwrap_or_default();
+    // Save kerning groups
+
     ufo.features = font.features.to_fea();
     Ok(ufo)
 }
@@ -257,12 +248,12 @@ pub(crate) fn save_kerning(
 ) -> Result<(), BabelfontError> {
     for ((left, right), value) in babelfont_kerning.iter() {
         let left_key = if left.starts_with('@') {
-            left.trim_start_matches('@').to_string()
+            "public.kern1.".to_string() + left.trim_start_matches('@')
         } else {
             left.to_string()
         };
         let right_key = if right.starts_with('@') {
-            right.trim_start_matches('@').to_string()
+            "public.kern2.".to_string() + right.trim_start_matches('@')
         } else {
             right.to_string()
         };
@@ -591,13 +582,13 @@ pub(crate) fn load_font_info(
 pub(crate) fn load_kerning(master: &mut Master, kerning: &norad::Kerning) {
     for (left, right_dict) in kerning.iter() {
         for (right, value) in right_dict.iter() {
-            let left_maybe_group = if left.starts_with("public.kern") {
-                format!("@{:}", left)
+            let left_maybe_group = if let Some(group) = left.strip_prefix("public.kern1.") {
+                format!("@{:}", group)
             } else {
                 left.to_string()
             };
-            let right_maybe_group = if right.starts_with("public.kern") {
-                format!("@{:}", right)
+            let right_maybe_group = if let Some(group) = right.strip_prefix("public.kern2.") {
+                format!("@{:}", group)
             } else {
                 right.to_string()
             };

@@ -1,4 +1,9 @@
-use crate::{convertors::ufo::stash_lib, glyph::GlyphList, names::Names, Instance, Layer};
+use crate::{
+    convertors::ufo::{load_kerning, stash_lib},
+    glyph::GlyphList,
+    names::Names,
+    Instance, Layer,
+};
 use fontdrasil::coords::{DesignCoord, DesignLocation};
 use norad::{
     designspace::{DesignSpaceDocument, Instance as DSInstance, RuleProcessing, Rules, Source},
@@ -166,31 +171,25 @@ fn load_master(
     let source_font = norad::Font::load(relative_path_to_master)?;
     let info = &source_font.font_info;
     load_master_info(&mut master, info);
-    let kerning = &source_font.kerning;
-    for (left, right_dict) in kerning.iter() {
-        for (right, value) in right_dict.iter() {
-            master
-                .kerning
-                .insert((left.to_string(), right.to_string()), *value as i16);
-        }
-    }
+    load_kerning(&mut master, &source_font.kerning);
+    let ufo_layer = if let Some(source_layer) = required_layer {
+        source_font
+            .layers
+            .get(source_layer)
+            .ok_or_else(|| BabelfontError::MasterNotFound(source_layer.to_string()))?
+    } else {
+        source_font.default_layer()
+    };
+
     let mut bf_layer_list = vec![];
     for g in glyphs.iter() {
         let mut glyph_layer_list = vec![];
-        for layer in source_font.iter_layers() {
-            let layername = layer.name().to_string();
-            if let Some(wanted) = &required_layer {
-                if &layername != wanted {
-                    continue;
-                }
-            }
-
-            if let Some(norad_glyph) = layer.get_glyph(g.name.as_str()) {
-                let mut our_layer = norad_glyph_to_babelfont_layer(norad_glyph, layer, &master.id);
-                // Even if this is non-default in the UFO, it is the default layer for this master
-                our_layer.master = crate::LayerType::DefaultForMaster(master.id.to_string());
-                glyph_layer_list.push(our_layer);
-            }
+        if let Some(norad_glyph) = ufo_layer.get_glyph(g.name.as_str()) {
+            let mut our_layer = norad_glyph_to_babelfont_layer(norad_glyph, ufo_layer, &master.id);
+            // Even if this is non-default in the UFO, it is the default layer for this master,
+            // because we have promoted sparse masters to their own babelfont master.
+            our_layer.master = crate::LayerType::DefaultForMaster(master.id.to_string());
+            glyph_layer_list.push(our_layer);
         }
         bf_layer_list.push(glyph_layer_list)
     }

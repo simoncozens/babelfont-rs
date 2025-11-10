@@ -6,7 +6,9 @@ use crate::common::FormatSpecific;
 pub struct Anchor {
     pub x: f64,
     pub y: f64,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub name: String,
+    #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
     pub format_specific: FormatSpecific,
 }
 

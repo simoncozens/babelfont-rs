@@ -60,7 +60,7 @@ where
     D: serde::Deserializer<'de>,
 {
     let opt: Option<f64> = Option::deserialize(deserializer)?;
-    Ok(opt.map(|v| UserCoord::new(v)))
+    Ok(opt.map(UserCoord::new))
 }
 
 pub(crate) fn axismap_ser<S>(
@@ -95,4 +95,86 @@ where
             .map(|(u, d)| (UserCoord::new(u), DesignCoord::new(d)))
             .collect()
     }))
+}
+
+pub(crate) fn affine_is_identity(affine: &kurbo::Affine) -> bool {
+    *affine == kurbo::Affine::IDENTITY
+}
+
+pub(crate) fn serialize_nodes<S>(
+    nodes: &Vec<crate::common::Node>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let mut s = String::new();
+    for node in nodes {
+        s.push_str(&format!(
+            "{} {} {}{} ",
+            node.x,
+            node.y,
+            match node.nodetype {
+                crate::NodeType::Move => "m",
+                crate::NodeType::Line => "l",
+                crate::NodeType::OffCurve => "o",
+                crate::NodeType::QCurve => "q",
+                crate::NodeType::Curve => "c",
+            },
+            if node.smooth { "s" } else { "" }
+        ));
+    }
+    s.pop(); // Remove trailing space
+    serializer.serialize_str(&s)
+}
+
+pub(crate) fn deserialize_nodes<'de, D>(
+    deserializer: D,
+) -> Result<Vec<crate::common::Node>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s: String = serde::Deserialize::deserialize(deserializer)?;
+    let mut nodes = Vec::new();
+    let mut tokens = s.split_whitespace();
+    while let Some(token) = tokens.next() {
+        let x_str = token;
+        let y_str = tokens
+            .next()
+            .ok_or_else(|| serde::de::Error::custom("Expected y coordinate"))?;
+        let type_str = tokens
+            .next()
+            .ok_or_else(|| serde::de::Error::custom("Expected node type"))?;
+        let x: f64 = x_str
+            .parse()
+            .map_err(|_| serde::de::Error::custom(format!("Invalid x coordinate: {}", x_str)))?;
+        let y: f64 = y_str
+            .parse()
+            .map_err(|_| serde::de::Error::custom(format!("Invalid y coordinate: {}", y_str)))?;
+        let (nodetype, smooth) = match type_str {
+            "m" => (crate::NodeType::Move, false),
+            "l" => (crate::NodeType::Line, false),
+            "o" => (crate::NodeType::OffCurve, false),
+            "q" => (crate::NodeType::QCurve, false),
+            "c" => (crate::NodeType::Curve, false),
+            "ms" => (crate::NodeType::Move, true),
+            "ls" => (crate::NodeType::Line, true),
+            "os" => (crate::NodeType::OffCurve, true),
+            "qs" => (crate::NodeType::QCurve, true),
+            "cs" => (crate::NodeType::Curve, true),
+            _ => {
+                return Err(serde::de::Error::custom(format!(
+                    "Invalid node type: {}",
+                    type_str
+                )))
+            }
+        };
+        nodes.push(crate::common::Node {
+            x,
+            y,
+            nodetype,
+            smooth,
+        });
+    }
+    Ok(nodes)
 }
