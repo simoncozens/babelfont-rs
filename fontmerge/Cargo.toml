@@ -17,6 +17,7 @@ regex = "1.12.2"
 itertools = "0.14.0"
 indicatif = "0.18.2"
 log-once = "0.4.1"
+uuid = "1.18.1"
 
 [lints.clippy]
 unwrap_used = "deny"

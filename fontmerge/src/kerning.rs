@@ -1,8 +1,16 @@
 use std::collections::{HashMap, HashSet};
 
-use babelfont::Font;
+use babelfont::{BabelfontError, Font};
+use fontdrasil::{
+    coords::{Location, NormalizedSpace},
+    variations::VariationModel,
+};
 
-use crate::{designspace::Strategy, glyphset::GlyphsetFilter};
+use crate::{
+    designspace::{fontdrasil_axes, Strategy},
+    error::FontmergeError,
+    glyphset::GlyphsetFilter,
+};
 
 // Remove glyphs to be imported from the target's kerning groups, so that
 // importing the source kerning then does not lead to duplicate group
@@ -41,36 +49,64 @@ fn clean_groups(
 fn get_kerning_table_for_master(
     font: &Font,
     strategy: &Strategy,
-) -> HashMap<(String, String), i16> {
+) -> Result<HashMap<(String, String), i16>, BabelfontError> {
     match strategy {
         Strategy::Exact {
             layer,
             master_name: _,
             clamped: _,
-        } => font
+        } => Ok(font
             .masters
             .iter()
             .find(|m| &m.id == layer)
             .map(|m| m.kerning.clone())
-            .unwrap_or_default(),
+            .unwrap_or_default()),
         Strategy::InterpolateOrIntermediate {
-            location: _,
+            location,
             clamped: _,
         } => {
-            // Whether we need to put interpolated, intermediate kerning in kind of depends if you're
-            // using fontmake or fontc to compile the eventual font. Fontmake requires a kerning table
-            // for each master, and if it isn't present, treats it as zero. Fontc, on the other hand, will
-            // just put whatever kerning information has available into the GPOS table, and if that's
-            // "sparse", then it's fine and the interpolation will be done at layout time.
-
-            // For now I am going to assume we're compiling with fontc, and return an empty table, simply
-            // because interpolating kerning is a lot of work and I've got enough to do right now.
-            log_once::warn_once!(
-                "Interpolated or intermediate kerning not yet implemented; skipping kerning for this master. If you're compiling with fontmake, this may lead to missing kerning in the final font."
-            );
-            HashMap::new()
+            // OK, this is going to be hellish.
+            let axes = fontdrasil_axes(&font.axes).unwrap();
+            log::debug!("Interpolating kerning at location {:?}", location);
+            let target_location = location.to_normalized(&axes);
+            let non_sparse_masters = font
+                .masters
+                .iter()
+                .filter(|m| !m.is_sparse(font))
+                .collect::<Vec<_>>();
+            let mut result = HashMap::new();
+            let locations_in_order = non_sparse_masters
+                .iter()
+                .map(|m| m.location.to_normalized(&axes))
+                .collect::<Vec<Location<NormalizedSpace>>>();
+            let locations: HashSet<Location<NormalizedSpace>> =
+                locations_in_order.iter().cloned().collect();
+            let model = VariationModel::new(locations, axes.axis_order());
+            let all_keys: HashSet<(String, String)> = font
+                .masters
+                .iter()
+                .flat_map(|m| m.kerning.keys().cloned())
+                .collect();
+            for key in all_keys {
+                // Collect all the values for this key
+                let mut kerns_positions: HashMap<Location<NormalizedSpace>, Vec<f64>> =
+                    HashMap::new();
+                for master in non_sparse_masters.iter() {
+                    if let Some(&value) = master.kerning.get(&key) {
+                        let loc = master.location.to_normalized(&axes);
+                        kerns_positions.entry(loc).or_default().push(value as f64);
+                    }
+                    let kern_deltas = model.deltas(&kerns_positions)?;
+                    let interpolated_kern =
+                        model.interpolate_from_deltas(&target_location, &kern_deltas);
+                    if let Some(interpolated_kern) = interpolated_kern.first() {
+                        result.insert(key.clone(), *interpolated_kern as i16);
+                    }
+                }
+            }
+            Ok(result)
         }
-        Strategy::Failed(_) => HashMap::default(),
+        Strategy::Failed(_) => Ok(HashMap::default()),
     }
 }
 
@@ -79,7 +115,7 @@ pub(crate) fn merge_kerning(
     font2: &mut Font,
     glyphset_filter: &GlyphsetFilter,
     strategies: &[Strategy],
-) {
+) -> Result<(), FontmergeError> {
     log::info!("Merging kerning");
     for group in font2.first_kern_groups.values_mut() {
         group.retain(|glyph_name| glyphset_filter.incoming_glyphset.contains(glyph_name));
@@ -115,7 +151,13 @@ pub(crate) fn merge_kerning(
             !first_groups_to_clean.contains(left.trim_start_matches('@'))
                 && !second_groups_to_clean.contains(right.trim_start_matches('@'))
         });
-        let font2_kerntable = get_kerning_table_for_master(font2, strategy);
+        let font2_kerntable = get_kerning_table_for_master(font2, strategy).map_err(|e| {
+            FontmergeError::Interpolation(format!(
+                "Failed to get kerning table for master '{}': {}",
+                master.name.get_default().unwrap_or(&master.id),
+                e
+            ))
+        })?;
         for ((first, second), value) in font2_kerntable {
             let mut first_glyphs = if first.starts_with('@') {
                 font2
@@ -172,4 +214,5 @@ pub(crate) fn merge_kerning(
         }
     }
     log::debug!("Merged kerning tables");
+    Ok(())
 }

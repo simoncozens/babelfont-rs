@@ -1,4 +1,4 @@
-use babelfont::filters::FontFilter as _;
+use babelfont::filters::{FontFilter as _, RetainGlyphs};
 use clap::Parser;
 use indexmap::IndexSet;
 use indicatif::ProgressIterator;
@@ -11,7 +11,7 @@ mod layout;
 mod merge;
 
 use crate::args::{DuplicateLookupHandling, ExistingGlyphHandling, LayoutHandling};
-use crate::designspace::{add_needed_masters, fontdrasil_axes, map_designspaces};
+use crate::designspace::{add_needed_masters, fontdrasil_axes, map_designspaces, sanity_check};
 use crate::kerning::merge_kerning;
 use crate::layout::lookupgatherer::LookupGathererVisitor;
 use crate::layout::subsetter::LayoutSubsetter;
@@ -103,6 +103,18 @@ fn main() {
         return;
     }
 
+    // Babelfont can slim down the font for us
+    let mut font2 = font2.clone();
+    RetainGlyphs::new(
+        glyphset_filter
+            .incoming_glyphset
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>(),
+    )
+    .apply(&mut font2)
+    .expect("Failed to retain selected glyphs in font 2");
+
     if args.layout_handling != LayoutHandling::Ignore {
         let final_glyphset: Vec<String> = glyphset_filter.final_glyphset();
         // Create a layout subsetter
@@ -174,7 +186,7 @@ fn main() {
     let f1_nonsparse_master_ids: Vec<String> = font1
         .masters
         .iter()
-        .filter(|m| !m.is_sparse(&font1))
+        // .filter(|m| !m.is_sparse(&font1)) // XXX
         .map(|m| m.id.clone())
         .collect();
 
@@ -197,7 +209,8 @@ fn main() {
     let f2_axes = fontdrasil_axes(&font2.axes).expect("Could not interpret font 2 axes");
 
     // Merge kerning here
-    merge_kerning(&mut font1, &mut font2, &glyphset_filter, &mapping);
+    merge_kerning(&mut font1, &mut font2, &glyphset_filter, &mapping)
+        .expect("Failed to merge kerning");
 
     log::info!("Merging glyphs");
     for glyph in glyphset_filter.incoming_glyphset.iter().progress() {
@@ -220,6 +233,10 @@ fn main() {
             .expect("Failed to merge glyph");
         }
     }
+    assert!(
+        sanity_check(&font1),
+        "Font failed sanity check after merging glyphs"
+    );
 
     // Handle dotted circle anchors
     log::info!(

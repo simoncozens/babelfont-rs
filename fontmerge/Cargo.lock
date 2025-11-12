@@ -706,6 +706,7 @@ dependencies = [
  "log-once",
  "regex",
  "thiserror 2.0.17",
+ "uuid",
 ]
 
 [[package]]

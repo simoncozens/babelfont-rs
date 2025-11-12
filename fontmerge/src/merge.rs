@@ -3,31 +3,8 @@ use fontdrasil::coords::{Location, UserSpace};
 use fontdrasil::types::Axes;
 use indexmap::IndexSet;
 
-use crate::designspace::{Strategy, compatible_location, fontdrasil_axes};
+use crate::designspace::{convert_between_designspaces, fontdrasil_axes, within_bounds, Strategy};
 use crate::error::FontmergeError;
-
-fn within_bounds(
-    loc: &fontdrasil::coords::Location<fontdrasil::coords::DesignSpace>,
-    axes: &fontdrasil::types::Axes,
-) -> bool {
-    for axis in axes.iter() {
-        if let Some(value) = loc.get(axis.tag)
-            && (value < axis.min.to_design(&axis.converter)
-                || value > axis.max.to_design(&axis.converter))
-        {
-            log::trace!(
-                "Location {:?} out of bounds on axis '{}': {} not in [{}, {}]",
-                loc,
-                axis.tag,
-                value.to_f64(),
-                axis.min.to_f64(),
-                axis.max.to_f64()
-            );
-            return false;
-        }
-    }
-    true
-}
 
 pub(crate) fn merge_glyph(
     font1: &mut Font,
@@ -95,13 +72,7 @@ pub(crate) fn merge_glyph(
             }
             Strategy::InterpolateOrIntermediate { location, clamped } => {
                 // We have set locations on all layers, but they're not in the right coordinate system
-                let layer = layers.iter().find(|l| {
-                    l.location
-                        .as_ref()
-                        .map(|l| l.to_user(font2_axes))
-                        .map(|l| compatible_location(location, &l))
-                        .unwrap_or(false)
-                });
+                let layer = layers.iter().find(|l| l.location == Some(location.clone()));
                 if let Some(l) = layer {
                     // This was an intermediate layer there, but will be a master layer here.
                     if !clamped {
@@ -119,7 +90,7 @@ pub(crate) fn merge_glyph(
                     );
                     Some(
                         font2
-                            .interpolate_glyph(&glyph.name, &location.to_design(font2_axes))
+                            .interpolate_glyph(&glyph.name, &location)
                             .map_err(|e| {
                                 FontmergeError::Interpolation(format!(
                                     "Failed to interpolate glyph '{}' at location {:?}: {}",
@@ -168,7 +139,7 @@ pub(crate) fn merge_glyph(
         .filter(|l| {
             l.location
                 .as_ref()
-                .is_some_and(|l| within_bounds(l, &font1_axes))
+                .is_some_and(|l| within_bounds(&font1_axes, l))
         })
         .collect::<Vec<_>>();
     let first_master = font1.masters.first();
@@ -185,18 +156,27 @@ pub(crate) fn merge_glyph(
         // * Convert them to user space,
         // * Then fill in any missing axes with defaults from font1 and remove any axes not in font1,
         // * Then convert to design space of font1.
-        let loc_in_user = layer.location.as_ref().unwrap().to_user(font2_axes);
-        let new_userspace: Location<UserSpace> = font1_axes
+        let (loc_in_font1, _) = convert_between_designspaces(
+            layer.location.as_ref().unwrap(),
+            font2_axes,
+            &font1_axes,
+            true,
+        );
+
+        // Make double double sure there isn't a font master at this location already in font1
+        if font1
+            .masters
             .iter()
-            .map(|axis| {
-                if let Some(value) = loc_in_user.get(axis.tag) {
-                    (axis.tag, value)
-                } else {
-                    (axis.tag, axis.default)
-                }
-            })
-            .collect();
-        layer.location = Some(new_userspace.to_design(&font1_axes));
+            .any(|m| m.location.to_user(&font1_axes) == loc_in_font1.to_user(&font1_axes))
+        {
+            log::debug!(
+                "Not adding remaining layer at location {:?} to glyph '{}' because a master already exists there",
+                layer.location.as_ref().unwrap(),
+                glyph.name
+            );
+            continue;
+        }
+        layer.location = Some(loc_in_font1);
 
         // Check we haven't already added a layer at this location.
         let loc = layer.location.as_ref().unwrap();
