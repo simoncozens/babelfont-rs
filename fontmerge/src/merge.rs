@@ -71,6 +71,9 @@ pub(crate) fn merge_glyph(
                 }
             }
             Strategy::InterpolateOrIntermediate { location, clamped } => {
+                // I'm just going to leave it sparse, dammit.
+                continue;
+
                 // We have set locations on all layers, but they're not in the right coordinate system
                 let layer = layers.iter().find(|l| l.location == Some(location.clone()));
                 if let Some(l) = layer {

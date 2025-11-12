@@ -233,7 +233,6 @@ pub(crate) fn add_needed_masters(
         .filter(|m| m.is_sparse(font1))
         .map(|m| m.id.clone())
         .collect::<HashSet<_>>();
-    let mut unsparsification_list = vec![];
     for f2_master in font2.masters.iter() {
         if f2_master.is_sparse(font2) {
             continue;
@@ -293,26 +292,6 @@ pub(crate) fn add_needed_masters(
                 .iter()
                 .find(|m| m.location == loc1_design)
             {
-                // If it's sparse, we need to unsparsify it
-                if f1_sparse_master_ids.contains(&existing_master.id) {
-                    log::debug!(
-                        "Font 2 master '{}' at location {:?} corresponds to sparse master '{}' in Font 1; unsparsifying",
-                        f2_master.name.get_default().unwrap_or(&f2_master.id),
-                        f2_master.location.to_user(&ds2),
-                        existing_master
-                            .name
-                            .get_default()
-                            .unwrap_or(&existing_master.id),
-                    );
-                    unsparsification_list
-                        .push((existing_master.id.clone(), existing_master.location.clone()));
-                } else {
-                    log::trace!(
-                        "Font 2 master '{}' at location {:?} already has a corresponding master in Font 1; skipping addition",
-                        f2_master.name.get_default().unwrap_or(&f2_master.id),
-                        f2_master.location.to_user(&ds2)
-                    );
-                }
                 continue;
             }
             let master = babelfont::Master::new(
@@ -325,120 +304,12 @@ pub(crate) fn add_needed_masters(
                 master.name.get_default().unwrap_or(&master.id),
                 loc1_design.to_user(&ds1)
             );
-            unsparsification_list.push((master.id.clone(), loc1_design.clone()));
             font1.masters.push(master);
         }
     }
-    if !unsparsification_list.is_empty() {
-        log::info!(
-            "Unsparsifying {} masters in font 1 to match font 2",
-            unsparsification_list.len()
-        );
-    }
-    log::debug!("Unsparsification list: {:?}", unsparsification_list);
 
-    for (master_id, location) in unsparsification_list.into_iter() {
-        unsparsify_master(font1, &master_id, &location)?;
-    }
     assert!(sanity_check(font1), "Font failed sanity check after adding needed masters");
 
-    Ok(())
-}
-
-fn unsparsify_master(
-    font: &mut babelfont::Font,
-    master_id: &str,
-    location: &Location<DesignSpace>,
-) -> Result<(), FontmergeError> {
-    assert!(sanity_check(font), "Font failed sanity check before unsparsifying master '{}'", master_id);
-    if !font.masters.iter().any(|m| m.id == master_id) {
-        return Err(FontmergeError::Font(format!(
-            "Cannot unsparsify master '{}': not found in font",
-            master_id
-        )));
-    }
-
-    log::debug!(
-        "Unsparsifying master '{}' ({}) at location {:?}",
-        font.masters.iter().find(|m| m.id == master_id).unwrap().name.get_default().unwrap_or(&master_id.to_string()),
-        master_id,
-        location
-    );
-    let mut layer_additions = vec![];
-    let mut promotion_list = vec![];
-
-    // Interpolate layers
-    for glyph in font.glyphs.iter() {
-        // If there already exists a *real* layer for this master, bug out
-        if glyph
-            .layers
-            .iter()
-            .any(|l| l.master == babelfont::LayerType::DefaultForMaster(master_id.to_string()))
-        {
-            log::debug!(
-                "Glyph '{}' already has a full layer for master '{}', skipping",
-                glyph.name,
-                master_id
-            );
-            continue;
-        }
-        // If there already exists a sparse layer for this master, promote it and move on
-        let mut found_sparse = false;
-        for layer in glyph.layers.iter() { 
-            if layer.location == Some(location.clone())
-            {
-                log::debug!(
-                    "Promoting sparse layer for glyph '{}' at location {:?} to full layer",
-                    glyph.name,
-                    location
-                );
-                promotion_list.push((glyph.name.clone(), layer.id.clone()));
-                found_sparse = true;
-                break;
-            }
-        }
-        if found_sparse {
-            continue;
-        }
-        let mut interpolated_layer =
-            font.interpolate_glyph(&glyph.name, location).map_err(|e| {
-                FontmergeError::Font(format!(
-                    "Failed to interpolate glyph '{}' for new master at location {:?}: {}",
-                    glyph.name, location, e
-                ))
-            })?;
-        // Give it an id
-        interpolated_layer.master = babelfont::LayerType::DefaultForMaster(master_id.to_string());
-        interpolated_layer.id = Some(master_id.to_string());
-        // Check we don't already have a layer at this location
-        layer_additions.push((glyph.name.clone(), interpolated_layer));
-    }
-
-    for (glyph_name, layer_id) in promotion_list.into_iter() {
-        let glyph = font.glyphs.get_mut(&glyph_name).unwrap();
-        let layer = glyph
-            .layers
-            .iter_mut()
-            .find(|l| l.id == layer_id)
-            .unwrap();
-        layer.master = babelfont::LayerType::DefaultForMaster(master_id.to_string());
-        layer.id = Some(master_id.to_string());
-    }
-
-    for (glyph_name, layer) in layer_additions.into_iter() {
-        if let Some(glyph) = font.glyphs.get_mut(&glyph_name) {
-            glyph.layers.push(layer);
-        }
-    }
-    assert!(
-        !font
-            .masters
-            .iter()
-            .find(|m| m.id == master_id)
-            .unwrap()
-            .is_sparse(font)
-    );
-    assert!(sanity_check(font), "Font failed sanity check after unsparsifying master '{}'", master_id);
     Ok(())
 }
 
