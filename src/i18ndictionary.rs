@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 static DFLT: &str = "dflt";
 
 #[derive(Default, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
 pub struct I18NDictionary(pub HashMap<String, String>);
 
 impl I18NDictionary {

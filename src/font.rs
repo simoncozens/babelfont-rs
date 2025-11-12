@@ -21,6 +21,7 @@ use write_fonts::types::Tag;
 extern crate serde_json_path_to_error as serde_json;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
 pub struct Font {
     pub upm: u16,
     pub version: (u16, u16),
@@ -38,6 +39,7 @@ pub struct Font {
     pub glyphs: GlyphList,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
+    #[cfg_attr(feature = "typescript", type_def(type_of = "String"))]
     pub date: chrono::DateTime<Local>,
     pub names: Names,
     /// Any values to be placed in OpenType tables on export to override defaults

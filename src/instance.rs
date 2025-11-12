@@ -3,9 +3,19 @@ use fontdrasil::coords::DesignLocation;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
 pub struct Instance {
     pub id: String,
     pub name: I18NDictionary,
+    #[serde(
+        default,
+        serialize_with = "crate::serde_helpers::design_location_to_map",
+        deserialize_with = "crate::serde_helpers::design_location_from_map"
+    )]
+    #[cfg_attr(
+        feature = "typescript",
+        type_def(type_of = "std::collections::HashMap<String, f32>")
+    )]
     pub location: DesignLocation,
     pub custom_names: Names,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]

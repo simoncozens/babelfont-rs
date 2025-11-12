@@ -2,6 +2,7 @@ use crate::common::{Color, Position};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
 pub struct Guide {
     pub pos: Position,
     #[serde(default, skip_serializing_if = "Option::is_none")]

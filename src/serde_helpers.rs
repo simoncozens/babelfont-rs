@@ -1,6 +1,9 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 
-use fontdrasil::coords::{DesignCoord, UserCoord};
+use fontdrasil::{
+    coords::{DesignCoord, DesignLocation, UserCoord},
+    types::Tag,
+};
 use serde::{
     ser::{SerializeMap as _, SerializeSeq as _},
     Deserialize as _,
@@ -184,4 +187,67 @@ where
     T: PartialEq + From<f32>,
 {
     f == &T::from(0.0)
+}
+
+pub(crate) fn design_location_to_map<S>(
+    location: &DesignLocation,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let mut ser_map = serializer.serialize_map(Some(location.iter().count()))?;
+    for (axis, coord) in location.iter() {
+        ser_map.serialize_entry(axis, &coord.to_f64())?;
+    }
+    ser_map.end()
+}
+
+pub(crate) fn design_location_from_map<'de, D>(deserializer: D) -> Result<DesignLocation, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let raw_map: HashMap<String, f64> = HashMap::deserialize(deserializer)?;
+    let mut location = DesignLocation::default();
+    for (axis, value) in raw_map {
+        location.insert(
+            Tag::from_str(&axis).map_err(serde::de::Error::custom)?,
+            DesignCoord::new(value),
+        );
+    }
+    Ok(location)
+}
+
+pub(crate) fn option_design_location_to_map<S>(
+    location: &Option<DesignLocation>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    match location {
+        Some(loc) => design_location_to_map(loc, serializer),
+        None => serializer.serialize_none(),
+    }
+}
+pub(crate) fn option_design_location_from_map<'de, D>(
+    deserializer: D,
+) -> Result<Option<DesignLocation>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let opt: Option<HashMap<String, f64>> = Option::deserialize(deserializer)?;
+    match opt {
+        Some(raw_map) => {
+            let mut location = DesignLocation::default();
+            for (axis, value) in raw_map {
+                location.insert(
+                    Tag::from_str(&axis).map_err(serde::de::Error::custom)?,
+                    DesignCoord::new(value),
+                );
+            }
+            Ok(Some(location))
+        }
+        None => Ok(None),
+    }
 }

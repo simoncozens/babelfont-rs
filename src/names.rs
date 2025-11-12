@@ -4,6 +4,7 @@ use write_fonts::read::tables::name::NameId;
 use crate::i18ndictionary::I18NDictionary;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
 pub enum StyleMapStyle {
     BoldItalic,
     Bold,
@@ -12,6 +13,7 @@ pub enum StyleMapStyle {
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
 pub struct Names {
     #[serde(default, skip_serializing_if = "I18NDictionary::is_empty")]
     pub copyright: I18NDictionary,

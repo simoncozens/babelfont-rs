@@ -7,9 +7,12 @@ use uuid::Uuid;
 pub use write_fonts::types::Tag;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
 pub struct Axis {
     pub name: I18NDictionary,
+    #[cfg_attr(feature = "typescript", type_def(type_of = "String"))]
     pub tag: Tag,
+    #[cfg_attr(feature = "typescript", type_def(type_of = "String"))]
     pub id: Uuid,
     #[serde(
         default,
@@ -17,6 +20,7 @@ pub struct Axis {
         serialize_with = "crate::serde_helpers::usercoord_option_ser",
         deserialize_with = "crate::serde_helpers::usercoord_option_de"
     )]
+    #[cfg_attr(feature = "typescript", type_def(type_of = "Option<f64>"))]
     pub min: Option<UserCoord>,
     #[serde(
         default,
@@ -24,6 +28,7 @@ pub struct Axis {
         serialize_with = "crate::serde_helpers::usercoord_option_ser",
         deserialize_with = "crate::serde_helpers::usercoord_option_de"
     )]
+    #[cfg_attr(feature = "typescript", type_def(type_of = "Option<f64>"))]
     pub max: Option<UserCoord>,
     #[serde(
         default,
@@ -31,6 +36,7 @@ pub struct Axis {
         serialize_with = "crate::serde_helpers::usercoord_option_ser",
         deserialize_with = "crate::serde_helpers::usercoord_option_de"
     )]
+    #[cfg_attr(feature = "typescript", type_def(type_of = "Option<f64>"))]
     pub default: Option<UserCoord>,
     #[serde(
         default,
@@ -38,10 +44,12 @@ pub struct Axis {
         serialize_with = "crate::serde_helpers::axismap_ser",
         deserialize_with = "crate::serde_helpers::axismap_de"
     )]
+    #[cfg_attr(feature = "typescript", type_def(type_of = "Vec<(f32, f32)>"))]
     pub map: Option<Vec<(UserCoord, DesignCoord)>>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub hidden: bool,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "typescript", type_def(type_of = "Vec<f64>"))]
     pub values: Vec<UserCoord>,
     #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
     pub formatspecific: FormatSpecific,

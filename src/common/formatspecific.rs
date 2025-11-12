@@ -3,7 +3,14 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
-pub struct FormatSpecific(IndexMap<String, Value>);
+#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+pub struct FormatSpecific(
+    #[cfg_attr(
+        feature = "typescript",
+        type_def(type_of = "std::collections::HashMap<String, Value>")
+    )]
+    IndexMap<String, Value>,
+);
 
 impl FormatSpecific {
     pub fn get(&self, key: &str) -> Option<&Value> {

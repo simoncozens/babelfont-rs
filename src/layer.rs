@@ -10,6 +10,7 @@ use kurbo::Shape as KurboShape;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
 pub enum LayerType {
     DefaultForMaster(String),
     AssociatedWithMaster(String),
@@ -23,6 +24,7 @@ impl LayerType {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
 pub struct Layer {
     pub width: f32,
     pub name: Option<String>,
@@ -44,7 +46,16 @@ pub struct Layer {
     pub is_background: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub background_layer_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "crate::serde_helpers::option_design_location_to_map",
+        deserialize_with = "crate::serde_helpers::option_design_location_from_map"
+    )]
+    #[cfg_attr(
+        feature = "typescript",
+        type_def(type_of = "Option<std::collections::HashMap<String, f32>>")
+    )]
     pub location: Option<DesignLocation>,
     #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
     pub format_specific: FormatSpecific,

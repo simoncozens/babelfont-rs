@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::common::FormatSpecific;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
 pub struct Anchor {
     pub x: f64,
     pub y: f64,

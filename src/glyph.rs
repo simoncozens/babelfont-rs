@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
 pub struct GlyphList(pub Vec<Glyph>);
 impl GlyphList {
     pub fn get(&self, g: &str) -> Option<&Glyph> {
@@ -40,6 +41,7 @@ impl DerefMut for GlyphList {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
 pub enum GlyphCategory {
     Base,
     Mark,
@@ -48,6 +50,7 @@ pub enum GlyphCategory {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
 pub struct Glyph {
     pub name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]

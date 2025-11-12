@@ -5,18 +5,21 @@ use crate::{
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
 pub struct Component {
     pub reference: String,
     #[serde(
         default = "kurbo::Affine::default",
         skip_serializing_if = "crate::serde_helpers::affine_is_identity"
     )]
+    #[cfg_attr(feature = "typescript", type_def(type_of = "Vec<f32>"))]
     pub transform: kurbo::Affine,
     #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
     pub format_specific: FormatSpecific,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
 pub struct Path {
     #[serde(
         serialize_with = "crate::serde_helpers::serialize_nodes",
@@ -91,6 +94,7 @@ impl Path {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
 pub enum Shape {
     Component(Component),
     Path(Path),

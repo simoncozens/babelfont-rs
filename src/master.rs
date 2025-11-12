@@ -11,12 +11,20 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
 pub struct Master {
     pub name: I18NDictionary,
     pub id: String,
+    #[serde(
+        default,
+        serialize_with = "crate::serde_helpers::design_location_to_map",
+        deserialize_with = "crate::serde_helpers::design_location_from_map"
+    )]
+    #[cfg_attr(feature = "typescript", type_def(type_of = "HashMap<String, f32>"))]
     pub location: DesignLocation,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub guides: Vec<Guide>,
+    #[cfg_attr(feature = "typescript", type_def(type_of = "HashMap<MetricType, i32>"))]
     pub metrics: IndexMap<MetricType, i32>,
     /// Kerning for this master.
     ///
