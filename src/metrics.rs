@@ -31,6 +31,7 @@ pub enum MetricType {
     HheaCaretSlopeRise,
     HheaCaretSlopeRun,
     HheaCaretOffset,
+    #[serde(untagged)]
     Custom(String), // This could possibly be smol_str and Copy
 }
 
@@ -162,5 +163,33 @@ mod glyphs {
                 metric_type,
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use indexmap::IndexMap;
+
+    use super::*;
+
+    #[test]
+    fn test_serialize() {
+        let metric = MetricType::XHeight;
+        let serialized = serde_json::to_string(&metric).unwrap();
+        assert_eq!(serialized, r#""XHeight""#);
+
+        let custom_metric = MetricType::Custom("myCustomMetric".to_string());
+        let serialized_custom = serde_json::to_string(&custom_metric).unwrap();
+        assert_eq!(serialized_custom, r#""myCustomMetric""#);
+    }
+
+    #[test]
+    fn test_serialize_indexmap() {
+        let metrics = IndexMap::from([
+            (MetricType::XHeight, 500.0),
+            (MetricType::Custom("myCustomMetric".to_string()), 300.0),
+        ]);
+        let serialized = serde_json::to_string(&metrics).unwrap();
+        assert_eq!(serialized, r#"{"XHeight":500.0,"myCustomMetric":300.0}"#);
     }
 }
