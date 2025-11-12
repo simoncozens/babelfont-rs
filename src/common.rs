@@ -22,6 +22,7 @@ pub(crate) fn tag_from_string(s: &str) -> Result<Tag, BabelfontError> {
 pub struct Position {
     pub x: f32,
     pub y: f32,
+    #[serde(default, skip_serializing_if = "crate::serde_helpers::is_zero")]
     pub angle: f32,
 }
 

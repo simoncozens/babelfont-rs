@@ -178,3 +178,10 @@ where
     }
     Ok(nodes)
 }
+
+pub(crate) fn is_zero<T>(f: &T) -> bool
+where
+    T: PartialEq + From<f32>,
+{
+    f == &T::from(0.0)
+}

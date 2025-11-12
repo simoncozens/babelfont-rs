@@ -4,8 +4,14 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Guide {
     pub pos: Position,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub color: Option<Color>,
+    #[serde(
+        default,
+        skip_serializing_if = "crate::common::FormatSpecific::is_empty"
+    )]
     pub format_specific: crate::common::FormatSpecific,
 }
 
