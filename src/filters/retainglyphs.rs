@@ -46,12 +46,25 @@ impl FontFilter for RetainGlyphs {
             .retain(|_group, members| !members.is_empty());
         // Filter kerning
         for master in font.masters.iter_mut() {
-            // XXX or groups!
-            master
-                .kerning
-                .retain(|(left, right), _| self.0.contains(left) && self.0.contains(right));
+            master.kerning.retain(|(left, right), _| {
+                // Because we removed all the dead groups, any groups still refer to things we care about
+                (self.0.contains(left)
+                    || (left.starts_with('@') && font.first_kern_groups.contains_key(&left[1..])))
+                    && (self.0.contains(right)
+                        || (right.starts_with('@')
+                            && font.second_kern_groups.contains_key(&right[1..])))
+            });
         }
         // Filter features!
+
+        // Filter masters - remove any masters which were just sparse
+        font.masters.retain(|master| {
+            font.glyphs.iter().any(|glyph| {
+                glyph.layers.iter().any(|layer| {
+                    layer.master == crate::LayerType::DefaultForMaster(master.id.clone())
+                })
+            })
+        });
         Ok(())
     }
 }

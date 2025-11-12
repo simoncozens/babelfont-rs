@@ -72,6 +72,12 @@ fn convert_filters(filter: &[String]) -> Vec<Box<dyn FontFilter>> {
             "dropkerning" => {
                 result.push(Box::new(babelfont::filters::DropKerning::new()));
             }
+            "dropguides" => {
+                result.push(Box::new(babelfont::filters::DropGuides::new()));
+            }
+            "dropinstances" => {
+                result.push(Box::new(babelfont::filters::DropInstances::new()));
+            }
             _ => {
                 log::warn!("Unknown filter: {}", parts[0]);
             }
