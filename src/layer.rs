@@ -1,7 +1,6 @@
 use crate::{
     anchor::Anchor,
     common::{Color, FormatSpecific},
-    convertors::glyphs3::copy_user_data,
     guide::Guide,
     shape::Shape,
     BabelfontError, Component, Font, Node, Path,
@@ -211,6 +210,7 @@ impl Layer {
 
 #[cfg(feature = "glyphs")]
 pub(crate) mod glyphs {
+    use crate::convertors::glyphs3::copy_user_data;
     use std::collections::BTreeMap;
 
     use fontdrasil::types::Tag;

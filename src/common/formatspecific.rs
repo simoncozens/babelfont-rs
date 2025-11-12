@@ -40,7 +40,7 @@ impl FormatSpecific {
             .unwrap_or_default()
     }
 
-    pub(crate) fn iter(&self) -> impl Iterator<Item = (&String, &Value)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&String, &Value)> {
         self.0.iter()
     }
 

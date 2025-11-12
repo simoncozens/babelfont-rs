@@ -105,6 +105,7 @@ impl MetricType {
     }
 }
 
+#[cfg(feature = "glyphs")]
 mod glyphs {
     use super::MetricType;
     use glyphslib::glyphs3::{Metric as G3Metric, MetricType as G3MetricType};

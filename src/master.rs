@@ -83,6 +83,7 @@ impl Master {
     }
 }
 
+#[cfg(feature = "fontra")]
 mod fontra {
     use super::*;
     use crate::convertors::fontra;

@@ -72,6 +72,7 @@ pub enum BabelfontError {
     FilterError(String),
 }
 
+#[cfg(feature = "fontir")]
 impl From<BabelfontError> for fontir::error::Error {
     fn from(val: BabelfontError) -> Self {
         match val {

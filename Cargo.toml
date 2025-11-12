@@ -19,11 +19,11 @@ glyphs = ["dep:glyphslib"]
 ufo = ["dep:norad"]
 fontra = []
 fontlab = []
-fontir = ["dep:fontir", "dep:smol_str", "dep:fontc"]
+fontir = ["dep:fontir", "dep:fontc"]
 cli = ["dep:env_logger", "dep:clap", "dep:serde_json_path_to_error", "dep:clap-verbosity-flag"]
 
 [dependencies]
-chrono = { version = "0.4.3" }
+chrono = { version = "0.4.3", features = ["serde"] }
 kurbo = "0.12"
 glyphslib = { git = "https://github.com/simoncozens/glyphslib-rs", optional = true }
 norad = { version = "0.14.0", features = ["rayon", "kurbo"], optional = true }
@@ -36,9 +36,9 @@ fontdrasil = { git = "https://github.com/googlefonts/fontc.git", branch = "edit-
 fontir = { version = "0.3.1", optional = true, git = "https://github.com/googlefonts/fontc.git", branch = "edit-edits" } # Must use version fondrasil uses
 fontc = { version = "0.3.1", optional = true, git = "https://github.com/googlefonts/fontc.git", branch = "edit-edits" } # Must use version fondrasil uses
 write-fonts = { version = "0.43.0" }                                           # Must use version fontdrasil uses
-smol_str = { version = "0.3.0", features = ["serde"], optional = true }
+smol_str = { version = "0.3.0", features = ["serde"] }
 ordered-float = "4.6.0"
-indexmap = "2.12.0"
+indexmap = { version = "2.12.0", features = ["serde"] }
 paste = "1.0.15"
 env_logger = { version = "0.11.8", optional = true }
 clap = { version = "4.5.51", optional = true, features = ["derive"] }
