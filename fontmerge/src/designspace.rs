@@ -1,7 +1,7 @@
 use std::{collections::HashSet, fmt::Display};
 
 use babelfont::{BabelfontError, Font};
-use fontdrasil::coords::{ConvertSpace, DesignSpace, Location, UserSpace};
+use fontdrasil::coords::{DesignSpace, Location};
 use itertools::Itertools;
 
 use crate::error::FontmergeError;
@@ -150,20 +150,6 @@ pub(crate) fn map_designspaces(
         );
     }
 
-    // let font1_axis_tags = font1.axes.iter().map(|a| a.tag).collect::<Vec<_>>();
-    // let font2_axis_tags = font2.axes.iter().map(|a| a.tag).collect::<Vec<_>>();
-
-    // let remove_not_in_f1 = |loc: Location<UserSpace>| -> Location<UserSpace> {
-    //     let mut new_loc = loc.clone();
-    //     new_loc.retain(|tag, _| font1_axis_tags.contains(tag));
-    //     new_loc
-    // };
-    // let remove_not_in_f2 = |loc: Location<UserSpace>| -> Location<UserSpace> {
-    //     let mut new_loc = loc.clone();
-    //     new_loc.retain(|tag, _| font2_axis_tags.contains(tag));
-    //     new_loc
-    // };
-
     // For each non-sparse master in font1, we need to find something in font2 at that location
     for master_id in f1_nonsparse_master_ids.iter() {
         #[allow(clippy::unwrap_used)]
@@ -210,35 +196,19 @@ pub(crate) fn map_designspaces(
     Ok(results)
 }
 
-// We have to insert full, interpolated masters for every point that font2 has a master. Why?
-// If I have font1 with masters at wght=400 and wght=1000, and font2 has range 400-700,
-// you might think you could put font2's 400 at 400 and its 700 at 1000, and then add an intermediate
-// layer at 700 so there's no variation between 700-1000.
-// Very clever - but no! Because of kerning. Intermediate layers don't hold kerning values, so
-// in the two-master-with-intermediate-layer setup, your outlines vary between 400-700 but your
-// kerning varies between 400-1000, which is wrong.
-// Also, avar tables. Suppose font2 has an avar mapping which maps 600 to 550 in user space, and
-// font1 does not. We can't add an avar to font1 because that'll bend its designspace. How do we
-// represent the mapping? We can't, unless we have a full master at 600 in font1.
-// So: full masters for each master in font2 *and* every point in the avar map.
 pub(crate) fn add_needed_masters(
     font1: &mut babelfont::Font,
     font2: &babelfont::Font,
 ) -> Result<(), FontmergeError> {
     let ds1 = fontdrasil_axes(&font1.axes)?;
     let ds2 = fontdrasil_axes(&font2.axes)?;
-    let f1_sparse_master_ids = font1
-        .masters
-        .iter()
-        .filter(|m| m.is_sparse(font1))
-        .map(|m| m.id.clone())
-        .collect::<HashSet<_>>();
     for f2_master in font2.masters.iter() {
         if f2_master.is_sparse(font2) {
             continue;
         } // Well thank goodness for that
 
         // if this is non-default for an axis we don't have in f1, ignore it
+        #[allow(clippy::unwrap_used)] // We know these axes are in ds2
         if f2_master
             .location
             .to_user(&ds2)
@@ -287,10 +257,10 @@ pub(crate) fn add_needed_masters(
         for loc1_design in locations_to_add.into_iter() {
 
             // Do we have one already?
-            if let Some(existing_master) = font1
+            if font1
                 .masters
                 .iter()
-                .find(|m| m.location == loc1_design)
+                .any(|m| m.location == loc1_design)
             {
                 continue;
             }
@@ -349,7 +319,7 @@ pub(crate) fn sanity_check(font: &Font) -> bool {
             .iter()
             .filter_map(|l| match &l.master {
                 babelfont::LayerType::DefaultForMaster(id) => Some(id),
-                babelfont::LayerType::AssociatedWithMaster(id) => None,
+                babelfont::LayerType::AssociatedWithMaster(_) => None,
                 babelfont::LayerType::FreeFloating => None,
             })
             .collect::<Vec<&String>>();

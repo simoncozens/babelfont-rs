@@ -1,5 +1,4 @@
 use babelfont::{Font, Glyph, LayerType};
-use fontdrasil::coords::{Location, UserSpace};
 use fontdrasil::types::Axes;
 use indexmap::IndexSet;
 
@@ -11,7 +10,6 @@ pub(crate) fn merge_glyph(
     font1_nonsparse_master_ids: &[String],
     font2_glyph: &Glyph,
     font2_axes: &Axes,
-    font2: &Font,
     strategies: &[Strategy],
 ) -> Result<(), FontmergeError> {
     let font1_axes = fontdrasil_axes(&font1.axes)?;
@@ -70,38 +68,12 @@ pub(crate) fn merge_glyph(
                     None
                 }
             }
-            Strategy::InterpolateOrIntermediate { location, clamped } => {
+            Strategy::InterpolateOrIntermediate {
+                location: _,
+                clamped: _,
+            } => {
                 // I'm just going to leave it sparse, dammit.
                 continue;
-
-                // We have set locations on all layers, but they're not in the right coordinate system
-                let layer = layers.iter().find(|l| l.location == Some(location.clone()));
-                if let Some(l) = layer {
-                    // This was an intermediate layer there, but will be a master layer here.
-                    if !clamped {
-                        #[allow(clippy::unwrap_used)] // We ensured all layers have an ID above
-                        drop_layers.insert(l.id.clone().unwrap());
-                    }
-                    let mut l = l.clone();
-                    l.master = LayerType::DefaultForMaster(master.id.clone());
-                    Some(l)
-                } else {
-                    log::info!(
-                        "Interpolating glyph '{}' at location {:?}",
-                        glyph.name,
-                        location
-                    );
-                    Some(
-                        font2
-                            .interpolate_glyph(&glyph.name, &location)
-                            .map_err(|e| {
-                                FontmergeError::Interpolation(format!(
-                                    "Failed to interpolate glyph '{}' at location {:?}: {}",
-                                    glyph.name, location, e
-                                ))
-                            })?,
-                    )
-                }
             }
             Strategy::Failed(reason) => {
                 log::warn!(

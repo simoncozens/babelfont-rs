@@ -62,7 +62,7 @@ fn main() {
     log::debug!("Loading font 1");
     let mut font1 = load(&args.font_1).expect("Failed to load font 1");
     log::debug!("Loading font 2");
-    let mut font2 = load(&args.font_2).expect("Failed to load font 2");
+    let font2 = load(&args.font_2).expect("Failed to load font 2");
     let font1_root = PathBuf::from(args.font_1)
         .parent()
         .unwrap_or_else(|| std::path::Path::new("."))
@@ -222,15 +222,8 @@ fn main() {
         }
         set_layer_locations(glyph, &mut font2);
         if let Some(g) = font2.glyphs.get(glyph) {
-            merge_glyph(
-                &mut font1,
-                &f1_nonsparse_master_ids,
-                g,
-                &f2_axes,
-                &font2,
-                &mapping,
-            )
-            .expect("Failed to merge glyph");
+            merge_glyph(&mut font1, &f1_nonsparse_master_ids, g, &f2_axes, &mapping)
+                .expect("Failed to merge glyph");
         }
     }
     assert!(

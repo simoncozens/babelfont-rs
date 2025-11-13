@@ -66,6 +66,7 @@ fn get_kerning_table_for_master(
             clamped: _,
         } => {
             // OK, this is going to be hellish.
+            #[allow(clippy::unwrap_used)] // We did this several times already by this point
             let axes = fontdrasil_axes(&font.axes).unwrap();
             log::debug!("Interpolating kerning at location {:?}", location);
             let target_location = location.to_normalized(&axes);
