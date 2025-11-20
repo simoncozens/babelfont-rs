@@ -260,6 +260,7 @@ mod ufo {
                 hidden: ax.hidden,
                 values: (!ax.values.is_empty())
                     .then(|| ax.values.iter().map(|v| v.to_f64() as f32).collect()),
+                label_names: vec![],
             }
         }
     }

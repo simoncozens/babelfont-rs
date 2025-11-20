@@ -73,15 +73,15 @@ mod ufo {
                     degrees: angle as f64,
                 },
             };
-            Ok(norad::Guideline::new(
-                line,
-                name,
-                color,
-                None,
-                g.format_specific
-                    .get(KEY_LIB)
-                    .and_then(|x| serde_json::from_value(x.clone()).ok()),
-            ))
+            let mut guide = norad::Guideline::new(line, name, color, None);
+            if let Some(lib) = g
+                .format_specific
+                .get(KEY_LIB)
+                .and_then(|x| serde_json::from_value(x.clone()).ok())
+            {
+                guide.replace_lib(lib);
+            }
+            Ok(guide)
         }
     }
 }

@@ -68,7 +68,7 @@ mod ufo {
 
     impl From<&Node> for norad::ContourPoint {
         fn from(p: &Node) -> Self {
-            norad::ContourPoint::new(p.x, p.y, p.nodetype.into(), p.smooth, None, None, None)
+            norad::ContourPoint::new(p.x, p.y, p.nodetype.into(), p.smooth, None, None)
         }
     }
 }

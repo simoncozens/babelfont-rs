@@ -109,9 +109,7 @@ impl Source for BabelfontIrSource {
         }))
     }
 
-    fn create_paint_graph_work(
-        &self,
-    ) -> Result<Box<fontir::orchestration::IrWork>, fontir::error::Error> {
+    fn create_color_glyphs_work(&self) -> Result<Box<IrWork>, Error> {
         Ok(Box::new(PaintGraphWork {
             _font_info: self.font_info.clone(),
         }))

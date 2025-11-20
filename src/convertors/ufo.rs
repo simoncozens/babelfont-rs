@@ -198,7 +198,7 @@ pub(crate) fn load_component(c: &norad::Component) -> Component {
 
 pub(crate) fn save_component(c: &Component) -> Result<norad::Component, BabelfontError> {
     let t = c.transform.as_coeffs();
-    Ok(norad::Component::new(
+    let mut comp = norad::Component::new(
         norad::Name::new(c.reference.as_str())?,
         norad::AffineTransform {
             x_scale: t[0],
@@ -209,10 +209,15 @@ pub(crate) fn save_component(c: &Component) -> Result<norad::Component, Babelfon
             y_offset: t[5],
         },
         None,
-        c.format_specific
-            .get(KEY_LIB)
-            .and_then(|x| serde_json::from_value(x.clone()).ok()),
-    ))
+    );
+    if let Some(lib) = c
+        .format_specific
+        .get(KEY_LIB)
+        .and_then(|x| serde_json::from_value(x.clone()).ok())
+    {
+        comp.replace_lib(lib);
+    }
+    Ok(comp)
 }
 
 pub(crate) fn load_path(c: &norad::Contour) -> Path {
@@ -233,13 +238,15 @@ pub(crate) fn save_path(p: &Path) -> norad::Contour {
     let mut points: Vec<norad::ContourPoint> = p.nodes.iter().map(|n| n.into()).collect();
     // See https://github.com/simoncozens/rust-font-tools/issues/3
     points.rotate_right(1);
-    norad::Contour::new(
-        points,
-        None,
-        p.format_specific
-            .get(KEY_LIB)
-            .and_then(|x| serde_json::from_value(x.clone()).ok()),
-    )
+    let mut c = norad::Contour::new(points, None);
+    if let Some(lib) = p
+        .format_specific
+        .get(KEY_LIB)
+        .and_then(|x| serde_json::from_value(x.clone()).ok())
+    {
+        c.replace_lib(lib);
+    }
+    c
 }
 
 pub(crate) fn save_kerning(

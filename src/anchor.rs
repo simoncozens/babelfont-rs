@@ -40,16 +40,16 @@ mod ufo {
         type Error = BabelfontError;
 
         fn try_from(a: &Anchor) -> Result<Self, BabelfontError> {
-            Ok(norad::Anchor::new(
-                a.x,
-                a.y,
-                Some(norad::Name::new(&a.name)?),
-                None,
-                None,
-                a.format_specific
-                    .get(KEY_LIB)
-                    .and_then(|x| serde_json::from_value(x.clone()).ok()),
-            ))
+            let mut anchor =
+                norad::Anchor::new(a.x, a.y, Some(norad::Name::new(&a.name)?), None, None);
+            if let Some(lib) = a
+                .format_specific
+                .get(KEY_LIB)
+                .and_then(|x| serde_json::from_value(x.clone()).ok())
+            {
+                anchor.replace_lib(lib);
+            }
+            Ok(anchor)
         }
     }
 }
