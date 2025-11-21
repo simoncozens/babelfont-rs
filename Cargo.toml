@@ -46,6 +46,7 @@ clap = { version = "4.5.51", optional = true, features = ["derive"] }
 serde_json_path_to_error = { version = "0.1.5", optional = true }
 clap-verbosity-flag = { version = "3.0.4", optional = true }
 typescript-type-def = { version = "0.5.13", optional = true, features =["json_value"] }
+fea-rs-ast = { version = "0.1.0", git = "https://github.com/simoncozens/fea-rs-ast.git" }
 
 [dev-dependencies]
 pretty_assertions = "1.4.1"

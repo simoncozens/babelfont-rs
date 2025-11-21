@@ -40,16 +40,17 @@ impl DerefMut for GlyphList {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
 pub enum GlyphCategory {
     Base,
     Mark,
+    #[default]
     Unknown,
     Ligature,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
 pub struct Glyph {
     pub name: String,
@@ -68,6 +69,12 @@ pub struct Glyph {
 }
 
 impl Glyph {
+    pub fn new(name: &str) -> Self {
+        Self {
+            name: name.to_string(),
+            ..Default::default()
+        }
+    }
     pub fn get_layer(&self, id: &str) -> Option<&Layer> {
         self.layers.iter().find(|l| l.id.as_deref() == Some(id))
     }

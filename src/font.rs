@@ -14,7 +14,10 @@ use fontdrasil::coords::{
     UserCoord,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap};
+use std::{
+    collections::{BTreeMap, HashMap},
+    path::PathBuf,
+};
 use write_fonts::types::Tag;
 
 #[cfg(feature = "cli")]
@@ -66,6 +69,9 @@ pub struct Font {
 
     #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
     pub format_specific: FormatSpecific,
+
+    /// The source file path, if any, from which this font was loaded
+    pub source: Option<PathBuf>,
 }
 impl Default for Font {
     fn default() -> Self {
@@ -91,6 +97,7 @@ impl Font {
             second_kern_groups: HashMap::new(),
             features: Features::default(),
             format_specific: FormatSpecific::default(),
+            source: None,
         }
     }
 
