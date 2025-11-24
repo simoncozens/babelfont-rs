@@ -94,7 +94,7 @@ checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
 [[package]]
 name = "ascii_plist_derive"
 version = "0.2.0"
-source = "git+https://github.com/googlefonts/fontc.git#3ff8f549a5f0eaaf74c7df7dbd87f5d8e7f7bdd3"
+source = "git+https://github.com/googlefonts/fontc.git#78d7185f165a3cef2c7b3443c2588c63de14bd34"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -549,8 +549,8 @@ dependencies = [
 
 [[package]]
 name = "fea-rs"
-version = "0.21.0"
-source = "git+https://github.com/googlefonts/fontc.git#3ff8f549a5f0eaaf74c7df7dbd87f5d8e7f7bdd3"
+version = "0.22.0"
+source = "git+https://github.com/googlefonts/fontc.git#78d7185f165a3cef2c7b3443c2588c63de14bd34"
 dependencies = [
  "ansi_term",
  "env_logger",
@@ -597,8 +597,8 @@ dependencies = [
 
 [[package]]
 name = "fontbe"
-version = "0.3.0"
-source = "git+https://github.com/googlefonts/fontc.git#3ff8f549a5f0eaaf74c7df7dbd87f5d8e7f7bdd3"
+version = "0.4.0"
+source = "git+https://github.com/googlefonts/fontc.git#78d7185f165a3cef2c7b3443c2588c63de14bd34"
 dependencies = [
  "bincode",
  "chrono",
@@ -620,8 +620,8 @@ dependencies = [
 
 [[package]]
 name = "fontc"
-version = "0.4.0"
-source = "git+https://github.com/googlefonts/fontc.git#3ff8f549a5f0eaaf74c7df7dbd87f5d8e7f7bdd3"
+version = "0.5.0"
+source = "git+https://github.com/googlefonts/fontc.git#78d7185f165a3cef2c7b3443c2588c63de14bd34"
 dependencies = [
  "bitflags",
  "clap",
@@ -646,8 +646,8 @@ dependencies = [
 
 [[package]]
 name = "fontdrasil"
-version = "0.3.0"
-source = "git+https://github.com/googlefonts/fontc.git#3ff8f549a5f0eaaf74c7df7dbd87f5d8e7f7bdd3"
+version = "0.4.0"
+source = "git+https://github.com/googlefonts/fontc.git#78d7185f165a3cef2c7b3443c2588c63de14bd34"
 dependencies = [
  "env_logger",
  "kurbo",
@@ -661,8 +661,8 @@ dependencies = [
 
 [[package]]
 name = "fontir"
-version = "0.4.0"
-source = "git+https://github.com/googlefonts/fontc.git#3ff8f549a5f0eaaf74c7df7dbd87f5d8e7f7bdd3"
+version = "0.5.0"
+source = "git+https://github.com/googlefonts/fontc.git#78d7185f165a3cef2c7b3443c2588c63de14bd34"
 dependencies = [
  "bitflags",
  "chrono",
@@ -682,8 +682,8 @@ dependencies = [
 
 [[package]]
 name = "fontra2fontir"
-version = "0.3.0"
-source = "git+https://github.com/googlefonts/fontc.git#3ff8f549a5f0eaaf74c7df7dbd87f5d8e7f7bdd3"
+version = "0.4.0"
+source = "git+https://github.com/googlefonts/fontc.git#78d7185f165a3cef2c7b3443c2588c63de14bd34"
 dependencies = [
  "env_logger",
  "fontdrasil",
@@ -712,8 +712,8 @@ dependencies = [
 
 [[package]]
 name = "glyphs-reader"
-version = "0.3.0"
-source = "git+https://github.com/googlefonts/fontc.git#3ff8f549a5f0eaaf74c7df7dbd87f5d8e7f7bdd3"
+version = "0.4.0"
+source = "git+https://github.com/googlefonts/fontc.git#78d7185f165a3cef2c7b3443c2588c63de14bd34"
 dependencies = [
  "ascii_plist_derive",
  "chrono",
@@ -733,8 +733,8 @@ dependencies = [
 
 [[package]]
 name = "glyphs2fontir"
-version = "0.4.0"
-source = "git+https://github.com/googlefonts/fontc.git#3ff8f549a5f0eaaf74c7df7dbd87f5d8e7f7bdd3"
+version = "0.5.0"
+source = "git+https://github.com/googlefonts/fontc.git#78d7185f165a3cef2c7b3443c2588c63de14bd34"
 dependencies = [
  "chrono",
  "env_logger",
@@ -1728,8 +1728,8 @@ dependencies = [
 
 [[package]]
 name = "ufo2fontir"
-version = "0.3.0"
-source = "git+https://github.com/googlefonts/fontc.git#3ff8f549a5f0eaaf74c7df7dbd87f5d8e7f7bdd3"
+version = "0.4.0"
+source = "git+https://github.com/googlefonts/fontc.git#78d7185f165a3cef2c7b3443c2588c63de14bd34"
 dependencies = [
  "chrono",
  "env_logger",
