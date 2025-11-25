@@ -1,4 +1,5 @@
-use fea_rs::parse::ParseTree;
+use fea_rs_ast::fea_rs;
+use fea_rs_ast::fea_rs::parse::ParseTree;
 use indexmap::IndexSet;
 
 use crate::layout::visitor::LayoutVisitor;

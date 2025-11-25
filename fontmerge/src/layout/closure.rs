@@ -1,3 +1,4 @@
+use fea_rs_ast::fea_rs;
 use fea_rs::Kind;
 use fea_rs::parse::ParseTree;
 use fea_rs::typed::{AstNode as _, GlyphOrClass, Gsub1, Gsub2, Gsub3};

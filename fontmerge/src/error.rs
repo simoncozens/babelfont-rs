@@ -24,5 +24,5 @@ pub enum FontmergeError {
 
     /// Source loading error
     #[error("Source loading error: {0}")]
-    SourceLoadError(#[from] fea_rs::parse::SourceLoadError),
+    SourceLoadError(#[from] fea_rs_ast::fea_rs::parse::SourceLoadError),
 }

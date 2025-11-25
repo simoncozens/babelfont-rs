@@ -1,5 +1,7 @@
-use babelfont::filters::{FontFilter as _, RetainGlyphs};
+use babelfont::filters::{DropFeatures, FontFilter as _, ResolveIncludes, RetainGlyphs};
 use clap::Parser;
+use fea_rs_ast::fea_rs::{self, GlyphMap};
+use fea_rs_ast::AsFea as _;
 use indexmap::IndexSet;
 use indicatif::ProgressIterator;
 mod args;
@@ -14,7 +16,6 @@ use crate::args::{DuplicateLookupHandling, ExistingGlyphHandling, LayoutHandling
 use crate::designspace::{add_needed_masters, fontdrasil_axes, map_designspaces, sanity_check};
 use crate::kerning::merge_kerning;
 use crate::layout::lookupgatherer::LookupGathererVisitor;
-use crate::layout::subsetter::LayoutSubsetter;
 use crate::layout::visitor::LayoutVisitor;
 use crate::merge::merge_glyph;
 use babelfont::load;
@@ -63,11 +64,11 @@ fn main() {
     let mut font1 = load(&args.font_1).expect("Failed to load font 1");
     log::debug!("Loading font 2");
     let font2 = load(&args.font_2).expect("Failed to load font 2");
-    let font1_root = PathBuf::from(args.font_1)
+    let font1_root = PathBuf::from(&args.font_1)
         .parent()
         .unwrap_or_else(|| std::path::Path::new("."))
         .to_path_buf();
-    let font2_root = PathBuf::from(args.font_2)
+    let font2_root = PathBuf::from(&args.font_2)
         .parent()
         .unwrap_or_else(|| std::path::Path::new("."))
         .to_path_buf();
@@ -105,6 +106,20 @@ fn main() {
 
     // Babelfont can slim down the font for us
     let mut font2 = font2.clone();
+    if args.layout_handling == LayoutHandling::Ignore {
+        // Drop all features first
+        DropFeatures::new()
+            .apply(&mut font2)
+            .expect("Failed to drop features");
+    } else {
+        // Resolve feature includes
+        ResolveIncludes::new(None::<PathBuf>)
+            .apply(&mut font2)
+            .expect("Failed to resolve includes");
+    }
+    sanity_check_features(&font2);
+    // This performs the layout subsetting
+
     RetainGlyphs::new(
         glyphset_filter
             .incoming_glyphset
@@ -115,51 +130,72 @@ fn main() {
     .apply(&mut font2)
     .expect("Failed to retain selected glyphs in font 2");
 
+    let final_glyphset = glyphset_filter.final_glyphset();
+
     if args.layout_handling != LayoutHandling::Ignore {
-        let final_glyphset: Vec<String> = glyphset_filter.final_glyphset();
-        // Create a layout subsetter
-        let pre_existing_lookups = if args.duplicate_lookups == DuplicateLookupHandling::First {
-            // Preseed the subsetter with existing lookups from font1
-            let font1_glyphnames = font1
-                .glyphs
-                .iter()
-                .map(|g| g.name.as_str())
-                .collect::<Vec<&str>>();
-            let font1_parse_tree = crate::layout::get_parse_tree(
-                &font1.features.to_fea(),
-                &font1_glyphnames,
-                &font1_root,
-            )
-            .expect("Failed to get parse tree for font 1");
-            let mut visitor = LookupGathererVisitor::new(&font1_parse_tree);
-            visitor.visit();
-            visitor.lookup_names
-        } else {
-            IndexSet::new()
-        };
-        let hidden_classes = discover_hidden_classes(&font2);
-        let final_glyphset_refs = final_glyphset
-            .iter()
-            .map(|s| s.as_str())
-            .collect::<Vec<&str>>();
-        let mut layout_subsetter = LayoutSubsetter::new(
-            &font2.features,
-            &font2_glyphnames,
-            &final_glyphset_refs,
-            &hidden_classes,
-            &pre_existing_lookups,
-            &font2_root,
+        let font1_features = format!(
+            "# Features from {}:\n{}",
+            args.font_1,
+            font1.features.to_fea()
         );
-        let subsetted_features = layout_subsetter
-            .subset()
-            .expect("Failed to subset layout features");
-        font1
-            .features
-            .prefixes
-            .insert("anonymous".into(), subsetted_features.to_fea());
+        let font2_features = format!(
+            "# Features from {}:\n{}",
+            args.font_2,
+            font2.features.to_fea()
+        );
+        let merged_features = font1_features + "\n" + &font2_features;
+        // Read into fea-rs-ast
+        let glyph_names: Vec<&str> = final_glyphset.iter().map(|g| g.as_str()).collect();
+        let merged = fea_rs_ast::FeatureFile::new_from_fea(
+            &merged_features,
+            Some(&glyph_names),
+            Some(font1_root),
+        )
+        .expect("Failed to parse merged features");
+        // Split out any languagesystem statements
+        let languagesystems: Vec<(String, String)> = merged
+            .statements
+            .iter()
+            .filter_map(|s| {
+                if let fea_rs_ast::ToplevelItem::LanguageSystem(ls) = s {
+                    Some((ls.script.clone(), ls.language.clone()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        let other_statements = merged
+            .statements
+            .into_iter()
+            .filter(|s| !matches!(s, fea_rs_ast::ToplevelItem::LanguageSystem(_)))
+            .collect::<Vec<fea_rs_ast::ToplevelItem>>();
+        // Sort and uniquify languagesystems, keeping DFLT/dflt at end
+        let mut unique_languagesystems = IndexSet::new();
+        let mut has_dflt = false;
+        for ls in languagesystems {
+            if ls.0 == "DFLT" && ls.1 == "dflt" {
+                has_dflt = true;
+            } else {
+                unique_languagesystems.insert(ls);
+            }
+        }
+        if has_dflt {
+            unique_languagesystems.insert_before(0, ("DFLT".to_string(), "dflt".to_string()));
+        }
+        let mut final_statements = unique_languagesystems
+            .into_iter()
+            .map(|(script, language)| {
+                fea_rs_ast::ToplevelItem::LanguageSystem(fea_rs_ast::LanguageSystemStatement::new(
+                    script, language,
+                ))
+            })
+            .chain(other_statements);
+        let final_fea = final_statements
+            .map(|s| fea_rs_ast::ToplevelItem::as_fea(&s, "") + "\n")
+            .collect::<String>();
+        font1.features = babelfont::Features::from_fea(&final_fea);
         // merge_features(&mut font1, &subsetted_features);
     }
-    // Parse feature file here
 
     if font1.upm != font2.upm {
         log::warn!(
@@ -232,6 +268,9 @@ fn main() {
     );
 
     // Handle dotted circle anchors
+
+    sanity_check_features(&font1);
+
     log::info!(
         "Saving merged font to {}",
         args.output.as_deref().unwrap_or("stdout")
@@ -282,5 +321,42 @@ fn set_layer_locations(glyph_name: &String, font: &mut babelfont::Font) {
                 layer.location
             );
         }
+    }
+}
+
+fn sanity_check_features(font: &babelfont::Font) {
+    let features_text = font.features.to_fea();
+    let resolver: Box<dyn fea_rs::parse::SourceResolver> = Box::new(
+        fea_rs::parse::FileSystemResolver::new(font.source.clone().unwrap()),
+    );
+    let glyph_map = GlyphMap::from_iter(font.glyphs.iter().map(|g| g.name.as_str()));
+    let (parse_tree, diagnostics) = fea_rs::parse::parse_root(
+        "get_parse_tree".into(),
+        Some(&glyph_map),
+        Box::new(move |s: &std::path::Path| {
+            if s == std::path::Path::new("get_parse_tree") {
+                Ok(std::sync::Arc::<str>::from(features_text.clone()))
+            } else {
+                let path = resolver.resolve_raw_path(s.as_ref(), None);
+                let canonical = resolver.canonicalize(&path)?;
+                resolver.get_contents(&canonical)
+            }
+        }),
+    )
+    .expect("Failed to parse features for sanity check");
+    if diagnostics.has_errors() {
+        log::error!("Errors encountered while parsing feature file for sanity check:");
+        log::error!("{}", diagnostics.display());
+        return;
+    }
+    // Validate
+    let diagnostics = fea_rs::compile::validate(
+        &parse_tree,
+        &glyph_map,
+        Some(&fea_rs::compile::NopVariationInfo),
+    );
+    if !diagnostics.is_empty() {
+        log::warn!("warns encountered while validating feature file for sanity check:");
+        log::warn!("{}", diagnostics.display());
     }
 }

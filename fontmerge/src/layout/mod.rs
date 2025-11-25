@@ -3,11 +3,12 @@ use std::{
     sync::Arc,
 };
 
-use fea_rs::{
-    GlyphMap, Kind, ParseTree,
+use fea_rs_ast::fea_rs;
+use fea_rs_ast::fea_rs::{
     compile::NopVariationInfo,
     parse::{FileSystemResolver, SourceResolver},
     typed::{AstNode, GlyphOrClass},
+    GlyphMap, Kind, ParseTree,
 };
 use itertools::Either;
 
@@ -15,7 +16,6 @@ use crate::error::FontmergeError;
 
 pub(crate) mod closure;
 pub(crate) mod lookupgatherer;
-pub(crate) mod subsetter;
 pub(crate) mod visitor;
 
 pub(crate) fn get_parse_tree(
@@ -27,7 +27,7 @@ pub(crate) fn get_parse_tree(
         .iter()
         .map(fontdrasil::types::GlyphName::new)
         .collect::<GlyphMap>();
-    let resolver = FileSystemResolver::new(project_root.into());
+    let resolver: FileSystemResolver = FileSystemResolver::new(project_root.into());
     let features_text: Arc<str> = Arc::from(features);
     let (parse_tree, diagnostics) = fea_rs::parse::parse_root(
         "get_parse_tree".into(),
