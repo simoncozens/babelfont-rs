@@ -46,38 +46,27 @@ use std::path::PathBuf;
 
 pub fn load(filename: impl Into<PathBuf>) -> Result<Font, BabelfontError> {
     let pb = filename.into();
-    match pb.extension() {
+    let pb_clone = pb.clone();
+
+    let mut font: Font = match pb.extension() {
         Some(ext) if ext == "babelfont" => {
             let buffered = std::io::BufReader::new(std::fs::File::open(&pb)?);
             Ok(serde_json::from_reader(buffered)?)
         }
-
-        Some(ext) if ext == "designspace" => {
-            #[cfg(feature = "ufo")]
-            return crate::convertors::designspace::load(pb);
-            #[cfg(not(feature = "ufo"))]
-            Err(BabelfontError::UnknownFileType { path: pb })
-        }
-        Some(ext) if ext == "vfj" => {
-            #[cfg(feature = "fontlab")]
-            return crate::convertors::fontlab::load(pb);
-            #[cfg(not(feature = "fontlab"))]
-            Err(BabelfontError::UnknownFileType { path: pb })
-        }
-        Some(ext) if ext == "ufo" => {
-            #[cfg(feature = "ufo")]
-            return crate::convertors::ufo::load(pb);
-            #[cfg(not(feature = "ufo"))]
-            Err(BabelfontError::UnknownFileType { path: pb })
-        }
+        #[cfg(feature = "ufo")]
+        Some(ext) if ext == "designspace" => crate::convertors::designspace::load(pb),
+        #[cfg(feature = "fontlab")]
+        Some(ext) if ext == "vfj" => crate::convertors::fontlab::load(pb),
+        #[cfg(feature = "ufo")]
+        Some(ext) if ext == "ufo" => crate::convertors::ufo::load(pb),
+        #[cfg(feature = "glyphs")]
         Some(ext) if ext == "glyphs" || ext == "glyphspackage" => {
-            #[cfg(feature = "glyphs")]
-            return crate::convertors::glyphs3::load(pb);
-            #[cfg(not(feature = "glyphs"))]
-            Err(BabelfontError::UnknownFileType { path: pb })
+            crate::convertors::glyphs3::load(pb)
         }
         _ => Err(BabelfontError::UnknownFileType { path: pb }),
-    }
+    }?;
+    font.source = Some(pb_clone);
+    Ok(font)
 }
 
 #[cfg(test)]

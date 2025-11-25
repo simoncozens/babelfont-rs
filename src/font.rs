@@ -228,7 +228,7 @@ impl Font {
                     fontc::Flags::default(),
                     false,
                 )
-                .map_err(|e| BabelfontError::General(format!("Font generation error: {}", e)))?;
+                .map_err(|e| BabelfontError::General(format!("Font generation error: {:#?}", e)))?;
                 std::fs::write(&path, bytes)?;
                 return Ok(());
             }
