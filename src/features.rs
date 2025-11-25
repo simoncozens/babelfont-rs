@@ -27,6 +27,11 @@ pub struct Features {
     /// A list of OpenType feature code, expressed as a tuple (feature tag, code).
     #[cfg_attr(feature = "typescript", type_def(type_of = "Vec<(String, String)>"))]
     pub features: Vec<(SmolStr, String)>,
+    /// Include paths
+    ///
+    /// Paths to search for included feature files.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub include_paths: Vec<std::path::PathBuf>,
 }
 
 impl Features {
@@ -48,8 +53,8 @@ impl Features {
         fea
     }
 
-    pub(crate) fn from_fea(fea: &str) -> Features {
-        // A very naive parser that just puts everything into the anonymous prefix.
+    /// A very naive parser that just puts everything into the anonymous prefix.
+    pub fn from_fea(fea: &str) -> Features {
         let mut features = Features::default();
         features
             .prefixes

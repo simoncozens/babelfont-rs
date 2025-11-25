@@ -77,6 +77,13 @@ pub fn load<T: AsRef<std::path::Path>>(path: T) -> Result<Font, BabelfontError> 
         }
     }
     font.features = Features::from_fea(&ufo.features);
+    font.features.include_paths.push(
+        path.as_ref()
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new("."))
+            .to_path_buf(),
+    );
+    // Potentially also within the UFO itself? I think this unclear.
 
     font.masters.push(master);
 
