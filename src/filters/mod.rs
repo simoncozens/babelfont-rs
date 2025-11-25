@@ -4,6 +4,7 @@ mod dropguides;
 mod dropinstances;
 mod dropkerning;
 mod dropsparsemasters;
+mod resolveincludes;
 mod retainglyphs;
 mod scaleupem;
 
@@ -13,6 +14,7 @@ pub use dropguides::DropGuides;
 pub use dropinstances::DropInstances;
 pub use dropkerning::DropKerning;
 pub use dropsparsemasters::DropSparseMasters;
+pub use resolveincludes::ResolveIncludes;
 pub use retainglyphs::RetainGlyphs;
 pub use scaleupem::ScaleUpem;
 

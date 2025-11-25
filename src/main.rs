@@ -78,6 +78,17 @@ fn convert_filters(filter: &[String]) -> Vec<Box<dyn FontFilter>> {
             "dropinstances" => {
                 result.push(Box::new(babelfont::filters::DropInstances::new()));
             }
+            "resolveincludes" => {
+                // help the Option<impl> out a bit
+                let filter_arg: Option<&str> = if parts.len() == 2 {
+                    Some(parts[1])
+                } else {
+                    None
+                };
+                result.push(Box::new(babelfont::filters::ResolveIncludes::new(
+                    filter_arg,
+                )));
+            }
             _ => {
                 log::warn!("Unknown filter: {}", parts[0]);
             }
@@ -112,6 +123,7 @@ fn main() {
     log::info!("Loading {}", args.font_path.display());
 
     let mut input = babelfont::load(args.font_path).expect("Failed to load font");
+    assert!(input.source.is_some(), "Loaded font has no source path");
     if !filters.is_empty() {
         log::info!("Applying filters...");
         for filter in filters {
