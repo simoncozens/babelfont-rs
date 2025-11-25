@@ -1,7 +1,8 @@
-use std::{collections::HashSet, sync::LazyLock};
-
-use fea_rs_ast::{AsFea as _, Comment, FeatureFile, LayoutVisitor, Statement, SubOrPos};
+use fea_rs_ast::{
+    AsFea as _, Comment, FeatureFile, GdefStatement, LayoutVisitor, Statement, SubOrPos,
+};
 use smol_str::SmolStr;
+use std::{collections::HashSet, sync::LazyLock};
 
 use crate::{filters::FontFilter, Features};
 
@@ -111,6 +112,7 @@ struct SubsetVisitor<'a> {
     glyphs: HashSet<&'a str>,
     dropped_lookups: HashSet<SmolStr>,
     dropped_features: HashSet<String>,
+    empty_classes: HashSet<String>,
 }
 impl<'a> SubsetVisitor<'a> {
     fn new(glyphs: HashSet<&'a str>) -> Self {
@@ -118,6 +120,7 @@ impl<'a> SubsetVisitor<'a> {
             glyphs,
             dropped_lookups: HashSet::new(),
             dropped_features: HashSet::new(),
+            empty_classes: HashSet::new(),
         }
     }
     fn subset_single_subst(
@@ -228,7 +231,7 @@ impl<'a> SubsetVisitor<'a> {
                 }
             }
         }
-        for (container, vr) in statement.pos.iter_mut() {
+        for (container, _vr) in statement.pos.iter_mut() {
             if !self.filter_container(container) {
                 return Some(DELETION_COMMENT.clone());
             }
@@ -338,22 +341,30 @@ impl<'a> SubsetVisitor<'a> {
         &self,
         statement: &mut fea_rs_ast::MarkClassDefinition,
     ) -> Option<Statement> {
-        self.filter_container(&mut statement.glyphs);
-        // keep even if empty
+        if !self.filter_container(&mut statement.glyphs) {
+            return Some(Statement::Comment(Comment::new(format!(
+                "# Removed mark class definition {} due to no glyphs remaining",
+                statement.mark_class.name
+            ))));
+        }
         None
     }
     fn subset_glyph_class_definition(
-        &self,
+        &mut self,
         statement: &mut fea_rs_ast::GlyphClassDefinition,
     ) -> Option<Statement> {
-        println!("{} Before: {:?}", statement.name, statement.glyphs);
         statement
             .glyphs
             .glyphs
             .retain_mut(|container| self.filter_container(container));
-        println!("After: {:?}", statement.glyphs);
 
-        // keep even if empty
+        if statement.glyphs.glyphs.is_empty() {
+            self.empty_classes.insert("@".to_string() + &statement.name);
+            return Some(Statement::Comment(Comment::new(format!(
+                "# Removed glyph class {} due to no glyphs remaining",
+                statement.name
+            ))));
+        }
         None
     }
     fn subset_feature_block(
@@ -403,6 +414,21 @@ impl<'a> SubsetVisitor<'a> {
         }
         None
     }
+    fn subset_lookup_reference(
+        &mut self,
+        lookup_reference: &mut fea_rs_ast::LookupReferenceStatement,
+    ) -> Option<Statement> {
+        if self
+            .dropped_lookups
+            .contains(&SmolStr::from(lookup_reference.lookup_name.clone()))
+        {
+            return Some(Statement::Comment(Comment::new(format!(
+                "# Removed lookup reference to {} due to lookup being dropped",
+                lookup_reference.lookup_name
+            ))));
+        }
+        None
+    }
     fn subset_nested_block(
         &mut self,
         nested_block: &mut fea_rs_ast::NestedBlock,
@@ -422,11 +448,15 @@ impl<'a> SubsetVisitor<'a> {
             fea_rs_ast::GlyphContainer::GlyphName(glyph_name) => {
                 self.glyphs.contains(glyph_name.name.as_str())
             }
-            fea_rs_ast::GlyphContainer::GlyphClass(glyph_class) => glyph_class
-                .glyphs
-                .iter_mut()
-                .all(|gc| self.filter_container(gc)),
-            fea_rs_ast::GlyphContainer::GlyphClassName(smol_str) => true,
+            fea_rs_ast::GlyphContainer::GlyphClass(glyph_class) => {
+                glyph_class
+                    .glyphs
+                    .retain_mut(|gc| self.filter_container(gc));
+                !glyph_class.glyphs.is_empty()
+            }
+            fea_rs_ast::GlyphContainer::GlyphClassName(smol_str) => {
+                !self.empty_classes.contains(smol_str.as_str())
+            }
             fea_rs_ast::GlyphContainer::GlyphRange(range) => todo!(),
             fea_rs_ast::GlyphContainer::GlyphNameOrRange(smol_str) => {
                 if self.glyphs.contains(smol_str.as_str()) {
@@ -440,26 +470,22 @@ impl<'a> SubsetVisitor<'a> {
 }
 
 fn non_trivial_statement(statement: &Statement) -> bool {
-    match statement {
-        Statement::Comment(_) => false,
-        Statement::FeatureNameStatement(_)
-        | Statement::FontRevision(_)
-        | Statement::FeatureReference(_)
-        | Statement::Language(_)
-        | Statement::LanguageSystem(_)
-        | Statement::LookupFlag(_)
-        | Statement::LookupReference(_)
-        | Statement::SizeParameters(_)
-        | Statement::SizeMenuName(_)
-        | Statement::Subtable(_)
-        | Statement::Script(_)
-        | Statement::Head(_)
-        | Statement::Hhea(_)
-        | Statement::Name(_)
-        | Statement::Stat(_)
-        | Statement::Vhea(_) => false,
-        _ => true,
-    }
+    !matches!(
+        statement,
+        Statement::Comment(_)
+            | Statement::FeatureNameStatement(_)
+            | Statement::FontRevision(_)
+            | Statement::FeatureReference(_)
+            | Statement::Language(_)
+            | Statement::LanguageSystem(_)
+            | Statement::LookupFlag(_)
+            | Statement::LookupReference(_)
+            | Statement::SizeParameters(_)
+            | Statement::SizeMenuName(_)
+            | Statement::Subtable(_)
+            | Statement::Script(_)
+            | Statement::Head(_)
+    )
 }
 impl LayoutVisitor for SubsetVisitor<'_> {
     fn depth_first(&self) -> bool {
@@ -507,8 +533,8 @@ impl LayoutVisitor for SubsetVisitor<'_> {
                 self.subset_chained_context(chained_context_statement)
             }
             Statement::IgnorePos(ignore_statement) => self.subset_ignore(ignore_statement),
-            Statement::AnchorDefinition(anchor_definition) => todo!(),
-            Statement::Attach(attach_statement) => todo!(),
+            Statement::AnchorDefinition(anchor_definition) => true,
+            Statement::Attach(attach_statement) => self.subset_attach(attach_statement),
             Statement::GlyphClassDef(glyph_class_def_statement) => todo!(),
             Statement::LigatureCaretByIndex(ligature_caret_by_index_statement) => todo!(),
             Statement::LigatureCaretByPos(ligature_caret_by_pos_statement) => todo!(),
@@ -521,18 +547,37 @@ impl LayoutVisitor for SubsetVisitor<'_> {
             Statement::FeatureReference(feature_reference) => {
                 self.subset_feature_reference(feature_reference)
             }
-            Statement::GlyphClassDefinition(glyph_class_definition) => {
-                self.subset_glyph_class_definition(glyph_class_definition)
+            Statement::GlyphClassDefinition(glyph_class_definition) => {}
+            Statement::Language(_) | Statement::LanguageSystem(_) | Statement::LookupFlag(_) => {
+                None
             }
-            Statement::Language(_)
-            | Statement::LanguageSystem(_)
-            | Statement::LookupFlag(_)
-            | Statement::LookupReference(_)
-            | Statement::SizeParameters(_)
+            Statement::LookupReference(lookup_reference) => {
+                self.subset_lookup_reference(lookup_reference)
+            }
+            Statement::SizeParameters(_)
             | Statement::SizeMenuName(_)
             | Statement::Subtable(_)
             | Statement::Script(_) => None,
-            Statement::Gdef(table) => todo!(),
+            Statement::Gdef(gdef) => {
+                // Recurse
+                for statement in gdef.statements.iter_mut() {
+                    match statement {
+                        GdefStatement::Attach(attach_statement) => {
+                            self.subset_attach(attach_statement)
+                        }
+                        GdefStatement::GlyphClassDef(glyph_class_def_statement) => {
+                            self.subset_gdef_class_definition(glyph_class_def_statement)
+                        }
+                        GdefStatement::LigatureCaretByIndex(ligature_caret_by_index_statement) => {
+                            todo!()
+                        }
+                        GdefStatement::LigatureCaretByPos(ligature_caret_by_pos_statement) => {
+                            todo!()
+                        }
+                    }
+                }
+                None
+            }
             Statement::Head(_)
             | Statement::Hhea(_)
             | Statement::Name(_)
