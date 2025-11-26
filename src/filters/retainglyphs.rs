@@ -1,6 +1,4 @@
-use fea_rs_ast::{
-    AsFea as _, Comment, FeatureFile, GdefStatement, LayoutVisitor, Statement, SubOrPos,
-};
+use fea_rs_ast::{AsFea as _, Comment, FeatureFile, LayoutVisitor, Statement, SubOrPos};
 use smol_str::SmolStr;
 use std::{collections::HashSet, sync::LazyLock};
 
@@ -367,6 +365,40 @@ impl<'a> SubsetVisitor<'a> {
         }
         None
     }
+    fn subset_gdef_class_definition(
+        &mut self,
+        statement: &mut fea_rs_ast::GlyphClassDefStatement,
+    ) -> Option<Statement> {
+        let _ = statement
+            .base_glyphs
+            .iter_mut()
+            .map(|x| self.filter_container(x));
+        let _ = statement
+            .mark_glyphs
+            .iter_mut()
+            .map(|container| self.filter_container(container));
+        let _ = statement
+            .ligature_glyphs
+            .iter_mut()
+            .map(|container| self.filter_container(container));
+        let _ = statement
+            .component_glyphs
+            .iter_mut()
+            .map(|container| self.filter_container(container));
+
+        None
+    }
+    fn subset_gdef_attach(
+        &mut self,
+        statement: &mut fea_rs_ast::AttachStatement,
+    ) -> Option<Statement> {
+        if !self.filter_container(&mut statement.glyphs) {
+            return Some(Statement::Comment(Comment::new(
+                "# Removed GDEF attach statement due to no glyphs remaining".to_string(),
+            )));
+        }
+        None
+    }
     fn subset_feature_block(
         &mut self,
         feature_block: &mut fea_rs_ast::FeatureBlock,
@@ -499,7 +531,6 @@ impl LayoutVisitor for SubsetVisitor<'_> {
             Statement::MultipleSubst(multiple_subst_statement) => {
                 self.subset_multiple_subst(multiple_subst_statement)
             }
-
             Statement::AlternateSubst(alternate_subst_statement) => {
                 self.subset_alternate_subst(alternate_subst_statement)
             }
@@ -533,11 +564,13 @@ impl LayoutVisitor for SubsetVisitor<'_> {
                 self.subset_chained_context(chained_context_statement)
             }
             Statement::IgnorePos(ignore_statement) => self.subset_ignore(ignore_statement),
-            Statement::AnchorDefinition(anchor_definition) => true,
-            Statement::Attach(attach_statement) => self.subset_attach(attach_statement),
-            Statement::GlyphClassDef(glyph_class_def_statement) => todo!(),
-            Statement::LigatureCaretByIndex(ligature_caret_by_index_statement) => todo!(),
-            Statement::LigatureCaretByPos(ligature_caret_by_pos_statement) => todo!(),
+            Statement::AnchorDefinition(_) => None,
+            Statement::GdefAttach(attach_statement) => self.subset_gdef_attach(attach_statement),
+            Statement::GdefClassDef(glyph_class_def_statement) => {
+                self.subset_gdef_class_definition(glyph_class_def_statement)
+            }
+            Statement::GdefLigatureCaretByIndex(ligature_caret_by_index_statement) => todo!(),
+            Statement::GdefLigatureCaretByPos(ligature_caret_by_pos_statement) => todo!(),
             Statement::MarkClassDefinition(mark_class_definition) => {
                 self.subset_mark_class_definition(mark_class_definition)
             }
@@ -547,7 +580,9 @@ impl LayoutVisitor for SubsetVisitor<'_> {
             Statement::FeatureReference(feature_reference) => {
                 self.subset_feature_reference(feature_reference)
             }
-            Statement::GlyphClassDefinition(glyph_class_definition) => {}
+            Statement::GlyphClassDefinition(glyph_class_definition) => {
+                self.subset_glyph_class_definition(glyph_class_definition)
+            }
             Statement::Language(_) | Statement::LanguageSystem(_) | Statement::LookupFlag(_) => {
                 None
             }
@@ -558,38 +593,23 @@ impl LayoutVisitor for SubsetVisitor<'_> {
             | Statement::SizeMenuName(_)
             | Statement::Subtable(_)
             | Statement::Script(_) => None,
-            Statement::Gdef(gdef) => {
-                // Recurse
-                for statement in gdef.statements.iter_mut() {
-                    match statement {
-                        GdefStatement::Attach(attach_statement) => {
-                            self.subset_attach(attach_statement)
-                        }
-                        GdefStatement::GlyphClassDef(glyph_class_def_statement) => {
-                            self.subset_gdef_class_definition(glyph_class_def_statement)
-                        }
-                        GdefStatement::LigatureCaretByIndex(ligature_caret_by_index_statement) => {
-                            todo!()
-                        }
-                        GdefStatement::LigatureCaretByPos(ligature_caret_by_pos_statement) => {
-                            todo!()
-                        }
-                    }
-                }
+            Statement::Gdef(_) => {
+                // Visitor will recurse
                 None
             }
             Statement::Head(_)
             | Statement::Hhea(_)
             | Statement::Name(_)
             | Statement::Stat(_)
-            | Statement::Vhea(_) => None,
+            | Statement::Vhea(_)
+            | Statement::Os2(_)
+            | Statement::Base(_) => None,
             Statement::FeatureBlock(feature_block) => self.subset_feature_block(feature_block),
             Statement::LookupBlock(lookup_block) => self.subset_lookup_block(lookup_block),
             Statement::NestedBlock(nested_block) => self.subset_nested_block(nested_block),
-            Statement::GdefAttach(attach_statement) => todo!(),
-            Statement::GdefClassDef(glyph_class_def_statement) => todo!(),
-            Statement::GdefLigatureCaretByIndex(ligature_caret_by_index_statement) => todo!(),
-            Statement::GdefLigatureCaretByPos(ligature_caret_by_pos_statement) => todo!(),
+            Statement::ValueRecordDefinition(_) => todo!(),
+            Statement::ConditionSet(_) => None,
+            Statement::VariationBlock(_) => None,
         } {
             *statement = rewritten;
             return true;

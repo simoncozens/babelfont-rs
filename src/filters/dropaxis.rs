@@ -64,6 +64,8 @@ impl FontFilter for DropAxis {
             instance.location.retain(|tag, _| tag != &self.0);
         }
         font.axes.retain(|axis| axis.tag != self.0);
+
+        // XXX Remove axis from variable scalars in features
         Ok(())
     }
 }
