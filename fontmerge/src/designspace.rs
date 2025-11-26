@@ -198,10 +198,80 @@ pub(crate) fn map_designspaces(
 
 pub(crate) fn add_needed_masters(
     font1: &mut babelfont::Font,
-    font2: &babelfont::Font,
+    font2: &mut babelfont::Font,
 ) -> Result<(), FontmergeError> {
     let ds1 = fontdrasil_axes(&font1.axes)?;
     let ds2 = fontdrasil_axes(&font2.axes)?;
+
+
+    // If there are axis mappings in font2 that don't exist in font1 we need to
+    // make intermediate masters for them in font2! This may get messy.
+    let mut intermediate_mappings = vec![];
+    for f2_axis in font2.axes.iter() {
+        let Some(f1_axis) = font1.axes.iter().find(|a| a.tag == f2_axis.tag) else { continue };
+        let Some(f2_map) = f2_axis.map.as_ref() else { continue };
+        for (user, design) in f2_map.iter() {
+            if f1_axis.userspace_to_designspace(*user)? != *design {
+                // If the problem is at the min or max, ignore it, we're mapping those already
+                #[allow(clippy::unwrap_used)] // We know these are Some() because we converted to fontdrasil previously
+                if (user.to_f64() - f2_axis.min.unwrap().to_f64()).abs() < f64::EPSILON
+                    || (user.to_f64() - f2_axis.max.unwrap().to_f64()).abs() < f64::EPSILON
+                {
+                    continue;
+                }
+                intermediate_mappings.push((f2_axis.tag, design));
+            }
+        }
+    }
+    let mut already_added = font2.masters.iter()
+        .filter(|m| !m.is_sparse(font2))
+        .map(|m| m.location.clone())
+        .collect::<HashSet<_>>();
+    for (tag, design) in intermediate_mappings {
+        log::info!("Adding intermediate masters to font 2 for axis '{}' at design value {} to satisfy avar table change", tag, design.to_f64());
+        // I *think* we need to add a master for *each master* in font2 already
+        let new_masters = font2
+            .masters
+            .iter()
+            .filter(|m| {
+                !m.is_sparse(font2)
+            })
+            .filter_map(|m| {
+                let mut new_m = m.clone();
+                new_m.location.insert(tag, *design);
+                // Only add if we don't already have one at this location
+                if already_added.contains(&new_m.location) {
+                    log::debug!(" Already have master at {:?}", new_m.location);
+                    return None;
+                }
+            log::debug!(" Adding intermediate master at {:?}", new_m.location);
+            already_added.insert(new_m.location.clone());
+                Some(new_m)
+            })
+            .collect::<Vec<_>>();
+        // Interpolate!
+        let mut new_layer_list = Vec::new();
+        for new_master in new_masters.iter() {
+            for glyph in font2.glyphs.iter() {
+                let mut new_layer = font2.interpolate_glyph(&glyph.name, &new_master.location)?;
+                new_layer.master = babelfont::LayerType::DefaultForMaster(new_master.id.clone());
+                new_layer_list.push((glyph.name.clone(), new_layer));
+            }
+        }
+        // Insert new layers
+        for (glyph_name, new_layer) in new_layer_list.into_iter() {
+            if let Some(glyph) = font2.glyphs.iter_mut().find(|g| g.name == glyph_name) {
+                glyph.layers.push(new_layer);
+            }
+        }
+
+        font2.masters.extend(new_masters); 
+    }
+    log::debug!("font2 master situation now: {}", font2.masters.iter()
+        .map(|m| format!("'{}' at {:?} {}", m.name.get_default().unwrap_or(&m.id), m.location, if m.is_sparse(font2) { "(sparse)" } else { "" }))
+        .collect::<Vec<String>>()
+        .join(", "));
+
     for f2_master in font2.masters.iter() {
         if f2_master.is_sparse(font2) {
             continue;
@@ -270,13 +340,15 @@ pub(crate) fn add_needed_masters(
                 loc1_design.clone(),
             );
             log::info!(
-                "Added new master '{}' at location {:?} to font 1",
+                "Added new master '{}' at location {:?} (font2 location {:?}) to font 1",
                 master.name.get_default().unwrap_or(&master.id),
-                loc1_design.to_user(&ds1)
+                loc1_design.to_user(&ds1),
+                f2_master.location
             );
             font1.masters.push(master);
         }
     }
+    
 
     assert!(sanity_check(font1), "Font failed sanity check after adding needed masters");
 

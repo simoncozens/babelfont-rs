@@ -1,3 +1,4 @@
+use babelfont::BabelfontError;
 use thiserror::Error;
 /// Error type for fontmerge
 #[derive(Error, Debug)]
@@ -25,4 +26,8 @@ pub enum FontmergeError {
     /// Source loading error
     #[error("Source loading error: {0}")]
     SourceLoadError(#[from] fea_rs_ast::fea_rs::parse::SourceLoadError),
+
+    /// Source manipulation error
+    #[error("Source manipulation error: {0}")]
+    SourceManipulationError(#[from] BabelfontError),
 }

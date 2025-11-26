@@ -213,7 +213,7 @@ fn main() {
     glyphset_filter.sort_glyphset(&mut font2);
     glyphset_filter.de_encode(&mut font1, &mut font2);
 
-    add_needed_masters(&mut font1, &font2)
+    add_needed_masters(&mut font1, &mut font2)
         .expect("Failed to add needed masters from font2 to font1");
 
     // Compute the list of master IDs here first because checking if a master is sparse or not is
