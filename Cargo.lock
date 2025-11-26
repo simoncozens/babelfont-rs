@@ -94,7 +94,7 @@ checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
 [[package]]
 name = "ascii_plist_derive"
 version = "0.2.0"
-source = "git+https://github.com/googlefonts/fontc.git#78d7185f165a3cef2c7b3443c2588c63de14bd34"
+source = "git+https://github.com/googlefonts/fontc.git#3cbb7f7883bcf14086d439fcd59fcca86b0a662c"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -162,9 +162,9 @@ checksum = "812e12b5285cc515a9c72a5c1d3b6d46a19dac5acfef5265968c166106e31dd3"
 
 [[package]]
 name = "borsh"
-version = "1.5.7"
+version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad8646f98db542e39fc66e68a20b2144f6a732636df7c2354e74645faaa433ce"
+checksum = "d1da5ab77c1437701eeff7c88d968729e7766172279eab0676857b3d63af7a6f"
 dependencies = [
  "cfg_aliases",
 ]
@@ -550,7 +550,7 @@ dependencies = [
 [[package]]
 name = "fea-rs"
 version = "0.22.0"
-source = "git+https://github.com/googlefonts/fontc.git#78d7185f165a3cef2c7b3443c2588c63de14bd34"
+source = "git+https://github.com/googlefonts/fontc.git#3cbb7f7883bcf14086d439fcd59fcca86b0a662c"
 dependencies = [
  "ansi_term",
  "env_logger",
@@ -567,10 +567,15 @@ dependencies = [
 [[package]]
 name = "fea-rs-ast"
 version = "0.1.0"
-source = "git+https://github.com/simoncozens/fea-rs-ast.git#eb5110dd42090866af481c770d2605142465a859"
+source = "git+https://github.com/simoncozens/fea-rs-ast.git#09633623ba6760c4f8fb4edfd77adca0f9b2dec1"
 dependencies = [
  "fea-rs",
+ "indexmap 2.12.1",
+ "itertools",
+ "log",
+ "read-fonts",
  "smol_str",
+ "thiserror 2.0.17",
 ]
 
 [[package]]
@@ -598,7 +603,7 @@ dependencies = [
 [[package]]
 name = "fontbe"
 version = "0.4.0"
-source = "git+https://github.com/googlefonts/fontc.git#78d7185f165a3cef2c7b3443c2588c63de14bd34"
+source = "git+https://github.com/googlefonts/fontc.git#3cbb7f7883bcf14086d439fcd59fcca86b0a662c"
 dependencies = [
  "bincode",
  "chrono",
@@ -621,7 +626,7 @@ dependencies = [
 [[package]]
 name = "fontc"
 version = "0.5.0"
-source = "git+https://github.com/googlefonts/fontc.git#78d7185f165a3cef2c7b3443c2588c63de14bd34"
+source = "git+https://github.com/googlefonts/fontc.git#3cbb7f7883bcf14086d439fcd59fcca86b0a662c"
 dependencies = [
  "bitflags",
  "clap",
@@ -647,7 +652,7 @@ dependencies = [
 [[package]]
 name = "fontdrasil"
 version = "0.4.0"
-source = "git+https://github.com/googlefonts/fontc.git#78d7185f165a3cef2c7b3443c2588c63de14bd34"
+source = "git+https://github.com/googlefonts/fontc.git#3cbb7f7883bcf14086d439fcd59fcca86b0a662c"
 dependencies = [
  "env_logger",
  "kurbo",
@@ -662,7 +667,7 @@ dependencies = [
 [[package]]
 name = "fontir"
 version = "0.5.0"
-source = "git+https://github.com/googlefonts/fontc.git#78d7185f165a3cef2c7b3443c2588c63de14bd34"
+source = "git+https://github.com/googlefonts/fontc.git#3cbb7f7883bcf14086d439fcd59fcca86b0a662c"
 dependencies = [
  "bitflags",
  "chrono",
@@ -683,7 +688,7 @@ dependencies = [
 [[package]]
 name = "fontra2fontir"
 version = "0.4.0"
-source = "git+https://github.com/googlefonts/fontc.git#78d7185f165a3cef2c7b3443c2588c63de14bd34"
+source = "git+https://github.com/googlefonts/fontc.git#3cbb7f7883bcf14086d439fcd59fcca86b0a662c"
 dependencies = [
  "env_logger",
  "fontdrasil",
@@ -713,7 +718,7 @@ dependencies = [
 [[package]]
 name = "glyphs-reader"
 version = "0.4.0"
-source = "git+https://github.com/googlefonts/fontc.git#78d7185f165a3cef2c7b3443c2588c63de14bd34"
+source = "git+https://github.com/googlefonts/fontc.git#3cbb7f7883bcf14086d439fcd59fcca86b0a662c"
 dependencies = [
  "ascii_plist_derive",
  "chrono",
@@ -734,7 +739,7 @@ dependencies = [
 [[package]]
 name = "glyphs2fontir"
 version = "0.5.0"
-source = "git+https://github.com/googlefonts/fontc.git#78d7185f165a3cef2c7b3443c2588c63de14bd34"
+source = "git+https://github.com/googlefonts/fontc.git#3cbb7f7883bcf14086d439fcd59fcca86b0a662c"
 dependencies = [
  "chrono",
  "env_logger",
@@ -1589,9 +1594,9 @@ checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
 
 [[package]]
 name = "syn"
-version = "2.0.110"
+version = "2.0.111"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a99801b5bd34ede4cf3fc688c5919368fea4e4814a4664359503e6015b280aea"
+checksum = "390cc9a294ab71bdb1aa2e99d13be9c753cd2d7bd6560c77118597410c4d2e87"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1729,7 +1734,7 @@ dependencies = [
 [[package]]
 name = "ufo2fontir"
 version = "0.4.0"
-source = "git+https://github.com/googlefonts/fontc.git#78d7185f165a3cef2c7b3443c2588c63de14bd34"
+source = "git+https://github.com/googlefonts/fontc.git#3cbb7f7883bcf14086d439fcd59fcca86b0a662c"
 dependencies = [
  "chrono",
  "env_logger",

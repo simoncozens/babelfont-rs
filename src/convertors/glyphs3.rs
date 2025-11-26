@@ -97,7 +97,7 @@ pub(crate) fn copy_user_data(
 pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
     if path.extension().and_then(|x| x.to_str()) == Some("glyphspackage") {
         return _load(
-            &glyphslib::Font::load(&path).map_err(BabelfontError::PlistParse)?,
+            &glyphslib::Font::load(&path).map_err(|x| BabelfontError::PlistParse(x.to_string()))?,
             path,
         );
     }
@@ -106,7 +106,8 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
 }
 
 pub fn load_str(s: &str, path: PathBuf) -> Result<Font, BabelfontError> {
-    let glyphs_font = glyphslib::Font::load_str(s).map_err(BabelfontError::PlistParse)?;
+    let glyphs_font =
+        glyphslib::Font::load_str(s).map_err(|x| BabelfontError::PlistParse(x.to_string()))?;
     _load(&glyphs_font, path)
 }
 

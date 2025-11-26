@@ -238,7 +238,9 @@ impl Font {
         {
             if path.extension().and_then(|x| x.to_str()) == Some("glyphs") {
                 let glyphs3_font = self.as_glyphslib();
-                return glyphs3_font.save(&path).map_err(BabelfontError::PlistParse);
+                return glyphs3_font
+                    .save(&path)
+                    .map_err(|x| BabelfontError::PlistParse(x.to_string()));
             }
         }
         #[cfg(feature = "ufo")]

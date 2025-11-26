@@ -27,7 +27,7 @@ pub enum BabelfontError {
 
     #[cfg(feature = "glyphs")]
     #[error("Error parsing Glyphs file: {0}")]
-    PlistParse(Box<dyn std::error::Error + 'static>),
+    PlistParse(String),
 
     #[cfg(feature = "ufo")]
     #[error("Error loading UFO: {0}")]
