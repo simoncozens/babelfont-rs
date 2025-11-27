@@ -1,4 +1,4 @@
-use fea_rs_ast::{AsFea as _, Comment, FeatureFile, LayoutVisitor, Statement, SubOrPos};
+use fea_rs_ast::{AsFea as _, Comment, FeatureFile, GlyphName, LayoutVisitor, Statement, SubOrPos};
 use smol_str::SmolStr;
 use std::{collections::HashSet, sync::LazyLock};
 
@@ -399,6 +399,30 @@ impl<'a> SubsetVisitor<'a> {
         }
         None
     }
+    fn subset_gdef_ligature_caret_by_index(
+        &mut self,
+        statement: &mut fea_rs_ast::LigatureCaretByIndexStatement,
+    ) -> Option<Statement> {
+        if !self.filter_container(&mut statement.glyphs) {
+            return Some(Statement::Comment(Comment::new(
+                "# Removed GDEF ligature caret by index statement due to no glyphs remaining"
+                    .to_string(),
+            )));
+        }
+        None
+    }
+    fn subset_gdef_ligature_caret_by_pos(
+        &mut self,
+        statement: &mut fea_rs_ast::LigatureCaretByPosStatement,
+    ) -> Option<Statement> {
+        if !self.filter_container(&mut statement.glyphs) {
+            return Some(Statement::Comment(Comment::new(
+                "# Removed GDEF ligature caret by pos statement due to no glyphs remaining"
+                    .to_string(),
+            )));
+        }
+        None
+    }
     fn subset_feature_block(
         &mut self,
         feature_block: &mut fea_rs_ast::FeatureBlock,
@@ -489,7 +513,16 @@ impl<'a> SubsetVisitor<'a> {
             fea_rs_ast::GlyphContainer::GlyphClassName(smol_str) => {
                 !self.empty_classes.contains(smol_str.as_str())
             }
-            fea_rs_ast::GlyphContainer::GlyphRange(range) => todo!(),
+            fea_rs_ast::GlyphContainer::GlyphRange(range) => {
+                *container = fea_rs_ast::GlyphContainer::GlyphClass(fea_rs_ast::GlyphClass::new(
+                    range
+                        .glyphset()
+                        .map(|x| fea_rs_ast::GlyphContainer::GlyphName(GlyphName::new(&x)))
+                        .collect(),
+                    0..0, // Oops, we don't know
+                ));
+                self.filter_container(container)
+            }
             fea_rs_ast::GlyphContainer::GlyphNameOrRange(smol_str) => {
                 if self.glyphs.contains(smol_str.as_str()) {
                     return true;
@@ -569,8 +602,12 @@ impl LayoutVisitor for SubsetVisitor<'_> {
             Statement::GdefClassDef(glyph_class_def_statement) => {
                 self.subset_gdef_class_definition(glyph_class_def_statement)
             }
-            Statement::GdefLigatureCaretByIndex(ligature_caret_by_index_statement) => todo!(),
-            Statement::GdefLigatureCaretByPos(ligature_caret_by_pos_statement) => todo!(),
+            Statement::GdefLigatureCaretByIndex(ligature_caret_by_index_statement) => {
+                self.subset_gdef_ligature_caret_by_index(ligature_caret_by_index_statement)
+            }
+            Statement::GdefLigatureCaretByPos(ligature_caret_by_pos_statement) => {
+                self.subset_gdef_ligature_caret_by_pos(ligature_caret_by_pos_statement)
+            }
             Statement::MarkClassDefinition(mark_class_definition) => {
                 self.subset_mark_class_definition(mark_class_definition)
             }
@@ -640,5 +677,17 @@ mod tests {
         feature_subset(&mut font, &old_glyphs, &new_glyphs).expect("Feature subsetting failed");
         let fea = font.features.to_fea();
         assert_eq!(fea, "feature foo {\nsub a by c;\n} foo;\n# Removed feature bar due to no statements remaining\n\n");
+    }
+
+    #[test]
+    fn test_filter_range() {
+        let visitor = SubsetVisitor::new(vec!["a", "b", "g"].into_iter().collect());
+        let mut container = fea_rs_ast::GlyphContainer::GlyphRange(fea_rs_ast::GlyphRange::new(
+            "a".into(),
+            "f".into(),
+        ));
+        let retained = visitor.filter_container(&mut container);
+        assert!(retained);
+        assert_eq!(container.as_fea(""), "[a b]");
     }
 }
