@@ -1,4 +1,7 @@
-use fea_rs_ast::{AsFea as _, Comment, FeatureFile, GlyphName, LayoutVisitor, Statement, SubOrPos};
+use fea_rs_ast::{
+    AsFea as _, Comment, FeatureFile, GlyphClass, GlyphContainer, GlyphName, LayoutVisitor,
+    Statement, SubOrPos,
+};
 use smol_str::SmolStr;
 use std::{collections::HashSet, sync::LazyLock};
 
@@ -430,6 +433,30 @@ impl<'a> SubsetVisitor<'a> {
         }
         None
     }
+    fn subset_lookupflag(
+        &mut self,
+        lookupflag: &mut fea_rs_ast::LookupFlagStatement,
+    ) -> Option<Statement> {
+        if let Some(GlyphContainer::GlyphClassName(ma)) = lookupflag.mark_attachment.as_ref() {
+            // If the mark classes departed, replace with [] literal
+            if self.empty_classes.contains(ma.as_str()) {
+                lookupflag.mark_attachment = Some(GlyphContainer::GlyphClass(GlyphClass::new(
+                    vec![],
+                    lookupflag.location.clone(),
+                )))
+            }
+        }
+        // Same trick for mark filtering
+        if let Some(GlyphContainer::GlyphClassName(ma)) = lookupflag.mark_filtering_set.as_ref() {
+            if self.empty_classes.contains(ma.as_str()) {
+                lookupflag.mark_filtering_set = Some(GlyphContainer::GlyphClass(GlyphClass::new(
+                    vec![],
+                    lookupflag.location.clone(),
+                )))
+            }
+        }
+        None
+    }
     fn subset_feature_block(
         &mut self,
         feature_block: &mut fea_rs_ast::FeatureBlock,
@@ -627,9 +654,8 @@ impl LayoutVisitor for SubsetVisitor<'_> {
             Statement::GlyphClassDefinition(glyph_class_definition) => {
                 self.subset_glyph_class_definition(glyph_class_definition)
             }
-            Statement::Language(_) | Statement::LanguageSystem(_) | Statement::LookupFlag(_) => {
-                None
-            }
+            Statement::Language(_) | Statement::LanguageSystem(_) => None,
+            Statement::LookupFlag(lookupflag) => self.subset_lookupflag(lookupflag),
             Statement::LookupReference(lookup_reference) => {
                 self.subset_lookup_reference(lookup_reference)
             }
