@@ -25,8 +25,11 @@ extern crate serde_json_path_to_error as serde_json;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+/// A representation of a font source file
 pub struct Font {
+    /// Units per em
     pub upm: u16,
+    /// Font version as (major, minor)
     pub version: (u16, u16),
     /// A list of axes, in the case of variable/multiple master font.
     ///
@@ -39,17 +42,22 @@ pub struct Font {
     /// A list of the font's masters
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub masters: Vec<Master>,
+    /// A list of the font's glyphs
     pub glyphs: GlyphList,
+    /// An optional note about the font
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
+    /// The font's creation date
     #[cfg_attr(feature = "typescript", type_def(type_of = "String"))]
     pub date: chrono::DateTime<Local>,
+    /// The font's naming information
     pub names: Names,
     /// Any values to be placed in OpenType tables on export to override defaults
     ///
     /// These must be font-wide. Metrics which may vary by master should be placed in the `metrics` field of a Master
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub custom_ot_values: Vec<OTValue>,
+    /// A map of Unicode Variation Sequences to glyph names
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub variation_sequences: BTreeMap<(u32, u32), String>,
     /// A representation of the font's OpenType features
@@ -67,6 +75,7 @@ pub struct Font {
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub second_kern_groups: HashMap<String, Vec<String>>,
 
+    /// Format-specific data
     #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
     pub format_specific: FormatSpecific,
 
@@ -80,6 +89,7 @@ impl Default for Font {
 }
 
 impl Font {
+    /// Create a new, empty Font
     pub fn new() -> Self {
         Font {
             upm: 1000,
@@ -101,6 +111,7 @@ impl Font {
         }
     }
 
+    /// Find the location of the default master in design space coordinates, if one is present
     pub fn default_location(&self) -> Result<DesignLocation, BabelfontError> {
         let iter: Result<Vec<(Tag, DesignCoord)>, _> = self
             .axes
@@ -112,6 +123,8 @@ impl Font {
             .collect();
         Ok(DesignLocation::from_iter(iter?))
     }
+
+    /// Find the default master, if one is present
     pub fn default_master(&self) -> Option<&Master> {
         let default_location: DesignLocation = self.default_location().ok()?;
         if self.masters.len() == 1 {
@@ -122,6 +135,7 @@ impl Font {
             .find(|&m| m.location == default_location)
     }
 
+    /// Find the index of the default master, if one is present
     pub fn default_master_index(&self) -> Option<usize> {
         let default_location: DesignLocation = self.default_location().ok()?;
         self.masters
@@ -130,12 +144,14 @@ impl Font {
             .find_map(|(ix, m)| (m.location == default_location).then_some(ix))
     }
 
+    /// Find a master by its name
     pub fn master(&self, master_name: &str) -> Option<&Master> {
         self.masters
             .iter()
             .find(|m| m.name.get_default().map(|x| x.as_str()) == Some(master_name))
     }
 
+    /// Find the layer for a given glyph and master, if it exists
     pub fn master_layer_for(&self, glyphname: &str, master: &Master) -> Option<&Layer> {
         if let Some(glyph) = self.glyphs.get(glyphname) {
             for layer in &glyph.layers {
@@ -147,6 +163,7 @@ impl Font {
         None
     }
 
+    /// Get an OpenType value for a given table and field
     pub fn ot_value(
         &self,
         table: &str,
@@ -167,6 +184,7 @@ impl Font {
         None
     }
 
+    /// Set an OpenType value for a given table and field
     pub fn set_ot_value(&mut self, table: &str, field: &str, value: OTScalar) {
         self.custom_ot_values.push(OTValue {
             table: table.to_string(),
@@ -175,6 +193,7 @@ impl Font {
         })
     }
 
+    /// Get a named metric from the default master, if present
     pub fn default_metric(&self, name: &str) -> Option<i32> {
         let metric: MetricType = MetricType::from(name);
         self.default_master()
@@ -203,6 +222,13 @@ impl Font {
     //     self.axes.iter().map(|ax| ax.tag.clone()).collect()
     // }
 
+    /// Save the font to a file
+    ///
+    /// Which file formats are supported will depend on which features are enabled:
+    ///  - With no features, only the `.babelfont` JSON format is supported
+    ///  - With the `ufo` feature, `.designspace` files and `.ufo` are also supported
+    ///  - With the `glyphs` feature, `.glyphs` files are also supported
+    ///  - With the `fontir` feature, `.ttf` files are also supported
     pub fn save<T: Into<std::path::PathBuf>>(&self, path: T) -> Result<(), BabelfontError> {
         let path = path.into();
         if path.extension().and_then(|x| x.to_str()) == Some("babelfont") {
@@ -255,6 +281,7 @@ impl Font {
         })
     }
 
+    /// Interpolate a glyph at a given location in design space
     pub fn interpolate_glyph(
         &self,
         glyphname: &str,
@@ -302,6 +329,7 @@ mod glyphs {
     use super::Font;
 
     impl Font {
+        /// Convert to a glyphslib::Font in glyphs 3 format
         pub fn as_glyphslib(&self) -> glyphslib::Font {
             glyphslib::Font::Glyphs3(crate::convertors::glyphs3::as_glyphs3(self))
         }
@@ -317,6 +345,7 @@ mod fontra {
     use super::Font;
     use crate::convertors::fontra;
     impl Font {
+        /// Return a [fontra::FontInfo] representation of this font's naming and version data
         pub fn as_fontra_info(&self) -> fontra::FontInfo {
             fontra::FontInfo {
                 family_name: self.names.family_name.get_default().cloned(),
@@ -337,6 +366,7 @@ mod fontra {
             }
         }
 
+        /// Return a [fontra::Axes] representation of this font's axes
         pub fn as_fontra_axes(&self) -> fontra::Axes {
             fontra::Axes {
                 axes: self.axes.iter().map(Into::into).collect(),
@@ -345,6 +375,7 @@ mod fontra {
             }
         }
 
+        /// Get a [fontra::Glyph] representation of a glyph by name
         pub fn get_fontra_glyph(&self, glyphname: &str) -> Option<fontra::Glyph> {
             let our_glyph = self.glyphs.get(glyphname)?;
             let mut glyph = fontra::Glyph {

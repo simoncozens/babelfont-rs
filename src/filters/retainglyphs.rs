@@ -4,9 +4,16 @@ use std::{collections::HashSet, sync::LazyLock};
 
 use crate::{filters::FontFilter, Features};
 
+/// A filter that retains only the specified glyphs in a font
+///
+/// When a glyph is retained, any components it references that are not in the retain list
+/// are decomposed. Masters that become sparse as a result are removed, and their associated layers
+/// are converted to associated layers of a non-sparse master. Features are also subsetted
+/// to only reference the retained glyphs.
 pub struct RetainGlyphs(Vec<String>);
 
 impl RetainGlyphs {
+    /// Create a new RetainGlyphs filter
     pub fn new(glyph_names: Vec<String>) -> Self {
         RetainGlyphs(glyph_names)
     }

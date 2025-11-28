@@ -1,38 +1,67 @@
 use serde::{Deserialize, Serialize};
 
+/// Type of font metric
 #[derive(Debug, Clone, PartialEq, Hash, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
 pub enum MetricType {
+    /// X height
     XHeight,
+    /// Cap height
     CapHeight,
+    /// Ascender (design-time ascender for the master)
     Ascender,
+    /// Descender (design-time descender for the master)
     Descender,
+    /// Italic angle (in degrees, negative for right slant)
     ItalicAngle,
+    /// Ascender (to be placed in the `hhea` table)
     HheaAscender,
+    /// Descender (to be placed in the `hhea` table)
     HheaDescender,
+    /// Line gap (to be placed in the `hhea` table)
     HheaLineGap,
+    /// Windows Ascender (to be placed in the `OS/2` table)
     WinAscent,
+    /// Windows Descender (to be placed in the `OS/2` table)
     WinDescent,
+    /// Typographic Ascender (to be placed in the `OS/2` table)
     TypoAscender,
+    /// Typographic Descender (to be placed in the `OS/2` table)
     TypoDescender,
+    /// Typographic Line Gap (to be placed in the `OS/2` table)
     TypoLineGap,
+    /// Subscript horizontal font size
     SubscriptXSize,
+    /// Subscript vertical font size
     SubscriptYSize,
+    /// Subscript horizontal offset
     SubscriptXOffset,
+    /// Subscript vertical offset
     SubscriptYOffset,
+    /// Superscript horizontal font size
     SuperscriptXSize,
+    /// Superscript vertical font size
     SuperscriptYSize,
+    /// Superscript horizontal offset
     SuperscriptXOffset,
+    /// Superscript vertical offset
     SuperscriptYOffset,
+    /// Strikeout size
     StrikeoutSize,
+    /// Strikeout position
     StrikeoutPosition,
+    /// Underline position
     UnderlinePosition,
+    /// Underline thickness
     UnderlineThickness,
+    /// Caret slope rise (for the `hhea` table)
     HheaCaretSlopeRise,
+    /// Caret slope run (for the `hhea` table)
     HheaCaretSlopeRun,
+    /// Caret offset (for the `hhea` table)
     HheaCaretOffset,
+    /// Custom metric type
     #[serde(untagged)]
-    Custom(String), // This could possibly be smol_str and Copy
+    Custom(String),
 }
 
 impl From<&str> for MetricType {
@@ -72,6 +101,7 @@ impl From<&str> for MetricType {
 }
 
 impl MetricType {
+    /// Get the name of the MetricType
     pub fn as_str(&self) -> &str {
         match self {
             MetricType::XHeight => "xHeight",
@@ -167,6 +197,7 @@ mod glyphs {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use indexmap::IndexMap;
 

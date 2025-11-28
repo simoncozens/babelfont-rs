@@ -3,12 +3,17 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+/// A guideline in the font, whether at master or layer level
 pub struct Guide {
+    /// Position of the guideline
     pub pos: Position,
+    /// Optional name of the guideline
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    /// Optional color of the guideline
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub color: Option<Color>,
+    /// Format-specific data
     #[serde(
         default,
         skip_serializing_if = "crate::common::FormatSpecific::is_empty"
@@ -17,6 +22,7 @@ pub struct Guide {
 }
 
 impl Guide {
+    /// Create a new, empty Guide
     pub fn new() -> Self {
         Guide::default()
     }
@@ -88,7 +94,7 @@ mod ufo {
 
 #[cfg(feature = "glyphs")]
 mod glyphs {
-    use glyphslib::{common::GuideAlignment, glyphs3::Guide as G3Guide};
+    use glyphslib::{common::Orientation, glyphs3::Guide as G3Guide};
 
     use super::*;
     impl From<&G3Guide> for Guide {
@@ -117,7 +123,7 @@ mod glyphs {
             G3Guide {
                 pos: (val.pos.x, val.pos.y),
                 angle: val.pos.angle,
-                alignment: GuideAlignment::Left,
+                alignment: Orientation::Left,
                 locked: val
                     .format_specific
                     .get("locked")

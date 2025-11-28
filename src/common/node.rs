@@ -2,26 +2,40 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+/// Types of nodes in a glyph outline
 pub enum NodeType {
+    /// Move to a new position without drawing (only defined for open contours)
     Move,
+    /// Draw a straight line to this node
     Line,
+    /// Cubic Bézier curve control node (off-curve)
     OffCurve,
+    /// Draw a cubic Bézier curve to this node
     Curve,
+    /// Draw a quadratic Bézier curve to this node
     QCurve,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+/// A node in a glyph outline
 pub struct Node {
+    /// The x-coordinate of the node
     pub x: f64,
+    /// The y-coordinate of the node
     pub y: f64,
+    /// The type of the node
     pub nodetype: NodeType,
+    /// Whether the node is smooth
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub smooth: bool, // Not keen on the idea that we can have a smooth OffCurve node, may change
-                      // userData: XXX
+                      // /// Format-specific data
+                      // #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
+                      // format_specific: crate::common::FormatSpecific,
 }
 
 impl Node {
+    /// Convert the Node to a [kurbo::Point]
     pub fn to_kurbo(&self) -> kurbo::Point {
         kurbo::Point::new(self.x, self.y)
     }

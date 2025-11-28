@@ -94,6 +94,7 @@ pub(crate) fn copy_user_data(
     }
 }
 
+/// Load a Glyphs font from a file path
 pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
     if path.extension().and_then(|x| x.to_str()) == Some("glyphspackage") {
         return _load(
@@ -105,6 +106,7 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
     load_str(&s, path.clone())
 }
 
+/// Load a Glyphs font from a string
 pub fn load_str(s: &str, path: PathBuf) -> Result<Font, BabelfontError> {
     let glyphs_font =
         glyphslib::Font::load_str(s).map_err(|x| BabelfontError::PlistParse(x.to_string()))?;
@@ -115,7 +117,7 @@ fn _load(glyphs_font: &glyphslib::Font, path: PathBuf) -> Result<Font, Babelfont
     let mut font = Font::new();
     let glyphs_font = glyphs_font
         .as_glyphs3()
-        .ok_or_else(|| BabelfontError::WrongConvertor { path })?;
+        .ok_or(BabelfontError::WrongConvertor { path })?;
     // App version
     font.format_specific.insert(
         KEY_APP_VERSION.into(),
@@ -930,7 +932,7 @@ mod tests {
     #![allow(clippy::unwrap_used)]
     use crate::Shape;
     use pretty_assertions::assert_eq;
-    use similar::TextDiff;
+    // use similar::TextDiff;
 
     use super::*;
 

@@ -1,10 +1,12 @@
-use fontdrasil::types::Tag;
-
+use crate::Tag;
 use crate::{filters::FontFilter, LayerType};
 
+/// A filter that drops a given axis from the font, removing any masters,
+/// layers, and instances that depend on that axis.
 pub struct DropAxis(Tag);
 
 impl DropAxis {
+    /// Create a new DropAxis filter for the given axis tag
     pub fn new(axis: Tag) -> Self {
         DropAxis(axis)
     }

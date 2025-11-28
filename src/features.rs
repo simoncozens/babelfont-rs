@@ -4,6 +4,7 @@ use smol_str::SmolStr;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+/// A representation of OpenType features, classes, and prefixes.
 pub struct Features {
     /// Opentype classes
     ///
@@ -35,6 +36,7 @@ pub struct Features {
 }
 
 impl Features {
+    /// Serialize to a single string of AFDKO feature code.
     pub fn to_fea(&self) -> String {
         let mut fea = String::new();
         for (name, glyphs) in &self.classes {

@@ -16,7 +16,9 @@ use std::path::PathBuf;
 
 use uuid::Uuid;
 
+/// Key to store the designspace format version in the font's format_specific
 pub const FORMAT_KEY: &str = "norad.designspace.format";
+/// Key to store the master filename in the instance's format_specific
 pub const FILENAME_KEY: &str = "norad.designspace.filename";
 
 use crate::{
@@ -24,6 +26,7 @@ use crate::{
     Axis, BabelfontError, Font, Master,
 };
 
+/// Load a DesignSpace document and all referenced UFOs into a Babelfont Font
 pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
     let ds: DesignSpaceDocument = norad::designspace::DesignSpaceDocument::load(path.clone())?;
     let relative = path.parent();
@@ -197,7 +200,8 @@ fn load_master(
 }
 
 fn default_master<'a>(ds: &'a DesignSpaceDocument, axes: &[Axis]) -> Option<&'a Source> {
-    #[warn(clippy::unwrap_used)] // XXX I am in a hurry
+    #[allow(clippy::unwrap_used)]
+    // We know the axes are well defined because we constructed them from the DS
     let defaults: BTreeMap<&String, DesignCoord> = axes
         .iter()
         .map(|ax| {
@@ -226,6 +230,9 @@ fn default_master<'a>(ds: &'a DesignSpaceDocument, axes: &[Axis]) -> Option<&'a 
     None
 }
 
+/// Save a Babelfont Font as a DesignSpace document and referenced UFOs
+///
+/// This is incomplete and may not save all data.
 pub fn save_designspace(font: &Font, path: &PathBuf) -> Result<(), BabelfontError> {
     let axis_tag_name_map: HashMap<Tag, String> = font
         .axes

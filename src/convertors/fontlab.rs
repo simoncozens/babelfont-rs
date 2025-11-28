@@ -385,6 +385,7 @@ struct FontlabFontWrapper {
     font: FontlabFont,
 }
 
+/// Load a Fontlab VFJ font from a file path
 pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
     let mut axes_short_name_to_tag: HashMap<String, _> = HashMap::new();
     log::debug!("Reading to string");

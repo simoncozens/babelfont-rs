@@ -4,11 +4,16 @@ use crate::common::FormatSpecific;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+/// An anchor point in a glyph
 pub struct Anchor {
+    /// X coordinate
     pub x: f64,
+    /// Y coordinate
     pub y: f64,
     #[serde(default, skip_serializing_if = "String::is_empty")]
+    /// Name of the anchor
     pub name: String,
+    /// Format-specific data
     #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
     pub format_specific: FormatSpecific,
 }
@@ -72,13 +77,13 @@ mod glyphs {
             if val.locked {
                 format_specific.insert(KEY_ANCHOR_LOCKED.into(), serde_json::json!(true));
             }
-            if val.orientation != glyphslib::glyphs3::Orientation::Center {
+            if val.orientation != glyphslib::common::Orientation::Center {
                 format_specific.insert(
                     KEY_ANCHOR_ORIENTATION.into(),
                     serde_json::json!(match val.orientation {
-                        glyphslib::glyphs3::Orientation::Left => "left",
-                        glyphslib::glyphs3::Orientation::Center => "center",
-                        glyphslib::glyphs3::Orientation::Right => "right",
+                        glyphslib::common::Orientation::Left => "left",
+                        glyphslib::common::Orientation::Center => "center",
+                        glyphslib::common::Orientation::Right => "right",
                     }),
                 );
             }
@@ -99,9 +104,9 @@ mod glyphs {
                 .and_then(|v| v.as_str())
                 .unwrap_or("center")
             {
-                "left" => glyphslib::glyphs3::Orientation::Left,
-                "right" => glyphslib::glyphs3::Orientation::Right,
-                _ => glyphslib::glyphs3::Orientation::Center,
+                "left" => glyphslib::common::Orientation::Left,
+                "right" => glyphslib::common::Orientation::Right,
+                _ => glyphslib::common::Orientation::Center,
             };
             glyphslib::glyphs3::Anchor {
                 name: val.name.clone(),

@@ -12,8 +12,11 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+/// A master/source font in a design space
 pub struct Master {
+    /// Name of the master
     pub name: I18NDictionary,
+    /// Unique identifier for the master (usually a UUID)
     pub id: String,
     #[serde(
         default,
@@ -21,10 +24,13 @@ pub struct Master {
         deserialize_with = "crate::serde_helpers::design_location_from_map"
     )]
     #[cfg_attr(feature = "typescript", type_def(type_of = "HashMap<String, f32>"))]
+    /// Location of the master in design space coordinates
     pub location: DesignLocation,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Global guidelines associated with the master
     pub guides: Vec<Guide>,
-    #[cfg_attr(feature = "typescript", type_def(type_of = "HashMap<MetricType, i32>"))]
+    #[cfg_attr(feature = "typescript", type_def(type_of = "HashMap<String, i32>"))]
+    /// Master-specific metrics
     pub metrics: IndexMap<MetricType, i32>,
     /// Kerning for this master.
     ///
@@ -37,12 +43,15 @@ pub struct Master {
     )]
     pub kerning: HashMap<(String, String), i16>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Custom OpenType values for this master
     pub custom_ot_values: Vec<OTValue>,
     #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
+    /// Format-specific data
     pub format_specific: FormatSpecific,
 }
 
 impl Master {
+    /// Create a new Master with the given name, id, and location
     pub fn new<T, U>(name: T, id: U, location: DesignLocation) -> Self
     where
         T: Into<I18NDictionary>,
@@ -60,6 +69,7 @@ impl Master {
         }
     }
 
+    /// Get a custom OpenType value for this master
     pub fn ot_value(&self, table: &str, field: &str) -> Option<OTScalar> {
         for i in &self.custom_ot_values {
             if i.table == table && i.field == field {
@@ -69,6 +79,7 @@ impl Master {
         None
     }
 
+    /// Set a custom OpenType value for this master
     pub fn set_ot_value(&mut self, table: &str, field: &str, value: OTScalar) {
         self.custom_ot_values.push(OTValue {
             table: table.to_string(),
@@ -77,6 +88,7 @@ impl Master {
         })
     }
 
+    /// Check if this master is sparse in the given font (i.e., if any glyphs lack a layer for this master)
     pub fn is_sparse(&self, font: &crate::Font) -> bool {
         for glyph in font.glyphs.iter() {
             let has_layer = glyph

@@ -7,9 +7,14 @@ use fea_rs_ast::fea_rs;
 
 use crate::filters::FontFilter;
 
+/// A filter that resolves include statements in feature files
 pub struct ResolveIncludes(Option<PathBuf>);
 
 impl ResolveIncludes {
+    /// Create a new ResolveIncludes filter
+    ///
+    /// The optional path is used as the base path for resolving includes.
+    /// If this is not present, the font's source path will be used instead.
     pub fn new(path: Option<impl Into<PathBuf>>) -> Self {
         ResolveIncludes(path.map(|a| a.into()))
     }

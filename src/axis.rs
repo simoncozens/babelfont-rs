@@ -1,18 +1,22 @@
 use std::collections::HashMap;
 
+pub use crate::Tag;
 use crate::{common::FormatSpecific, i18ndictionary::I18NDictionary, BabelfontError};
 use fontdrasil::coords::{CoordConverter, DesignCoord, NormalizedCoord, UserCoord};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-pub use write_fonts::types::Tag;
 
+/// An axis in a variable font
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
 pub struct Axis {
+    /// Name of the axis
     pub name: I18NDictionary,
     #[cfg_attr(feature = "typescript", type_def(type_of = "String"))]
+    /// 4-character tag of the axis
     pub tag: Tag,
     #[cfg_attr(feature = "typescript", type_def(type_of = "String"))]
+    /// Unique identifier for the axis
     pub id: Uuid,
     #[serde(
         default,
@@ -21,6 +25,7 @@ pub struct Axis {
         deserialize_with = "crate::serde_helpers::usercoord_option_de"
     )]
     #[cfg_attr(feature = "typescript", type_def(type_of = "Option<f64>"))]
+    /// Minimum value of the axis in user space coordinates
     pub min: Option<UserCoord>,
     #[serde(
         default,
@@ -29,6 +34,7 @@ pub struct Axis {
         deserialize_with = "crate::serde_helpers::usercoord_option_de"
     )]
     #[cfg_attr(feature = "typescript", type_def(type_of = "Option<f64>"))]
+    /// Maximum value of the axis in user space coordinates
     pub max: Option<UserCoord>,
     #[serde(
         default,
@@ -37,6 +43,7 @@ pub struct Axis {
         deserialize_with = "crate::serde_helpers::usercoord_option_de"
     )]
     #[cfg_attr(feature = "typescript", type_def(type_of = "Option<f64>"))]
+    /// Default value of the axis in user space coordinates
     pub default: Option<UserCoord>,
     #[serde(
         default,
@@ -45,17 +52,22 @@ pub struct Axis {
         deserialize_with = "crate::serde_helpers::axismap_de"
     )]
     #[cfg_attr(feature = "typescript", type_def(type_of = "Vec<(f32, f32)>"))]
+    /// Mapping of user space coordinates to design space coordinates
     pub map: Option<Vec<(UserCoord, DesignCoord)>>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    /// Whether the axis is hidden in the font's user interface
     pub hidden: bool,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[cfg_attr(feature = "typescript", type_def(type_of = "Vec<f64>"))]
+    /// Predefined values for the axis in user space coordinates
     pub values: Vec<UserCoord>,
     #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
+    /// Format-specific data
     pub formatspecific: FormatSpecific,
 }
 
 impl Axis {
+    /// Create a new axis with the given name and tag
     pub fn new<T>(name: T, tag: Tag) -> Self
     where
         T: Into<I18NDictionary>,
@@ -90,6 +102,7 @@ impl Axis {
         }
     }
 
+    /// Get the bounds (min, default, max) of this axis, if all are defined
     pub fn bounds(&self) -> Option<(UserCoord, UserCoord, UserCoord)> {
         if self.min.is_none() || self.default.is_none() || self.max.is_none() {
             return None;
@@ -108,6 +121,7 @@ impl Axis {
         self._converter().map(|c| l.convert(&c))
     }
 
+    /// Normalize a userspace value to -1.0 to 1.0 range
     pub fn normalize_userspace_value(
         &self,
         l: UserCoord,
@@ -115,6 +129,7 @@ impl Axis {
         self._converter().map(|c| l.convert(&c))
     }
 
+    /// Normalize a designspace value to -1.0 to 1.0 range
     pub fn normalize_designspace_value(
         &self,
         l: DesignCoord,
@@ -122,6 +137,7 @@ impl Axis {
         self._converter().map(|c| l.convert(&c))
     }
 
+    /// Get the name of the axis in the default language, or "Unnamed axis" if not set
     pub fn name(&self) -> String {
         self.name
             .get_default()

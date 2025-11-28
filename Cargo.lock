@@ -94,7 +94,8 @@ checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
 [[package]]
 name = "ascii_plist_derive"
 version = "0.2.0"
-source = "git+https://github.com/googlefonts/fontc.git#3cbb7f7883bcf14086d439fcd59fcca86b0a662c"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe2ef6f9d2f3579dc90b7f28c9f91c42daa4ea6c04225ad9336446f9ec45a363"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -109,7 +110,7 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
 name = "babelfont"
-version = "0.1.1"
+version = "0.1.1-pre"
 dependencies = [
  "chrono",
  "clap",
@@ -229,9 +230,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.2.47"
+version = "1.2.48"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd405d82c84ff7f35739f175f67d8b9fb7687a0e84ccdc78bd3568839827cf07"
+checksum = "c481bdbf0ed3b892f6f806287d72acd515b352a4ec27a208489b8c1bc839633a"
 dependencies = [
  "find-msvc-tools",
  "shlex",
@@ -550,7 +551,8 @@ dependencies = [
 [[package]]
 name = "fea-rs"
 version = "0.22.0"
-source = "git+https://github.com/googlefonts/fontc.git#3cbb7f7883bcf14086d439fcd59fcca86b0a662c"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c6acd5f994d5b0a5945942bd7db366873ab4304143b37c7e4008283475c87a1a"
 dependencies = [
  "ansi_term",
  "env_logger",
@@ -567,7 +569,8 @@ dependencies = [
 [[package]]
 name = "fea-rs-ast"
 version = "0.1.0"
-source = "git+https://github.com/simoncozens/fea-rs-ast.git#09633623ba6760c4f8fb4edfd77adca0f9b2dec1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7676d50f93f126329b9b337b17484210edec9c1d2097bb25f22ca82c2c58ce90"
 dependencies = [
  "fea-rs",
  "indexmap 2.12.1",
@@ -603,7 +606,8 @@ dependencies = [
 [[package]]
 name = "fontbe"
 version = "0.4.0"
-source = "git+https://github.com/googlefonts/fontc.git#3cbb7f7883bcf14086d439fcd59fcca86b0a662c"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe79abc46ed06c70a8afad5654af0e1806f4fbc9040c519fdae0337341f5b74d"
 dependencies = [
  "bincode",
  "chrono",
@@ -626,7 +630,8 @@ dependencies = [
 [[package]]
 name = "fontc"
 version = "0.5.0"
-source = "git+https://github.com/googlefonts/fontc.git#3cbb7f7883bcf14086d439fcd59fcca86b0a662c"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e7236b0c099604f413257747d46670b2ca37b51ada27df0a56c7d2645716e5d"
 dependencies = [
  "bitflags",
  "clap",
@@ -652,7 +657,8 @@ dependencies = [
 [[package]]
 name = "fontdrasil"
 version = "0.4.0"
-source = "git+https://github.com/googlefonts/fontc.git#3cbb7f7883bcf14086d439fcd59fcca86b0a662c"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fa3a7a2fbc9d1817cd07298326376c8bd39868efe7c6149090c4fafea95eaf34"
 dependencies = [
  "env_logger",
  "kurbo",
@@ -667,7 +673,8 @@ dependencies = [
 [[package]]
 name = "fontir"
 version = "0.5.0"
-source = "git+https://github.com/googlefonts/fontc.git#3cbb7f7883bcf14086d439fcd59fcca86b0a662c"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8eb683c35e2e661c2b44e388443ca6e102558a9d76fba6ca0c8bbe1626a86a6c"
 dependencies = [
  "bitflags",
  "chrono",
@@ -688,7 +695,8 @@ dependencies = [
 [[package]]
 name = "fontra2fontir"
 version = "0.4.0"
-source = "git+https://github.com/googlefonts/fontc.git#3cbb7f7883bcf14086d439fcd59fcca86b0a662c"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba9ec46c21a672919b050939c95ac1fd166873e6f0bf60d2a0ba2757890a2012"
 dependencies = [
  "env_logger",
  "fontdrasil",
@@ -718,7 +726,8 @@ dependencies = [
 [[package]]
 name = "glyphs-reader"
 version = "0.4.0"
-source = "git+https://github.com/googlefonts/fontc.git#3cbb7f7883bcf14086d439fcd59fcca86b0a662c"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "deddf1058f868676794eeab55511122b7ff1257ee4ad86a8523e4c86db320607"
 dependencies = [
  "ascii_plist_derive",
  "chrono",
@@ -739,7 +748,8 @@ dependencies = [
 [[package]]
 name = "glyphs2fontir"
 version = "0.5.0"
-source = "git+https://github.com/googlefonts/fontc.git#3cbb7f7883bcf14086d439fcd59fcca86b0a662c"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6f834accdf74843abdfaf1a449779ddd8a779b59fbeaebbbaee50e3d65b1e568"
 dependencies = [
  "chrono",
  "env_logger",
@@ -758,7 +768,8 @@ dependencies = [
 [[package]]
 name = "glyphslib"
 version = "0.1.0"
-source = "git+https://github.com/simoncozens/glyphslib-rs#0f3b9edb401270e85ec51a662b60fca013b5034a"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf12af6504e11bb3f713f6183dbb4d40d629099aadf0bf8b713b5110849a907f"
 dependencies = [
  "itertools",
  "openstep-plist",
@@ -766,6 +777,7 @@ dependencies = [
  "serde",
  "serde_path_to_error",
  "serde_with",
+ "thiserror 2.0.17",
 ]
 
 [[package]]
@@ -964,9 +976,9 @@ dependencies = [
 
 [[package]]
 name = "js-sys"
-version = "0.3.82"
+version = "0.3.83"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b011eec8cc36da2aab2d5cff675ec18454fad408585853910a202391cf9f8e65"
+checksum = "464a3709c7f55f1f721e5389aa6ea4e3bc6aba669353300af094b29ffbdde1d8"
 dependencies = [
  "once_cell",
  "wasm-bindgen",
@@ -1092,7 +1104,8 @@ checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 [[package]]
 name = "openstep-plist"
 version = "0.1.0"
-source = "git+https://github.com/simoncozens/glyphslib-rs#0f3b9edb401270e85ec51a662b60fca013b5034a"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9950bf633d13e32875256c772828e28773fb047e53d1e18d2c6772f716ffa2fa"
 dependencies = [
  "itertools",
  "serde",
@@ -1507,9 +1520,9 @@ dependencies = [
 
 [[package]]
 name = "serde_with"
-version = "3.16.0"
+version = "3.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10574371d41b0d9b2cff89418eda27da52bcaff2cc8741db26382a77c29131f1"
+checksum = "4fa237f2807440d238e0364a218270b98f767a00d3dada77b1c53ae88940e2e7"
 dependencies = [
  "base64",
  "chrono",
@@ -1526,9 +1539,9 @@ dependencies = [
 
 [[package]]
 name = "serde_with_macros"
-version = "3.16.0"
+version = "3.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08a72d8216842fdd57820dc78d840bef99248e35fb2554ff923319e60f2d686b"
+checksum = "52a8e3ca0ca629121f70ab50f95249e5a6f925cc0f6ffe8256c45b728875706c"
 dependencies = [
  "darling 0.21.3",
  "proc-macro2",
@@ -1734,7 +1747,8 @@ dependencies = [
 [[package]]
 name = "ufo2fontir"
 version = "0.4.0"
-source = "git+https://github.com/googlefonts/fontc.git#3cbb7f7883bcf14086d439fcd59fcca86b0a662c"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b7b4f33808a2d82be0bdafecbaed4402d61a01160fa59af499fbc98b3f6cb62e"
 dependencies = [
  "chrono",
  "env_logger",
@@ -1834,9 +1848,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen"
-version = "0.2.105"
+version = "0.2.106"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da95793dfc411fbbd93f5be7715b0578ec61fe87cb1a42b12eb625caa5c5ea60"
+checksum = "0d759f433fa64a2d763d1340820e46e111a7a5ab75f993d1852d70b03dbb80fd"
 dependencies = [
  "cfg-if",
  "once_cell",
@@ -1847,9 +1861,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-macro"
-version = "0.2.105"
+version = "0.2.106"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04264334509e04a7bf8690f2384ef5265f05143a4bff3889ab7a3269adab59c2"
+checksum = "48cb0d2638f8baedbc542ed444afc0644a29166f1595371af4fecf8ce1e7eeb3"
 dependencies = [
  "quote",
  "wasm-bindgen-macro-support",
@@ -1857,9 +1871,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-macro-support"
-version = "0.2.105"
+version = "0.2.106"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "420bc339d9f322e562942d52e115d57e950d12d88983a14c79b86859ee6c7ebc"
+checksum = "cefb59d5cd5f92d9dcf80e4683949f15ca4b511f4ac0a6e14d4e1ac60c6ecd40"
 dependencies = [
  "bumpalo",
  "proc-macro2",
@@ -1870,9 +1884,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-shared"
-version = "0.2.105"
+version = "0.2.106"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76f218a38c84bcb33c25ec7059b07847d465ce0e0a76b995e134a45adcb6af76"
+checksum = "cbc538057e648b67f72a982e708d485b2efa771e1ac05fec311f9f63e5800db4"
 dependencies = [
  "unicode-ident",
 ]

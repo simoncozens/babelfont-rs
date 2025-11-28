@@ -1,28 +1,34 @@
 use crate::{
     common::{Direction, FormatSpecific},
     layer::Layer,
+    serde_helpers::{default_true, is_true},
 };
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+/// A list of glyphs in the font
 pub struct GlyphList(pub Vec<Glyph>);
 impl GlyphList {
+    /// Get a glyph by name
     pub fn get(&self, g: &str) -> Option<&Glyph> {
         self.0.iter().find(|&glyph| glyph.name == g)
     }
+    /// Get a glyph by name, mutably
     pub fn get_mut(&mut self, g: &str) -> Option<&mut Glyph> {
         self.0.iter_mut().find(|glyph| glyph.name == g)
     }
 
+    /// Get a glyph by index
     pub fn get_by_index(&self, id: usize) -> Option<&Glyph> {
         self.0.get(id)
     }
+    /// Get a glyph by index, mutably
     pub fn get_by_index_mut(&mut self, id: usize) -> Option<&mut Glyph> {
         self.0.get_mut(id)
     }
-
+    /// Get an iterator over the glyphs
     pub fn iter(&self) -> std::slice::Iter<'_, Glyph> {
         self.0.iter()
     }
@@ -42,42 +48,64 @@ impl DerefMut for GlyphList {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+/// The category of a glyph
 pub enum GlyphCategory {
+    /// A base glyph
     Base,
+    /// A mark glyph
     Mark,
+    /// An unknown / un-set category
     #[default]
     Unknown,
+    /// A ligature glyph
     Ligature,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+/// A glyph in the font
 pub struct Glyph {
+    /// The name of the glyph
     pub name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// The production name of the glyph, if any
     pub production_name: Option<String>,
+    /// The category of the glyph
     pub category: GlyphCategory,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Unicode codepoints assigned to the glyph
     pub codepoints: Vec<u32>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// The layers in the glyph
+    ///
+    /// These include background layers, design-only layers, etc. as well as
+    /// the main master and location-specific layers.
     pub layers: Vec<Layer>,
+    #[serde(default = "default_true", skip_serializing_if = "is_true")]
+    /// Whether the glyph is exported
     pub exported: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// The writing direction of the glyph, if any
     pub direction: Option<Direction>,
     #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
+    /// Format-specific data
     pub formatspecific: FormatSpecific,
 }
 
 impl Glyph {
+    /// Create a new Glyph with the given name
     pub fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
             ..Default::default()
         }
     }
+
+    /// Get a layer by id
     pub fn get_layer(&self, id: &str) -> Option<&Layer> {
         self.layers.iter().find(|l| l.id.as_deref() == Some(id))
     }
+    /// Get a mutable layer by id
     pub fn get_layer_mut(&mut self, id: &str) -> Option<&mut Layer> {
         self.layers.iter_mut().find(|l| l.id.as_deref() == Some(id))
     }

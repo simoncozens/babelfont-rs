@@ -11,39 +11,56 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+/// The type of a layer in relation to masters
 pub enum LayerType {
+    /// A default layer for a master
     DefaultForMaster(String),
+    /// A layer associated with a master but not the default
     AssociatedWithMaster(String),
+    /// A free-floating layer not associated with any master
     #[default]
     FreeFloating,
 }
 impl LayerType {
-    pub fn is_default(&self) -> bool {
+    fn is_default(&self) -> bool {
         matches!(self, LayerType::FreeFloating)
     }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+/// A layer of a glyph in a font
 pub struct Layer {
+    /// The advance width of the layer
     pub width: f32,
+    /// The name of the layer
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    /// The ID of the layer
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
+    /// The relationship between this layer and a master, if any
     #[serde(default, skip_serializing_if = "LayerType::is_default")]
     pub master: LayerType,
+    /// Guidelines in the layer
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub guides: Vec<Guide>,
+    /// Shapes (paths and components) in the layer
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub shapes: Vec<Shape>,
+    /// Anchors in the layer
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub anchors: Vec<Anchor>,
+    /// The color of the layer
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub color: Option<Color>,
+    /// The index of the layer in a color font
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub layer_index: Option<i32>,
+    /// Whether this layer is a background layer
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub is_background: bool,
+    /// The ID of the background layer for this layer, if any
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub background_layer_id: Option<String>,
     #[serde(
@@ -56,12 +73,15 @@ pub struct Layer {
         feature = "typescript",
         type_def(type_of = "Option<std::collections::HashMap<String, f32>>")
     )]
+    /// The location of the layer in design space, if it is not at the default location for a master
     pub location: Option<DesignLocation>,
     #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
+    /// Format-specific data for the layer
     pub format_specific: FormatSpecific,
 }
 
 impl Layer {
+    /// Create a new layer with the given advance width
     pub fn new(width: f32) -> Layer {
         Layer {
             width,
@@ -69,6 +89,7 @@ impl Layer {
         }
     }
 
+    /// Iterate over the components in the layer
     pub fn components(&self) -> impl DoubleEndedIterator<Item = &Component> {
         self.shapes.iter().filter_map(|x| {
             if let Shape::Component(c) = x {
@@ -79,6 +100,7 @@ impl Layer {
         })
     }
 
+    /// Iterate over the paths in the layer
     pub fn paths(&self) -> impl DoubleEndedIterator<Item = &Path> {
         self.shapes.iter().filter_map(|x| {
             if let Shape::Path(p) = x {
@@ -89,28 +111,33 @@ impl Layer {
         })
     }
 
+    /// Clear all components from the layer
     pub fn clear_components(&mut self) {
         self.shapes.retain(|sh| matches!(sh, Shape::Path(_)));
     }
 
+    /// Add a component to the layer
     pub fn push_component(&mut self, c: Component) {
         self.shapes.push(Shape::Component(c))
     }
-
+    /// Add a path to the layer
     pub fn push_path(&mut self, p: Path) {
         self.shapes.push(Shape::Path(p))
     }
 
+    /// Check if the layer has any components
     pub fn has_components(&self) -> bool {
         self.shapes
             .iter()
             .any(|sh| matches!(sh, Shape::Component(_)))
     }
 
+    /// Check if the layer has any paths
     pub fn has_paths(&self) -> bool {
         self.shapes.iter().any(|sh| matches!(sh, Shape::Path(_)))
     }
 
+    /// Decompose all components in the layer, replacing them with their decomposed paths
     pub fn decompose(&mut self, font: &Font) {
         let decomposed_shapes = self
             .decomposed_components(font)
@@ -120,6 +147,7 @@ impl Layer {
         self.shapes.extend(decomposed_shapes);
     }
 
+    /// Return a new layer with all components decomposed into paths
     pub fn decomposed(&self, font: &Font) -> Layer {
         let decomposed_shapes = self
             .decomposed_components(font)
@@ -148,6 +176,7 @@ impl Layer {
         }
     }
 
+    /// Return a vector of decomposed paths from all components in the layer
     pub fn decomposed_components(&self, font: &Font) -> Vec<Path> {
         let mut contours = Vec::new();
 
@@ -195,7 +224,10 @@ impl Layer {
         contours
     }
 
-    pub fn bounds(&self) -> Result<kurbo::Rect, BabelfontError> {
+    /// Calculate the bounding box of the layer
+    ///
+    /// If the layer has components, an error is returned and the layer must be decomposed first
+    pub fn bounds(&self) -> Result<crate::Rect, BabelfontError> {
         if self.has_components() {
             return Err(BabelfontError::NeedsDecomposition);
         }
@@ -209,10 +241,17 @@ impl Layer {
         Ok(bbox)
     }
 
+    /// Calculate the left side bearing of the layer
+    ///
+    /// If the layer has components, an error is returned and the layer must be decomposed first
     pub fn lsb(&self) -> Result<f32, BabelfontError> {
         let bounds: kurbo::Rect = self.bounds()?;
         Ok(bounds.min_x() as f32)
     }
+
+    /// Calculate the right side bearing of the layer
+    ///
+    /// If the layer has components, an error is returned and the layer must be decomposed first
     pub fn rsb(&self) -> Result<f32, BabelfontError> {
         let bounds = self.bounds()?;
         Ok(self.width - bounds.max_x() as f32)

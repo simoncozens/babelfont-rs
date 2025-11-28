@@ -4,6 +4,7 @@ use serde_json::Value;
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+/// A map for storing format-specific data.
 pub struct FormatSpecific(
     #[cfg_attr(
         feature = "typescript",
@@ -13,18 +14,22 @@ pub struct FormatSpecific(
 );
 
 impl FormatSpecific {
+    /// Get a value by key
     pub fn get(&self, key: &str) -> Option<&Value> {
         self.0.get(key)
     }
 
+    /// Insert a key-value pair
     pub fn insert(&mut self, key: String, value: Value) {
         self.0.insert(key, value);
     }
 
+    /// Check if the map contains a key
     pub fn contains_key(&self, key: &str) -> bool {
         self.0.contains_key(key)
     }
 
+    /// Get a string value by key, or an empty string if not found
     pub(crate) fn get_string(&self, key: &str) -> String {
         self.0
             .get(key)
@@ -47,10 +52,12 @@ impl FormatSpecific {
             .unwrap_or_default()
     }
 
+    /// Get an iterator over the key-value pairs
     pub fn iter(&self) -> impl Iterator<Item = (&String, &Value)> {
         self.0.iter()
     }
 
+    /// Check if the FormatSpecific is empty
     pub fn is_empty(value: &FormatSpecific) -> bool {
         value.0.is_empty()
     }

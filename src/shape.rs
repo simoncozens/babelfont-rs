@@ -6,27 +6,35 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+/// A component in a glyph
 pub struct Component {
+    /// The referenced glyph name
     pub reference: String,
     #[serde(
         default = "kurbo::Affine::default",
         skip_serializing_if = "crate::serde_helpers::affine_is_identity"
     )]
     #[cfg_attr(feature = "typescript", type_def(type_of = "Vec<f32>"))]
+    /// The transformation applied to the component
     pub transform: kurbo::Affine,
     #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
+    /// Format-specific data
     pub format_specific: FormatSpecific,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+/// A path in a glyph
 pub struct Path {
     #[serde(
         serialize_with = "crate::serde_helpers::serialize_nodes",
         deserialize_with = "crate::serde_helpers::deserialize_nodes"
     )]
+    /// A list of nodes in the path
     pub nodes: Vec<Node>,
+    /// Whether the path is closed
     pub closed: bool,
+    /// Format-specific data
     #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
     pub format_specific: FormatSpecific,
 }
@@ -95,8 +103,11 @@ impl Path {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+/// A shape in a glyph, either a component or a path
 pub enum Shape {
+    /// A component in a glyph
     Component(Component),
+    /// A path in a glyph
     Path(Path),
 }
 
@@ -224,8 +235,8 @@ mod fontra {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used)]
     use super::*;
-    use serde_json::json;
 
     #[test]
     fn test_path_serde_roundtrip() {

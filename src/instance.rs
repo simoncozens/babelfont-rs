@@ -4,8 +4,13 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+/// A font instance
 pub struct Instance {
+    /// Unique identifier for the instance
+    ///
+    /// Should be unique within the design space; usually a UUID.
     pub id: String,
+    /// Name of the instance
     pub name: I18NDictionary,
     #[serde(
         default,
@@ -16,13 +21,18 @@ pub struct Instance {
         feature = "typescript",
         type_def(type_of = "std::collections::HashMap<String, f32>")
     )]
+    /// Location of the instance in design space coordinates
     pub location: DesignLocation,
+    /// Any custom names for the instance if it is exported as a static font
     pub custom_names: Names,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    /// Whether the instance represents an export of a variable font
     pub variable: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Name of the linked style for style linking (e.g., "Bold Italic" links to "Bold" and "Italic")
     pub linked_style: Option<String>,
     #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
+    /// Format-specific data
     pub format_specific: FormatSpecific,
 }
 

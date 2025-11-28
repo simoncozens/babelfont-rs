@@ -20,14 +20,19 @@ pub(crate) fn tag_from_string(s: &str) -> Result<Tag, BabelfontError> {
 }
 #[derive(Debug, Copy, Clone, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+/// A position in 2D space, with an optional angle
 pub struct Position {
+    /// X coordinate
     pub x: f32,
+    /// Y coordinate
     pub y: f32,
+    /// Angle in degrees
     #[serde(default, skip_serializing_if = "crate::serde_helpers::is_zero")]
     pub angle: f32,
 }
 
 impl Position {
+    /// Create a zeroed Position
     pub fn zero() -> Position {
         Position {
             x: 0.0,
@@ -76,17 +81,26 @@ mod ufo {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+/// A scalar value in an OpenType table
 pub enum OTScalar {
+    /// String value
     StringType(String),
+    /// Boolean value
     Bool(bool),
+    /// Unsigned integer value
     Unsigned(u32),
+    /// Signed integer value
     Signed(i32),
+    /// Floating-point value
     Float(f32),
+    /// Bit field value
     BitField(Vec<u8>),
+    /// Array of floating-point values
     Array(Vec<f64>),
 }
 
 impl OTScalar {
+    /// Returns the bit field value if this scalar is a BitField, otherwise None.
     pub fn as_bitfield(&self) -> Option<Vec<u8>> {
         if let OTScalar::BitField(u) = self {
             Some(u.to_vec())
@@ -172,8 +186,12 @@ pub struct OTValue {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+/// Direction of text flow
 pub enum Direction {
+    /// Left to right text flow
     LeftToRight,
+    /// Right to left text flow
     RightToLeft,
+    /// Top to bottom text flow
     TopToBottom,
 }

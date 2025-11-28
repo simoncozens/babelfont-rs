@@ -18,6 +18,8 @@ pub use resolveincludes::ResolveIncludes;
 pub use retainglyphs::RetainGlyphs;
 pub use scaleupem::ScaleUpem;
 
+/// A trait for font filters that can be applied to a font
 pub trait FontFilter {
+    /// Apply the filter to the given font
     fn apply(&self, font: &mut crate::Font) -> Result<(), crate::BabelfontError>;
 }

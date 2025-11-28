@@ -3,9 +3,15 @@ use std::collections::HashMap;
 use crate::{filters::FontFilter, LayerType};
 
 #[derive(Default)]
+/// A filter that drops all sparse masters from a font
+///
+/// A sparse master is defined as a master that does not have a glyph layer for every glyph in the font.
+/// When this filter is applied, all sparse masters are removed from the font, and their associated layers
+/// are converted to associated layers of a non-sparse master.
 pub struct DropSparseMasters;
 
 impl DropSparseMasters {
+    /// Create a new DropSparseMasters filter
     pub fn new() -> Self {
         DropSparseMasters
     }

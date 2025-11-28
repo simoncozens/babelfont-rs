@@ -1,9 +1,11 @@
 use crate::filters::FontFilter;
 
 #[derive(Default)]
+/// A filter that drops all kerning from a font
 pub struct DropKerning;
 
 impl DropKerning {
+    /// Create a new DropKerning filter
     pub fn new() -> Self {
         DropKerning
     }

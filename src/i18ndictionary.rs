@@ -9,25 +9,32 @@ static DFLT: &str = "dflt";
 
 #[derive(Default, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+/// A dictionary for internationalized strings.
 pub struct I18NDictionary(pub HashMap<String, String>);
 
 impl I18NDictionary {
+    /// Create a new, empty I18NDictionary.
     pub fn new() -> Self {
         I18NDictionary::default()
     }
 
+    /// Get the default string, if any.
     pub fn get_default(&self) -> Option<&String> {
         self.0.get(DFLT)
     }
 
+    /// Set the default string.
     pub fn set_default(&mut self, s: String) {
         self.0.insert(DFLT.to_string(), s);
     }
 
+    /// Insert a string for a given language code.
+    ///
+    /// Language codes should be [OpenType Language System Tags](https://docs.microsoft.com/en-us/typography/opentype/spec/languagetags).
     pub fn insert(&mut self, lang: String, s: String) {
         self.0.insert(lang, s);
     }
-
+    /// Check if the dictionary is empty.
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }

@@ -1,9 +1,11 @@
 use crate::filters::FontFilter;
 
+/// A filter that drops all guides from a font
 #[derive(Default)]
 pub struct DropGuides;
 
 impl DropGuides {
+    /// Create a new DropGuides filter
     pub fn new() -> Self {
         DropGuides
     }

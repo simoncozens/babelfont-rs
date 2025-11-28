@@ -1,8 +1,10 @@
 use crate::filters::FontFilter;
 
+/// A filter that scales the UPEM of a font and adjusts all relevant metrics accordingly
 pub struct ScaleUpem(u16);
 
 impl ScaleUpem {
+    /// Create a new ScaleUpem filter
     pub fn new(new_upem: u16) -> Self {
         ScaleUpem(new_upem)
     }

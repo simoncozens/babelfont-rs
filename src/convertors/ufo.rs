@@ -11,8 +11,11 @@ use std::{
     time::SystemTime,
 };
 
+/// Key for storing norad lib data in FormatSpecific
 pub const KEY_LIB: &str = "norad.lib";
+/// Key for storing norad groups in FormatSpecific
 pub const KEY_GROUPS: &str = "norad.groups";
+// These aren't pub because we just use them to get stuff out of the ufo's lib, we don't store them ourselves
 const KEY_CATEGORIES: &str = "public.openTypeCategories";
 const KEY_PSNAMES: &str = "public.postscriptNames";
 const KEY_SKIP_EXPORT: &str = "public.skipExportGlyphs";
@@ -46,6 +49,7 @@ pub(crate) fn stat(path: &std::path::Path) -> Option<DateTime<chrono::Local>> {
         .map(DateTime::<chrono::Local>::from)
 }
 
+/// Load a UFO font from a file path
 pub fn load<T: AsRef<std::path::Path>>(path: T) -> Result<Font, BabelfontError> {
     let mut font = Font::new();
     let created_time: Option<DateTime<Local>> = stat(path.as_ref());
@@ -90,6 +94,9 @@ pub fn load<T: AsRef<std::path::Path>>(path: T) -> Result<Font, BabelfontError> 
     Ok(font)
 }
 
+/// Convert a Babelfont Font to a norad UFO font
+///
+/// This is currently unfinished and may not preserve all data.
 pub fn as_norad(font: &Font) -> Result<norad::Font, BabelfontError> {
     let mut ufo = norad::Font::new();
     // Move some things into lib key before serializing it:

@@ -31,6 +31,7 @@ use write_fonts::{
 };
 
 #[derive(Debug, Clone)]
+/// A FontIR source for a Babelfont Font
 pub struct BabelfontIrSource {
     font_info: Arc<FontInfo>,
     source_path: Option<Arc<std::path::Path>>,
@@ -117,6 +118,7 @@ impl Source for BabelfontIrSource {
 }
 
 impl BabelfontIrSource {
+    /// Create a BabelfontIrSource from a Babelfont Font in memory
     pub fn new_from_memory(font: Font) -> Result<Self, Error> {
         Ok(Self {
             font_info: Arc::new(FontInfo::try_from(font)?),
@@ -780,7 +782,7 @@ impl Work<Context, WorkId, Error> for FeatureWork {
         let font_info = self.font_info.as_ref();
         let font = &font_info.font;
 
-        #[warn(clippy::unwrap_used)]
+        #[warn(clippy::expect_used)]
         context.features.set(to_ir_features(
             &Some(font.features.to_fea()),
             self.font_file_path.as_ref().map(|path| {
