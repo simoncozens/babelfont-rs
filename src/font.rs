@@ -243,19 +243,12 @@ impl Font {
         #[cfg(feature = "fontir")]
         {
             if path.extension().and_then(|x| x.to_str()) == Some("ttf") {
-                let source =
-                    crate::convertors::fontir::BabelfontIrSource::new_from_memory(self.clone())
-                        .map_err(|e| {
-                            BabelfontError::General(format!("FontIR conversion error: {}", e))
-                        })?;
-                let bytes = fontc::generate_font(
-                    Box::new(source),
-                    std::path::Path::new("build"),
-                    None,
-                    fontc::Flags::default(),
-                    false,
-                )
-                .map_err(|e| BabelfontError::General(format!("Font generation error: {:#?}", e)))?;
+                use crate::convertors::fontir::CompilationOptions;
+
+                let bytes = crate::convertors::fontir::BabelfontIrSource::compile(
+                    self.clone(),
+                    CompilationOptions::default(),
+                )?;
                 std::fs::write(&path, bytes)?;
                 return Ok(());
             }
