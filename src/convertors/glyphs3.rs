@@ -1,6 +1,6 @@
 use crate::{
     common::{FormatSpecific, OTValue},
-    filters::{DropSparseMasters, FontFilter as _},
+    filters::{DropSparseMasters, FontFilter as _, GlyphsData},
     glyph::glyphs::glyph_to_glyphs,
     i18ndictionary::I18NDictionary,
     names::Names,
@@ -243,6 +243,9 @@ fn _load(glyphs_font: &glyphslib::Font, path: PathBuf) -> Result<Font, Babelfont
     // Interpret metrics
     // Interpret axes
     interpret_axes(&mut font);
+
+    // Bake in Glyphs data
+    GlyphsData.apply(&mut font)?;
 
     Ok(font)
 }

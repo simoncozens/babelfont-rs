@@ -46,7 +46,7 @@ impl DerefMut for GlyphList {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
 /// The category of a glyph
 pub enum GlyphCategory {
