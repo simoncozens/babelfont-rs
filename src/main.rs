@@ -1,7 +1,8 @@
-use std::str::FromStr;
+use std::{str::FromStr, sync::LazyLock};
 
 use babelfont::filters::FontFilter;
 use clap::Parser;
+use smol_str::ToSmolStr;
 
 #[derive(Parser)]
 struct Cli {
@@ -11,6 +12,24 @@ struct Cli {
     #[clap(long)]
     filter: Vec<String>,
 
+    #[clap(long)]
+    /// Drop kerning from the output font
+    drop_kerning: bool,
+
+    #[clap(long)]
+    /// Drop features from the output font
+    drop_features: bool,
+
+    #[clap(long)]
+    /// Drop outlines from the output font
+    drop_outlines: bool,
+
+    #[clap(long)]
+    no_production_names: bool,
+
+    #[clap(long, value_delimiter = ',')]
+    retain_glyphs: Vec<String>,
+
     /// Path to the input file to convert
     font_path: std::path::PathBuf,
 
@@ -18,14 +37,21 @@ struct Cli {
     output: std::path::PathBuf,
 }
 
-const SUPPORTED_EXTENSIONS: &[&str; 6] = &[
-    "ufo",
-    "designspace",
-    "glyphs",
-    "glyphspackage",
-    "babelfont",
-    "ttf",
-];
+static SUPPORTED_EXTENSIONS: LazyLock<Vec<&'static str>> = LazyLock::new(|| {
+    vec![
+        "babelfont",
+        #[cfg(feature = "ufo")]
+        "ufo",
+        #[cfg(feature = "ufo")]
+        "designspace",
+        #[cfg(feature = "glyphs")]
+        "glyphs",
+        #[cfg(feature = "glyphs")]
+        "glyphspackage",
+        #[cfg(feature = "fontir")]
+        "ttf",
+    ]
+});
 
 // Convert filters to FontFilter trait objects
 fn convert_filters(filter: &[String]) -> Vec<Box<dyn FontFilter>> {
@@ -33,16 +59,6 @@ fn convert_filters(filter: &[String]) -> Vec<Box<dyn FontFilter>> {
     for f in filter {
         let parts: Vec<&str> = f.splitn(2, '=').collect();
         match parts[0] {
-            "retainglyphs" => {
-                if parts.len() != 2 {
-                    log::error!(
-                        "retainglyphs filter requires a comma-separated list of glyph names"
-                    );
-                    continue;
-                }
-                let glyph_names: Vec<String> = parts[1].split(',').map(|s| s.to_string()).collect();
-                result.push(Box::new(babelfont::filters::RetainGlyphs::new(glyph_names)));
-            }
             "scaleupem" => {
                 if parts.len() != 2 {
                     log::error!("scaleupem filter requires a new upem value");
@@ -66,17 +82,14 @@ fn convert_filters(filter: &[String]) -> Vec<Box<dyn FontFilter>> {
                     fontdrasil::types::Tag::from_str(&parts[1]).expect("Invalid axis tag");
                 result.push(Box::new(babelfont::filters::DropAxis::new(axis_tag)));
             }
-            "dropfeatures" => {
-                result.push(Box::new(babelfont::filters::DropFeatures::new()));
-            }
-            "dropkerning" => {
-                result.push(Box::new(babelfont::filters::DropKerning::new()));
-            }
             "dropguides" => {
                 result.push(Box::new(babelfont::filters::DropGuides::new()));
             }
             "dropinstances" => {
                 result.push(Box::new(babelfont::filters::DropInstances::new()));
+            }
+            "dropvariations" => {
+                result.push(Box::new(babelfont::filters::DropVariations::new()));
             }
             "resolveincludes" => {
                 // help the Option<impl> out a bit
@@ -102,36 +115,106 @@ fn main() {
     env_logger::Builder::new()
         .filter_level(args.verbosity.into())
         .init();
-    if !SUPPORTED_EXTENSIONS.contains(&args.font_path.extension().unwrap().to_str().unwrap()) {
+    let input_extension = args.font_path.extension().unwrap().to_str().unwrap();
+    if !SUPPORTED_EXTENSIONS.contains(&input_extension) {
         log::error!(
-            "Input extension {:?} is not in the list of supported extensions: {:?}",
+            "Input extension {:?} is not in the list of supported extensions: {}",
             args.font_path.extension().unwrap(),
-            SUPPORTED_EXTENSIONS
+            SUPPORTED_EXTENSIONS.join(", ")
         );
         std::process::exit(1);
     }
-    if !SUPPORTED_EXTENSIONS.contains(&args.output.extension().unwrap().to_str().unwrap()) {
+    let output_extension = args.output.extension().unwrap().to_str().unwrap();
+    if !SUPPORTED_EXTENSIONS.contains(&output_extension) {
         log::error!(
-            "Output extension {:?} is not in the list of supported extensions: {:?}",
+            "Output extension {:?} is not in the list of supported extensions: {}",
             args.output.extension().unwrap(),
-            SUPPORTED_EXTENSIONS
+            SUPPORTED_EXTENSIONS.join(", ")
         );
         std::process::exit(1);
     }
 
-    let filters = convert_filters(&args.filter);
+    let compiling = output_extension == "ttf";
+
+    let mut filters = convert_filters(&args.filter);
+
+    #[cfg(feature = "fontir")]
+    let mut compilation_options = babelfont::convertors::fontir::CompilationOptions::default();
+
+    #[cfg(feature = "fontir")]
+    if args.no_production_names && compiling {
+        compilation_options.dont_use_production_names = true;
+    }
+
+    if args.retain_glyphs.len() > 0 {
+        filters.push(Box::new(babelfont::filters::RetainGlyphs::new(
+            args.retain_glyphs.clone(),
+        )));
+    }
+
+    #[cfg(feature = "fontir")]
+    if args.drop_kerning {
+        #[cfg(feature = "fontir")]
+        if compiling {
+            compilation_options.skip_kerning = true;
+        }
+
+        if !compiling {
+            filters.push(Box::new(babelfont::filters::DropKerning::new()));
+        }
+    }
+    if args.drop_features {
+        #[cfg(feature = "fontir")]
+        if compiling {
+            compilation_options.skip_features = true;
+        }
+        if !compiling {
+            filters.push(Box::new(babelfont::filters::DropFeatures::new()));
+        }
+    }
+
+    if args.drop_outlines {
+        #[cfg(feature = "fontir")]
+        if compiling {
+            compilation_options.skip_outlines = true;
+        }
+    }
     log::info!("Loading {}", args.font_path.display());
 
     let mut input = babelfont::load(args.font_path).expect("Failed to load font");
     assert!(input.source.is_some(), "Loaded font has no source path");
     if !filters.is_empty() {
         log::info!("Applying filters...");
+        let before_filters = std::time::Instant::now();
         for filter in filters {
             filter
                 .apply(&mut input)
                 .expect("Failed to apply font filter");
         }
+        let after_filters = std::time::Instant::now();
+        log::info!("Applied filters in {:.2?}", after_filters - before_filters);
     }
+
     log::info!("Saving {}", args.output.display());
-    input.save(args.output).expect("Failed to save font");
+    if compiling {
+        #[cfg(feature = "fontir")]
+        {
+            let before = std::time::Instant::now();
+            let bytes = babelfont::convertors::fontir::BabelfontIrSource::compile(
+                input,
+                compilation_options,
+            )
+            .expect("Failed to compile font");
+            let after_compile = std::time::Instant::now();
+            std::fs::write(&args.output, bytes).expect("Failed to write output font");
+            let after_safe = std::time::Instant::now();
+            log::info!(
+                "Compiled in {:.2?}, saved in {:.2?}",
+                after_compile - before,
+                after_safe - after_compile
+            );
+        }
+    } else {
+        input.save(args.output).expect("Failed to save font");
+    }
 }
