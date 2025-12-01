@@ -4,6 +4,8 @@ mod dropguides;
 mod dropinstances;
 mod dropkerning;
 mod dropsparsemasters;
+mod dropvariations;
+#[cfg(feature = "glyphs")]
 mod glyphsdata;
 mod resolveincludes;
 mod retainglyphs;
@@ -15,6 +17,8 @@ pub use dropguides::DropGuides;
 pub use dropinstances::DropInstances;
 pub use dropkerning::DropKerning;
 pub use dropsparsemasters::DropSparseMasters;
+pub use dropvariations::DropVariations;
+#[cfg(feature = "glyphs")]
 pub use glyphsdata::GlyphsData;
 pub use resolveincludes::ResolveIncludes;
 pub use retainglyphs::RetainGlyphs;
