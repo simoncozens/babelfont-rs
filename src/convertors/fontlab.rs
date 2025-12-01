@@ -38,7 +38,7 @@ struct FontlabComponent {
 impl From<FontlabComponent> for Shape {
     fn from(val: FontlabComponent) -> Self {
         Shape::Component(Component {
-            reference: val.glyphName,
+            reference: val.glyphName.into(),
             transform: Affine::IDENTITY,
             format_specific: Default::default(),
         })
@@ -239,7 +239,7 @@ impl FontlabGlyph {
             .collect();
 
         Ok(Glyph {
-            name: self.name,
+            name: self.name.into(),
             production_name: None,
             category: GlyphCategory::Unknown,
             codepoints,

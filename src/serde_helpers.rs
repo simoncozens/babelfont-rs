@@ -8,9 +8,10 @@ use serde::{
     ser::{SerializeMap as _, SerializeSeq as _},
     Deserialize as _,
 };
+use smol_str::SmolStr;
 
 pub(crate) fn kerning_map<S>(
-    map: &HashMap<(String, String), i16>,
+    map: &HashMap<(SmolStr, SmolStr), i16>,
     serializer: S,
 ) -> Result<S::Ok, S::Error>
 where
@@ -26,7 +27,7 @@ where
 
 pub(crate) fn kerning_unmap<'de, D>(
     deserializer: D,
-) -> Result<HashMap<(String, String), i16>, D::Error>
+) -> Result<HashMap<(SmolStr, SmolStr), i16>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
@@ -40,7 +41,7 @@ where
                 key
             )));
         }
-        map.insert((parts[0].to_string(), parts[1].to_string()), value);
+        map.insert((SmolStr::from(parts[0]), SmolStr::from(parts[1])), value);
     }
     Ok(map)
 }

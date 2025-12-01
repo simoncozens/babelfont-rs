@@ -33,7 +33,7 @@ impl FontFilter for GlyphsData {
             if let Some(glyph) = font.glyphs.get_mut(&glyph_info.name) {
                 if let Some(production_name) = &glyph_info.production {
                     if glyph.production_name.is_none() {
-                        glyph.production_name = Some(production_name.clone());
+                        glyph.production_name = Some(production_name.into());
                     }
                 }
                 if glyph.category != crate::GlyphCategory::Unknown {

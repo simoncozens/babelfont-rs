@@ -13,12 +13,12 @@ use crate::{filters::FontFilter, Features};
 /// are decomposed. Masters that become sparse as a result are removed, and their associated layers
 /// are converted to associated layers of a non-sparse master. Features are also subsetted
 /// to only reference the retained glyphs.
-pub struct RetainGlyphs(Vec<String>);
+pub struct RetainGlyphs(Vec<SmolStr>);
 
 impl RetainGlyphs {
     /// Create a new RetainGlyphs filter
     pub fn new(glyph_names: Vec<String>) -> Self {
-        RetainGlyphs(glyph_names)
+        RetainGlyphs(glyph_names.into_iter().map(SmolStr::from).collect())
     }
 }
 
@@ -78,12 +78,12 @@ impl FontFilter for RetainGlyphs {
             })
         });
         // Filter features!
-        let old_glyphs: Vec<String> = immutable_font
+        let old_glyphs: Vec<SmolStr> = immutable_font
             .glyphs
             .iter()
             .map(|g| g.name.clone())
             .collect();
-        let new_glyphs: Vec<String> = font.glyphs.iter().map(|g| g.name.clone()).collect();
+        let new_glyphs: Vec<SmolStr> = font.glyphs.iter().map(|g| g.name.clone()).collect();
         let old_glyphs: Vec<&str> = old_glyphs.iter().map(|s| s.as_str()).collect();
         let new_glyphs: Vec<&str> = new_glyphs.iter().map(|s| s.as_str()).collect();
         feature_subset(font, &old_glyphs, &new_glyphs)?;

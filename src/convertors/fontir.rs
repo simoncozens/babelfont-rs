@@ -35,6 +35,7 @@ use write_fonts::{
 pub struct BabelfontIrSource {
     font_info: Arc<FontInfo>,
     source_path: Option<Arc<std::path::Path>>,
+    // glyph_filter: Option<HashSet<SmolStr>>,
 }
 
 impl BabelfontIrSource {
@@ -851,13 +852,13 @@ impl Work<Context, WorkId, Error> for KerningGroupWork {
 
         for (group, members) in font.first_kern_groups.iter() {
             groups.groups.insert(
-                KernGroup::Side1(group.into()),
+                KernGroup::Side1(group.clone()),
                 members.iter().map(GlyphName::new).collect(),
             );
         }
         for (group, members) in font.second_kern_groups.iter() {
             groups.groups.insert(
-                KernGroup::Side2(group.into()),
+                KernGroup::Side2(group.clone()),
                 members.iter().map(GlyphName::new).collect(),
             );
         }
@@ -944,7 +945,7 @@ fn kerning_at_location<'a>(
         .find(|master| master.location.to_normalized(&axes) == *location)?;
     Some(Cow::Owned(master.kerning.iter().map(
         |((side1, side2), value)| {
-            ((side1.into(), side2.into()), OrderedFloat(*value as f64))
+            ((side1.clone(), side2.clone()), OrderedFloat(*value as f64))
         },
     ).collect::<Kerns>()))
 }

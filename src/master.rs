@@ -1,5 +1,6 @@
 use fontdrasil::coords::DesignLocation;
 use indexmap::IndexMap;
+use smol_str::SmolStr;
 
 use crate::{
     common::{FormatSpecific, OTValue},
@@ -41,7 +42,7 @@ pub struct Master {
         serialize_with = "crate::serde_helpers::kerning_map",
         deserialize_with = "crate::serde_helpers::kerning_unmap"
     )]
-    pub kerning: HashMap<(String, String), i16>,
+    pub kerning: HashMap<(SmolStr, SmolStr), i16>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     /// Custom OpenType values for this master
     pub custom_ot_values: Vec<OTValue>,

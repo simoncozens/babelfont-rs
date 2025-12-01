@@ -14,6 +14,7 @@ use fontdrasil::coords::{
     UserCoord,
 };
 use serde::{Deserialize, Serialize};
+use smol_str::SmolStr;
 use std::{
     collections::{BTreeMap, HashMap},
     path::PathBuf,
@@ -59,7 +60,7 @@ pub struct Font {
     pub custom_ot_values: Vec<OTValue>,
     /// A map of Unicode Variation Sequences to glyph names
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub variation_sequences: BTreeMap<(u32, u32), String>,
+    pub variation_sequences: BTreeMap<(u32, u32), SmolStr>,
     /// A representation of the font's OpenType features
     pub features: Features,
     /// A dictionary of kerning groups
@@ -67,13 +68,13 @@ pub struct Font {
     /// The key is the group name and the value is a list of glyph names in the group
     /// Group names are *not* prefixed with "@" here
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    pub first_kern_groups: HashMap<String, Vec<String>>,
+    pub first_kern_groups: HashMap<SmolStr, Vec<SmolStr>>,
     // A dictionary of kerning groups
     ///
     /// The key is the group name and the value is a list of glyph names in the group
     /// Group names are *not* prefixed with "@" here
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    pub second_kern_groups: HashMap<String, Vec<String>>,
+    pub second_kern_groups: HashMap<SmolStr, Vec<SmolStr>>,
 
     /// Format-specific data
     #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
@@ -379,7 +380,7 @@ mod fontra {
         pub fn get_fontra_glyph(&self, glyphname: &str) -> Option<fontra::Glyph> {
             let our_glyph = self.glyphs.get(glyphname)?;
             let mut glyph = fontra::Glyph {
-                name: our_glyph.name.clone(),
+                name: our_glyph.name.to_string(),
                 axes: vec![],
                 sources: vec![],
                 layers: HashMap::new(),

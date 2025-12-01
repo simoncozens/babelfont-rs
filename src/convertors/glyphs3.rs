@@ -230,13 +230,13 @@ fn _load(glyphs_font: &glyphslib::Font, path: PathBuf) -> Result<Font, Babelfont
     for glyph in font.glyphs.iter() {
         let left_group = glyph.formatspecific.get_string("kern_left");
         font.second_kern_groups
-            .entry(left_group)
+            .entry(left_group.into())
             .or_default()
             .push(glyph.name.clone());
 
         let right_group = glyph.formatspecific.get_string("kern_right");
         font.first_kern_groups
-            .entry(right_group)
+            .entry(right_group.into())
             .or_default()
             .push(glyph.name.clone());
     }
@@ -425,7 +425,10 @@ fn load_master(master: &glyphs3::Master, glyphs_font: &glyphs3::Glyphs3, font: &
                         second.clone()
                     };
 
-                    kerns.insert((first.clone(), second.clone()), *kern as i16);
+                    kerns.insert(
+                        (SmolStr::from(&first), SmolStr::from(&second)),
+                        *kern as i16,
+                    );
                 }
             }
             kerns
@@ -715,18 +718,18 @@ pub(crate) fn as_glyphs3(font: &Font) -> glyphs3::Glyphs3 {
                     .iter()
                     .fold(BTreeMap::new(), |mut acc, ((first, second), value)| {
                         let first = if let Some(stripped) = first.strip_prefix("@") {
-                            format!("@MMK_L_{}", stripped)
+                            SmolStr::from(format!("@MMK_L_{}", stripped))
                         } else {
                             first.clone()
                         };
                         let second = if let Some(stripped) = second.strip_prefix("@") {
-                            format!("@MMK_R_{}", stripped)
+                            SmolStr::from(format!("@MMK_R_{}", stripped))
                         } else {
                             second.clone()
                         };
-                        acc.entry(first.clone())
+                        acc.entry(first.to_string())
                             .or_default()
-                            .insert(second.clone(), *value as f32);
+                            .insert(second.to_string(), *value as f32);
                         acc
                     });
 

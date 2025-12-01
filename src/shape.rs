@@ -3,13 +3,14 @@ use crate::{
     BabelfontError,
 };
 use serde::{Deserialize, Serialize};
+use smol_str::SmolStr;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
 /// A component in a glyph
 pub struct Component {
     /// The referenced glyph name
-    pub reference: String,
+    pub reference: SmolStr,
     #[serde(
         default = "kurbo::Affine::default",
         skip_serializing_if = "crate::serde_helpers::affine_is_identity"
@@ -150,7 +151,7 @@ mod glyphs {
             //     val.position.1 as f64,
             // ]);
             Component {
-                reference: val.component_glyph.clone(),
+                reference: SmolStr::from(&val.component_glyph),
                 transform,
                 format_specific: Default::default(),
             }
@@ -161,7 +162,7 @@ mod glyphs {
         fn from(val: &Component) -> Self {
             let decomposed: DecomposedAffine = val.transform.into();
             glyphslib::glyphs3::Component {
-                component_glyph: val.reference.clone(),
+                component_glyph: val.reference.to_string(),
                 position: (
                     decomposed.translation.0 as f32,
                     decomposed.translation.1 as f32,
@@ -225,7 +226,7 @@ mod fontra {
         fn from(val: &Component) -> Self {
             let decomposed: DecomposedAffine = val.transform.into();
             fontra::Component {
-                name: val.reference.clone(),
+                name: val.reference.to_string(),
                 transformation: decomposed.into(),
                 location: HashMap::new(),
             }

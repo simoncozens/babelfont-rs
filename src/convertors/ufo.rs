@@ -5,6 +5,7 @@ use crate::{
 use chrono::{DateTime, Local, NaiveDateTime, TimeZone};
 use fontdrasil::coords::Location;
 use paste::paste;
+use smol_str::{SmolStr, ToSmolStr};
 use std::{
     collections::{HashMap, HashSet},
     fs,
@@ -202,7 +203,7 @@ pub(crate) fn norad_glyph_to_babelfont_layer(
 pub(crate) fn load_component(c: &norad::Component) -> Component {
     let t = c.transform;
     Component {
-        reference: c.base.to_string(),
+        reference: c.base.to_smolstr(),
         transform: kurbo::Affine::new([
             t.x_scale, t.xy_scale, t.yx_scale, t.y_scale, t.x_offset, t.y_offset,
         ]),
@@ -265,7 +266,7 @@ pub(crate) fn save_path(p: &Path) -> norad::Contour {
 
 pub(crate) fn save_kerning(
     norad_kerning: &mut norad::Kerning,
-    babelfont_kerning: &HashMap<(String, String), i16>,
+    babelfont_kerning: &HashMap<(SmolStr, SmolStr), i16>,
 ) -> Result<(), BabelfontError> {
     for ((left, right), value) in babelfont_kerning.iter() {
         let left_key = if left.starts_with('@') {
@@ -613,28 +614,32 @@ pub(crate) fn load_kerning(master: &mut Master, kerning: &norad::Kerning) {
             } else {
                 right.to_string()
             };
-            master
-                .kerning
-                .insert((left_maybe_group, right_maybe_group), *value as i16);
+            master.kerning.insert(
+                (left_maybe_group.into(), right_maybe_group.into()),
+                *value as i16,
+            );
         }
     }
 }
 
 pub(crate) fn load_kern_groups(
     groups: &norad::Groups,
-) -> (HashMap<String, Vec<String>>, HashMap<String, Vec<String>>) {
-    let mut first: HashMap<String, Vec<String>> = HashMap::new();
-    let mut second: HashMap<String, Vec<String>> = HashMap::new();
+) -> (
+    HashMap<SmolStr, Vec<SmolStr>>,
+    HashMap<SmolStr, Vec<SmolStr>>,
+) {
+    let mut first: HashMap<SmolStr, Vec<SmolStr>> = HashMap::new();
+    let mut second: HashMap<SmolStr, Vec<SmolStr>> = HashMap::new();
     for (name, members) in groups.iter() {
         if let Some(first_name) = name.strip_prefix("public.kern1.") {
             first.insert(
-                first_name.to_string(),
-                members.iter().map(|x| x.to_string()).collect(),
+                SmolStr::from(first_name),
+                members.iter().map(|x| SmolStr::from(x.as_str())).collect(),
             );
         } else if let Some(second_name) = name.strip_prefix("public.kern2.") {
             second.insert(
-                second_name.to_string(),
-                members.iter().map(|x| x.to_string()).collect(),
+                SmolStr::from(second_name),
+                members.iter().map(|x| SmolStr::from(x.as_str())).collect(),
             );
         }
     }
@@ -693,9 +698,9 @@ pub(crate) fn load_glyphs(font: &mut Font, ufo: &norad::Font) {
             let production_name = psnames
                 .and_then(|x| x.get(&glyphname))
                 .and_then(|x| x.as_string())
-                .map(|x| x.to_string());
+                .map(|x| x.into());
             font.glyphs.push(Glyph {
-                name: glyphname.to_string(),
+                name: SmolStr::from(glyphname.as_str()),
                 category: cat,
                 production_name,
                 codepoints: glyph.codepoints.iter().map(|x| x as u32).collect(),
@@ -723,7 +728,7 @@ fn add_uvs_sequences(font: &mut Font, ufo: &norad::Font) {
                         if let Ok(codepoint) = u32::from_str_radix(codepoint_s, 16) {
                             if let Some(glyphname) = glyphname_plist.as_string() {
                                 font.variation_sequences
-                                    .insert((selector, codepoint), glyphname.to_string());
+                                    .insert((selector, codepoint), glyphname.into());
                             }
                         }
                     }

@@ -4,6 +4,7 @@ use crate::{
     serde_helpers::{default_true, is_true},
 };
 use serde::{Deserialize, Serialize};
+use smol_str::SmolStr;
 use std::ops::{Deref, DerefMut};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -66,10 +67,10 @@ pub enum GlyphCategory {
 /// A glyph in the font
 pub struct Glyph {
     /// The name of the glyph
-    pub name: String,
+    pub name: SmolStr,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     /// The production name of the glyph, if any
-    pub production_name: Option<String>,
+    pub production_name: Option<SmolStr>,
     /// The category of the glyph
     pub category: GlyphCategory,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -96,7 +97,7 @@ impl Glyph {
     /// Create a new Glyph with the given name
     pub fn new(name: &str) -> Self {
         Self {
-            name: name.to_string(),
+            name: name.into(),
             ..Default::default()
         }
     }
@@ -191,8 +192,8 @@ pub(crate) mod glyphs {
                 }
             }
             Glyph {
-                name: val.name.clone(),
-                production_name: val.production.clone(),
+                name: SmolStr::from(&val.name),
+                production_name: val.production.as_ref().map(SmolStr::from),
                 category,
                 codepoints: val.unicode.clone(),
                 layers,
@@ -206,8 +207,8 @@ pub(crate) mod glyphs {
     pub(crate) fn glyph_to_glyphs(
         val: &Glyph,
         axis_order: &[Tag],
-        kern_left: Option<&String>,
-        kern_right: Option<&String>,
+        kern_left: Option<&SmolStr>,
+        kern_right: Option<&SmolStr>,
     ) -> glyphslib::glyphs3::Glyph {
         let mut g3_layers = vec![];
         for layer in &val.layers {
@@ -224,8 +225,8 @@ pub(crate) mod glyphs {
         }
 
         G3Glyph {
-            name: val.name.clone(),
-            production: val.production_name.clone(),
+            name: val.name.to_string(),
+            production: val.production_name.as_ref().map(|p| p.to_string()),
             unicode: val.codepoints.clone(),
             layers: g3_layers,
             export: val.exported,
@@ -233,8 +234,8 @@ pub(crate) mod glyphs {
             category: val.formatspecific.get_optionstring("category"),
             direction: val.formatspecific.get_optionstring("kern_direction"),
             kern_bottom: val.formatspecific.get_optionstring("kern_bottom"),
-            kern_left: kern_left.cloned(),
-            kern_right: kern_right.cloned(),
+            kern_left: kern_left.as_ref().map(|s| s.to_string()),
+            kern_right: kern_right.as_ref().map(|s| s.to_string()),
             kern_top: val.formatspecific.get_optionstring("kern_top"),
             last_change: val.formatspecific.get_optionstring("last_change"),
             locked: val.formatspecific.get_bool("locked"),
