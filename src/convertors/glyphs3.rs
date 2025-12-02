@@ -1,7 +1,7 @@
 use crate::{
     common::{FormatSpecific, OTValue},
     filters::{DropSparseMasters, FontFilter as _, GlyphsData},
-    glyph::glyphs::glyph_to_glyphs,
+    glyph::{self, glyphs::glyph_to_glyphs},
     i18ndictionary::I18NDictionary,
     names::Names,
     Axis, BabelfontError, Font, GlyphList, Master,
@@ -139,6 +139,7 @@ fn _load(glyphs_font: &glyphslib::Font, path: PathBuf) -> Result<Font, Babelfont
             ..Default::default()
         })
         .collect();
+    let axes_order = font.axes.iter().map(|a| a.tag).collect::<Vec<Tag>>();
     // Classes
     font.features.classes = glyphs_font
         .classes
@@ -176,7 +177,13 @@ fn _load(glyphs_font: &glyphslib::Font, path: PathBuf) -> Result<Font, Babelfont
         .map(|master| load_master(master, glyphs_font, &font))
         .collect();
     // Glyphs
-    font.glyphs = GlyphList(glyphs_font.glyphs.iter().map(Into::into).collect());
+    font.glyphs = GlyphList(
+        glyphs_font
+            .glyphs
+            .iter()
+            .map(|g| glyph::glyphs::from_glyphs(g, &axes_order))
+            .collect(),
+    );
     // Instances
     font.instances = glyphs_font
         .instances

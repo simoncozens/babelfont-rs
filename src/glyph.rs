@@ -116,91 +116,89 @@ impl Glyph {
 pub(crate) mod glyphs {
     use crate::{
         convertors::glyphs3::{copy_user_data, UserData, KEY_USER_DATA},
-        layer::glyphs::layer_to_glyphs,
+        layer::glyphs::{layer_from_glyphs, layer_to_glyphs},
     };
 
     use super::*;
     use fontdrasil::types::Tag;
     use glyphslib::glyphs3::Glyph as G3Glyph;
 
-    impl From<&G3Glyph> for Glyph {
-        fn from(val: &G3Glyph) -> Self {
-            let mut formatspecific = FormatSpecific::default();
-            formatspecific.insert("case".to_string(), val.case.clone().into());
-            formatspecific.insert(
-                "color".to_string(),
-                serde_json::to_value(&val.color).unwrap_or_default(),
-            );
-            formatspecific.insert("kern_direction".to_string(), val.direction.clone().into());
-            formatspecific.insert("kern_bottom".to_string(), val.kern_bottom.clone().into());
-            formatspecific.insert("kern_left".to_string(), val.kern_left.clone().into());
-            formatspecific.insert("kern_right".to_string(), val.kern_right.clone().into());
-            formatspecific.insert("kern_top".to_string(), val.kern_top.clone().into());
-            formatspecific.insert("last_change".to_string(), val.last_change.clone().into());
-            formatspecific.insert("locked".to_string(), val.locked.into());
-            formatspecific.insert(
-                "metric_bottom".to_string(),
-                val.metric_bottom.clone().into(),
-            );
-            formatspecific.insert("metric_left".to_string(), val.metric_left.clone().into());
-            formatspecific.insert("metric_right".to_string(), val.metric_right.clone().into());
-            formatspecific.insert("metric_top".to_string(), val.metric_top.clone().into());
-            formatspecific.insert(
-                "metric_vert_width".to_string(),
-                val.metric_vert_width.clone().into(),
-            );
-            formatspecific.insert("metric_width".to_string(), val.metric_width.clone().into());
-            formatspecific.insert("note".to_string(), val.note.clone().into());
-            formatspecific.insert("script".to_string(), val.script.clone().into());
-            formatspecific.insert("subcategory".to_string(), val.subcategory.clone().into());
-            formatspecific.insert(
-                "tags".to_string(),
-                serde_json::value::to_value(&val.tags).unwrap_or_default(),
-            );
-            let category = if let Some(cat) = &val.category {
-                match cat.as_str() {
-                    "Base" => GlyphCategory::Base,
-                    "Mark" => {
-                        if val.subcategory == Some("Nonspacing".to_string()) {
-                            GlyphCategory::Mark
-                        } else {
-                            GlyphCategory::Base
-                        }
+    pub(crate) fn from_glyphs(val: &G3Glyph, axes_order: &[Tag]) -> Glyph {
+        let mut formatspecific = FormatSpecific::default();
+        formatspecific.insert("case".to_string(), val.case.clone().into());
+        formatspecific.insert(
+            "color".to_string(),
+            serde_json::to_value(&val.color).unwrap_or_default(),
+        );
+        formatspecific.insert("kern_direction".to_string(), val.direction.clone().into());
+        formatspecific.insert("kern_bottom".to_string(), val.kern_bottom.clone().into());
+        formatspecific.insert("kern_left".to_string(), val.kern_left.clone().into());
+        formatspecific.insert("kern_right".to_string(), val.kern_right.clone().into());
+        formatspecific.insert("kern_top".to_string(), val.kern_top.clone().into());
+        formatspecific.insert("last_change".to_string(), val.last_change.clone().into());
+        formatspecific.insert("locked".to_string(), val.locked.into());
+        formatspecific.insert(
+            "metric_bottom".to_string(),
+            val.metric_bottom.clone().into(),
+        );
+        formatspecific.insert("metric_left".to_string(), val.metric_left.clone().into());
+        formatspecific.insert("metric_right".to_string(), val.metric_right.clone().into());
+        formatspecific.insert("metric_top".to_string(), val.metric_top.clone().into());
+        formatspecific.insert(
+            "metric_vert_width".to_string(),
+            val.metric_vert_width.clone().into(),
+        );
+        formatspecific.insert("metric_width".to_string(), val.metric_width.clone().into());
+        formatspecific.insert("note".to_string(), val.note.clone().into());
+        formatspecific.insert("script".to_string(), val.script.clone().into());
+        formatspecific.insert("subcategory".to_string(), val.subcategory.clone().into());
+        formatspecific.insert(
+            "tags".to_string(),
+            serde_json::value::to_value(&val.tags).unwrap_or_default(),
+        );
+        let category = if let Some(cat) = &val.category {
+            match cat.as_str() {
+                "Base" => GlyphCategory::Base,
+                "Mark" => {
+                    if val.subcategory == Some("Nonspacing".to_string()) {
+                        GlyphCategory::Mark
+                    } else {
+                        GlyphCategory::Base
                     }
-                    "Ligature" => GlyphCategory::Ligature,
-                    _ => GlyphCategory::Unknown,
                 }
+                "Ligature" => GlyphCategory::Ligature,
+                _ => GlyphCategory::Unknown,
+            }
+        } else {
+            GlyphCategory::Unknown
+        };
+        copy_user_data(&mut formatspecific, &val.user_data);
+        let mut layers = vec![];
+        for layer in &val.layers {
+            let mut bf_layer = layer_from_glyphs(layer, axes_order);
+            if let Some(bg_layer) = &layer.background {
+                let mut background = layer_from_glyphs(bg_layer.deref(), axes_order);
+                background.is_background = true;
+                if background.id.is_none() {
+                    background.id =
+                        Some(format!("{}.bg", bf_layer.id.as_deref().unwrap_or("layer")));
+                }
+                bf_layer.background_layer_id = background.id.clone();
+                layers.push(bf_layer);
+                layers.push(background);
             } else {
-                GlyphCategory::Unknown
-            };
-            copy_user_data(&mut formatspecific, &val.user_data);
-            let mut layers = vec![];
-            for layer in &val.layers {
-                let mut bf_layer = Layer::from(layer);
-                if let Some(bg_layer) = &layer.background {
-                    let mut background = Layer::from(bg_layer.deref());
-                    background.is_background = true;
-                    if background.id.is_none() {
-                        background.id =
-                            Some(format!("{}.bg", bf_layer.id.as_deref().unwrap_or("layer")));
-                    }
-                    bf_layer.background_layer_id = background.id.clone();
-                    layers.push(bf_layer);
-                    layers.push(background);
-                } else {
-                    layers.push(bf_layer);
-                }
+                layers.push(bf_layer);
             }
-            Glyph {
-                name: SmolStr::from(&val.name),
-                production_name: val.production.as_ref().map(SmolStr::from),
-                category,
-                codepoints: val.unicode.clone(),
-                layers,
-                exported: val.export,
-                direction: None,
-                formatspecific,
-            }
+        }
+        Glyph {
+            name: SmolStr::from(&val.name),
+            production_name: val.production.as_ref().map(SmolStr::from),
+            category,
+            codepoints: val.unicode.clone(),
+            layers,
+            exported: val.export,
+            direction: None,
+            formatspecific,
         }
     }
 

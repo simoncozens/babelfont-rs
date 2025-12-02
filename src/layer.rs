@@ -263,7 +263,7 @@ pub(crate) mod glyphs {
     use crate::convertors::glyphs3::copy_user_data;
     use std::collections::BTreeMap;
 
-    use fontdrasil::types::Tag;
+    use fontdrasil::{coords::DesignCoord, types::Tag};
     use glyphslib::Plist;
     use smol_str::SmolStr;
 
@@ -273,52 +273,63 @@ pub(crate) mod glyphs {
 
     use super::*;
 
-    impl From<&glyphslib::glyphs3::Layer> for Layer {
-        fn from(val: &glyphslib::glyphs3::Layer) -> Self {
-            let format_specific = {
-                let mut fs = FormatSpecific::default();
-                if !val.visible {
-                    fs.insert("visible".into(), serde_json::Value::Bool(false));
-                }
-                if !val.hints.is_empty() {
-                    fs.insert(
-                        KEY_LAYER_HINTS.into(),
-                        serde_json::to_value(&val.hints).unwrap_or(serde_json::Value::Null),
-                    );
-                }
-                if !val.annotations.is_empty() {
-                    fs.insert(
-                        KEY_ANNOTATIONS.into(),
-                        serde_json::to_value(&val.annotations).unwrap_or(serde_json::Value::Null),
-                    );
-                }
-                if let Some(bg_image) = &val.background_image {
-                    fs.insert(
-                        KEY_LAYER_IMAGE.into(),
-                        serde_json::to_value(bg_image).unwrap_or(serde_json::Value::Null),
-                    );
-                }
-                copy_user_data(&mut fs, &val.user_data);
-                fs
-            };
-            Layer {
-                id: Some(val.layer_id.clone()),
-                master: match &val.associated_master_id {
-                    Some(m) => LayerType::AssociatedWithMaster(m.clone()),
-                    None => LayerType::DefaultForMaster(val.layer_id.clone()),
-                },
-                name: val.name.clone(),
-                color: None,
-                shapes: val.shapes.iter().map(Into::into).collect(),
-                width: val.width,
-                guides: val.guides.iter().map(Into::into).collect(),
-                anchors: val.anchors.iter().map(Into::into).collect(),
-                layer_index: None,
-                is_background: false,
-                background_layer_id: None,
-                location: None,
-                format_specific,
+    pub(crate) fn layer_from_glyphs(val: &glyphslib::glyphs3::Layer, axes_order: &[Tag]) -> Layer {
+        let format_specific = {
+            let mut fs = FormatSpecific::default();
+            if !val.visible {
+                fs.insert("visible".into(), serde_json::Value::Bool(false));
             }
+            if !val.hints.is_empty() {
+                fs.insert(
+                    KEY_LAYER_HINTS.into(),
+                    serde_json::to_value(&val.hints).unwrap_or(serde_json::Value::Null),
+                );
+            }
+            if !val.annotations.is_empty() {
+                fs.insert(
+                    KEY_ANNOTATIONS.into(),
+                    serde_json::to_value(&val.annotations).unwrap_or(serde_json::Value::Null),
+                );
+            }
+            if let Some(bg_image) = &val.background_image {
+                fs.insert(
+                    KEY_LAYER_IMAGE.into(),
+                    serde_json::to_value(bg_image).unwrap_or(serde_json::Value::Null),
+                );
+            }
+            copy_user_data(&mut fs, &val.user_data);
+            fs
+        };
+        let location = val
+            .attr
+            .get("coordinates")
+            .and_then(|x| x.as_array())
+            .map(|coords| {
+                axes_order
+                    .iter()
+                    .zip(coords.iter())
+                    .filter_map(|(axis_tag, v)| {
+                        v.as_f64().map(|f| (*axis_tag, DesignCoord::new(f)))
+                    })
+                    .collect::<DesignLocation>()
+            });
+        Layer {
+            id: Some(val.layer_id.clone()),
+            master: match &val.associated_master_id {
+                Some(m) => LayerType::AssociatedWithMaster(m.clone()),
+                None => LayerType::DefaultForMaster(val.layer_id.clone()),
+            },
+            name: val.name.clone(),
+            color: None,
+            shapes: val.shapes.iter().map(Into::into).collect(),
+            width: val.width,
+            guides: val.guides.iter().map(Into::into).collect(),
+            anchors: val.anchors.iter().map(Into::into).collect(),
+            layer_index: None,
+            is_background: false,
+            background_layer_id: None,
+            location,
+            format_specific,
         }
     }
 
