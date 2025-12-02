@@ -20,7 +20,7 @@ uuid = { version = "1.11.0", features = ["v4", "serde"] }
 uuid = { version = "1.11.0", features = ["v4", "js", "serde"] }
 
 [features]
-default = ["glyphs", "ufo", "fontlab", "fontra", "fontir"]
+default = ["glyphs", "ufo", "fontlab", "fontra", "fontir", "rayon"]
 glyphs = ["dep:glyphslib"]
 ufo = ["dep:norad"]
 fontra = []
@@ -33,20 +33,22 @@ cli = [
     "dep:clap-verbosity-flag",
 ]
 typescript = ["dep:typescript-type-def"]
+rayon = ["fontc/rayon", "norad/rayon"]
 
 [dependencies]
 chrono = { version = "0.4.3", features = ["serde"] }
 kurbo = "0.12"
 glyphslib = { version = "0.1.0", optional = true }
-norad = { version = "0.16.1", features = ["rayon", "kurbo"], optional = true }
+norad = { version = "0.17.0", features = ["kurbo"], optional = true }
 log = "0.4.14"
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0.37"
 regex = "1.5.5"
-fontdrasil = { version = "0.4.0" }
-fontir = { version = "0.5.0", optional = true } # Must use version fondrasil uses
-fontc = { version = "0.5.0", optional = true } # Must use version fondrasil uses
+# This git branch stuff should hopefully be temporary until #1789 is merged
+fontdrasil = { version = "0.4.0", git = "https://github.com/googlefonts/fontc", branch = "sequential-scope" }
+fontir = { version = "0.5.0", optional = true, git = "https://github.com/googlefonts/fontc", branch = "sequential-scope" } # Must use version fondrasil uses
+fontc = { version = "0.6.0", optional = true, git = "https://github.com/googlefonts/fontc", branch = "sequential-scope", default-features = false } # Must use version fondrasil uses
 write-fonts = { version = "0.44.1", features = [
     "read",
 ] } # Must use version fontdrasil uses
