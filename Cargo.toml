@@ -45,10 +45,9 @@ serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0.37"
 regex = "1.5.5"
-# This git branch stuff should hopefully be temporary until #1789 is merged
-fontdrasil = { version = "0.4.0", git = "https://github.com/googlefonts/fontc", branch = "sequential-scope" }
-fontir = { version = "0.5.0", optional = true, git = "https://github.com/googlefonts/fontc", branch = "sequential-scope" } # Must use version fondrasil uses
-fontc = { version = "0.6.0", optional = true, git = "https://github.com/googlefonts/fontc", branch = "sequential-scope", default-features = false } # Must use version fondrasil uses
+fontdrasil = { version = "0.4.0", git = "https://github.com/googlefonts/fontc" }
+fontir = { version = "0.5.0", optional = true, git = "https://github.com/googlefonts/fontc" } # Must use version fondrasil uses
+fontc = { version = "0.6.0", optional = true, git = "https://github.com/googlefonts/fontc", default-features = false } # Must use version fondrasil uses
 write-fonts = { version = "0.44.1", features = [
     "read",
 ] } # Must use version fontdrasil uses

@@ -94,7 +94,7 @@ checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
 [[package]]
 name = "ascii_plist_derive"
 version = "0.2.0"
-source = "git+https://github.com/googlefonts/fontc?branch=sequential-scope#45890d9e2cc10e7f715689e7413686e8624739a0"
+source = "git+https://github.com/googlefonts/fontc#f453ef017e664dcdfea115a75dbbded604044f36"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -117,7 +117,7 @@ dependencies = [
  "env_logger",
  "fea-rs-ast",
  "fontc",
- "fontdrasil 0.4.0 (git+https://github.com/googlefonts/fontc?branch=sequential-scope)",
+ "fontdrasil 0.4.0 (git+https://github.com/googlefonts/fontc)",
  "fontir",
  "glyphslib",
  "indexmap 2.12.1",
@@ -568,11 +568,11 @@ dependencies = [
 [[package]]
 name = "fea-rs"
 version = "0.22.0"
-source = "git+https://github.com/googlefonts/fontc?branch=sequential-scope#45890d9e2cc10e7f715689e7413686e8624739a0"
+source = "git+https://github.com/googlefonts/fontc#f453ef017e664dcdfea115a75dbbded604044f36"
 dependencies = [
  "ansi_term",
  "env_logger",
- "fontdrasil 0.4.0 (git+https://github.com/googlefonts/fontc?branch=sequential-scope)",
+ "fontdrasil 0.4.0 (git+https://github.com/googlefonts/fontc)",
  "indexmap 2.12.1",
  "log",
  "ordered-float",
@@ -622,12 +622,12 @@ dependencies = [
 [[package]]
 name = "fontbe"
 version = "0.5.0"
-source = "git+https://github.com/googlefonts/fontc?branch=sequential-scope#45890d9e2cc10e7f715689e7413686e8624739a0"
+source = "git+https://github.com/googlefonts/fontc#f453ef017e664dcdfea115a75dbbded604044f36"
 dependencies = [
  "bincode",
  "chrono",
- "fea-rs 0.22.0 (git+https://github.com/googlefonts/fontc?branch=sequential-scope)",
- "fontdrasil 0.4.0 (git+https://github.com/googlefonts/fontc?branch=sequential-scope)",
+ "fea-rs 0.22.0 (git+https://github.com/googlefonts/fontc)",
+ "fontdrasil 0.4.0 (git+https://github.com/googlefonts/fontc)",
  "fontir",
  "icu_properties",
  "indexmap 2.12.1",
@@ -645,13 +645,13 @@ dependencies = [
 [[package]]
 name = "fontc"
 version = "0.6.0"
-source = "git+https://github.com/googlefonts/fontc?branch=sequential-scope#45890d9e2cc10e7f715689e7413686e8624739a0"
+source = "git+https://github.com/googlefonts/fontc#f453ef017e664dcdfea115a75dbbded604044f36"
 dependencies = [
  "bitflags",
  "crossbeam-channel",
  "env_logger",
  "fontbe",
- "fontdrasil 0.4.0 (git+https://github.com/googlefonts/fontc?branch=sequential-scope)",
+ "fontdrasil 0.4.0 (git+https://github.com/googlefonts/fontc)",
  "fontir",
  "fontra2fontir",
  "glyphs2fontir",
@@ -686,7 +686,7 @@ dependencies = [
 [[package]]
 name = "fontdrasil"
 version = "0.4.0"
-source = "git+https://github.com/googlefonts/fontc?branch=sequential-scope#45890d9e2cc10e7f715689e7413686e8624739a0"
+source = "git+https://github.com/googlefonts/fontc#f453ef017e664dcdfea115a75dbbded604044f36"
 dependencies = [
  "env_logger",
  "kurbo 0.12.0",
@@ -701,12 +701,12 @@ dependencies = [
 [[package]]
 name = "fontir"
 version = "0.5.0"
-source = "git+https://github.com/googlefonts/fontc?branch=sequential-scope#45890d9e2cc10e7f715689e7413686e8624739a0"
+source = "git+https://github.com/googlefonts/fontc#f453ef017e664dcdfea115a75dbbded604044f36"
 dependencies = [
  "bitflags",
  "chrono",
  "env_logger",
- "fontdrasil 0.4.0 (git+https://github.com/googlefonts/fontc?branch=sequential-scope)",
+ "fontdrasil 0.4.0 (git+https://github.com/googlefonts/fontc)",
  "indexmap 2.12.1",
  "kurbo 0.12.0",
  "log",
@@ -722,10 +722,10 @@ dependencies = [
 [[package]]
 name = "fontra2fontir"
 version = "0.4.0"
-source = "git+https://github.com/googlefonts/fontc?branch=sequential-scope#45890d9e2cc10e7f715689e7413686e8624739a0"
+source = "git+https://github.com/googlefonts/fontc#f453ef017e664dcdfea115a75dbbded604044f36"
 dependencies = [
  "env_logger",
- "fontdrasil 0.4.0 (git+https://github.com/googlefonts/fontc?branch=sequential-scope)",
+ "fontdrasil 0.4.0 (git+https://github.com/googlefonts/fontc)",
  "fontir",
  "indexmap 2.12.1",
  "kurbo 0.12.0",
@@ -752,12 +752,12 @@ dependencies = [
 [[package]]
 name = "glyphs-reader"
 version = "0.5.0"
-source = "git+https://github.com/googlefonts/fontc?branch=sequential-scope#45890d9e2cc10e7f715689e7413686e8624739a0"
+source = "git+https://github.com/googlefonts/fontc#f453ef017e664dcdfea115a75dbbded604044f36"
 dependencies = [
  "ascii_plist_derive",
  "chrono",
  "env_logger",
- "fontdrasil 0.4.0 (git+https://github.com/googlefonts/fontc?branch=sequential-scope)",
+ "fontdrasil 0.4.0 (git+https://github.com/googlefonts/fontc)",
  "icu_properties",
  "indexmap 2.12.1",
  "kurbo 0.12.0",
@@ -774,11 +774,11 @@ dependencies = [
 [[package]]
 name = "glyphs2fontir"
 version = "0.6.0"
-source = "git+https://github.com/googlefonts/fontc?branch=sequential-scope#45890d9e2cc10e7f715689e7413686e8624739a0"
+source = "git+https://github.com/googlefonts/fontc#f453ef017e664dcdfea115a75dbbded604044f36"
 dependencies = [
  "chrono",
  "env_logger",
- "fontdrasil 0.4.0 (git+https://github.com/googlefonts/fontc?branch=sequential-scope)",
+ "fontdrasil 0.4.0 (git+https://github.com/googlefonts/fontc)",
  "fontir",
  "glyphs-reader",
  "indexmap 2.12.1",
@@ -1793,11 +1793,11 @@ dependencies = [
 [[package]]
 name = "ufo2fontir"
 version = "0.4.0"
-source = "git+https://github.com/googlefonts/fontc?branch=sequential-scope#45890d9e2cc10e7f715689e7413686e8624739a0"
+source = "git+https://github.com/googlefonts/fontc#f453ef017e664dcdfea115a75dbbded604044f36"
 dependencies = [
  "chrono",
  "env_logger",
- "fontdrasil 0.4.0 (git+https://github.com/googlefonts/fontc?branch=sequential-scope)",
+ "fontdrasil 0.4.0 (git+https://github.com/googlefonts/fontc)",
  "fontir",
  "indexmap 2.12.1",
  "kurbo 0.12.0",
@@ -1831,13 +1831,13 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "uuid"
-version = "1.18.1"
+version = "1.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f87b8aa10b915a06587d0dec516c282ff295b475d94abf425d62b57710070a2"
+checksum = "e2e054861b4bd027cd373e18e8d8d8e6548085000e41290d95ce0c373a654b4a"
 dependencies = [
  "getrandom",
  "js-sys",
- "serde",
+ "serde_core",
  "wasm-bindgen",
 ]
 
