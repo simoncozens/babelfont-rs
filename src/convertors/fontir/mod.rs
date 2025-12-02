@@ -49,6 +49,14 @@ impl BabelfontIrSource {
         })
     }
 
+    /// Create a new BabelfontIrSource that the user will compile themselves
+    pub fn new(font: Font, options: CompilationOptions) -> Self {
+        Self {
+            font: Arc::new(font),
+            options,
+        }
+    }
+
     /// Compile the Babelfont Font to a font binary
     pub fn compile(font: Font, options: CompilationOptions) -> Result<Vec<u8>, BabelfontError> {
         let source = Self {
