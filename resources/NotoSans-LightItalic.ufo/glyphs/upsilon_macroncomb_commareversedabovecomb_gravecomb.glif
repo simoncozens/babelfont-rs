@@ -1,0 +1,21 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="upsilon_macroncomb_commareversedabovecomb_gravecomb" format="2">
+  <advance width="516.0"/>
+  <anchor x="206.0" y="0.0" name="bottom"/>
+  <anchor x="263.97" y="259.0" name="center"/>
+  <anchor x="305.0" y="528.0" name="top"/>
+  <outline>
+    <component base="upsilon"/>
+    <component base="dasiavaria_macronmod" xOffset="34"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>greek</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Lowercase</string>
+    </dict>
+  </lib>
+</glyph>

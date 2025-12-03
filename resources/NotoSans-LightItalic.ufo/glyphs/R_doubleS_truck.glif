@@ -1,0 +1,61 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="RdoubleStruck" format="2">
+  <advance width="714.0"/>
+  <unicode hex="211D"/>
+  <anchor x="398.0" y="357.0" name="center"/>
+  <outline>
+    <contour>
+      <point x="97.0" y="0.0" type="line"/>
+      <point x="270.0" y="0.0" type="line"/>
+      <point x="270.0" y="317.0" type="line"/>
+      <point x="313.0" y="317.0" type="line"/>
+      <point x="504.0" y="0.0" type="line"/>
+      <point x="699.0" y="0.0" type="line"/>
+      <point x="476.0" y="342.0" type="line"/>
+      <point x="557.0" y="373.0"/>
+      <point x="604.0" y="436.0"/>
+      <point x="604.0" y="524.0" type="curve" smooth="yes"/>
+      <point x="604.0" y="645.0"/>
+      <point x="526.0" y="714.0"/>
+      <point x="356.0" y="714.0" type="curve" smooth="yes"/>
+      <point x="97.0" y="714.0" type="line"/>
+    </contour>
+    <contour>
+      <point x="150.0" y="53.0" type="line"/>
+      <point x="150.0" y="661.0" type="line"/>
+      <point x="217.0" y="661.0" type="line"/>
+      <point x="217.0" y="53.0" type="line"/>
+    </contour>
+    <contour>
+      <point x="531.0" y="52.0" type="line"/>
+      <point x="369.0" y="319.0" type="line"/>
+      <point x="388.0" y="320.0"/>
+      <point x="411.0" y="323.0"/>
+      <point x="430.0" y="327.0" type="curve"/>
+      <point x="605.0" y="52.0" type="line"/>
+    </contour>
+    <contour>
+      <point x="270.0" y="370.0" type="line"/>
+      <point x="270.0" y="661.0" type="line"/>
+      <point x="409.0" y="661.0" type="line"/>
+      <point x="409.0" y="370.0" type="line"/>
+    </contour>
+    <contour>
+      <point x="463.0" y="387.0" type="curve"/>
+      <point x="463.0" y="649.0" type="line"/>
+      <point x="517.0" y="631.0"/>
+      <point x="546.0" y="597.0"/>
+      <point x="546.0" y="524.0" type="curve" smooth="yes"/>
+      <point x="546.0" y="444.0"/>
+      <point x="511.0" y="409.0"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Uppercase</string>
+    </dict>
+  </lib>
+</glyph>

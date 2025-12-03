@@ -1,0 +1,26 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="quotereversed" format="2">
+  <advance width="131.0"/>
+  <unicode hex="201B"/>
+  <outline>
+    <contour>
+      <point x="171.0" y="469.0" type="curve"/>
+      <point x="189.0" y="469.0" type="line"/>
+      <point x="171.0" y="543.0"/>
+      <point x="152.0" y="642.0"/>
+      <point x="149.0" y="714.0" type="curve"/>
+      <point x="129.0" y="714.0" type="line"/>
+      <point x="123.0" y="708.0" type="line"/>
+      <point x="129.0" y="643.0"/>
+      <point x="148.0" y="544.0"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Punctuation</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Quote</string>
+    </dict>
+  </lib>
+</glyph>

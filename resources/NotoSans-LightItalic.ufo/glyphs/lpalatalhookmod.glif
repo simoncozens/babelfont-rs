@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="lpalatalhookmod" format="2">
+  <advance width="135.0"/>
+  <unicode hex="1DAA"/>
+  <anchor x="49.0" y="175.0" name="bottom"/>
+  <anchor x="106.3" y="459.2" name="center"/>
+  <anchor x="170.0" y="743.0" name="top"/>
+  <outline>
+    <component base="lpalatalhook" xScale="0.65" yScale="0.6" xOffset="53" yOffset="287"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>lpalatalhook</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Modifier</string>
+    </dict>
+  </lib>
+</glyph>

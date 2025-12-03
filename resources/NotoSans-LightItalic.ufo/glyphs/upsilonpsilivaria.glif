@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="upsilonpsilivaria" format="2">
+  <advance width="516.0"/>
+  <unicode hex="1F52"/>
+  <anchor x="206.0" y="0.0" name="bottom"/>
+  <anchor x="263.97" y="259.0" name="center"/>
+  <anchor x="305.0" y="528.0" name="top"/>
+  <outline>
+    <component base="upsilon"/>
+    <component base="psilivaria" xOffset="24"/>
+  </outline>
+</glyph>

@@ -1,0 +1,50 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="thstrikethrough" format="2">
+  <advance width="854.0"/>
+  <unicode hex="1D7A"/>
+  <anchor x="522.0" y="0.0" name="bottom"/>
+  <anchor x="578.0" y="264.0" name="center"/>
+  <anchor x="683.0" y="760.0" name="top"/>
+  <anchor x="899.0" y="760.0" name="topright"/>
+  <outline>
+    <contour>
+      <point x="7.0" y="-75.0" type="line"/>
+      <point x="40.0" y="-75.0" type="line"/>
+      <point x="819.0" y="760.0" type="line"/>
+      <point x="786.0" y="760.0" type="line"/>
+    </contour>
+    <component base="t" xOffset="2"/>
+    <component base="h" xOffset="301"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>t</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>1</integer>
+          <key>name</key>
+          <string>h</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>latin</string>
+      <key>com.schriftgestaltung.Glyphs.shapeOrder</key>
+      <string>PCC</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Lowercase</string>
+    </dict>
+  </lib>
+</glyph>

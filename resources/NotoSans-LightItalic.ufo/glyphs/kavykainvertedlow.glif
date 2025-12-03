@@ -1,0 +1,31 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="kavykainvertedlow" format="2">
+  <advance width="325.0"/>
+  <unicode hex="2E45"/>
+  <outline>
+    <contour>
+      <point x="248.0" y="206.0" type="curve"/>
+      <point x="273.0" y="206.0" type="line"/>
+      <point x="273.0" y="279.0"/>
+      <point x="236.0" y="318.0"/>
+      <point x="164.0" y="318.0" type="curve" smooth="yes"/>
+      <point x="92.0" y="318.0"/>
+      <point x="50.0" y="279.0"/>
+      <point x="28.0" y="206.0" type="curve"/>
+      <point x="53.0" y="206.0" type="line"/>
+      <point x="71.0" y="259.0"/>
+      <point x="101.0" y="294.0"/>
+      <point x="162.0" y="294.0" type="curve" smooth="yes"/>
+      <point x="227.0" y="294.0"/>
+      <point x="246.0" y="259.0"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Punctuation</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Other</string>
+    </dict>
+  </lib>
+</glyph>

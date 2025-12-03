@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="u10789" format="2">
+  <advance width="659.0"/>
+  <unicode hex="10789"/>
+  <anchor x="314.05" y="287.0" name="bottom"/>
+  <anchor x="366.7" y="491.6" name="center"/>
+  <anchor x="418.7" y="743.0" name="top"/>
+  <outline>
+    <component base="dzcurl" xScale="0.65" yScale="0.6" xOffset="69" yOffset="287"/>
+  </outline>
+</glyph>

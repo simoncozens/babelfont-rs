@@ -1,0 +1,22 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Tau" format="2">
+  <advance width="485.0"/>
+  <unicode hex="03A4"/>
+  <anchor x="187.0" y="0.0" name="bottom"/>
+  <anchor x="263.0" y="357.0" name="center"/>
+  <anchor x="339.0" y="714.0" name="top"/>
+  <anchor x="561.0" y="714.0" name="topright"/>
+  <outline>
+    <component base="T"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>greek</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Uppercase</string>
+    </dict>
+  </lib>
+</glyph>

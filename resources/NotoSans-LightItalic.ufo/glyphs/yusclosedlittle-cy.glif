@@ -1,0 +1,46 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="yusclosedlittle-cy" format="2">
+  <advance width="397.0"/>
+  <unicode hex="A659"/>
+  <anchor x="139.0" y="264.0" name="center"/>
+  <outline>
+    <contour>
+      <point x="-52.0" y="0.0" type="line"/>
+      <point x="-23.0" y="0.0" type="line"/>
+      <point x="101.0" y="227.0" type="line"/>
+      <point x="276.0" y="227.0" type="line"/>
+      <point x="305.0" y="0.0" type="line"/>
+      <point x="331.0" y="0.0" type="line"/>
+      <point x="262.0" y="528.0" type="line"/>
+      <point x="241.0" y="528.0" type="line"/>
+    </contour>
+    <contour>
+      <point x="-35.0" y="0.0" type="line"/>
+      <point x="315.0" y="0.0" type="line"/>
+      <point x="320.0" y="25.0" type="line"/>
+      <point x="-30.0" y="25.0" type="line"/>
+    </contour>
+    <contour>
+      <point x="115.0" y="252.0" type="line"/>
+      <point x="192.0" y="393.0" type="line" smooth="yes"/>
+      <point x="214.0" y="434.0"/>
+      <point x="230.0" y="463.0"/>
+      <point x="244.0" y="492.0" type="curve"/>
+      <point x="246.0" y="492.0" type="line"/>
+      <point x="248.0" y="460.0"/>
+      <point x="251.0" y="433.0"/>
+      <point x="256.0" y="390.0" type="curve" smooth="yes"/>
+      <point x="272.0" y="252.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>cyrillic</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Lowercase</string>
+    </dict>
+  </lib>
+</glyph>

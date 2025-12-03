@@ -1,0 +1,47 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="fi" format="2">
+  <advance width="463.0"/>
+  <unicode hex="FB01"/>
+  <anchor x="-71.0" y="-240.0" name="bottom_1"/>
+  <anchor x="140.0" y="262.0" name="center_1"/>
+  <anchor x="322.0" y="765.0" name="top_1"/>
+  <anchor x="401.0" y="760.0" name="topright_1"/>
+  <anchor x="300.0" y="0.0" name="bottom_2"/>
+  <anchor x="381.0" y="360.0" name="center_2"/>
+  <anchor x="459.0" y="765.0" name="top_2"/>
+  <anchor x="513.0" y="760.0" name="topright_2"/>
+  <anchor x="172.0" y="0.0" name="caret_1"/>
+  <outline>
+    <component base="f"/>
+    <component base="i" xOffset="256"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>f</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>1</integer>
+          <key>name</key>
+          <string>i</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>latin</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Ligature</string>
+    </dict>
+  </lib>
+</glyph>

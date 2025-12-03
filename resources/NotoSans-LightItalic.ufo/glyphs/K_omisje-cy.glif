@@ -1,0 +1,51 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Komisje-cy" format="2">
+  <advance width="663.0"/>
+  <unicode hex="050C"/>
+  <anchor x="276.0" y="0.0" name="bottom"/>
+  <anchor x="369.0" y="357.0" name="center"/>
+  <anchor x="428.0" y="714.0" name="top"/>
+  <outline>
+    <contour>
+      <point x="327.0" y="-10.0" type="curve" smooth="yes"/>
+      <point x="502.0" y="-10.0"/>
+      <point x="577.0" y="97.0"/>
+      <point x="614.0" y="302.0" type="curve" smooth="yes"/>
+      <point x="621.0" y="341.0" type="line"/>
+      <point x="394.0" y="341.0" type="line"/>
+      <point x="388.0" y="316.0" type="line"/>
+      <point x="589.0" y="316.0" type="line"/>
+      <point x="554.0" y="105.0"/>
+      <point x="482.0" y="15.0"/>
+      <point x="328.0" y="15.0" type="curve" smooth="yes"/>
+      <point x="199.0" y="15.0"/>
+      <point x="110.0" y="97.0"/>
+      <point x="110.0" y="267.0" type="curve" smooth="yes"/>
+      <point x="110.0" y="510.0"/>
+      <point x="250.0" y="699.0"/>
+      <point x="463.0" y="699.0" type="curve" smooth="yes"/>
+      <point x="538.0" y="699.0"/>
+      <point x="596.0" y="680.0"/>
+      <point x="643.0" y="654.0" type="curve"/>
+      <point x="654.0" y="679.0" type="line"/>
+      <point x="605.0" y="705.0"/>
+      <point x="546.0" y="724.0"/>
+      <point x="464.0" y="724.0" type="curve" smooth="yes"/>
+      <point x="233.0" y="724.0"/>
+      <point x="84.0" y="524.0"/>
+      <point x="84.0" y="267.0" type="curve" smooth="yes"/>
+      <point x="84.0" y="92.0"/>
+      <point x="173.0" y="-10.0"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>cyrillic</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Uppercase</string>
+    </dict>
+  </lib>
+</glyph>

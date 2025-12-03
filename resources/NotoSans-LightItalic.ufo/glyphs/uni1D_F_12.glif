@@ -1,0 +1,37 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="uni1DF12" format="2">
+  <advance width="1011.0"/>
+  <unicode hex="1DF12"/>
+  <anchor x="321.0" y="-240.0" name="bottom"/>
+  <anchor x="453.0" y="260.0" name="center"/>
+  <anchor x="533.0" y="760.0" name="top"/>
+  <outline>
+    <contour>
+      <point x="807.0" y="-186.0" type="curve" smooth="yes"/>
+      <point x="863.0" y="-186.0"/>
+      <point x="890.0" y="-155.0"/>
+      <point x="902.0" y="-101.0" type="curve" smooth="yes"/>
+      <point x="929.0" y="25.0" type="line"/>
+      <point x="759.0" y="25.0" type="line"/>
+      <point x="754.0" y="0.0" type="line"/>
+      <point x="898.0" y="0.0" type="line"/>
+      <point x="876.0" y="-101.0" type="line" smooth="yes"/>
+      <point x="867.0" y="-141.0"/>
+      <point x="848.0" y="-162.0"/>
+      <point x="810.0" y="-162.0" type="curve" smooth="yes"/>
+      <point x="793.0" y="-162.0"/>
+      <point x="777.0" y="-158.0"/>
+      <point x="767.0" y="-153.0" type="curve"/>
+      <point x="762.0" y="-177.0" type="line"/>
+      <point x="770.0" y="-181.0"/>
+      <point x="787.0" y="-186.0"/>
+    </contour>
+    <component base="dezh"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.shapeOrder</key>
+      <string>PC</string>
+    </dict>
+  </lib>
+</glyph>

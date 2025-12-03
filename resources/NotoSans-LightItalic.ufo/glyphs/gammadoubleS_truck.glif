@@ -1,0 +1,49 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="gammadoubleStruck" format="2">
+  <advance width="543.0"/>
+  <unicode hex="213D"/>
+  <anchor x="260.0" y="148.0" name="center"/>
+  <outline>
+    <contour>
+      <point x="211.0" y="-240.0" type="curve"/>
+      <point x="266.0" y="-240.0" type="line"/>
+      <point x="266.0" y="-173.0"/>
+      <point x="284.0" y="-68.0"/>
+      <point x="315.0" y="13.0" type="curve"/>
+      <point x="515.0" y="536.0" type="line"/>
+      <point x="458.0" y="536.0" type="line"/>
+      <point x="360.0" y="271.0" type="line"/>
+      <point x="354.0" y="257.0"/>
+      <point x="341.0" y="215.0"/>
+      <point x="340.0" y="210.0" type="curve"/>
+      <point x="337.0" y="224.0"/>
+      <point x="323.0" y="253.0"/>
+      <point x="314.0" y="272.0" type="curve"/>
+      <point x="188.0" y="536.0" type="line"/>
+      <point x="5.0" y="536.0" type="line"/>
+      <point x="262.0" y="6.0" type="line"/>
+      <point x="232.0" y="-76.0"/>
+      <point x="211.0" y="-185.0"/>
+    </contour>
+    <contour>
+      <point x="285.0" y="60.0" type="curve"/>
+      <point x="281.0" y="60.0" type="line"/>
+      <point x="275.0" y="95.0"/>
+      <point x="221.0" y="204.0"/>
+      <point x="197.0" y="255.0" type="curve"/>
+      <point x="86.0" y="487.0" type="line"/>
+      <point x="154.0" y="487.0" type="line"/>
+      <point x="315.0" y="154.0" type="line"/>
+      <point x="301.0" y="114.0"/>
+      <point x="288.0" y="76.0"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Lowercase</string>
+    </dict>
+  </lib>
+</glyph>

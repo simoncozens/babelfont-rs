@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="oemod" format="2">
+  <advance width="579.0"/>
+  <unicode hex="A7F9"/>
+  <anchor x="305.85" y="287.0" name="bottom"/>
+  <anchor x="346.15" y="445.4" name="center"/>
+  <anchor x="378.65" y="603.8" name="top"/>
+  <outline>
+    <component base="oe" xScale="0.65" yScale="0.6" xOffset="53" yOffset="287"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>oe</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Lowercase</string>
+    </dict>
+  </lib>
+</glyph>

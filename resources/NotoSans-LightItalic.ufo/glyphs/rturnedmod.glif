@@ -1,0 +1,33 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="rturnedmod" format="2">
+  <advance width="228.0"/>
+  <unicode hex="02B4"/>
+  <anchor x="129.7" y="282.2" name="bottom"/>
+  <anchor x="140.75" y="443.0" name="center"/>
+  <anchor x="203.87475" y="603.8" name="top"/>
+  <anchor x="259.05" y="603.8" name="topright"/>
+  <outline>
+    <component base="rturned" xScale="0.65" yScale="0.6" xOffset="53" yOffset="287"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>rturned</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>latin</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Modifier</string>
+    </dict>
+  </lib>
+</glyph>

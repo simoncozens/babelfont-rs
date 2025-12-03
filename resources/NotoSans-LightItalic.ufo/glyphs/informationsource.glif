@@ -1,0 +1,31 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="informationsource" format="2">
+  <advance width="207.0"/>
+  <unicode hex="2139"/>
+  <anchor x="48.0" y="0.0" name="bottom"/>
+  <anchor x="125.0" y="360.0" name="center"/>
+  <anchor x="201.0" y="721.0" name="top"/>
+  <anchor x="284.0" y="721.0" name="topright"/>
+  <outline>
+    <component base="i"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>i</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Symbol</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Other</string>
+    </dict>
+  </lib>
+</glyph>

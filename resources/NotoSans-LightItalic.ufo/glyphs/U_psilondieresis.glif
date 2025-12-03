@@ -1,0 +1,27 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Upsilondieresis" format="2">
+  <advance width="485.0"/>
+  <unicode hex="03AB"/>
+  <anchor x="187.0" y="0.0" name="bottom"/>
+  <anchor x="337.0" y="357.0" name="center"/>
+  <anchor x="377.0" y="895.0" name="top"/>
+  <anchor x="561.0" y="714.0" name="topright"/>
+  <outline>
+    <component base="Ydieresis"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>Ydieresis</string>
+        </dict>
+      </array>
+    </dict>
+  </lib>
+</glyph>

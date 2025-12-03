@@ -1,0 +1,32 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="deltaturned" format="2">
+  <advance width="539.0"/>
+  <unicode hex="018D"/>
+  <anchor x="242.639" y="151.0" name="center"/>
+  <anchor x="160.0" y="-240.0" name="bottom"/>
+  <anchor x="323.0" y="528.0" name="top"/>
+  <outline>
+    <component base="delta" xScale="-1.0" yScale="-1.0" xOffset="536" yOffset="528"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>delta</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>latin</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Lowercase</string>
+    </dict>
+  </lib>
+</glyph>

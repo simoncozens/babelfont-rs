@@ -1,0 +1,37 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Upsilondasia" format="2">
+  <advance width="635.0"/>
+  <unicode hex="1F59"/>
+  <anchor x="337.0" y="0.0" name="bottom"/>
+  <anchor x="487.0" y="357.0" name="center"/>
+  <anchor x="489.0" y="714.0" name="top"/>
+  <anchor x="711.0" y="714.0" name="topright"/>
+  <anchor x="203.0" y="714.0" name="topleft"/>
+  <outline>
+    <component base="Upsilon" xOffset="150"/>
+    <component base="dasia.case" xOffset="-51"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>Upsilon</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>1</integer>
+          <key>name</key>
+          <string>dasia.case</string>
+        </dict>
+      </array>
+    </dict>
+  </lib>
+</glyph>

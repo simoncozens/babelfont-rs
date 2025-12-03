@@ -1,0 +1,44 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Omegapsilioxiaprosgegrammeni" format="2">
+  <advance width="920.0"/>
+  <unicode hex="1FAC"/>
+  <anchor x="542.0" y="0.0" name="bottom"/>
+  <anchor x="514.696" y="-166.0" name="center"/>
+  <anchor x="375.0" y="714.0" name="topleft"/>
+  <outline>
+    <component base="Omega" xOffset="246"/>
+    <component base="psilioxia.case" xOffset="-29"/>
+    <component base="ypogegrammeni" xOffset="484"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>Omega</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>1</integer>
+          <key>name</key>
+          <string>psilioxia.case</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>2</integer>
+          <key>name</key>
+          <string>ypogegrammeni</string>
+        </dict>
+      </array>
+    </dict>
+  </lib>
+</glyph>

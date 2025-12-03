@@ -1,0 +1,37 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Iotaoxia" format="2">
+  <advance width="391.0"/>
+  <unicode hex="1FDB"/>
+  <anchor x="196.0" y="0.0" name="bottom"/>
+  <anchor x="274.0" y="357.0" name="center"/>
+  <anchor x="348.0" y="714.0" name="top"/>
+  <anchor x="467.0" y="714.0" name="topright"/>
+  <anchor x="188.0" y="714.0" name="topleft"/>
+  <outline>
+    <component base="Iota" xOffset="112"/>
+    <component base="oxia.case" xOffset="-30"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>Iota</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>1</integer>
+          <key>name</key>
+          <string>oxia.case</string>
+        </dict>
+      </array>
+    </dict>
+  </lib>
+</glyph>

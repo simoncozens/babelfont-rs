@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="u107B5" format="2">
+  <advance width="489.0"/>
+  <unicode hex="107B5"/>
+  <anchor x="245.3" y="287.0" name="bottom"/>
+  <anchor x="294.7" y="501.2" name="center"/>
+  <anchor x="345.4" y="722.0" name="top"/>
+  <anchor x="563.8" y="715.4" name="topright"/>
+  <outline>
+    <component base="bilabialclick" xScale="0.65" yScale="0.6" xOffset="49" yOffset="287"/>
+  </outline>
+</glyph>

@@ -1,0 +1,65 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Omegatitlo-cy" format="2">
+  <advance width="893.0"/>
+  <unicode hex="047C"/>
+  <anchor x="474.0" y="357.0" name="center"/>
+  <outline>
+    <contour>
+      <point x="462.0" y="908.0" type="curve"/>
+      <point x="487.0" y="908.0" type="line"/>
+      <point x="491.0" y="946.0"/>
+      <point x="512.0" y="974.0"/>
+      <point x="564.0" y="974.0" type="curve" smooth="yes"/>
+      <point x="647.0" y="974.0"/>
+      <point x="682.0" y="907.0"/>
+      <point x="770.0" y="907.0" type="curve" smooth="yes"/>
+      <point x="780.0" y="907.0" type="line"/>
+      <point x="782.0" y="930.0" type="line"/>
+      <point x="773.0" y="930.0" type="line"/>
+      <point x="682.0" y="930.0"/>
+      <point x="669.0" y="997.0"/>
+      <point x="563.0" y="997.0" type="curve" smooth="yes"/>
+      <point x="497.0" y="997.0"/>
+      <point x="466.0" y="957.0"/>
+    </contour>
+    <contour>
+      <point x="550.0" y="804.0" type="curve"/>
+      <point x="550.0" y="784.0" type="line"/>
+      <point x="599.0" y="797.0"/>
+      <point x="631.0" y="831.0"/>
+      <point x="631.0" y="876.0" type="curve" smooth="yes"/>
+      <point x="631.0" y="906.0"/>
+      <point x="618.0" y="925.0"/>
+      <point x="599.0" y="925.0" type="curve" smooth="yes"/>
+      <point x="582.0" y="925.0"/>
+      <point x="572.0" y="915.0"/>
+      <point x="572.0" y="901.0" type="curve" smooth="yes"/>
+      <point x="572.0" y="889.0"/>
+      <point x="577.0" y="882.0"/>
+      <point x="585.0" y="875.0" type="curve" smooth="yes"/>
+      <point x="595.0" y="867.0"/>
+      <point x="600.0" y="860.0"/>
+      <point x="600.0" y="847.0" type="curve" smooth="yes"/>
+      <point x="600.0" y="827.0"/>
+      <point x="576.0" y="810.0"/>
+    </contour>
+    <component base="Omegabroad-cy"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>Omegabroad-cy</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.shapeOrder</key>
+      <string>PPC</string>
+    </dict>
+  </lib>
+</glyph>

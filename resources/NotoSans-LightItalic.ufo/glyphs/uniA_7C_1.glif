@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="uniA7C1" format="2">
+  <advance width="565.0"/>
+  <unicode hex="A7C1"/>
+  <anchor x="227.0" y="0.0" name="bottom"/>
+  <anchor x="283.0" y="264.0" name="center"/>
+  <anchor x="339.0" y="528.0" name="top"/>
+  <anchor x="601.0" y="528.0" name="topright"/>
+  <outline>
+    <contour>
+      <point x="221.0" y="10.0" type="line"/>
+      <point x="196.0" y="-108.0" type="line"/>
+      <point x="220.0" y="-108.0" type="line"/>
+      <point x="245.0" y="10.0" type="line"/>
+    </contour>
+    <contour>
+      <point x="356.0" y="534.0" type="line"/>
+      <point x="378.0" y="639.0" type="line"/>
+      <point x="354.0" y="639.0" type="line"/>
+      <point x="332.0" y="534.0" type="line"/>
+    </contour>
+    <component base="o"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.shapeOrder</key>
+      <string>PPC</string>
+    </dict>
+  </lib>
+</glyph>

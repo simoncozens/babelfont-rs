@@ -1,0 +1,42 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Iotapsili.salt" format="2">
+  <advance width="366.0"/>
+  <anchor x="195.0" y="0.0" name="bottom"/>
+  <anchor x="273.0" y="357.0" name="center"/>
+  <anchor x="347.0" y="714.0" name="top"/>
+  <anchor x="440.0" y="714.0" name="topright"/>
+  <anchor x="231.0" y="714.0" name="topleft"/>
+  <outline>
+    <component base="Iota.salt" xOffset="135"/>
+    <component base="psili.case" xOffset="-29"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>Iota.salt</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>1</integer>
+          <key>name</key>
+          <string>psili.case</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>greek</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Uppercase</string>
+    </dict>
+  </lib>
+</glyph>

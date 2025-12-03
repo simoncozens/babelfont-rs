@@ -1,0 +1,71 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="squaredfourdot" format="2">
+  <advance width="785.0"/>
+  <unicode hex="2E2C"/>
+  <outline>
+    <contour>
+      <point x="710.0" y="642.0" type="curve"/>
+      <point x="729.0" y="642.0"/>
+      <point x="739.0" y="653.0"/>
+      <point x="739.0" y="676.0" type="curve"/>
+      <point x="739.0" y="699.0"/>
+      <point x="729.0" y="710.0"/>
+      <point x="710.0" y="710.0" type="curve"/>
+      <point x="692.0" y="710.0"/>
+      <point x="682.0" y="699.0"/>
+      <point x="682.0" y="676.0" type="curve"/>
+      <point x="682.0" y="653.0"/>
+      <point x="692.0" y="642.0"/>
+    </contour>
+    <contour>
+      <point x="89.0" y="4.0" type="curve"/>
+      <point x="108.0" y="4.0"/>
+      <point x="118.0" y="15.0"/>
+      <point x="118.0" y="38.0" type="curve"/>
+      <point x="118.0" y="61.0"/>
+      <point x="108.0" y="72.0"/>
+      <point x="89.0" y="72.0" type="curve"/>
+      <point x="71.0" y="72.0"/>
+      <point x="61.0" y="61.0"/>
+      <point x="61.0" y="38.0" type="curve"/>
+      <point x="61.0" y="15.0"/>
+      <point x="71.0" y="4.0"/>
+    </contour>
+    <contour>
+      <point x="696.0" y="4.0" type="curve"/>
+      <point x="715.0" y="4.0"/>
+      <point x="725.0" y="15.0"/>
+      <point x="725.0" y="38.0" type="curve"/>
+      <point x="725.0" y="61.0"/>
+      <point x="715.0" y="72.0"/>
+      <point x="696.0" y="72.0" type="curve"/>
+      <point x="678.0" y="72.0"/>
+      <point x="668.0" y="61.0"/>
+      <point x="668.0" y="38.0" type="curve"/>
+      <point x="668.0" y="15.0"/>
+      <point x="678.0" y="4.0"/>
+    </contour>
+    <contour>
+      <point x="89.0" y="642.0" type="curve"/>
+      <point x="108.0" y="642.0"/>
+      <point x="118.0" y="653.0"/>
+      <point x="118.0" y="676.0" type="curve"/>
+      <point x="118.0" y="699.0"/>
+      <point x="108.0" y="710.0"/>
+      <point x="89.0" y="710.0" type="curve"/>
+      <point x="71.0" y="710.0"/>
+      <point x="61.0" y="699.0"/>
+      <point x="61.0" y="676.0" type="curve"/>
+      <point x="61.0" y="653.0"/>
+      <point x="71.0" y="642.0"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Punctuation</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Other</string>
+    </dict>
+  </lib>
+</glyph>

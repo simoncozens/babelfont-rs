@@ -1,0 +1,39 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="oeturnedstroke" format="2">
+  <advance width="885.0"/>
+  <unicode hex="AB41"/>
+  <anchor x="507.0" y="566.0" name="top"/>
+  <anchor x="433.0" y="264.0" name="center"/>
+  <anchor x="379.0" y="-37.0" name="bottom"/>
+  <anchor x="890.0" y="566.0" name="topright"/>
+  <outline>
+    <contour>
+      <point x="383.0" y="-37.0" type="line"/>
+      <point x="865.0" y="551.0" type="line"/>
+      <point x="846.0" y="566.0" type="line"/>
+      <point x="365.0" y="-22.0" type="line"/>
+    </contour>
+    <component base="oe" xScale="-1.0" yScale="-1.0" xOffset="884" yOffset="528"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>oe</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.shapeOrder</key>
+      <string>PC</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Lowercase</string>
+    </dict>
+  </lib>
+</glyph>

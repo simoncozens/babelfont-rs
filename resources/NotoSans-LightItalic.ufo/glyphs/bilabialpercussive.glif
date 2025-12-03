@@ -1,0 +1,50 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="bilabialpercussive" format="2">
+  <advance width="429.0"/>
+  <unicode hex="02AC"/>
+  <anchor x="159.0" y="0.0" name="bottom"/>
+  <anchor x="267.0" y="356.0" name="center"/>
+  <anchor x="310.0" y="713.0" name="top"/>
+  <outline>
+    <contour>
+      <point x="116.0" y="376.0" type="line"/>
+      <point x="147.0" y="376.0" type="line"/>
+      <point x="301.0" y="671.0" type="line"/>
+      <point x="323.0" y="376.0" type="line"/>
+      <point x="354.0" y="376.0" type="line"/>
+      <point x="503.0" y="713.0" type="line"/>
+      <point x="477.0" y="713.0" type="line"/>
+      <point x="344.0" y="409.0" type="line"/>
+      <point x="321.0" y="713.0" type="line"/>
+      <point x="299.0" y="713.0" type="line"/>
+      <point x="139.0" y="409.0" type="line"/>
+      <point x="137.0" y="713.0" type="line"/>
+      <point x="111.0" y="713.0" type="line"/>
+    </contour>
+    <contour>
+      <point x="37.0" y="0.0" type="line"/>
+      <point x="68.0" y="0.0" type="line"/>
+      <point x="222.0" y="295.0" type="line"/>
+      <point x="244.0" y="0.0" type="line"/>
+      <point x="275.0" y="0.0" type="line"/>
+      <point x="424.0" y="337.0" type="line"/>
+      <point x="398.0" y="337.0" type="line"/>
+      <point x="265.0" y="33.0" type="line"/>
+      <point x="242.0" y="337.0" type="line"/>
+      <point x="220.0" y="337.0" type="line"/>
+      <point x="60.0" y="33.0" type="line"/>
+      <point x="58.0" y="337.0" type="line"/>
+      <point x="32.0" y="337.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>latin</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Lowercase</string>
+    </dict>
+  </lib>
+</glyph>

@@ -1,0 +1,36 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="raisedexclamationmarkmod" format="2">
+  <advance width="199.0"/>
+  <unicode hex="A71D"/>
+  <anchor x="170.0" y="631.0" name="center"/>
+  <outline>
+    <contour>
+      <point x="130.0" y="493.0" type="line"/>
+      <point x="148.0" y="493.0" type="line"/>
+      <point x="237.0" y="875.0" type="line"/>
+      <point x="209.0" y="875.0" type="line"/>
+    </contour>
+    <contour>
+      <point x="120.0" y="387.0" type="curve" smooth="yes"/>
+      <point x="132.0" y="387.0"/>
+      <point x="139.0" y="405.0"/>
+      <point x="139.0" y="420.0" type="curve" smooth="yes"/>
+      <point x="139.0" y="429.0"/>
+      <point x="135.0" y="438.0"/>
+      <point x="124.0" y="438.0" type="curve" smooth="yes"/>
+      <point x="111.0" y="438.0"/>
+      <point x="104.0" y="420.0"/>
+      <point x="104.0" y="405.0" type="curve" smooth="yes"/>
+      <point x="104.0" y="394.0"/>
+      <point x="110.0" y="387.0"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Modifier</string>
+    </dict>
+  </lib>
+</glyph>

@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="ezhmod" format="2">
+  <advance width="262.0"/>
+  <unicode hex="1DBE"/>
+  <anchor x="105.0" y="143.0" name="bottom"/>
+  <anchor x="156.35" y="373.4" name="center"/>
+  <anchor x="203.0" y="604.0" name="top"/>
+  <outline>
+    <component base="ezh" xScale="0.65" yScale="0.6" xOffset="53" yOffset="287"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>ezh</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Modifier</string>
+    </dict>
+  </lib>
+</glyph>

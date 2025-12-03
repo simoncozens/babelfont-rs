@@ -1,0 +1,27 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="lowleftarrowmod" format="2">
+  <advance width="477.0"/>
+  <unicode hex="02FF"/>
+  <outline>
+    <contour>
+      <point x="166.0" y="-199.0" type="line"/>
+      <point x="166.0" y="-164.0" type="line"/>
+      <point x="34.0" y="-95.0" type="line"/>
+      <point x="361.0" y="-95.0" type="line"/>
+      <point x="361.0" y="-69.0" type="line"/>
+      <point x="34.0" y="-69.0" type="line"/>
+      <point x="166.0" y="-1.0" type="line"/>
+      <point x="166.0" y="34.0" type="line"/>
+      <point x="-32.0" y="-73.0" type="line"/>
+      <point x="-32.0" y="-90.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Symbol</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Modifier</string>
+    </dict>
+  </lib>
+</glyph>

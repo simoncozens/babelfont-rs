@@ -1,0 +1,45 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Alphadasiaperispomeniprosgegrammeni.ad" format="2">
+  <advance width="983.0"/>
+  <anchor x="411.0" y="0.0" name="bottom"/>
+  <anchor x="858.643" y="159.0" name="center"/>
+  <anchor x="572.0" y="714.0" name="top"/>
+  <anchor x="816.0" y="714.0" name="topright"/>
+  <anchor x="373.0" y="714.0" name="topleft"/>
+  <outline>
+    <component base="Alpha" xOffset="193"/>
+    <component base="dasiaperispomeni.case" xOffset="-30"/>
+    <component base="prosgegrammeni" xOffset="740"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>Alpha</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>1</integer>
+          <key>name</key>
+          <string>dasiaperispomeni.case</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>2</integer>
+          <key>name</key>
+          <string>prosgegrammeni</string>
+        </dict>
+      </array>
+    </dict>
+  </lib>
+</glyph>

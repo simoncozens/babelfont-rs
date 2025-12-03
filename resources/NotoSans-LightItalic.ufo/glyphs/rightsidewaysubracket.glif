@@ -1,0 +1,35 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="rightsidewaysubracket" format="2">
+  <advance width="1000.0"/>
+  <unicode hex="2E27"/>
+  <outline>
+    <contour>
+      <point x="212.0" y="193.0" type="line"/>
+      <point x="498.0" y="193.0" type="line"/>
+      <point x="639.0" y="193.0"/>
+      <point x="789.0" y="195.0"/>
+      <point x="789.0" y="354.0" type="curve"/>
+      <point x="789.0" y="513.0"/>
+      <point x="638.0" y="515.0"/>
+      <point x="498.0" y="515.0" type="curve"/>
+      <point x="212.0" y="515.0" type="line"/>
+      <point x="212.0" y="467.0" type="line"/>
+      <point x="498.0" y="467.0" type="line"/>
+      <point x="624.0" y="467.0"/>
+      <point x="743.0" y="471.0"/>
+      <point x="743.0" y="354.0" type="curve"/>
+      <point x="743.0" y="237.0"/>
+      <point x="624.0" y="241.0"/>
+      <point x="498.0" y="241.0" type="curve"/>
+      <point x="212.0" y="241.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Punctuation</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Parenthesis</string>
+    </dict>
+  </lib>
+</glyph>

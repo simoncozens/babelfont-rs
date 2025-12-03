@@ -1,0 +1,42 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="lpalatalhook" format="2">
+  <advance width="207.0"/>
+  <unicode hex="1D85"/>
+  <anchor x="-3.0" y="-188.0" name="bottom"/>
+  <anchor x="82.0" y="287.0" name="center"/>
+  <anchor x="207.0" y="758.0" name="top"/>
+  <outline>
+    <contour>
+      <point x="-10.0" y="-186.0" type="curve" smooth="yes"/>
+      <point x="46.0" y="-186.0"/>
+      <point x="73.0" y="-155.0"/>
+      <point x="85.0" y="-101.0" type="curve" smooth="yes"/>
+      <point x="112.0" y="25.0" type="line"/>
+      <point x="63.0" y="25.0" type="line"/>
+      <point x="219.0" y="760.0" type="line"/>
+      <point x="193.0" y="760.0" type="line"/>
+      <point x="32.0" y="0.0" type="line"/>
+      <point x="81.0" y="0.0" type="line"/>
+      <point x="59.0" y="-101.0" type="line" smooth="yes"/>
+      <point x="50.0" y="-141.0"/>
+      <point x="31.0" y="-162.0"/>
+      <point x="-7.0" y="-162.0" type="curve" smooth="yes"/>
+      <point x="-24.0" y="-162.0"/>
+      <point x="-40.0" y="-158.0"/>
+      <point x="-50.0" y="-153.0" type="curve"/>
+      <point x="-55.0" y="-177.0" type="line"/>
+      <point x="-47.0" y="-181.0"/>
+      <point x="-30.0" y="-186.0"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>latin</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Lowercase</string>
+    </dict>
+  </lib>
+</glyph>

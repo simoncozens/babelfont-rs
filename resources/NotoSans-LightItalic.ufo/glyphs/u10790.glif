@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="u10790" format="2">
+  <advance width="522.0"/>
+  <unicode hex="10790"/>
+  <anchor x="235.75" y="143.0" name="bottom"/>
+  <anchor x="242.25" y="444.2" name="center"/>
+  <anchor x="374.2" y="746.0" name="top"/>
+  <outline>
+    <component base="fengdigraph" xScale="0.65" yScale="0.6" xOffset="70" yOffset="287"/>
+  </outline>
+</glyph>

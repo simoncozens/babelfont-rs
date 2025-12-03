@@ -1,0 +1,33 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Iota.salt" format="2">
+  <advance width="231.0"/>
+  <anchor x="60.0" y="0.0" name="bottom"/>
+  <anchor x="138.0" y="357.0" name="center"/>
+  <anchor x="212.0" y="714.0" name="top"/>
+  <anchor x="305.0" y="714.0" name="topright"/>
+  <anchor x="96.0" y="714.0" name="topleft"/>
+  <outline>
+    <component base="I.salt"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>I.salt</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>greek</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Uppercase</string>
+    </dict>
+  </lib>
+</glyph>

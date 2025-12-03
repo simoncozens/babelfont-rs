@@ -1,0 +1,17 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="stackedcommadbl" format="2">
+  <advance width="183.0"/>
+  <unicode hex="2E49"/>
+  <outline>
+    <component base="comma" xOffset="92" yOffset="382"/>
+    <component base="comma" xOffset="20" yOffset="100"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Punctuation</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Other</string>
+    </dict>
+  </lib>
+</glyph>

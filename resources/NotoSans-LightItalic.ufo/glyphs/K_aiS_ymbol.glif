@@ -1,0 +1,45 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="KaiSymbol" format="2">
+  <advance width="543.0"/>
+  <unicode hex="03CF"/>
+  <anchor x="329.0" y="235.0" name="center"/>
+  <outline>
+    <contour>
+      <point x="182.0" y="-243.0" type="curve" smooth="yes"/>
+      <point x="357.0" y="-243.0"/>
+      <point x="433.0" y="-130.0"/>
+      <point x="484.0" y="0.0" type="curve"/>
+      <point x="283.0" y="414.0" type="line"/>
+      <point x="629.0" y="714.0" type="line"/>
+      <point x="592.0" y="714.0" type="line"/>
+      <point x="202.0" y="376.0" type="line"/>
+      <point x="145.0" y="324.0" type="line"/>
+      <point x="228.0" y="714.0" type="line"/>
+      <point x="201.0" y="714.0" type="line"/>
+      <point x="50.0" y="0.0" type="line"/>
+      <point x="77.0" y="0.0" type="line"/>
+      <point x="138.0" y="291.0" type="line"/>
+      <point x="262.0" y="396.0" type="line"/>
+      <point x="454.0" y="0.0" type="line"/>
+      <point x="416.0" y="-98.0"/>
+      <point x="338.0" y="-218.0"/>
+      <point x="184.0" y="-218.0" type="curve" smooth="yes"/>
+      <point x="115.0" y="-218.0"/>
+      <point x="76.0" y="-202.0"/>
+      <point x="37.0" y="-168.0" type="curve"/>
+      <point x="29.0" y="-197.0" type="line"/>
+      <point x="74.0" y="-233.0"/>
+      <point x="127.0" y="-243.0"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>greek</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Uppercase</string>
+    </dict>
+  </lib>
+</glyph>

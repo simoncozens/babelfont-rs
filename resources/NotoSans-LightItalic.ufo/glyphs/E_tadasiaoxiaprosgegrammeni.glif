@@ -1,0 +1,46 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Etadasiaoxiaprosgegrammeni" format="2">
+  <advance width="930.0"/>
+  <unicode hex="1F9D"/>
+  <anchor x="534.0" y="0.0" name="bottom"/>
+  <anchor x="533.696" y="-166.0" name="center"/>
+  <anchor x="686.0" y="714.0" name="top"/>
+  <anchor x="1006.0" y="714.0" name="topright"/>
+  <anchor x="345.0" y="714.0" name="topleft"/>
+  <outline>
+    <component base="Eta" xOffset="249"/>
+    <component base="dasiaoxia.case" xOffset="-51"/>
+    <component base="ypogegrammeni" xOffset="503"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>Eta</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>1</integer>
+          <key>name</key>
+          <string>dasiaoxia.case</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>2</integer>
+          <key>name</key>
+          <string>ypogegrammeni</string>
+        </dict>
+      </array>
+    </dict>
+  </lib>
+</glyph>

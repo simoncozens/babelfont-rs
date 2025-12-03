@@ -1,0 +1,31 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="bmod" format="2">
+  <advance width="369.0"/>
+  <unicode hex="1D47"/>
+  <anchor x="189.0" y="281.0" name="bottom"/>
+  <anchor x="229.8" y="512.0" name="center"/>
+  <anchor x="287.0" y="743.0" name="top"/>
+  <anchor x="477.45" y="743.0" name="topright"/>
+  <outline>
+    <component base="b" xScale="0.65" yScale="0.6" xOffset="53" yOffset="287"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>b</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Modifier</string>
+    </dict>
+  </lib>
+</glyph>

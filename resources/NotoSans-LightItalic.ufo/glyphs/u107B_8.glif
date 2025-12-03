@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="u107B8" format="2">
+  <advance width="334.0"/>
+  <unicode hex="107B8"/>
+  <anchor x="166.55" y="287.0" name="bottom"/>
+  <anchor x="220.5" y="515.0" name="center"/>
+  <anchor x="271.85" y="743.0" name="top"/>
+  <outline>
+    <component base="clickalveolar" xScale="0.65" yScale="0.6" xOffset="45" yOffset="287"/>
+  </outline>
+</glyph>

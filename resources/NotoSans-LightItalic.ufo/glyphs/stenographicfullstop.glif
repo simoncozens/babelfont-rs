@@ -1,0 +1,28 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="stenographicfullstop" format="2">
+  <unicode hex="2E3C"/>
+  <outline>
+    <contour>
+      <point x="-137.0" y="-213.0" type="line"/>
+      <point x="-89.0" y="-174.0" type="line"/>
+      <point x="-60.0" y="-212.0" type="line"/>
+      <point x="-29.0" y="-187.0" type="line"/>
+      <point x="-59.0" y="-149.0" type="line"/>
+      <point x="-14.0" y="-111.0" type="line"/>
+      <point x="-39.0" y="-79.0" type="line"/>
+      <point x="-85.0" y="-117.0" type="line"/>
+      <point x="-114.0" y="-79.0" type="line"/>
+      <point x="-144.0" y="-104.0" type="line"/>
+      <point x="-114.0" y="-142.0" type="line"/>
+      <point x="-162.0" y="-181.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Punctuation</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Other</string>
+    </dict>
+  </lib>
+</glyph>

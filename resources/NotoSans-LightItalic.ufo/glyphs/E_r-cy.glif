@@ -1,0 +1,22 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Er-cy" format="2">
+  <advance width="558.0"/>
+  <unicode hex="0420"/>
+  <anchor x="223.0" y="0.0" name="bottom"/>
+  <anchor x="304.0" y="357.0" name="center"/>
+  <anchor x="375.0" y="714.0" name="top"/>
+  <anchor x="634.0" y="714.0" name="topright"/>
+  <outline>
+    <component base="P"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>cyrillic</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Uppercase</string>
+    </dict>
+  </lib>
+</glyph>

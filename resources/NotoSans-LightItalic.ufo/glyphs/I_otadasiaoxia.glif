@@ -1,0 +1,37 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Iotadasiaoxia" format="2">
+  <advance width="548.0"/>
+  <unicode hex="1F3D"/>
+  <anchor x="353.0" y="0.0" name="bottom"/>
+  <anchor x="431.0" y="357.0" name="center"/>
+  <anchor x="505.0" y="714.0" name="top"/>
+  <anchor x="624.0" y="714.0" name="topright"/>
+  <anchor x="345.0" y="714.0" name="topleft"/>
+  <outline>
+    <component base="Iota" xOffset="269"/>
+    <component base="dasiaoxia.case" xOffset="-51"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>Iota</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>1</integer>
+          <key>name</key>
+          <string>dasiaoxia.case</string>
+        </dict>
+      </array>
+    </dict>
+  </lib>
+</glyph>

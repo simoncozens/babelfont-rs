@@ -1,0 +1,29 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="emsoft-cy" format="2">
+  <advance width="837.0"/>
+  <unicode hex="A667"/>
+  <anchor x="281.0" y="0.0" name="bottom"/>
+  <anchor x="337.0" y="264.0" name="center"/>
+  <anchor x="393.0" y="528.0" name="top"/>
+  <outline>
+    <contour>
+      <point x="622.0" y="503.0" type="line"/>
+      <point x="876.0" y="503.0" type="line"/>
+      <point x="881.0" y="528.0" type="line"/>
+      <point x="627.0" y="528.0" type="line"/>
+    </contour>
+    <component base="em-cy"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>cyrillic</string>
+      <key>com.schriftgestaltung.Glyphs.shapeOrder</key>
+      <string>PC</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Lowercase</string>
+    </dict>
+  </lib>
+</glyph>

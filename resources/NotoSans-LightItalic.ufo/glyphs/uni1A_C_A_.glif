@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="uni1ACA" format="2">
+  <unicode hex="1ACA"/>
+  <anchor x="-57.0" y="0.0" name="_bottom"/>
+  <anchor x="-98.0" y="-193.0" name="bottom"/>
+  <outline>
+    <component base="plusbelowcomb" xOffset="-120"/>
+    <component base="plusbelowcomb" xOffset="120"/>
+  </outline>
+</glyph>

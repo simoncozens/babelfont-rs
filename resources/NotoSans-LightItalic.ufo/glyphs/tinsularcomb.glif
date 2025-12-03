@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="tinsularcomb" format="2">
+  <unicode hex="1ACE"/>
+  <anchor x="91.65" y="723.6" name="center"/>
+  <anchor x="102.9" y="831.2" name="top"/>
+  <anchor x="56.0" y="528.0" name="_top"/>
+  <outline>
+    <component base="tinsular" xScale="0.45" yScale="0.4" xOffset="-24" yOffset="620"/>
+  </outline>
+</glyph>

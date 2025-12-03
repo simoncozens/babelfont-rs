@@ -1,0 +1,23 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Iepigraphicsideways.salt" format="2">
+  <advance width="722.0"/>
+  <anchor x="384.0" y="375.0" name="center"/>
+  <outline>
+    <contour>
+      <point x="90.0" y="388.0" type="line"/>
+      <point x="85.0" y="363.0" type="line"/>
+      <point x="680.0" y="363.0" type="line"/>
+      <point x="684.0" y="388.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>latin</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Other</string>
+    </dict>
+  </lib>
+</glyph>

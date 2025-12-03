@@ -1,0 +1,49 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="tripledagger" format="2">
+  <advance width="454.0"/>
+  <unicode hex="2E4B"/>
+  <outline>
+    <contour>
+      <point x="152.0" y="0.0" type="line"/>
+      <point x="179.0" y="0.0" type="line"/>
+      <point x="214.0" y="183.0" type="line"/>
+      <point x="386.0" y="180.0" type="line"/>
+      <point x="392.0" y="205.0" type="line"/>
+      <point x="218.0" y="202.0" type="line"/>
+      <point x="259.0" y="383.0" type="line"/>
+      <point x="294.0" y="558.0" type="line"/>
+      <point x="466.0" y="555.0" type="line"/>
+      <point x="472.0" y="580.0" type="line"/>
+      <point x="298.0" y="577.0" type="line"/>
+      <point x="341.0" y="760.0" type="line"/>
+      <point x="314.0" y="760.0" type="line"/>
+      <point x="279.0" y="577.0" type="line"/>
+      <point x="107.0" y="580.0" type="line"/>
+      <point x="101.0" y="555.0" type="line"/>
+      <point x="275.0" y="558.0" type="line"/>
+      <point x="236.0" y="383.0" type="line"/>
+      <point x="199.0" y="202.0" type="line"/>
+      <point x="27.0" y="205.0" type="line"/>
+      <point x="21.0" y="180.0" type="line"/>
+      <point x="195.0" y="183.0" type="line"/>
+    </contour>
+    <contour>
+      <point x="62.0" y="371.0" type="line"/>
+      <point x="236.0" y="374.0" type="line"/>
+      <point x="255.0" y="374.0" type="line"/>
+      <point x="427.0" y="371.0" type="line"/>
+      <point x="432.0" y="396.0" type="line"/>
+      <point x="259.0" y="393.0" type="line"/>
+      <point x="240.0" y="393.0" type="line"/>
+      <point x="67.0" y="396.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Punctuation</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Other</string>
+    </dict>
+  </lib>
+</glyph>

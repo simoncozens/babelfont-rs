@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="u10797" format="2">
+  <advance width="377.0"/>
+  <unicode hex="10797"/>
+  <anchor x="155.55" y="143.0" name="bottom"/>
+  <anchor x="217.3" y="446.0" name="center"/>
+  <anchor x="294.65" y="749.0" name="top"/>
+  <outline>
+    <component base="henghook" xScale="0.65" yScale="0.6" xOffset="47" yOffset="287"/>
+  </outline>
+</glyph>

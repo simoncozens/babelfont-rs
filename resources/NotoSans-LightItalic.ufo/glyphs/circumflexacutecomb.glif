@@ -1,0 +1,36 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="circumflexacutecomb" format="2">
+  <outline>
+    <contour>
+      <point x="-367.0" y="612.0" type="curve"/>
+      <point x="-368.0" y="606.0" type="line"/>
+      <point x="-345.0" y="606.0" type="line"/>
+      <point x="-303.0" y="635.0"/>
+      <point x="-259.0" y="671.0"/>
+      <point x="-227.0" y="700.0" type="curve"/>
+      <point x="-206.0" y="671.0"/>
+      <point x="-175.0" y="635.0"/>
+      <point x="-147.0" y="606.0" type="curve"/>
+      <point x="-129.0" y="606.0" type="line"/>
+      <point x="-127.0" y="612.0" type="line"/>
+      <point x="-155.0" y="645.0"/>
+      <point x="-194.0" y="700.0"/>
+      <point x="-211.0" y="732.0" type="curve"/>
+      <point x="-233.0" y="732.0" type="line"/>
+      <point x="-262.0" y="699.0"/>
+      <point x="-324.0" y="645.0"/>
+    </contour>
+    <contour>
+      <point x="-138.0" y="708.0" type="curve"/>
+      <point x="-138.0" y="702.0" type="line"/>
+      <point x="-117.0" y="702.0" type="line"/>
+      <point x="-77.0" y="734.0"/>
+      <point x="-40.0" y="773.0"/>
+      <point x="-14.0" y="806.0" type="curve"/>
+      <point x="-14.0" y="813.0" type="line"/>
+      <point x="-43.0" y="813.0" type="line"/>
+      <point x="-65.0" y="782.0"/>
+      <point x="-105.0" y="738.0"/>
+    </contour>
+  </outline>
+</glyph>

@@ -1,0 +1,25 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="leftverticalbarwithquill" format="2">
+  <advance width="551.0"/>
+  <unicode hex="2E20"/>
+  <outline>
+    <contour>
+      <point x="166.0" y="-241.0" type="line"/>
+      <point x="204.0" y="-241.0" type="line"/>
+      <point x="204.0" y="241.0" type="line"/>
+      <point x="373.0" y="241.0" type="line"/>
+      <point x="373.0" y="278.0" type="line"/>
+      <point x="204.0" y="278.0" type="line"/>
+      <point x="204.0" y="760.0" type="line"/>
+      <point x="166.0" y="760.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Punctuation</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Other</string>
+    </dict>
+  </lib>
+</glyph>

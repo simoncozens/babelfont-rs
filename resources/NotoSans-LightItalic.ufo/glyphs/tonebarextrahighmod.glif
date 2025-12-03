@@ -1,0 +1,23 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="tonebarextrahighmod" format="2">
+  <advance width="418.0"/>
+  <unicode hex="02E5"/>
+  <outline>
+    <contour>
+      <point x="274.0" y="0.0" type="line"/>
+      <point x="340.0" y="0.0" type="line"/>
+      <point x="340.0" y="688.0" type="line"/>
+      <point x="78.0" y="688.0" type="line"/>
+      <point x="78.0" y="622.0" type="line"/>
+      <point x="274.0" y="622.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Symbol</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Modifier</string>
+    </dict>
+  </lib>
+</glyph>

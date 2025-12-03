@@ -1,0 +1,29 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="nationalshapes" format="2">
+  <unicode hex="206E"/>
+  <outline>
+    <contour>
+      <point x="-21.0" y="-133.0" type="line"/>
+      <point x="21.0" y="-133.0" type="line"/>
+      <point x="21.0" y="494.0" type="line"/>
+      <point x="117.0" y="583.0" type="line"/>
+      <point x="0.0" y="690.0" type="line"/>
+      <point x="-117.0" y="583.0" type="line"/>
+      <point x="-21.0" y="494.0" type="line"/>
+    </contour>
+    <contour>
+      <point x="0.0" y="528.0" type="line"/>
+      <point x="-62.0" y="583.0" type="line"/>
+      <point x="0.0" y="638.0" type="line"/>
+      <point x="62.0" y="583.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Separator</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Format</string>
+    </dict>
+  </lib>
+</glyph>

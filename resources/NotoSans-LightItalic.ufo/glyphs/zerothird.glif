@@ -1,0 +1,18 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="zerothird" format="2">
+  <advance width="760.0"/>
+  <unicode hex="2189"/>
+  <outline>
+    <component base="zero.numr"/>
+    <component base="fraction" xOffset="312"/>
+    <component base="three.dnom" xOffset="448"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Number</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Fraction</string>
+    </dict>
+  </lib>
+</glyph>

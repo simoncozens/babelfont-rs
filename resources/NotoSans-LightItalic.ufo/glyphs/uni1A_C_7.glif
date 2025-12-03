@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="uni1AC7" format="2">
+  <unicode hex="1AC7"/>
+  <anchor x="-103.0" y="609.0" name="_top"/>
+  <anchor x="-71.0" y="772.0" name="top"/>
+  <outline>
+    <component base="dblarchinvertedbelowcomb" yOffset="833"/>
+  </outline>
+</glyph>

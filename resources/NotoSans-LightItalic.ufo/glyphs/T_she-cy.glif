@@ -1,0 +1,48 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Tshe-cy" format="2">
+  <advance width="602.0"/>
+  <unicode hex="040B"/>
+  <anchor x="246.0" y="0.0" name="bottom"/>
+  <anchor x="278.0" y="357.0" name="center"/>
+  <anchor x="398.0" y="714.0" name="top"/>
+  <outline>
+    <contour>
+      <point x="79.0" y="1.0" type="line"/>
+      <point x="105.0" y="1.0" type="line"/>
+      <point x="185.0" y="376.0" type="line"/>
+      <point x="172.0" y="358.0" type="line"/>
+      <point x="250.0" y="388.0"/>
+      <point x="306.0" y="400.0"/>
+      <point x="367.0" y="400.0" type="curve" smooth="yes"/>
+      <point x="492.0" y="400.0"/>
+      <point x="532.0" y="344.0"/>
+      <point x="502.0" y="203.0" type="curve" smooth="yes"/>
+      <point x="459.0" y="1.0" type="line"/>
+      <point x="485.0" y="1.0" type="line"/>
+      <point x="530.0" y="215.0" type="line" smooth="yes"/>
+      <point x="560.0" y="358.0"/>
+      <point x="509.0" y="425.0"/>
+      <point x="374.0" y="425.0" type="curve" smooth="yes"/>
+      <point x="317.0" y="425.0"/>
+      <point x="261.0" y="414.0"/>
+      <point x="177.0" y="385.0" type="curve"/>
+      <point x="185.0" y="378.0" type="line"/>
+      <point x="252.0" y="689.0" type="line"/>
+      <point x="496.0" y="689.0" type="line"/>
+      <point x="501.0" y="714.0" type="line"/>
+      <point x="98.0" y="714.0" type="line"/>
+      <point x="93.0" y="689.0" type="line"/>
+      <point x="226.0" y="689.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>cyrillic</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Uppercase</string>
+    </dict>
+  </lib>
+</glyph>

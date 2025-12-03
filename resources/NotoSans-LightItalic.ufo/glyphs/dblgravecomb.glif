@@ -1,0 +1,40 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="dblgravecomb" format="2">
+  <unicode hex="030F"/>
+  <anchor x="-287.0" y="528.0" name="_top"/>
+  <anchor x="-236.0" y="766.0" name="top"/>
+  <outline>
+    <contour>
+      <point x="-125.0" y="606.0" type="curve"/>
+      <point x="-104.0" y="606.0" type="line"/>
+      <point x="-104.0" y="612.0" type="line"/>
+      <point x="-140.0" y="651.0"/>
+      <point x="-190.0" y="721.0"/>
+      <point x="-213.0" y="766.0" type="curve"/>
+      <point x="-243.0" y="766.0" type="line"/>
+      <point x="-243.0" y="759.0" type="line"/>
+      <point x="-214.0" y="712.0"/>
+      <point x="-167.0" y="650.0"/>
+    </contour>
+    <contour>
+      <point x="-285.0" y="606.0" type="curve"/>
+      <point x="-264.0" y="606.0" type="line"/>
+      <point x="-264.0" y="612.0" type="line"/>
+      <point x="-300.0" y="651.0"/>
+      <point x="-350.0" y="721.0"/>
+      <point x="-373.0" y="766.0" type="curve"/>
+      <point x="-403.0" y="766.0" type="line"/>
+      <point x="-403.0" y="759.0" type="line"/>
+      <point x="-374.0" y="712.0"/>
+      <point x="-327.0" y="650.0"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Mark</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Nonspacing</string>
+    </dict>
+  </lib>
+</glyph>

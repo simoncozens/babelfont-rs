@@ -1,0 +1,35 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Omegaoxia" format="2">
+  <advance width="760.0"/>
+  <unicode hex="1FFB"/>
+  <anchor x="382.0" y="0.0" name="bottom"/>
+  <anchor x="411.0" y="362.0" name="center"/>
+  <anchor x="215.0" y="714.0" name="topleft"/>
+  <outline>
+    <component base="Omega" xOffset="86"/>
+    <component base="oxia.case" xOffset="-30"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>Omega</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>1</integer>
+          <key>name</key>
+          <string>oxia.case</string>
+        </dict>
+      </array>
+    </dict>
+  </lib>
+</glyph>

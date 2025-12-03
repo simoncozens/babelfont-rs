@@ -1,0 +1,36 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Alphaprosgegrammeni.ad" format="2">
+  <advance width="790.0"/>
+  <anchor x="218.0" y="0.0" name="bottom"/>
+  <anchor x="665.643" y="159.0" name="center"/>
+  <anchor x="379.0" y="714.0" name="top"/>
+  <anchor x="623.0" y="714.0" name="topright"/>
+  <anchor x="180.0" y="714.0" name="topleft"/>
+  <outline>
+    <component base="Alpha"/>
+    <component base="prosgegrammeni" xOffset="547"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>Alpha</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>1</integer>
+          <key>name</key>
+          <string>prosgegrammeni</string>
+        </dict>
+      </array>
+    </dict>
+  </lib>
+</glyph>

@@ -1,0 +1,22 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="yerubackyer-cy" format="2">
+  <advance width="754.0"/>
+  <unicode hex="A651"/>
+  <anchor x="600.0" y="0.0" name="bottom"/>
+  <anchor x="653.0" y="264.0" name="center"/>
+  <anchor x="712.0" y="528.0" name="top"/>
+  <outline>
+    <component base="hardsign-cy"/>
+    <component base="idotless" xOffset="552"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>cyrillic</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Lowercase</string>
+    </dict>
+  </lib>
+</glyph>

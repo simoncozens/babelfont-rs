@@ -1,0 +1,37 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Alphatonos" format="2">
+  <advance width="557.0"/>
+  <unicode hex="0386"/>
+  <anchor x="228.0" y="0.0" name="bottom"/>
+  <anchor x="234.0" y="358.0" name="center"/>
+  <anchor x="389.0" y="714.0" name="top"/>
+  <anchor x="633.0" y="714.0" name="topright"/>
+  <anchor x="190.0" y="714.0" name="topleft"/>
+  <outline>
+    <component base="Alpha" xOffset="10"/>
+    <component base="tonos.case" xOffset="38"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>Alpha</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>1</integer>
+          <key>name</key>
+          <string>tonos.case</string>
+        </dict>
+      </array>
+    </dict>
+  </lib>
+</glyph>

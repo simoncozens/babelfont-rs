@@ -1,0 +1,22 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="LJ.salt" format="2">
+  <advance width="872.0"/>
+  <anchor x="597.0" y="0.0" name="bottom"/>
+  <anchor x="674.0" y="352.0" name="center"/>
+  <anchor x="853.0" y="714.0" name="top"/>
+  <anchor x="948.0" y="714.0" name="topright"/>
+  <outline>
+    <component base="L"/>
+    <component base="J.salt" xOffset="491"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>latin</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Uppercase</string>
+    </dict>
+  </lib>
+</glyph>

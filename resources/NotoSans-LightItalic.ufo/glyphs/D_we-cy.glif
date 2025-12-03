@@ -1,0 +1,29 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Dwe-cy" format="2">
+  <advance width="645.0"/>
+  <unicode hex="A680"/>
+  <anchor x="246.0" y="-150.0" name="bottom"/>
+  <anchor x="338.0" y="269.0" name="center"/>
+  <anchor x="473.0" y="920.0" name="top"/>
+  <outline>
+    <contour>
+      <point x="284.0" y="697.0" type="line"/>
+      <point x="310.0" y="697.0" type="line"/>
+      <point x="358.0" y="920.0" type="line"/>
+      <point x="332.0" y="920.0" type="line"/>
+    </contour>
+    <component base="De-cy"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>cyrillic</string>
+      <key>com.schriftgestaltung.Glyphs.shapeOrder</key>
+      <string>PC</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Uppercase</string>
+    </dict>
+  </lib>
+</glyph>

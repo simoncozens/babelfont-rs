@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="omegapsilioxia.sc.ss06" format="2">
+  <advance width="622.0"/>
+  <anchor x="266.0" y="0.0" name="bottom"/>
+  <anchor x="285.0" y="284.0" name="center"/>
+  <anchor x="337.0" y="559.0" name="top"/>
+  <outline>
+    <component base="omega.sc"/>
+    <component base="psilioxia.sc" xOffset="102" yOffset="31"/>
+  </outline>
+</glyph>

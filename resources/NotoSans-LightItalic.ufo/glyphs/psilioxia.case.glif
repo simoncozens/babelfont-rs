@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="psilioxia.case" format="2">
+  <advance width="322.0"/>
+  <anchor x="377.0" y="714.0" name="_topleft"/>
+  <outline>
+    <component base="psilioxia" xOffset="-13" yOffset="-62"/>
+  </outline>
+</glyph>

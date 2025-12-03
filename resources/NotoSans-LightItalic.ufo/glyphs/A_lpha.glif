@@ -1,0 +1,23 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Alpha" format="2">
+  <advance width="547.0"/>
+  <unicode hex="0391"/>
+  <anchor x="218.0" y="0.0" name="bottom"/>
+  <anchor x="224.0" y="358.0" name="center"/>
+  <anchor x="379.0" y="714.0" name="top"/>
+  <anchor x="623.0" y="714.0" name="topright"/>
+  <anchor x="180.0" y="714.0" name="topleft"/>
+  <outline>
+    <component base="A"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>greek</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Uppercase</string>
+    </dict>
+  </lib>
+</glyph>

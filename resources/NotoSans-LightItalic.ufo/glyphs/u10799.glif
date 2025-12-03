@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="u10799" format="2">
+  <advance width="386.0"/>
+  <unicode hex="10799"/>
+  <anchor x="195.15" y="287.0" name="bottom"/>
+  <anchor x="234.15" y="512.0" name="center"/>
+  <anchor x="299.8" y="743.0" name="top"/>
+  <outline>
+    <component base="lsdigraph" xScale="0.65" yScale="0.6" xOffset="45" yOffset="287"/>
+  </outline>
+</glyph>

@@ -1,0 +1,37 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Etapsiliperispomeni" format="2">
+  <advance width="1005.0"/>
+  <unicode hex="1F2E"/>
+  <anchor x="609.0" y="0.0" name="bottom"/>
+  <anchor x="685.0" y="357.0" name="center"/>
+  <anchor x="761.0" y="714.0" name="top"/>
+  <anchor x="1081.0" y="714.0" name="topright"/>
+  <anchor x="420.0" y="714.0" name="topleft"/>
+  <outline>
+    <component base="Eta" xOffset="324"/>
+    <component base="psiliperispomeni.case" xOffset="-30"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>Eta</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>1</integer>
+          <key>name</key>
+          <string>psiliperispomeni.case</string>
+        </dict>
+      </array>
+    </dict>
+  </lib>
+</glyph>

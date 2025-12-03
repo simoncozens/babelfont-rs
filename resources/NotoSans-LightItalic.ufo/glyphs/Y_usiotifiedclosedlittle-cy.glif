@@ -1,0 +1,38 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Yusiotifiedclosedlittle-cy" format="2">
+  <advance width="738.0"/>
+  <unicode hex="A65C"/>
+  <anchor x="369.0" y="358.0" name="center"/>
+  <outline>
+    <contour>
+      <point x="245.0" y="0.0" type="line"/>
+      <point x="674.0" y="0.0" type="line"/>
+      <point x="679.0" y="25.0" type="line"/>
+      <point x="250.0" y="25.0" type="line"/>
+    </contour>
+    <component base="Iotifieda-cy"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>Iotifieda-cy</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>cyrillic</string>
+      <key>com.schriftgestaltung.Glyphs.shapeOrder</key>
+      <string>PC</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Uppercase</string>
+    </dict>
+  </lib>
+</glyph>

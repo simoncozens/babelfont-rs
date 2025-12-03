@@ -1,0 +1,37 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Upsilontonos" format="2">
+  <advance width="620.0"/>
+  <unicode hex="038E"/>
+  <anchor x="322.0" y="0.0" name="bottom"/>
+  <anchor x="472.0" y="357.0" name="center"/>
+  <anchor x="474.0" y="714.0" name="top"/>
+  <anchor x="696.0" y="714.0" name="topright"/>
+  <anchor x="188.0" y="714.0" name="topleft"/>
+  <outline>
+    <component base="Upsilon" xOffset="135"/>
+    <component base="tonos.case" xOffset="-30"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>Upsilon</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>1</integer>
+          <key>name</key>
+          <string>tonos.case</string>
+        </dict>
+      </array>
+    </dict>
+  </lib>
+</glyph>

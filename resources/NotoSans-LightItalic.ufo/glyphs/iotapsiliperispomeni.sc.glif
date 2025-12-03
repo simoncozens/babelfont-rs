@@ -1,0 +1,26 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="iotapsiliperispomeni.sc" format="2">
+  <advance width="200.0"/>
+  <anchor x="41.0" y="0.0" name="bottom"/>
+  <anchor x="103.0" y="280.0" name="center"/>
+  <anchor x="159.0" y="559.0" name="top"/>
+  <anchor x="239.0" y="559.0" name="topright"/>
+  <outline>
+    <component base="i.sc"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>i.sc</string>
+        </dict>
+      </array>
+    </dict>
+  </lib>
+</glyph>

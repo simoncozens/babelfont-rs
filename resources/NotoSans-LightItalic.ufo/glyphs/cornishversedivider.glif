@@ -1,0 +1,46 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="cornishversedivider" format="2">
+  <advance width="317.0"/>
+  <unicode hex="2E4F"/>
+  <outline>
+    <contour>
+      <point x="106.0" y="437.0" type="curve" smooth="yes"/>
+      <point x="131.0" y="437.0"/>
+      <point x="140.0" y="450.0"/>
+      <point x="140.0" y="481.0" type="curve" smooth="yes"/>
+      <point x="140.0" y="511.0"/>
+      <point x="131.0" y="524.0"/>
+      <point x="106.0" y="524.0" type="curve" smooth="yes"/>
+      <point x="83.0" y="524.0"/>
+      <point x="74.0" y="511.0"/>
+      <point x="74.0" y="481.0" type="curve" smooth="yes"/>
+      <point x="74.0" y="450.0"/>
+      <point x="83.0" y="437.0"/>
+    </contour>
+    <contour>
+      <point x="207.0" y="62.0" type="curve" smooth="yes"/>
+      <point x="232.0" y="62.0"/>
+      <point x="241.0" y="74.0"/>
+      <point x="241.0" y="105.0" type="curve" smooth="yes"/>
+      <point x="241.0" y="136.0"/>
+      <point x="232.0" y="148.0"/>
+      <point x="207.0" y="148.0" type="curve" smooth="yes"/>
+      <point x="184.0" y="148.0"/>
+      <point x="175.0" y="136.0"/>
+      <point x="175.0" y="105.0" type="curve" smooth="yes"/>
+      <point x="175.0" y="74.0"/>
+      <point x="184.0" y="62.0"/>
+    </contour>
+    <component base="doubleobliquehyphen"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Punctuation</string>
+      <key>com.schriftgestaltung.Glyphs.shapeOrder</key>
+      <string>PPC</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Other</string>
+    </dict>
+  </lib>
+</glyph>

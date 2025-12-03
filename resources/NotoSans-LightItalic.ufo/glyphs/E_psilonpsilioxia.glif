@@ -1,0 +1,37 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Epsilonpsilioxia" format="2">
+  <advance width="787.0"/>
+  <unicode hex="1F1C"/>
+  <anchor x="464.0" y="0.0" name="bottom"/>
+  <anchor x="556.0" y="357.0" name="center"/>
+  <anchor x="616.0" y="714.0" name="top"/>
+  <anchor x="863.0" y="714.0" name="topright"/>
+  <anchor x="348.0" y="714.0" name="topleft"/>
+  <outline>
+    <component base="Epsilon" xOffset="252"/>
+    <component base="psilioxia.case" xOffset="-29"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>Epsilon</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>1</integer>
+          <key>name</key>
+          <string>psilioxia.case</string>
+        </dict>
+      </array>
+    </dict>
+  </lib>
+</glyph>

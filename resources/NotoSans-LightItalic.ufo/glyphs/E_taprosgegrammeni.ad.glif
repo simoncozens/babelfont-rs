@@ -1,0 +1,36 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Etaprosgegrammeni.ad" format="2">
+  <advance width="924.0"/>
+  <anchor x="285.0" y="0.0" name="bottom"/>
+  <anchor x="799.643" y="159.0" name="center"/>
+  <anchor x="437.0" y="714.0" name="top"/>
+  <anchor x="757.0" y="714.0" name="topright"/>
+  <anchor x="96.0" y="714.0" name="topleft"/>
+  <outline>
+    <component base="Eta"/>
+    <component base="prosgegrammeni" xOffset="681"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>Eta</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>1</integer>
+          <key>name</key>
+          <string>prosgegrammeni</string>
+        </dict>
+      </array>
+    </dict>
+  </lib>
+</glyph>

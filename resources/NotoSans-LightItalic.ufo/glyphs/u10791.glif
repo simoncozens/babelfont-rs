@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="u10791" format="2">
+  <advance width="329.0"/>
+  <unicode hex="10791"/>
+  <anchor x="165.5" y="287.0" name="bottom"/>
+  <anchor x="236.35" y="445.4" name="center"/>
+  <anchor x="238.3" y="603.8" name="top"/>
+  <outline>
+    <component base="ramshorn" xScale="0.65" yScale="0.6" xOffset="68" yOffset="287"/>
+  </outline>
+</glyph>

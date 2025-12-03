@@ -1,0 +1,16 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="lowLeftStemToneBarmod" format="2">
+  <advance width="418.0"/>
+  <unicode hex="A715"/>
+  <outline>
+    <component base="tonebarhighmod" xScale="-1.0" yScale="-1.0" xOffset="418" yOffset="688"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Symbol</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Modifier</string>
+    </dict>
+  </lib>
+</glyph>

@@ -1,0 +1,24 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="leftanglebelowcomb" format="2">
+  <unicode hex="0349"/>
+  <anchor x="-44.0" y="0.0" name="_bottom"/>
+  <anchor x="-90.0" y="-217.0" name="bottom"/>
+  <outline>
+    <contour>
+      <point x="-65.0" y="-217.0" type="line"/>
+      <point x="-39.0" y="-217.0" type="line"/>
+      <point x="-9.0" y="-78.0" type="line"/>
+      <point x="-137.0" y="-78.0" type="line"/>
+      <point x="-142.0" y="-103.0" type="line"/>
+      <point x="-41.0" y="-103.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Mark</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Nonspacing</string>
+    </dict>
+  </lib>
+</glyph>

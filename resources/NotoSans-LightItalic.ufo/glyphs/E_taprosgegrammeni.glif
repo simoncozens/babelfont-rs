@@ -1,0 +1,37 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Etaprosgegrammeni" format="2">
+  <advance width="681.0"/>
+  <unicode hex="1FCC"/>
+  <anchor x="285.0" y="0.0" name="bottom"/>
+  <anchor x="284.696" y="-166.0" name="center"/>
+  <anchor x="437.0" y="714.0" name="top"/>
+  <anchor x="757.0" y="714.0" name="topright"/>
+  <anchor x="96.0" y="714.0" name="topleft"/>
+  <outline>
+    <component base="Eta"/>
+    <component base="ypogegrammeni" xOffset="254"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>Eta</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>1</integer>
+          <key>name</key>
+          <string>ypogegrammeni</string>
+        </dict>
+      </array>
+    </dict>
+  </lib>
+</glyph>

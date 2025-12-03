@@ -1,0 +1,55 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Yae-cy" format="2">
+  <advance width="848.0"/>
+  <unicode hex="0518"/>
+  <anchor x="368.0" y="0.0" name="bottom"/>
+  <anchor x="428.0" y="357.0" name="center"/>
+  <anchor x="520.0" y="714.0" name="top"/>
+  <outline>
+    <contour>
+      <point x="244.0" y="328.0" type="curve"/>
+      <point x="-16.0" y="0.0" type="line"/>
+      <point x="18.0" y="0.0" type="line"/>
+      <point x="272.0" y="320.0" type="line"/>
+      <point x="431.0" y="320.0" type="line"/>
+      <point x="363.0" y="0.0" type="line"/>
+      <point x="721.0" y="0.0" type="line"/>
+      <point x="726.0" y="25.0" type="line"/>
+      <point x="396.0" y="25.0" type="line"/>
+      <point x="468.0" y="364.0" type="line"/>
+      <point x="779.0" y="364.0" type="line"/>
+      <point x="784.0" y="389.0" type="line"/>
+      <point x="473.0" y="389.0" type="line"/>
+      <point x="537.0" y="689.0" type="line"/>
+      <point x="867.0" y="689.0" type="line"/>
+      <point x="872.0" y="714.0" type="line"/>
+      <point x="408.0" y="714.0" type="line" smooth="yes"/>
+      <point x="245.0" y="714.0"/>
+      <point x="123.0" y="653.0"/>
+      <point x="123.0" y="484.0" type="curve" smooth="yes"/>
+      <point x="123.0" y="397.0"/>
+      <point x="177.0" y="345.0"/>
+    </contour>
+    <contour>
+      <point x="307.0" y="345.0" type="line"/>
+      <point x="214.0" y="345.0"/>
+      <point x="151.0" y="399.0"/>
+      <point x="151.0" y="485.0" type="curve" smooth="yes"/>
+      <point x="151.0" y="646.0"/>
+      <point x="266.0" y="689.0"/>
+      <point x="414.0" y="689.0" type="curve" smooth="yes"/>
+      <point x="509.0" y="689.0" type="line"/>
+      <point x="436.0" y="345.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>cyrillic</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Uppercase</string>
+    </dict>
+  </lib>
+</glyph>

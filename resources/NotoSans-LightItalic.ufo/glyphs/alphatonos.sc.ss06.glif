@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="alphatonos.sc.ss06" format="2">
+  <advance width="558.0"/>
+  <anchor x="220.0" y="0.0" name="bottom"/>
+  <anchor x="223.0" y="280.0" name="center"/>
+  <anchor x="338.0" y="559.0" name="top"/>
+  <anchor x="519.0" y="559.0" name="topright"/>
+  <outline>
+    <component base="alpha.sc"/>
+    <component base="tonos.sc" xOffset="223" yOffset="31"/>
+  </outline>
+</glyph>

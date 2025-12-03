@@ -1,0 +1,17 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="lefttackmod" format="2">
+  <advance width="204.0"/>
+  <unicode hex="AB6A"/>
+  <outline>
+    <contour>
+      <point x="134.0" y="213.0" type="line"/>
+      <point x="161.0" y="213.0" type="line"/>
+      <point x="189.0" y="344.0" type="line"/>
+      <point x="162.0" y="344.0" type="line"/>
+      <point x="151.0" y="291.0" type="line"/>
+      <point x="38.0" y="291.0" type="line"/>
+      <point x="33.0" y="266.0" type="line"/>
+      <point x="146.0" y="266.0" type="line"/>
+    </contour>
+  </outline>
+</glyph>

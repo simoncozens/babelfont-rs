@@ -1,0 +1,33 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="rsubscript" format="2">
+  <advance width="241.0"/>
+  <unicode hex="1D63"/>
+  <anchor x="44.0" y="-96.0" name="bottom"/>
+  <anchor x="86.45" y="64.8" name="center"/>
+  <anchor x="113.0" y="226.0" name="top"/>
+  <anchor x="211.9" y="220.8" name="topright"/>
+  <outline>
+    <component base="r" xScale="0.65" yScale="0.6" xOffset="-52" yOffset="-96"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>r</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>latin</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Modifier</string>
+    </dict>
+  </lib>
+</glyph>

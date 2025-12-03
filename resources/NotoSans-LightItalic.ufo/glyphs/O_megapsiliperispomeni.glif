@@ -1,0 +1,35 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Omegapsiliperispomeni" format="2">
+  <advance width="992.0"/>
+  <unicode hex="1F6E"/>
+  <anchor x="614.0" y="0.0" name="bottom"/>
+  <anchor x="643.0" y="362.0" name="center"/>
+  <anchor x="447.0" y="714.0" name="topleft"/>
+  <outline>
+    <component base="Omega" xOffset="318"/>
+    <component base="psiliperispomeni.case" xOffset="-30"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>Omega</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>1</integer>
+          <key>name</key>
+          <string>psiliperispomeni.case</string>
+        </dict>
+      </array>
+    </dict>
+  </lib>
+</glyph>

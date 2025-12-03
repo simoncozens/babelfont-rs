@@ -1,0 +1,23 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="iigrave-cy" format="2">
+  <advance width="553.0"/>
+  <unicode hex="045D"/>
+  <anchor x="221.0" y="0.0" name="bottom"/>
+  <anchor x="285.0" y="259.0" name="center"/>
+  <anchor x="344.0" y="766.0" name="top"/>
+  <anchor x="589.0" y="528.0" name="topright"/>
+  <outline>
+    <component base="u"/>
+    <component base="gravecomb" xOffset="527"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>cyrillic</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Lowercase</string>
+    </dict>
+  </lib>
+</glyph>

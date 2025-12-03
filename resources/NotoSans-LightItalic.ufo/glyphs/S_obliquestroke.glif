@@ -1,0 +1,41 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Sobliquestroke" format="2">
+  <advance width="498.0"/>
+  <unicode hex="A7A8"/>
+  <anchor x="192.0" y="0.0" name="bottom"/>
+  <anchor x="263.0" y="357.0" name="center"/>
+  <anchor x="344.0" y="714.0" name="top"/>
+  <anchor x="573.0" y="714.0" name="topright"/>
+  <outline>
+    <contour>
+      <point x="19.0" y="294.0" type="line"/>
+      <point x="511.0" y="408.0" type="line"/>
+      <point x="517.0" y="433.0" type="line"/>
+      <point x="25.0" y="320.0" type="line"/>
+    </contour>
+    <component base="S" xOffset="-1"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>S</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>latin</string>
+      <key>com.schriftgestaltung.Glyphs.shapeOrder</key>
+      <string>PC</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Uppercase</string>
+    </dict>
+  </lib>
+</glyph>

@@ -1,0 +1,33 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="delonglegged-cy" format="2">
+  <advance width="528.0"/>
+  <unicode hex="1C81"/>
+  <anchor x="157.0" y="-240.0" name="bottom"/>
+  <anchor x="320.0" y="528.0" name="top"/>
+  <outline>
+    <contour>
+      <point x="490.0" y="528.0" type="line"/>
+      <point x="248.0" y="528.0" type="line"/>
+      <point x="202.0" y="338.0"/>
+      <point x="120.0" y="180.0"/>
+      <point x="12.0" y="70.0" type="curve"/>
+      <point x="-19.0" y="70.0" type="line"/>
+      <point x="-85.0" y="-240.0" type="line"/>
+      <point x="-59.0" y="-240.0" type="line"/>
+      <point x="2.0" y="45.0" type="line"/>
+      <point x="428.0" y="45.0" type="line"/>
+      <point x="367.0" y="-240.0" type="line"/>
+      <point x="393.0" y="-240.0" type="line"/>
+      <point x="459.0" y="70.0" type="line"/>
+      <point x="392.0" y="70.0" type="line"/>
+    </contour>
+    <contour>
+      <point x="268.0" y="503.0" type="curve"/>
+      <point x="459.0" y="503.0" type="line"/>
+      <point x="366.0" y="70.0" type="line"/>
+      <point x="44.0" y="70.0" type="line"/>
+      <point x="150.0" y="186.0"/>
+      <point x="220.0" y="324.0"/>
+    </contour>
+  </outline>
+</glyph>

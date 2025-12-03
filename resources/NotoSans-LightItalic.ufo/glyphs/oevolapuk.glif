@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="oevolapuk" format="2">
+  <advance width="512.0"/>
+  <unicode hex="A79D"/>
+  <anchor x="196.0" y="0.0" name="bottom"/>
+  <anchor x="250.0" y="263.0" name="center"/>
+  <anchor x="308.0" y="528.0" name="top"/>
+  <outline>
+    <component base="eopenclosed"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>eopenclosed</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Lowercase</string>
+    </dict>
+  </lib>
+</glyph>

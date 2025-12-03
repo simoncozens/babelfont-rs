@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="epsilonvaria" format="2">
+  <advance width="420.0"/>
+  <unicode hex="1F72"/>
+  <anchor x="195.0" y="0.0" name="bottom"/>
+  <anchor x="236.0" y="264.0" name="center"/>
+  <anchor x="303.0" y="528.0" name="top"/>
+  <outline>
+    <component base="epsilon"/>
+    <component base="varia" xOffset="90"/>
+  </outline>
+</glyph>

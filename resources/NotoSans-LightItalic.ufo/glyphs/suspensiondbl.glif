@@ -1,0 +1,27 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="suspensiondbl" format="2">
+  <advance width="261.0"/>
+  <unicode hex="2E44"/>
+  <outline>
+    <contour>
+      <point x="113.0" y="534.0" type="line"/>
+      <point x="321.0" y="738.0" type="line"/>
+      <point x="303.0" y="755.0" type="line"/>
+      <point x="100.0" y="547.0" type="line"/>
+    </contour>
+    <contour>
+      <point x="-7.0" y="-33.0" type="line"/>
+      <point x="201.0" y="171.0" type="line"/>
+      <point x="183.0" y="188.0" type="line"/>
+      <point x="-20.0" y="-20.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Punctuation</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Other</string>
+    </dict>
+  </lib>
+</glyph>

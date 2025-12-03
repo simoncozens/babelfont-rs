@@ -1,0 +1,37 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Alphapsiliperispomeni" format="2">
+  <advance width="721.0"/>
+  <unicode hex="1F0E"/>
+  <anchor x="392.0" y="0.0" name="bottom"/>
+  <anchor x="398.0" y="358.0" name="center"/>
+  <anchor x="553.0" y="714.0" name="top"/>
+  <anchor x="797.0" y="714.0" name="topright"/>
+  <anchor x="354.0" y="714.0" name="topleft"/>
+  <outline>
+    <component base="Alpha" xOffset="174"/>
+    <component base="psiliperispomeni.case" xOffset="-30"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>Alpha</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>1</integer>
+          <key>name</key>
+          <string>psiliperispomeni.case</string>
+        </dict>
+      </array>
+    </dict>
+  </lib>
+</glyph>

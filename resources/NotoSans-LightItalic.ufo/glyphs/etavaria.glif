@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="etavaria" format="2">
+  <advance width="553.0"/>
+  <unicode hex="1F74"/>
+  <anchor x="41.0" y="0.0" name="bottom"/>
+  <anchor x="262.0" y="149.0" name="center"/>
+  <anchor x="264.0" y="528.0" name="top"/>
+  <outline>
+    <component base="eta"/>
+    <component base="varia" xOffset="51"/>
+  </outline>
+</glyph>

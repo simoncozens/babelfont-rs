@@ -1,0 +1,54 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Ereversed-cy" format="2">
+  <advance width="640.0"/>
+  <unicode hex="042D"/>
+  <anchor x="216.0" y="0.0" name="bottom"/>
+  <anchor x="292.0" y="357.0" name="center"/>
+  <anchor x="368.0" y="714.0" name="top"/>
+  <outline>
+    <contour>
+      <point x="210.0" y="-10.0" type="curve" smooth="yes"/>
+      <point x="446.0" y="-10.0"/>
+      <point x="598.0" y="167.0"/>
+      <point x="598.0" y="448.0" type="curve" smooth="yes"/>
+      <point x="598.0" y="631.0"/>
+      <point x="508.0" y="724.0"/>
+      <point x="334.0" y="724.0" type="curve" smooth="yes"/>
+      <point x="269.0" y="724.0"/>
+      <point x="208.0" y="710.0"/>
+      <point x="149.0" y="684.0" type="curve"/>
+      <point x="155.0" y="661.0" type="line"/>
+      <point x="217.0" y="687.0"/>
+      <point x="274.0" y="699.0"/>
+      <point x="331.0" y="699.0" type="curve" smooth="yes"/>
+      <point x="489.0" y="699.0"/>
+      <point x="571.0" y="613.0"/>
+      <point x="571.0" y="444.0" type="curve" smooth="yes"/>
+      <point x="571.0" y="181.0"/>
+      <point x="429.0" y="15.0"/>
+      <point x="212.0" y="15.0" type="curve" smooth="yes"/>
+      <point x="141.0" y="15.0"/>
+      <point x="86.0" y="31.0"/>
+      <point x="37.0" y="54.0" type="curve"/>
+      <point x="37.0" y="25.0" type="line"/>
+      <point x="85.0" y="4.0"/>
+      <point x="137.0" y="-10.0"/>
+    </contour>
+    <contour>
+      <point x="190.0" y="363.0" type="line"/>
+      <point x="574.0" y="363.0" type="line"/>
+      <point x="577.0" y="388.0" type="line"/>
+      <point x="195.0" y="388.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>cyrillic</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Uppercase</string>
+    </dict>
+  </lib>
+</glyph>

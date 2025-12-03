@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="uni1AC8" format="2">
+  <unicode hex="1AC8"/>
+  <anchor x="-97.0" y="624.0" name="_top"/>
+  <anchor x="-59.0" y="823.0" name="top"/>
+  <outline>
+    <component base="plusbelowcomb" yOffset="842"/>
+  </outline>
+</glyph>

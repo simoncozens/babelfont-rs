@@ -1,0 +1,31 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="YturnedSansSerif" format="2">
+  <advance width="485.0"/>
+  <unicode hex="2144"/>
+  <anchor x="338.0" y="714.0" name="top"/>
+  <anchor x="188.0" y="357.0" name="center"/>
+  <anchor x="186.0" y="0.0" name="bottom"/>
+  <anchor x="-36.0" y="0.0" name="bottomleft"/>
+  <outline>
+    <component base="Y" xScale="-1.0" yScale="-1.0" xOffset="525" yOffset="714"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>Y</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Symbol</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Math</string>
+    </dict>
+  </lib>
+</glyph>

@@ -1,0 +1,32 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="qpdigraph" format="2">
+  <advance width="929.0"/>
+  <unicode hex="0239"/>
+  <anchor x="521.0" y="528.0" name="top"/>
+  <anchor x="467.0" y="153.0" name="center"/>
+  <anchor x="360.0" y="-232.0" name="bottom"/>
+  <outline>
+    <component base="dbdigraph" xScale="-1.0" yScale="-1.0" xOffset="929" yOffset="528"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>dbdigraph</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>latin</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Lowercase</string>
+    </dict>
+  </lib>
+</glyph>

@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="omicronvaria.sc.ss06" format="2">
+  <advance width="575.0"/>
+  <anchor x="229.0" y="0.0" name="bottom"/>
+  <anchor x="288.0" y="280.0" name="center"/>
+  <anchor x="347.0" y="559.0" name="top"/>
+  <anchor x="614.0" y="559.0" name="topright"/>
+  <outline>
+    <component base="omicron.sc"/>
+    <component base="varia.sc" xOffset="134" yOffset="31"/>
+  </outline>
+</glyph>

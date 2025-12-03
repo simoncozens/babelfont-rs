@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="u107AF" format="2">
+  <advance width="295.0"/>
+  <unicode hex="107AF"/>
+  <anchor x="123.2" y="143.0" name="bottom"/>
+  <anchor x="199.9" y="412.4" name="center"/>
+  <anchor x="247.35" y="682.4" name="top"/>
+  <anchor x="334.45" y="682.4" name="topright"/>
+  <outline>
+    <component base="tretroflexhook" xScale="0.65" yScale="0.6" xOffset="92" yOffset="287"/>
+  </outline>
+</glyph>

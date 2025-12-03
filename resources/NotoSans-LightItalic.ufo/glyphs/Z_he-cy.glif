@@ -1,0 +1,52 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Zhe-cy" format="2">
+  <advance width="783.0"/>
+  <unicode hex="0416"/>
+  <anchor x="336.0" y="0.0" name="bottom"/>
+  <anchor x="412.0" y="357.0" name="center"/>
+  <anchor x="487.0" y="714.0" name="top"/>
+  <outline>
+    <contour>
+      <point x="688.0" y="0.0" type="line"/>
+      <point x="715.0" y="0.0" type="line"/>
+      <point x="564.0" y="393.0" type="line"/>
+      <point x="562.0" y="364.0" type="line"/>
+      <point x="847.0" y="714.0" type="line"/>
+      <point x="816.0" y="714.0" type="line"/>
+      <point x="551.0" y="388.0" type="line"/>
+      <point x="548.0" y="364.0" type="line"/>
+    </contour>
+    <contour>
+      <point x="-44.0" y="0.0" type="line"/>
+      <point x="-12.0" y="0.0" type="line"/>
+      <point x="284.0" y="364.0" type="line"/>
+      <point x="287.0" y="386.0" type="line"/>
+      <point x="144.0" y="714.0" type="line"/>
+      <point x="118.0" y="714.0" type="line"/>
+      <point x="270.0" y="364.0" type="line"/>
+      <point x="275.0" y="393.0" type="line"/>
+    </contour>
+    <contour>
+      <point x="322.0" y="0.0" type="line"/>
+      <point x="348.0" y="0.0" type="line"/>
+      <point x="500.0" y="714.0" type="line"/>
+      <point x="474.0" y="714.0" type="line"/>
+    </contour>
+    <contour>
+      <point x="274.0" y="363.0" type="line"/>
+      <point x="555.0" y="363.0" type="line"/>
+      <point x="556.0" y="388.0" type="line"/>
+      <point x="279.0" y="388.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>cyrillic</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Uppercase</string>
+    </dict>
+  </lib>
+</glyph>

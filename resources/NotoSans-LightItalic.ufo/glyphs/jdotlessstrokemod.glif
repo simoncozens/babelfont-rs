@@ -1,0 +1,31 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="jdotlessstrokemod" format="2">
+  <advance width="135.0"/>
+  <unicode hex="1DA1"/>
+  <anchor x="42.0" y="143.0" name="bottom"/>
+  <anchor x="67.3" y="373.4" name="center"/>
+  <anchor x="140.0" y="604.0" name="top"/>
+  <anchor x="201.2" y="603.8" name="topright"/>
+  <outline>
+    <component base="jdotlessstroke" xScale="0.65" yScale="0.6" xOffset="53" yOffset="287"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>jdotlessstroke</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Modifier</string>
+    </dict>
+  </lib>
+</glyph>

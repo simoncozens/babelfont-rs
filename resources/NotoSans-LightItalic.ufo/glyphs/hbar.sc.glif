@@ -1,0 +1,40 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="hbar.sc" format="2">
+  <advance width="534.0"/>
+  <anchor x="208.0" y="0.0" name="bottom"/>
+  <anchor x="267.0" y="280.0" name="center"/>
+  <anchor x="326.0" y="559.0" name="top"/>
+  <anchor x="573.0" y="559.0" name="topright"/>
+  <outline>
+    <contour>
+      <point x="36.0" y="421.0" type="line"/>
+      <point x="564.0" y="421.0" type="line"/>
+      <point x="569.0" y="445.0" type="line"/>
+      <point x="41.0" y="445.0" type="line"/>
+    </contour>
+    <component base="h.sc"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>h.sc</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>latin</string>
+      <key>com.schriftgestaltung.Glyphs.shapeOrder</key>
+      <string>PC</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Smallcaps</string>
+    </dict>
+  </lib>
+</glyph>

@@ -1,0 +1,36 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="dothorizontalbarmod" format="2">
+  <advance width="331.0"/>
+  <unicode hex="A719"/>
+  <anchor x="241.0" y="683.0" name="center"/>
+  <outline>
+    <contour>
+      <point x="119.0" y="609.0" type="line"/>
+      <point x="364.0" y="609.0" type="line"/>
+      <point x="364.0" y="634.0" type="line"/>
+      <point x="119.0" y="634.0" type="line"/>
+    </contour>
+    <contour>
+      <point x="254.0" y="672.0" type="curve" smooth="yes"/>
+      <point x="271.0" y="672.0"/>
+      <point x="278.0" y="682.0"/>
+      <point x="278.0" y="714.0" type="curve" smooth="yes"/>
+      <point x="278.0" y="747.0"/>
+      <point x="271.0" y="758.0"/>
+      <point x="254.0" y="758.0" type="curve" smooth="yes"/>
+      <point x="240.0" y="758.0"/>
+      <point x="229.0" y="747.0"/>
+      <point x="229.0" y="714.0" type="curve" smooth="yes"/>
+      <point x="229.0" y="682.0"/>
+      <point x="240.0" y="672.0"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Modifier</string>
+    </dict>
+  </lib>
+</glyph>

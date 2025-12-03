@@ -1,0 +1,32 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="gedescender-cy" format="2">
+  <advance width="359.0"/>
+  <unicode hex="04F7"/>
+  <anchor x="89.0" y="-167.0" name="bottom"/>
+  <anchor x="212.0" y="180.0" name="center"/>
+  <anchor x="236.0" y="528.0" name="top"/>
+  <outline>
+    <contour>
+      <point x="79.0" y="-167.0" type="line"/>
+      <point x="105.0" y="-167.0" type="line"/>
+      <point x="149.0" y="25.0" type="line"/>
+      <point x="63.0" y="25.0" type="line"/>
+      <point x="165.0" y="503.0" type="line"/>
+      <point x="388.0" y="503.0" type="line"/>
+      <point x="393.0" y="528.0" type="line"/>
+      <point x="144.0" y="528.0" type="line"/>
+      <point x="32.0" y="0.0" type="line"/>
+      <point x="116.0" y="0.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>cyrillic</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Lowercase</string>
+    </dict>
+  </lib>
+</glyph>

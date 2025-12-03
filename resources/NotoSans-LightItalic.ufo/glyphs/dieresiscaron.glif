@@ -1,0 +1,52 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="dieresiscaron" format="2">
+  <outline>
+    <contour>
+      <point x="83.0" y="714.0" type="curve"/>
+      <point x="105.0" y="714.0" type="line"/>
+      <point x="137.0" y="756.0"/>
+      <point x="203.0" y="824.0"/>
+      <point x="246.0" y="865.0" type="curve"/>
+      <point x="247.0" y="871.0" type="line"/>
+      <point x="224.0" y="871.0" type="line"/>
+      <point x="182.0" y="834.0"/>
+      <point x="134.0" y="784.0"/>
+      <point x="99.0" y="746.0" type="curve"/>
+      <point x="81.0" y="784.0"/>
+      <point x="54.0" y="834.0"/>
+      <point x="26.0" y="871.0" type="curve"/>
+      <point x="8.0" y="871.0" type="line"/>
+      <point x="6.0" y="865.0" type="line"/>
+      <point x="34.0" y="824.0"/>
+      <point x="69.0" y="755.0"/>
+    </contour>
+    <contour>
+      <point x="4.0" y="620.0" type="curve" smooth="yes"/>
+      <point x="26.0" y="620.0"/>
+      <point x="34.0" y="643.0"/>
+      <point x="34.0" y="661.0" type="curve" smooth="yes"/>
+      <point x="34.0" y="673.0"/>
+      <point x="28.0" y="682.0"/>
+      <point x="14.0" y="682.0" type="curve" smooth="yes"/>
+      <point x="-8.0" y="682.0"/>
+      <point x="-15.0" y="658.0"/>
+      <point x="-15.0" y="641.0" type="curve" smooth="yes"/>
+      <point x="-15.0" y="629.0"/>
+      <point x="-9.0" y="620.0"/>
+    </contour>
+    <contour>
+      <point x="157.0" y="620.0" type="curve" smooth="yes"/>
+      <point x="179.0" y="620.0"/>
+      <point x="187.0" y="643.0"/>
+      <point x="187.0" y="661.0" type="curve" smooth="yes"/>
+      <point x="187.0" y="673.0"/>
+      <point x="181.0" y="682.0"/>
+      <point x="167.0" y="682.0" type="curve" smooth="yes"/>
+      <point x="145.0" y="682.0"/>
+      <point x="138.0" y="658.0"/>
+      <point x="138.0" y="641.0" type="curve" smooth="yes"/>
+      <point x="138.0" y="629.0"/>
+      <point x="144.0" y="620.0"/>
+    </contour>
+  </outline>
+</glyph>

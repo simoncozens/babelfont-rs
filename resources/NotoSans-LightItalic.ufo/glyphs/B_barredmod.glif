@@ -1,0 +1,39 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Bbarredmod" format="2">
+  <advance width="389.0"/>
+  <unicode hex="1D2F"/>
+  <anchor x="200.0" y="287.0" name="bottom"/>
+  <anchor x="257.75" y="501.2" name="center"/>
+  <anchor x="291.0" y="715.0" name="top"/>
+  <anchor x="491.1" y="715.4" name="topright"/>
+  <outline>
+    <contour>
+      <point x="70.0" y="505.0" type="line"/>
+      <point x="438.0" y="505.0" type="line"/>
+      <point x="442.0" y="520.0" type="line"/>
+      <point x="74.0" y="520.0" type="line"/>
+    </contour>
+    <component base="B" xScale="0.65" yScale="0.6" xOffset="53" yOffset="287"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>B</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.shapeOrder</key>
+      <string>PC</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Modifier</string>
+    </dict>
+  </lib>
+</glyph>

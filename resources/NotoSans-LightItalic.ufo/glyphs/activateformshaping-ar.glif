@@ -1,0 +1,25 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="activateformshaping-ar" format="2">
+  <unicode hex="206D"/>
+  <outline>
+    <contour>
+      <point x="-21.0" y="-133.0" type="line"/>
+      <point x="21.0" y="-133.0" type="line"/>
+      <point x="21.0" y="477.0" type="line"/>
+      <point x="117.0" y="477.0" type="line"/>
+      <point x="0.0" y="692.0" type="line"/>
+      <point x="-117.0" y="477.0" type="line"/>
+      <point x="-21.0" y="477.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Separator</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>arabic</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Format</string>
+    </dict>
+  </lib>
+</glyph>

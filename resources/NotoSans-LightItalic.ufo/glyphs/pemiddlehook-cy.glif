@@ -1,0 +1,56 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="pemiddlehook-cy" format="2">
+  <advance width="779.0"/>
+  <unicode hex="04A7"/>
+  <anchor x="283.0" y="-242.0" name="bottom"/>
+  <anchor x="393.0" y="143.0" name="center"/>
+  <anchor x="446.0" y="528.0" name="top"/>
+  <outline>
+    <contour>
+      <point x="501.0" y="-242.0" type="curve"/>
+      <point x="690.0" y="-242.0"/>
+      <point x="750.0" y="-32.0"/>
+      <point x="750.0" y="108.0" type="curve"/>
+      <point x="750.0" y="267.0"/>
+      <point x="648.0" y="305.0"/>
+      <point x="567.0" y="305.0" type="curve"/>
+      <point x="542.0" y="305.0"/>
+      <point x="517.0" y="302.0"/>
+      <point x="502.0" y="300.0" type="curve"/>
+      <point x="550.0" y="528.0" type="line"/>
+      <point x="149.0" y="528.0" type="line"/>
+      <point x="37.0" y="0.0" type="line"/>
+      <point x="66.0" y="0.0" type="line"/>
+      <point x="173.0" y="499.0" type="line"/>
+      <point x="515.0" y="499.0" type="line"/>
+      <point x="408.0" y="0.0" type="line"/>
+      <point x="439.0" y="0.0" type="line"/>
+      <point x="495.0" y="271.0" type="line"/>
+      <point x="515.0" y="273.0"/>
+      <point x="540.0" y="278.0"/>
+      <point x="571.0" y="278.0" type="curve"/>
+      <point x="661.0" y="278.0"/>
+      <point x="721.0" y="218.0"/>
+      <point x="721.0" y="108.0" type="curve"/>
+      <point x="721.0" y="-53.0"/>
+      <point x="652.0" y="-217.0"/>
+      <point x="509.0" y="-217.0" type="curve"/>
+      <point x="468.0" y="-217.0"/>
+      <point x="437.0" y="-205.0"/>
+      <point x="420.0" y="-197.0" type="curve"/>
+      <point x="420.0" y="-228.0" type="line"/>
+      <point x="433.0" y="-233.0"/>
+      <point x="463.0" y="-242.0"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>cyrillic</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Lowercase</string>
+    </dict>
+  </lib>
+</glyph>

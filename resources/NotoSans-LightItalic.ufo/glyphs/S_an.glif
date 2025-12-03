@@ -1,0 +1,42 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="San" format="2">
+  <advance width="786.0"/>
+  <unicode hex="03FA"/>
+  <anchor x="415.0" y="357.0" name="center"/>
+  <outline>
+    <contour>
+      <point x="50.0" y="0.0" type="line"/>
+      <point x="77.0" y="0.0" type="line"/>
+      <point x="203.0" y="597.0" type="line" smooth="yes"/>
+      <point x="209.0" y="627.0"/>
+      <point x="212.0" y="646.0"/>
+      <point x="218.0" y="679.0" type="curve"/>
+      <point x="220.0" y="679.0" type="line"/>
+      <point x="388.0" y="260.0" type="line"/>
+      <point x="409.0" y="260.0" type="line"/>
+      <point x="746.0" y="678.0" type="line"/>
+      <point x="748.0" y="678.0" type="line"/>
+      <point x="740.0" y="644.0"/>
+      <point x="735.0" y="622.0"/>
+      <point x="731.0" y="602.0" type="curve" smooth="yes"/>
+      <point x="604.0" y="0.0" type="line"/>
+      <point x="630.0" y="0.0" type="line"/>
+      <point x="781.0" y="714.0" type="line"/>
+      <point x="743.0" y="714.0" type="line"/>
+      <point x="403.0" y="292.0" type="line"/>
+      <point x="401.0" y="292.0" type="line"/>
+      <point x="234.0" y="714.0" type="line"/>
+      <point x="201.0" y="714.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>greek</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Uppercase</string>
+    </dict>
+  </lib>
+</glyph>

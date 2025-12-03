@@ -1,0 +1,38 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Tetse-cy" format="2">
+  <advance width="797.0"/>
+  <unicode hex="04B4"/>
+  <anchor x="306.0" y="-175.0" name="bottom"/>
+  <anchor x="444.0" y="269.0" name="center"/>
+  <anchor x="495.0" y="714.0" name="top"/>
+  <outline>
+    <contour>
+      <point x="650.0" y="-175.0" type="line"/>
+      <point x="675.0" y="-175.0" type="line"/>
+      <point x="718.0" y="25.0" type="line"/>
+      <point x="649.0" y="25.0" type="line"/>
+      <point x="795.0" y="714.0" type="line"/>
+      <point x="768.0" y="714.0" type="line"/>
+      <point x="622.0" y="25.0" type="line"/>
+      <point x="205.0" y="25.0" type="line"/>
+      <point x="346.0" y="689.0" type="line"/>
+      <point x="571.0" y="689.0" type="line"/>
+      <point x="576.0" y="714.0" type="line"/>
+      <point x="98.0" y="714.0" type="line"/>
+      <point x="93.0" y="689.0" type="line"/>
+      <point x="319.0" y="689.0" type="line"/>
+      <point x="173.0" y="0.0" type="line"/>
+      <point x="687.0" y="0.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>cyrillic</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Uppercase</string>
+    </dict>
+  </lib>
+</glyph>

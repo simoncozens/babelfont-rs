@@ -1,0 +1,41 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="yattall-cy" format="2">
+  <advance width="522.0"/>
+  <unicode hex="1C87"/>
+  <anchor x="205.0" y="0.0" name="bottom"/>
+  <anchor x="366.0" y="760.0" name="top"/>
+  <outline>
+    <contour>
+      <point x="75.0" y="0.0" type="line"/>
+      <point x="284.0" y="0.0" type="line" smooth="yes"/>
+      <point x="405.0" y="0.0"/>
+      <point x="465.0" y="56.0"/>
+      <point x="465.0" y="156.0" type="curve" smooth="yes"/>
+      <point x="465.0" y="244.0"/>
+      <point x="414.0" y="302.0"/>
+      <point x="298.0" y="302.0" type="curve" smooth="yes"/>
+      <point x="165.0" y="302.0" type="line"/>
+      <point x="208.0" y="503.0" type="line"/>
+      <point x="411.0" y="503.0" type="line"/>
+      <point x="416.0" y="528.0" type="line"/>
+      <point x="213.0" y="528.0" type="line"/>
+      <point x="263.0" y="760.0" type="line"/>
+      <point x="237.0" y="760.0" type="line"/>
+      <point x="187.0" y="528.0" type="line"/>
+      <point x="75.0" y="528.0" type="line"/>
+      <point x="70.0" y="503.0" type="line"/>
+      <point x="182.0" y="503.0" type="line"/>
+    </contour>
+    <contour>
+      <point x="280.0" y="25.0" type="curve" smooth="yes"/>
+      <point x="107.0" y="25.0" type="line"/>
+      <point x="160.0" y="277.0" type="line"/>
+      <point x="294.0" y="277.0" type="line" smooth="yes"/>
+      <point x="392.0" y="277.0"/>
+      <point x="438.0" y="233.0"/>
+      <point x="438.0" y="157.0" type="curve" smooth="yes"/>
+      <point x="438.0" y="72.0"/>
+      <point x="396.0" y="25.0"/>
+    </contour>
+  </outline>
+</glyph>

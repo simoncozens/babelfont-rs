@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="aa.pcap" format="2">
+  <advance width="776.0"/>
+  <anchor x="516.0" y="0.0" name="bottom"/>
+  <anchor x="515.0" y="266.0" name="center"/>
+  <anchor x="628.0" y="528.0" name="top"/>
+  <outline>
+    <component base="Asmall"/>
+    <component base="Asmall" xOffset="367"/>
+  </outline>
+</glyph>

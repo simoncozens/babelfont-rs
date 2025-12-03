@@ -1,0 +1,21 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="macronrighthalfcomb" format="2">
+  <unicode hex="FE25"/>
+  <anchor x="0.0" y="528.0" name="_top"/>
+  <outline>
+    <contour>
+      <point x="3.0" y="764.0" type="line"/>
+      <point x="-252.0" y="764.0" type="line"/>
+      <point x="-252.0" y="739.0" type="line"/>
+      <point x="3.0" y="739.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Mark</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Nonspacing</string>
+    </dict>
+  </lib>
+</glyph>

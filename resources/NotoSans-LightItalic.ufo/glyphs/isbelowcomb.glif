@@ -1,0 +1,50 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="isbelowcomb" format="2">
+  <unicode hex="1DD0"/>
+  <anchor x="-61.0" y="0.0" name="_bottom"/>
+  <anchor x="-109.0" y="-224.0" name="bottom"/>
+  <outline>
+    <contour>
+      <point x="-291.0" y="-224.0" type="curve"/>
+      <point x="-266.0" y="-224.0" type="line"/>
+      <point x="-233.0" y="-165.0"/>
+      <point x="-209.0" y="-138.0"/>
+      <point x="-163.0" y="-138.0" type="curve" smooth="yes"/>
+      <point x="-110.0" y="-138.0"/>
+      <point x="-74.0" y="-224.0"/>
+      <point x="2.0" y="-224.0" type="curve" smooth="yes"/>
+      <point x="74.0" y="-224.0"/>
+      <point x="124.0" y="-172.0"/>
+      <point x="124.0" y="-100.0" type="curve" smooth="yes"/>
+      <point x="124.0" y="-57.0"/>
+      <point x="101.0" y="-25.0"/>
+      <point x="65.0" y="-14.0" type="curve"/>
+      <point x="54.0" y="-38.0" type="line"/>
+      <point x="84.0" y="-47.0"/>
+      <point x="97.0" y="-73.0"/>
+      <point x="97.0" y="-104.0" type="curve" smooth="yes"/>
+      <point x="97.0" y="-159.0"/>
+      <point x="61.0" y="-197.0"/>
+      <point x="2.0" y="-197.0" type="curve" smooth="yes"/>
+      <point x="-59.0" y="-197.0"/>
+      <point x="-90.0" y="-111.0"/>
+      <point x="-162.0" y="-111.0" type="curve" smooth="yes"/>
+      <point x="-211.0" y="-111.0"/>
+      <point x="-238.0" y="-131.0"/>
+    </contour>
+    <contour>
+      <point x="-294.0" y="-224.0" type="line"/>
+      <point x="-266.0" y="-224.0" type="line"/>
+      <point x="-143.0" y="0.0" type="line"/>
+      <point x="-171.0" y="0.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Mark</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Nonspacing</string>
+    </dict>
+  </lib>
+</glyph>

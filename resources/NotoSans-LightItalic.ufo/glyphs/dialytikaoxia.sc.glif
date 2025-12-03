@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="dialytikaoxia.sc" format="2">
+  <advance width="575.0"/>
+  <anchor x="336.0" y="528.0" name="_top"/>
+  <outline>
+    <component base="dieresistonos.sc"/>
+  </outline>
+</glyph>

@@ -1,0 +1,17 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="dotaboveleftcmb" format="2">
+  <unicode hex="1DF8"/>
+  <anchor x="100.0" y="528.0" name="_top"/>
+  <anchor x="0.0" y="721.0" name="top"/>
+  <outline>
+    <component base="dotaccent" xOffset="-157"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Mark</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Nonspacing</string>
+    </dict>
+  </lib>
+</glyph>

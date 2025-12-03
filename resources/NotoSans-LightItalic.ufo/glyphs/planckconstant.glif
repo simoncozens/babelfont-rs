@@ -1,0 +1,31 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="planckconstant" format="2">
+  <advance width="553.0"/>
+  <unicode hex="210E"/>
+  <anchor x="221.0" y="0.0" name="bottom"/>
+  <anchor x="277.0" y="264.0" name="center"/>
+  <anchor x="382.0" y="760.0" name="top"/>
+  <anchor x="598.0" y="760.0" name="topright"/>
+  <outline>
+    <component base="h"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>h</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Lowercase</string>
+    </dict>
+  </lib>
+</glyph>

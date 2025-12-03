@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Hturned" format="2">
+  <advance width="675.0"/>
+  <unicode hex="A78D"/>
+  <anchor x="397.0" y="357.0" name="center"/>
+  <outline>
+    <contour>
+      <point x="486.0" y="0.0" type="line"/>
+      <point x="512.0" y="0.0" type="line"/>
+      <point x="663.0" y="714.0" type="line"/>
+      <point x="638.0" y="714.0" type="line"/>
+      <point x="567.0" y="385.0" type="line"/>
+      <point x="163.0" y="385.0" type="line"/>
+      <point x="232.0" y="714.0" type="line"/>
+      <point x="206.0" y="714.0" type="line"/>
+      <point x="131.0" y="360.0" type="line"/>
+      <point x="563.0" y="360.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>latin</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Uppercase</string>
+    </dict>
+  </lib>
+</glyph>

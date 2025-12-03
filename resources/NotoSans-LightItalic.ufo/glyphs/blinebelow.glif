@@ -1,0 +1,42 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="blinebelow" format="2">
+  <advance width="568.0"/>
+  <unicode hex="1E07"/>
+  <anchor x="197.0" y="-144.0" name="bottom"/>
+  <anchor x="272.0" y="375.0" name="center"/>
+  <anchor x="389.0" y="760.0" name="top"/>
+  <anchor x="653.0" y="760.0" name="topright"/>
+  <outline>
+    <component base="b"/>
+    <component base="macronmod" xOffset="-18" yOffset="-758"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>b</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>1</integer>
+          <key>name</key>
+          <string>macronmod</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>latin</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Lowercase</string>
+    </dict>
+  </lib>
+</glyph>

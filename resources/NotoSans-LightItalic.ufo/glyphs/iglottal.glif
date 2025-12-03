@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="iglottal" format="2">
+  <advance width="529.0"/>
+  <unicode hex="A7BD"/>
+  <anchor x="48.0" y="0.0" name="bottom"/>
+  <anchor x="101.0" y="264.0" name="center"/>
+  <anchor x="160.0" y="528.0" name="top"/>
+  <outline>
+    <component base="idotless"/>
+    <component base="A7newcommashape" xOffset="207"/>
+  </outline>
+</glyph>

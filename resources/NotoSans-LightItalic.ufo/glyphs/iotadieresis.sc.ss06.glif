@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="iotadieresis.sc.ss06" format="2">
+  <advance width="200.0"/>
+  <anchor x="44.0" y="0.0" name="bottom"/>
+  <anchor x="103.0" y="280.0" name="center"/>
+  <anchor x="197.0" y="719.0" name="top"/>
+  <anchor x="239.0" y="559.0" name="topright"/>
+  <outline>
+    <component base="idieresis.sc"/>
+  </outline>
+</glyph>

@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="lretroflexhookmod" format="2">
+  <advance width="142.0"/>
+  <unicode hex="1DA9"/>
+  <anchor x="45.0" y="144.0" name="bottom"/>
+  <anchor x="131.65" y="443.0" name="center"/>
+  <anchor x="173.0" y="743.0" name="top"/>
+  <outline>
+    <component base="lhookretroflex" xScale="0.65" yScale="0.6" xOffset="53" yOffset="287"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>lhookretroflex</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Modifier</string>
+    </dict>
+  </lib>
+</glyph>

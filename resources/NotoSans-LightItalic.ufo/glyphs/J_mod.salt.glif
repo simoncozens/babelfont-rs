@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Jmod.salt" format="2">
+  <advance width="199.0"/>
+  <anchor x="88.9" y="287.0" name="bottom"/>
+  <anchor x="138.95" y="498.2" name="center"/>
+  <anchor x="255.3" y="715.4" name="top"/>
+  <anchor x="317.05" y="715.4" name="topright"/>
+  <outline>
+    <component base="J.salt" xScale="0.65" yScale="0.6" xOffset="20" yOffset="287"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>J.salt</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Modifier</string>
+    </dict>
+  </lib>
+</glyph>

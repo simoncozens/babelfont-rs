@@ -1,0 +1,35 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="ot-cy" format="2">
+  <advance width="694.0"/>
+  <unicode hex="047F"/>
+  <anchor x="291.0" y="0.0" name="bottom"/>
+  <anchor x="401.0" y="264.0" name="center"/>
+  <anchor x="434.0" y="707.0" name="top"/>
+  <outline>
+    <component base="omega-cy"/>
+    <component base="cyrillic_otmark" xOffset="73" yOffset="2"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>omega-cy</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>1</integer>
+          <key>name</key>
+          <string>cyrillic_otmark</string>
+        </dict>
+      </array>
+    </dict>
+  </lib>
+</glyph>

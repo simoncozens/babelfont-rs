@@ -1,0 +1,21 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="leftraisedomissionbracket" format="2">
+  <advance width="500.0"/>
+  <unicode hex="2E0C"/>
+  <outline>
+    <contour>
+      <point x="411.0" y="343.0" type="line"/>
+      <point x="435.0" y="367.0" type="line"/>
+      <point x="90.0" y="714.0" type="line"/>
+      <point x="65.0" y="689.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Punctuation</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Other</string>
+    </dict>
+  </lib>
+</glyph>

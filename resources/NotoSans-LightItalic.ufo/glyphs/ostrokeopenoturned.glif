@@ -1,0 +1,39 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="ostrokeopenoturned" format="2">
+  <advance width="884.0"/>
+  <unicode hex="AB44"/>
+  <anchor x="546.0" y="0.0" name="bottom"/>
+  <anchor x="602.0" y="264.0" name="center"/>
+  <anchor x="658.0" y="528.0" name="top"/>
+  <anchor x="920.0" y="528.0" name="topright"/>
+  <outline>
+    <contour>
+      <point x="427.0" y="-45.0" type="line"/>
+      <point x="800.0" y="559.0" type="line"/>
+      <point x="779.0" y="571.0" type="line"/>
+      <point x="407.0" y="-32.0" type="line"/>
+    </contour>
+    <component base="oopenoturned"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>oopenoturned</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.shapeOrder</key>
+      <string>PC</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Lowercase</string>
+    </dict>
+  </lib>
+</glyph>

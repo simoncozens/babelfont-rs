@@ -1,0 +1,29 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="crossaccentmod" format="2">
+  <advance width="222.0"/>
+  <unicode hex="02DF"/>
+  <outline>
+    <contour>
+      <point x="134.0" y="592.0" type="line"/>
+      <point x="197.0" y="651.0" type="line"/>
+      <point x="237.0" y="594.0" type="line"/>
+      <point x="254.0" y="607.0" type="line"/>
+      <point x="214.0" y="666.0" type="line"/>
+      <point x="281.0" y="729.0" type="line"/>
+      <point x="265.0" y="743.0" type="line"/>
+      <point x="201.0" y="683.0" type="line"/>
+      <point x="158.0" y="743.0" type="line"/>
+      <point x="139.0" y="730.0" type="line"/>
+      <point x="184.0" y="668.0" type="line"/>
+      <point x="119.0" y="607.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Symbol</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Superscript</string>
+    </dict>
+  </lib>
+</glyph>

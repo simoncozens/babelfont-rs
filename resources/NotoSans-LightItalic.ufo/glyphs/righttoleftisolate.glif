@@ -1,0 +1,15 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="righttoleftisolate" format="2">
+  <advance width="600.0"/>
+  <unicode hex="2067"/>
+  <outline>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Separator</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Format</string>
+    </dict>
+  </lib>
+</glyph>

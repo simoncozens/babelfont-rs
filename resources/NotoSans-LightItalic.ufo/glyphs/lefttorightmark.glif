@@ -1,0 +1,27 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="lefttorightmark" format="2">
+  <unicode hex="200E"/>
+  <outline>
+    <contour>
+      <point x="-20.0" y="-133.0" type="line"/>
+      <point x="20.0" y="-133.0" type="line"/>
+      <point x="20.0" y="563.0" type="line"/>
+      <point x="141.0" y="563.0" type="line"/>
+      <point x="77.0" y="502.0" type="line"/>
+      <point x="104.0" y="476.0" type="line"/>
+      <point x="212.0" y="583.0" type="line"/>
+      <point x="104.0" y="690.0" type="line"/>
+      <point x="77.0" y="663.0" type="line"/>
+      <point x="141.0" y="602.0" type="line"/>
+      <point x="-20.0" y="602.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Separator</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Nonspace</string>
+    </dict>
+  </lib>
+</glyph>

@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="u107B0" format="2">
+  <advance width="309.0"/>
+  <unicode hex="107B0"/>
+  <anchor x="149.85" y="287.0" name="bottom"/>
+  <anchor x="227.85" y="448.4" name="center"/>
+  <anchor x="222.65" y="603.8" name="top"/>
+  <outline>
+    <component base="vrighthook" xScale="0.65" yScale="0.6" xOffset="53" yOffset="287"/>
+  </outline>
+</glyph>

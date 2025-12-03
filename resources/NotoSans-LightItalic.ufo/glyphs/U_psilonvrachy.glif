@@ -1,0 +1,37 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Upsilonvrachy" format="2">
+  <advance width="485.0"/>
+  <unicode hex="1FE8"/>
+  <anchor x="187.0" y="0.0" name="bottom"/>
+  <anchor x="337.0" y="357.0" name="center"/>
+  <anchor x="379.0" y="904.0" name="top"/>
+  <anchor x="561.0" y="714.0" name="topright"/>
+  <anchor x="53.0" y="714.0" name="topleft"/>
+  <outline>
+    <component base="Upsilon"/>
+    <component base="brevecomb" xOffset="276" yOffset="186"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>Upsilon</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>1</integer>
+          <key>name</key>
+          <string>brevecomb</string>
+        </dict>
+      </array>
+    </dict>
+  </lib>
+</glyph>

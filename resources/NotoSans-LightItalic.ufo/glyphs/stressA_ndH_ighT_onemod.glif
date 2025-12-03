@@ -1,0 +1,27 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="stressAndHighTonemod" format="2">
+  <advance width="452.0"/>
+  <unicode hex="A720"/>
+  <outline>
+    <contour>
+      <point x="325.0" y="464.0" type="line"/>
+      <point x="325.0" y="579.0" type="line"/>
+      <point x="480.0" y="519.0" type="line"/>
+      <point x="480.0" y="577.0" type="line"/>
+      <point x="122.0" y="714.0" type="line"/>
+      <point x="122.0" y="522.0" type="line"/>
+      <point x="175.0" y="502.0" type="line"/>
+      <point x="175.0" y="637.0" type="line"/>
+      <point x="272.0" y="599.0" type="line"/>
+      <point x="272.0" y="485.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Symbol</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Modifier</string>
+    </dict>
+  </lib>
+</glyph>

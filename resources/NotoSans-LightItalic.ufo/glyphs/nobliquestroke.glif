@@ -1,0 +1,41 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="nobliquestroke" format="2">
+  <advance width="553.0"/>
+  <unicode hex="A7A5"/>
+  <anchor x="221.0" y="0.0" name="bottom"/>
+  <anchor x="262.0" y="269.0" name="center"/>
+  <anchor x="333.0" y="528.0" name="top"/>
+  <anchor x="589.0" y="528.0" name="topright"/>
+  <outline>
+    <contour>
+      <point x="1.0" y="210.0" type="line"/>
+      <point x="559.0" y="321.0" type="line"/>
+      <point x="564.0" y="346.0" type="line"/>
+      <point x="7.0" y="236.0" type="line"/>
+    </contour>
+    <component base="n"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>n</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>latin</string>
+      <key>com.schriftgestaltung.Glyphs.shapeOrder</key>
+      <string>PC</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Lowercase</string>
+    </dict>
+  </lib>
+</glyph>

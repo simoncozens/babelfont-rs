@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="epsilonvaria.sc.ss06" format="2">
+  <advance width="417.0"/>
+  <anchor x="150.0" y="0.0" name="bottom"/>
+  <anchor x="224.0" y="280.0" name="center"/>
+  <anchor x="268.0" y="559.0" name="top"/>
+  <anchor x="456.0" y="559.0" name="topright"/>
+  <outline>
+    <component base="epsilon.sc"/>
+    <component base="varia.sc" xOffset="55" yOffset="31"/>
+  </outline>
+</glyph>

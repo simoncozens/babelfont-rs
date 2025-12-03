@@ -1,0 +1,57 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Tsse-cy" format="2">
+  <advance width="485.0"/>
+  <unicode hex="A690"/>
+  <anchor x="187.0" y="0.0" name="bottom"/>
+  <anchor x="263.0" y="357.0" name="center"/>
+  <anchor x="339.0" y="714.0" name="top"/>
+  <anchor x="561.0" y="714.0" name="topright"/>
+  <outline>
+    <contour>
+      <point x="131.0" y="-162.0" type="curve" smooth="yes"/>
+      <point x="151.0" y="-162.0"/>
+      <point x="167.0" y="-158.0"/>
+      <point x="179.0" y="-154.0" type="curve"/>
+      <point x="179.0" y="-130.0" type="line"/>
+      <point x="167.0" y="-134.0"/>
+      <point x="152.0" y="-137.0"/>
+      <point x="134.0" y="-137.0" type="curve" smooth="yes"/>
+      <point x="105.0" y="-137.0"/>
+      <point x="87.0" y="-120.0"/>
+      <point x="87.0" y="-86.0" type="curve" smooth="yes"/>
+      <point x="87.0" y="-31.0"/>
+      <point x="123.0" y="0.0"/>
+      <point x="190.0" y="0.0" type="curve"/>
+      <point x="182.0" y="20.0" type="line"/>
+      <point x="103.0" y="20.0"/>
+      <point x="61.0" y="-28.0"/>
+      <point x="61.0" y="-88.0" type="curve" smooth="yes"/>
+      <point x="61.0" y="-136.0"/>
+      <point x="91.0" y="-162.0"/>
+    </contour>
+    <component base="T"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>T</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>cyrillic</string>
+      <key>com.schriftgestaltung.Glyphs.shapeOrder</key>
+      <string>PC</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Uppercase</string>
+    </dict>
+  </lib>
+</glyph>

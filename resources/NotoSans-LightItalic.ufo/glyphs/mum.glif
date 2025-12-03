@@ -1,0 +1,47 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="mum" format="2">
+  <advance width="935.0"/>
+  <unicode hex="A773"/>
+  <anchor x="365.0" y="0.0" name="bottom"/>
+  <anchor x="407.0" y="269.0" name="center"/>
+  <anchor x="477.0" y="528.0" name="top"/>
+  <anchor x="878.0" y="528.0" name="topright"/>
+  <outline>
+    <contour>
+      <point x="668.0" y="-145.0" type="line"/>
+      <point x="697.0" y="-145.0" type="line"/>
+      <point x="879.0" y="164.0" type="line"/>
+      <point x="851.0" y="164.0" type="line"/>
+    </contour>
+    <contour>
+      <point x="676.0" y="0.0" type="line"/>
+      <point x="879.0" y="0.0" type="line"/>
+      <point x="884.0" y="25.0" type="line"/>
+      <point x="682.0" y="25.0" type="line"/>
+    </contour>
+    <component base="m"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>m</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>latin</string>
+      <key>com.schriftgestaltung.Glyphs.shapeOrder</key>
+      <string>PPC</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Lowercase</string>
+    </dict>
+  </lib>
+</glyph>

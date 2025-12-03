@@ -1,0 +1,45 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Ystroke" format="2">
+  <advance width="485.0"/>
+  <unicode hex="024E"/>
+  <anchor x="187.0" y="0.0" name="bottom"/>
+  <anchor x="325.0" y="357.0" name="center"/>
+  <anchor x="339.0" y="714.0" name="top"/>
+  <outline>
+    <contour>
+      <point x="174.0" y="0.0" type="line"/>
+      <point x="201.0" y="0.0" type="line"/>
+      <point x="259.0" y="275.0" type="line"/>
+      <point x="461.0" y="553.0" type="line"/>
+      <point x="538.0" y="553.0" type="line"/>
+      <point x="544.0" y="578.0" type="line"/>
+      <point x="479.0" y="578.0" type="line"/>
+      <point x="578.0" y="714.0" type="line"/>
+      <point x="547.0" y="714.0" type="line"/>
+      <point x="449.0" y="578.0" type="line"/>
+      <point x="164.0" y="578.0" type="line"/>
+      <point x="123.0" y="714.0" type="line"/>
+      <point x="96.0" y="714.0" type="line"/>
+      <point x="137.0" y="578.0" type="line"/>
+      <point x="78.0" y="578.0" type="line"/>
+      <point x="73.0" y="553.0" type="line"/>
+      <point x="145.0" y="553.0" type="line"/>
+      <point x="231.0" y="271.0" type="line"/>
+    </contour>
+    <contour>
+      <point x="249.0" y="301.0" type="line"/>
+      <point x="172.0" y="553.0" type="line"/>
+      <point x="431.0" y="553.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>latin</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Uppercase</string>
+    </dict>
+  </lib>
+</glyph>

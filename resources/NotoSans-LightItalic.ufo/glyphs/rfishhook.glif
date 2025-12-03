@@ -1,0 +1,38 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="rfishhook" format="2">
+  <advance width="284.0"/>
+  <unicode hex="027E"/>
+  <anchor x="86.0" y="0.0" name="bottom"/>
+  <anchor x="187.0" y="269.0" name="center"/>
+  <anchor x="198.0" y="528.0" name="top"/>
+  <outline>
+    <contour>
+      <point x="123.0" y="385.0" type="curve" smooth="yes"/>
+      <point x="43.0" y="0.0" type="line"/>
+      <point x="69.0" y="0.0" type="line"/>
+      <point x="150.0" y="385.0" type="line" smooth="yes"/>
+      <point x="170.0" y="482.0"/>
+      <point x="206.0" y="513.0"/>
+      <point x="272.0" y="513.0" type="curve" smooth="yes"/>
+      <point x="291.0" y="513.0"/>
+      <point x="311.0" y="509.0"/>
+      <point x="325.0" y="503.0" type="curve"/>
+      <point x="331.0" y="528.0" type="line"/>
+      <point x="317.0" y="534.0"/>
+      <point x="297.0" y="538.0"/>
+      <point x="274.0" y="538.0" type="curve" smooth="yes"/>
+      <point x="189.0" y="538.0"/>
+      <point x="144.0" y="488.0"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>latin</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Lowercase</string>
+    </dict>
+  </lib>
+</glyph>

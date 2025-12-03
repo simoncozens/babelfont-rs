@@ -1,0 +1,21 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Gje-cy" format="2">
+  <advance width="478.0"/>
+  <unicode hex="0403"/>
+  <anchor x="227.0" y="0.0" name="bottom"/>
+  <anchor x="416.0" y="952.0" name="top"/>
+  <outline>
+    <component base="Ge-cy"/>
+    <component base="acutecomb" xOffset="601" yOffset="186"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>cyrillic</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Uppercase</string>
+    </dict>
+  </lib>
+</glyph>

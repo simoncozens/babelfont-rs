@@ -1,0 +1,43 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Omegapsiliprosgegrammeni.ad" format="2">
+  <advance width="1055.0"/>
+  <anchor x="425.0" y="0.0" name="bottom"/>
+  <anchor x="930.643" y="159.0" name="center"/>
+  <anchor x="258.0" y="714.0" name="topleft"/>
+  <outline>
+    <component base="Omega" xOffset="129"/>
+    <component base="psili.case" xOffset="-29"/>
+    <component base="prosgegrammeni" xOffset="812"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>Omega</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>1</integer>
+          <key>name</key>
+          <string>psili.case</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>2</integer>
+          <key>name</key>
+          <string>prosgegrammeni</string>
+        </dict>
+      </array>
+    </dict>
+  </lib>
+</glyph>

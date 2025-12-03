@@ -1,0 +1,25 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="yotdotless" format="2">
+  <advance width="207.0"/>
+  <anchor x="-3.0" y="-240.0" name="bottom"/>
+  <anchor x="14.0" y="144.0" name="center"/>
+  <anchor x="160.0" y="528.0" name="top"/>
+  <outline>
+    <component base="jdotless"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>jdotless</string>
+        </dict>
+      </array>
+    </dict>
+  </lib>
+</glyph>

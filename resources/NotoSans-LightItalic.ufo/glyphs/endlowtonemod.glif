@@ -1,0 +1,23 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="endlowtonemod" format="2">
+  <advance width="297.0"/>
+  <unicode hex="02FC"/>
+  <outline>
+    <contour>
+      <point x="-5.0" y="0.0" type="line"/>
+      <point x="201.0" y="0.0" type="line"/>
+      <point x="201.0" y="226.0" type="line"/>
+      <point x="148.0" y="226.0" type="line"/>
+      <point x="148.0" y="53.0" type="line"/>
+      <point x="-5.0" y="53.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Symbol</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Modifier</string>
+    </dict>
+  </lib>
+</glyph>

@@ -1,0 +1,24 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Ustroke" format="2">
+  <advance width="692.0"/>
+  <unicode hex="A7B8"/>
+  <anchor x="290.0" y="0.0" name="bottom"/>
+  <anchor x="390.0" y="352.0" name="center"/>
+  <anchor x="442.0" y="714.0" name="top"/>
+  <anchor x="768.0" y="714.0" name="topright"/>
+  <outline>
+    <contour>
+      <point x="3.0" y="-28.0" type="line"/>
+      <point x="756.0" y="723.0" type="line"/>
+      <point x="740.0" y="740.0" type="line"/>
+      <point x="-13.0" y="-11.0" type="line"/>
+    </contour>
+    <component base="U"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.shapeOrder</key>
+      <string>PC</string>
+    </dict>
+  </lib>
+</glyph>

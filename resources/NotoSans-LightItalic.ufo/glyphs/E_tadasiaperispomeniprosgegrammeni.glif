@@ -1,0 +1,46 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Etadasiaperispomeniprosgegrammeni" format="2">
+  <advance width="1024.0"/>
+  <unicode hex="1F9F"/>
+  <anchor x="628.0" y="0.0" name="bottom"/>
+  <anchor x="627.696" y="-166.0" name="center"/>
+  <anchor x="780.0" y="714.0" name="top"/>
+  <anchor x="1100.0" y="714.0" name="topright"/>
+  <anchor x="439.0" y="714.0" name="topleft"/>
+  <outline>
+    <component base="Eta" xOffset="343"/>
+    <component base="dasiaperispomeni.case" xOffset="-30"/>
+    <component base="ypogegrammeni" xOffset="597"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>Eta</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>1</integer>
+          <key>name</key>
+          <string>dasiaperispomeni.case</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>2</integer>
+          <key>name</key>
+          <string>ypogegrammeni</string>
+        </dict>
+      </array>
+    </dict>
+  </lib>
+</glyph>

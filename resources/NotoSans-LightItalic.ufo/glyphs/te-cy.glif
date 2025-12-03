@@ -1,0 +1,22 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="te-cy" format="2">
+  <advance width="842.0"/>
+  <unicode hex="0442"/>
+  <anchor x="365.0" y="0.0" name="bottom"/>
+  <anchor x="407.0" y="269.0" name="center"/>
+  <anchor x="477.0" y="528.0" name="top"/>
+  <anchor x="878.0" y="528.0" name="topright"/>
+  <outline>
+    <component base="m"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>cyrillic</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Lowercase</string>
+    </dict>
+  </lib>
+</glyph>

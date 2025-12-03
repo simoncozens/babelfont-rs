@@ -1,0 +1,21 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="strokelongcomb" format="2">
+  <unicode hex="0336"/>
+  <anchor x="5.0" y="283.0" name="_center"/>
+  <outline>
+    <contour>
+      <point x="-303.0" y="270.0" type="line"/>
+      <point x="308.0" y="270.0" type="line"/>
+      <point x="313.0" y="295.0" type="line"/>
+      <point x="-298.0" y="295.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Mark</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Nonspacing</string>
+    </dict>
+  </lib>
+</glyph>

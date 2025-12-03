@@ -1,0 +1,42 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Ndescender" format="2">
+  <advance width="674.0"/>
+  <unicode hex="A790"/>
+  <anchor x="279.0" y="0.0" name="bottom"/>
+  <anchor x="357.0" y="357.0" name="center"/>
+  <anchor x="431.0" y="714.0" name="top"/>
+  <anchor x="748.0" y="714.0" name="topright"/>
+  <outline>
+    <contour>
+      <point x="473.0" y="-160.0" type="line"/>
+      <point x="505.0" y="-160.0" type="line"/>
+      <point x="547.0" y="31.0" type="line"/>
+      <point x="508.0" y="31.0" type="line"/>
+      <point x="510.0" y="0.0" type="line"/>
+    </contour>
+    <component base="N" xOffset="-2"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>N</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>latin</string>
+      <key>com.schriftgestaltung.Glyphs.shapeOrder</key>
+      <string>PC</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Uppercase</string>
+    </dict>
+  </lib>
+</glyph>

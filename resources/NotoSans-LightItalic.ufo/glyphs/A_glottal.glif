@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Aglottal" format="2">
+  <advance width="869.0"/>
+  <unicode hex="A7BA"/>
+  <anchor x="218.0" y="0.0" name="bottom"/>
+  <anchor x="224.0" y="358.0" name="center"/>
+  <anchor x="379.0" y="714.0" name="top"/>
+  <anchor x="623.0" y="714.0" name="topright"/>
+  <outline>
+    <component base="A"/>
+    <component base="A7newcommashape" xOffset="547"/>
+  </outline>
+</glyph>

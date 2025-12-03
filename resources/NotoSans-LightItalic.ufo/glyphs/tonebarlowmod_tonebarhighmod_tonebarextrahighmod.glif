@@ -1,0 +1,25 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="tonebarlowmod_tonebarhighmod_tonebarextrahighmod" format="2">
+  <advance width="542.0"/>
+  <outline>
+    <contour>
+      <point x="398.0" y="0.0" type="line"/>
+      <point x="464.0" y="0.0" type="line"/>
+      <point x="464.0" y="688.0" type="line"/>
+      <point x="398.0" y="688.0" type="line"/>
+      <point x="236.0" y="537.0" type="line"/>
+      <point x="63.0" y="197.0" type="line"/>
+      <point x="121.0" y="167.0" type="line"/>
+      <point x="289.0" y="496.0" type="line"/>
+      <point x="398.0" y="595.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Symbol</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Ligature</string>
+    </dict>
+  </lib>
+</glyph>

@@ -1,0 +1,41 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="astroke" format="2">
+  <advance width="547.0"/>
+  <unicode hex="2C65"/>
+  <anchor x="174.0" y="-208.0" name="bottom"/>
+  <anchor x="281.0" y="264.0" name="center"/>
+  <anchor x="379.0" y="760.0" name="top"/>
+  <anchor x="583.0" y="528.0" name="topright"/>
+  <outline>
+    <contour>
+      <point x="24.0" y="-208.0" type="line"/>
+      <point x="50.0" y="-208.0" type="line"/>
+      <point x="535.0" y="760.0" type="line"/>
+      <point x="509.0" y="760.0" type="line"/>
+    </contour>
+    <component base="a"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>a</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>latin</string>
+      <key>com.schriftgestaltung.Glyphs.shapeOrder</key>
+      <string>PC</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Lowercase</string>
+    </dict>
+  </lib>
+</glyph>

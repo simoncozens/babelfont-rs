@@ -1,0 +1,51 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Bflourish" format="2">
+  <advance width="665.0"/>
+  <unicode hex="A796"/>
+  <anchor x="310.0" y="0.0" name="bottom"/>
+  <anchor x="382.0" y="357.0" name="center"/>
+  <anchor x="462.0" y="714.0" name="top"/>
+  <anchor x="741.0" y="714.0" name="topright"/>
+  <outline>
+    <contour>
+      <point x="32.0" y="227.0" type="curve"/>
+      <point x="61.0" y="227.0" type="line"/>
+      <point x="57.0" y="237.0"/>
+      <point x="52.0" y="250.0"/>
+      <point x="52.0" y="270.0" type="curve" smooth="yes"/>
+      <point x="52.0" y="328.0"/>
+      <point x="85.0" y="363.0"/>
+      <point x="150.0" y="363.0" type="curve" smooth="yes"/>
+      <point x="201.0" y="363.0" type="line"/>
+      <point x="207.0" y="388.0" type="line"/>
+      <point x="148.0" y="388.0" type="line" smooth="yes"/>
+      <point x="73.0" y="388.0"/>
+      <point x="25.0" y="341.0"/>
+      <point x="25.0" y="272.0" type="curve" smooth="yes"/>
+      <point x="25.0" y="252.0"/>
+      <point x="29.0" y="237.0"/>
+    </contour>
+    <component base="B" xOffset="67"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>B</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.shapeOrder</key>
+      <string>PC</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Uppercase</string>
+    </dict>
+  </lib>
+</glyph>

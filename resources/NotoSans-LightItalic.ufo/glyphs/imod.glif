@@ -1,0 +1,33 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="imod" format="2">
+  <advance width="188.0"/>
+  <unicode hex="2071"/>
+  <anchor x="91.2" y="287.0" name="bottom"/>
+  <anchor x="141.25" y="503.0" name="center"/>
+  <anchor x="190.65" y="719.6" name="top"/>
+  <anchor x="244.6" y="719.6" name="topright"/>
+  <outline>
+    <component base="i" xScale="0.65" yScale="0.6" xOffset="60" yOffset="287"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>i</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>latin</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Modifier</string>
+    </dict>
+  </lib>
+</glyph>

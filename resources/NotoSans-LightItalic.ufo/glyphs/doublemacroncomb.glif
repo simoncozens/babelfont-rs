@@ -1,0 +1,22 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="doublemacroncomb" format="2">
+  <unicode hex="035E"/>
+  <anchor x="-115.0" y="528.0" name="_top"/>
+  <anchor x="78.0" y="633.0" name="top"/>
+  <outline>
+    <contour>
+      <point x="-166.0" y="608.0" type="line"/>
+      <point x="311.0" y="608.0" type="line"/>
+      <point x="316.0" y="633.0" type="line"/>
+      <point x="-161.0" y="633.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Mark</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Nonspacing</string>
+    </dict>
+  </lib>
+</glyph>

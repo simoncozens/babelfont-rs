@@ -1,0 +1,22 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Mu" format="2">
+  <advance width="806.0"/>
+  <unicode hex="039C"/>
+  <anchor x="347.0" y="0.0" name="bottom"/>
+  <anchor x="425.0" y="357.0" name="center"/>
+  <anchor x="499.0" y="714.0" name="top"/>
+  <anchor x="882.0" y="714.0" name="topright"/>
+  <outline>
+    <component base="M"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>greek</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Uppercase</string>
+    </dict>
+  </lib>
+</glyph>

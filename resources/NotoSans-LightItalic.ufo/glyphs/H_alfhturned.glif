@@ -1,0 +1,21 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Halfhturned" format="2">
+  <advance width="492.0"/>
+  <unicode hex="A7F5"/>
+  <anchor x="190.0" y="0.0" name="bottom"/>
+  <anchor x="342.0" y="714.0" name="top"/>
+  <outline>
+    <contour>
+      <point x="304.0" y="0.0" type="line"/>
+      <point x="331.0" y="0.0" type="line"/>
+      <point x="482.0" y="714.0" type="line"/>
+      <point x="455.0" y="714.0" type="line"/>
+    </contour>
+    <contour>
+      <point x="59.0" y="363.0" type="line"/>
+      <point x="389.0" y="363.0" type="line"/>
+      <point x="394.0" y="388.0" type="line"/>
+      <point x="65.0" y="388.0" type="line"/>
+    </contour>
+  </outline>
+</glyph>

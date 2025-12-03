@@ -1,0 +1,22 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="yeru-cy" format="2">
+  <advance width="657.0"/>
+  <unicode hex="044B"/>
+  <anchor x="503.0" y="0.0" name="bottom"/>
+  <anchor x="556.0" y="264.0" name="center"/>
+  <anchor x="615.0" y="528.0" name="top"/>
+  <outline>
+    <component base="softsign-cy"/>
+    <component base="idotless" xOffset="455"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>cyrillic</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Lowercase</string>
+    </dict>
+  </lib>
+</glyph>

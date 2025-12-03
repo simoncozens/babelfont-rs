@@ -1,0 +1,29 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="enmod-cy" format="2">
+  <advance width="364.0"/>
+  <unicode hex="1D78"/>
+  <outline>
+    <contour>
+      <point x="74.0" y="287.0" type="line"/>
+      <point x="91.0" y="287.0" type="line"/>
+      <point x="127.0" y="445.0" type="line"/>
+      <point x="343.0" y="445.0" type="line"/>
+      <point x="307.0" y="287.0" type="line"/>
+      <point x="323.0" y="287.0" type="line"/>
+      <point x="396.0" y="604.0" type="line"/>
+      <point x="379.0" y="604.0" type="line"/>
+      <point x="346.0" y="460.0" type="line"/>
+      <point x="130.0" y="460.0" type="line"/>
+      <point x="164.0" y="604.0" type="line"/>
+      <point x="147.0" y="604.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Modifier</string>
+    </dict>
+  </lib>
+</glyph>

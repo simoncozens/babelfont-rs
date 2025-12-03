@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="u107A9" format="2">
+  <advance width="205.0"/>
+  <unicode hex="107A9"/>
+  <anchor x="117.9" y="287.0" name="bottom"/>
+  <anchor x="183.55" y="448.4" name="center"/>
+  <anchor x="190.7" y="603.8" name="top"/>
+  <outline>
+    <component base="rfishhook" xScale="0.65" yScale="0.6" xOffset="62" yOffset="287"/>
+  </outline>
+</glyph>

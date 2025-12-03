@@ -1,0 +1,46 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Hardsign-cy" format="2">
+  <advance width="631.0"/>
+  <unicode hex="042A"/>
+  <anchor x="255.0" y="0.0" name="bottom"/>
+  <anchor x="304.0" y="357.0" name="center"/>
+  <anchor x="407.0" y="714.0" name="top"/>
+  <outline>
+    <contour>
+      <point x="119.0" y="0.0" type="line"/>
+      <point x="289.0" y="0.0" type="line" smooth="yes"/>
+      <point x="481.0" y="0.0"/>
+      <point x="565.0" y="97.0"/>
+      <point x="565.0" y="233.0" type="curve" smooth="yes"/>
+      <point x="565.0" y="349.0"/>
+      <point x="494.0" y="410.0"/>
+      <point x="363.0" y="410.0" type="curve" smooth="yes"/>
+      <point x="233.0" y="410.0" type="line"/>
+      <point x="298.0" y="714.0" type="line"/>
+      <point x="98.0" y="714.0" type="line"/>
+      <point x="92.0" y="689.0" type="line"/>
+      <point x="266.0" y="689.0" type="line"/>
+    </contour>
+    <contour>
+      <point x="151.0" y="25.0" type="line"/>
+      <point x="228.0" y="385.0" type="line"/>
+      <point x="358.0" y="385.0" type="line" smooth="yes"/>
+      <point x="473.0" y="385.0"/>
+      <point x="538.0" y="339.0"/>
+      <point x="538.0" y="234.0" type="curve" smooth="yes"/>
+      <point x="538.0" y="110.0"/>
+      <point x="466.0" y="25.0"/>
+      <point x="293.0" y="25.0" type="curve" smooth="yes"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>cyrillic</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Uppercase</string>
+    </dict>
+  </lib>
+</glyph>

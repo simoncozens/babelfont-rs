@@ -1,0 +1,37 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Alphapsilioxia" format="2">
+  <advance width="649.0"/>
+  <unicode hex="1F0C"/>
+  <anchor x="320.0" y="0.0" name="bottom"/>
+  <anchor x="326.0" y="358.0" name="center"/>
+  <anchor x="481.0" y="714.0" name="top"/>
+  <anchor x="725.0" y="714.0" name="topright"/>
+  <anchor x="282.0" y="714.0" name="topleft"/>
+  <outline>
+    <component base="Alpha" xOffset="102"/>
+    <component base="psilioxia.case" xOffset="-29"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>Alpha</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>1</integer>
+          <key>name</key>
+          <string>psilioxia.case</string>
+        </dict>
+      </array>
+    </dict>
+  </lib>
+</glyph>

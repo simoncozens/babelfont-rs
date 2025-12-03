@@ -1,0 +1,31 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="GturnedSansSerif" format="2">
+  <advance width="690.0"/>
+  <unicode hex="2141"/>
+  <anchor x="440.0" y="715.0" name="top"/>
+  <anchor x="355.0" y="358.0" name="center"/>
+  <anchor x="288.0" y="1.0" name="bottom"/>
+  <anchor x="-37.0" y="1.0" name="bottomleft"/>
+  <outline>
+    <component base="G" xScale="-1.0" yScale="-1.0" xOffset="729" yOffset="715"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>G</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Symbol</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Math</string>
+    </dict>
+  </lib>
+</glyph>

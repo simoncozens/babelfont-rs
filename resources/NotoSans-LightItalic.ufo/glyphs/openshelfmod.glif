@@ -1,0 +1,23 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="openshelfmod" format="2">
+  <advance width="407.0"/>
+  <unicode hex="02FE"/>
+  <outline>
+    <contour>
+      <point x="-27.0" y="-181.0" type="line"/>
+      <point x="272.0" y="-181.0" type="line"/>
+      <point x="272.0" y="-151.0" type="line"/>
+      <point x="13.0" y="-151.0" type="line"/>
+      <point x="13.0" y="-49.0" type="line"/>
+      <point x="-27.0" y="-49.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Symbol</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Modifier</string>
+    </dict>
+  </lib>
+</glyph>

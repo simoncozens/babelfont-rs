@@ -1,0 +1,38 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="dzelo-cy" format="2">
+  <advance width="427.0"/>
+  <unicode hex="A643"/>
+  <anchor x="190.0" y="164.0" name="center"/>
+  <outline>
+    <contour>
+      <point x="80.0" y="262.0" type="line"/>
+      <point x="356.0" y="262.0" type="line"/>
+      <point x="361.0" y="287.0" type="line"/>
+      <point x="86.0" y="287.0" type="line"/>
+    </contour>
+    <component base="zemlya-cy"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>zemlya-cy</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>cyrillic</string>
+      <key>com.schriftgestaltung.Glyphs.shapeOrder</key>
+      <string>PC</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Lowercase</string>
+    </dict>
+  </lib>
+</glyph>

@@ -1,0 +1,21 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="efcomb-cy" format="2">
+  <unicode hex="A69E"/>
+  <anchor x="32.0" y="439.0" name="_top"/>
+  <anchor x="153.0" y="959.0" name="top"/>
+  <outline>
+    <component base="phiSymbol" xScale="0.45" yScale="0.4" xOffset="-37" yOffset="635"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Mark</string>
+      <key>com.schriftgestaltung.Glyphs.originalWidth</key>
+      <integer>272</integer>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>cyrillic</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Nonspacing</string>
+    </dict>
+  </lib>
+</glyph>

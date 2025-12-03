@@ -1,0 +1,41 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="tugrik" format="2">
+  <advance width="485.0"/>
+  <unicode hex="20AE"/>
+  <outline>
+    <contour>
+      <point x="172.0" y="0.0" type="line"/>
+      <point x="199.0" y="0.0" type="line"/>
+      <point x="246.0" y="221.0" type="line"/>
+      <point x="418.0" y="344.0" type="line"/>
+      <point x="402.0" y="366.0" type="line"/>
+      <point x="254.0" y="261.0" type="line"/>
+      <point x="288.0" y="418.0" type="line"/>
+      <point x="456.0" y="538.0" type="line"/>
+      <point x="440.0" y="560.0" type="line"/>
+      <point x="296.0" y="458.0" type="line"/>
+      <point x="345.0" y="689.0" type="line"/>
+      <point x="571.0" y="689.0" type="line"/>
+      <point x="576.0" y="714.0" type="line"/>
+      <point x="98.0" y="714.0" type="line"/>
+      <point x="93.0" y="689.0" type="line"/>
+      <point x="318.0" y="689.0" type="line"/>
+      <point x="264.0" y="435.0" type="line"/>
+      <point x="83.0" y="306.0" type="line"/>
+      <point x="100.0" y="284.0" type="line"/>
+      <point x="256.0" y="395.0" type="line"/>
+      <point x="222.0" y="238.0" type="line"/>
+      <point x="45.0" y="112.0" type="line"/>
+      <point x="62.0" y="90.0" type="line"/>
+      <point x="214.0" y="198.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Symbol</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Currency</string>
+    </dict>
+  </lib>
+</glyph>

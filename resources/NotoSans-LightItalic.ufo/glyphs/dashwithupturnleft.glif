@@ -1,0 +1,35 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="dashwithupturnleft" format="2">
+  <advance width="955.0"/>
+  <unicode hex="2E43"/>
+  <outline>
+    <contour>
+      <point x="143.0" y="259.0" type="curve" smooth="yes"/>
+      <point x="912.0" y="259.0" type="line"/>
+      <point x="917.0" y="284.0" type="line"/>
+      <point x="142.0" y="284.0" type="line" smooth="yes"/>
+      <point x="115.0" y="284.0"/>
+      <point x="100.0" y="293.0"/>
+      <point x="100.0" y="308.0" type="curve" smooth="yes"/>
+      <point x="100.0" y="323.0"/>
+      <point x="107.0" y="332.0"/>
+      <point x="107.0" y="355.0" type="curve" smooth="yes"/>
+      <point x="107.0" y="370.0"/>
+      <point x="100.0" y="380.0"/>
+      <point x="86.0" y="380.0" type="curve" smooth="yes"/>
+      <point x="67.0" y="380.0"/>
+      <point x="55.0" y="363.0"/>
+      <point x="55.0" y="333.0" type="curve" smooth="yes"/>
+      <point x="55.0" y="281.0"/>
+      <point x="93.0" y="259.0"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Punctuation</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Other</string>
+    </dict>
+  </lib>
+</glyph>

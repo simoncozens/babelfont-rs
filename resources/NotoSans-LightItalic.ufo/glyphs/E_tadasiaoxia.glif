@@ -1,0 +1,37 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Etadasiaoxia" format="2">
+  <advance width="930.0"/>
+  <unicode hex="1F2D"/>
+  <anchor x="534.0" y="0.0" name="bottom"/>
+  <anchor x="610.0" y="357.0" name="center"/>
+  <anchor x="686.0" y="714.0" name="top"/>
+  <anchor x="1006.0" y="714.0" name="topright"/>
+  <anchor x="345.0" y="714.0" name="topleft"/>
+  <outline>
+    <component base="Eta" xOffset="249"/>
+    <component base="dasiaoxia.case" xOffset="-51"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>Eta</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>1</integer>
+          <key>name</key>
+          <string>dasiaoxia.case</string>
+        </dict>
+      </array>
+    </dict>
+  </lib>
+</glyph>

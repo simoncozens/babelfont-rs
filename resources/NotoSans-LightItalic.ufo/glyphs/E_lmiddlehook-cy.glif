@@ -1,0 +1,72 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Elmiddlehook-cy" format="2">
+  <advance width="947.0"/>
+  <unicode hex="0520"/>
+  <anchor x="368.0" y="-235.0" name="bottom"/>
+  <anchor x="421.0" y="239.0" name="center"/>
+  <anchor x="570.0" y="714.0" name="top"/>
+  <outline>
+    <contour>
+      <point x="563.0" y="-235.0" type="curve" smooth="yes"/>
+      <point x="824.0" y="-235.0"/>
+      <point x="885.0" y="-18.0"/>
+      <point x="885.0" y="192.0" type="curve" smooth="yes"/>
+      <point x="885.0" y="356.0"/>
+      <point x="790.0" y="406.0"/>
+      <point x="701.0" y="406.0" type="curve" smooth="yes"/>
+      <point x="645.0" y="406.0"/>
+      <point x="583.0" y="388.0"/>
+      <point x="518.0" y="350.0" type="curve"/>
+      <point x="595.0" y="714.0" type="line"/>
+      <point x="329.0" y="714.0" type="line"/>
+      <point x="303.0" y="621.0"/>
+      <point x="212.0" y="334.0"/>
+      <point x="151.0" y="181.0" type="curve" smooth="yes"/>
+      <point x="103.0" y="60.0"/>
+      <point x="61.0" y="14.0"/>
+      <point x="5.0" y="14.0" type="curve" smooth="yes"/>
+      <point x="-14.0" y="14.0"/>
+      <point x="-28.0" y="18.0"/>
+      <point x="-42.0" y="24.0" type="curve"/>
+      <point x="-42.0" y="-2.0" type="line"/>
+      <point x="-33.0" y="-7.0"/>
+      <point x="-15.0" y="-11.0"/>
+      <point x="3.0" y="-11.0" type="curve" smooth="yes"/>
+      <point x="88.0" y="-11.0"/>
+      <point x="128.0" y="49.0"/>
+      <point x="180.0" y="178.0" type="curve" smooth="yes"/>
+      <point x="238.0" y="323.0"/>
+      <point x="318.0" y="579.0"/>
+      <point x="350.0" y="689.0" type="curve"/>
+      <point x="563.0" y="689.0" type="line"/>
+      <point x="417.0" y="0.0" type="line"/>
+      <point x="443.0" y="0.0" type="line"/>
+      <point x="512.0" y="320.0" type="line"/>
+      <point x="591.0" y="365.0"/>
+      <point x="646.0" y="381.0"/>
+      <point x="703.0" y="381.0" type="curve" smooth="yes"/>
+      <point x="776.0" y="381.0"/>
+      <point x="855.0" y="338.0"/>
+      <point x="855.0" y="189.0" type="curve" smooth="yes"/>
+      <point x="855.0" y="6.0"/>
+      <point x="810.0" y="-210.0"/>
+      <point x="563.0" y="-210.0" type="curve" smooth="yes"/>
+      <point x="507.0" y="-210.0"/>
+      <point x="459.0" y="-193.0"/>
+      <point x="431.0" y="-176.0" type="curve"/>
+      <point x="431.0" y="-204.0" type="line"/>
+      <point x="461.0" y="-222.0"/>
+      <point x="501.0" y="-235.0"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>cyrillic</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Uppercase</string>
+    </dict>
+  </lib>
+</glyph>

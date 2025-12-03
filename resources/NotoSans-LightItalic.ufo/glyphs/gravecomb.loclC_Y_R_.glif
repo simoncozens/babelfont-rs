@@ -1,0 +1,24 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="gravecomb.loclCYR" format="2">
+  <anchor x="204.0" y="528.0" name="_top"/>
+  <outline>
+    <contour>
+      <point x="262.0" y="606.0" type="line"/>
+      <point x="280.0" y="606.0" type="line"/>
+      <point x="280.0" y="612.0" type="line"/>
+      <point x="173.0" y="766.0" type="line"/>
+      <point x="147.0" y="766.0" type="line"/>
+      <point x="147.0" y="759.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Mark</string>
+      <key>com.schriftgestaltung.Glyphs.originalWidth</key>
+      <integer>247</integer>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Nonspacing</string>
+    </dict>
+  </lib>
+</glyph>

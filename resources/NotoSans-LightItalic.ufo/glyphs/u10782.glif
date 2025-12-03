@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="u10782" format="2">
+  <advance width="153.0"/>
+  <unicode hex="10782"/>
+  <outline>
+    <component base="colontriangularhalfmod" xScale="0.65" yScale="0.6" yOffset="287"/>
+  </outline>
+</glyph>

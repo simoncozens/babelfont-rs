@@ -1,0 +1,26 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="upsilonoxia.sc" format="2">
+  <advance width="366.0"/>
+  <anchor x="124.0" y="0.0" name="bottom"/>
+  <anchor x="246.0" y="280.0" name="center"/>
+  <anchor x="242.0" y="559.0" name="top"/>
+  <anchor x="405.0" y="559.0" name="topright"/>
+  <outline>
+    <component base="y.sc"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>y.sc</string>
+        </dict>
+      </array>
+    </dict>
+  </lib>
+</glyph>

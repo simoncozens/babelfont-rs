@@ -1,0 +1,22 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="pe-cy" format="2">
+  <advance width="553.0"/>
+  <unicode hex="043F"/>
+  <anchor x="221.0" y="0.0" name="bottom"/>
+  <anchor x="262.0" y="269.0" name="center"/>
+  <anchor x="333.0" y="528.0" name="top"/>
+  <anchor x="589.0" y="528.0" name="topright"/>
+  <outline>
+    <component base="n"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>cyrillic</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Lowercase</string>
+    </dict>
+  </lib>
+</glyph>

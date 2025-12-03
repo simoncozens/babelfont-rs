@@ -1,0 +1,23 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="LreversedSansSerif" format="2">
+  <advance width="480.0"/>
+  <unicode hex="2143"/>
+  <outline>
+    <contour>
+      <point x="-27.0" y="0.0" type="line"/>
+      <point x="319.0" y="0.0" type="line"/>
+      <point x="470.0" y="714.0" type="line"/>
+      <point x="441.0" y="714.0" type="line"/>
+      <point x="295.0" y="25.0" type="line"/>
+      <point x="-21.0" y="25.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Symbol</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Math</string>
+    </dict>
+  </lib>
+</glyph>

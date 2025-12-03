@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="etadasiaperispomeniypogegrammeni" format="2">
+  <advance width="553.0"/>
+  <unicode hex="1F97"/>
+  <anchor x="41.0" y="0.0" name="bottom"/>
+  <anchor x="39.696" y="-166.0" name="center"/>
+  <anchor x="264.0" y="528.0" name="top"/>
+  <outline>
+    <component base="eta"/>
+    <component base="dasiaperispomeni" xOffset="-12"/>
+    <component base="ypogegrammeni" xOffset="9"/>
+  </outline>
+</glyph>

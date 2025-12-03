@@ -1,0 +1,17 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="righttackmod" format="2">
+  <advance width="204.0"/>
+  <unicode hex="AB6B"/>
+  <outline>
+    <contour>
+      <point x="76.0" y="344.0" type="line"/>
+      <point x="49.0" y="344.0" type="line"/>
+      <point x="21.0" y="213.0" type="line"/>
+      <point x="48.0" y="213.0" type="line"/>
+      <point x="59.0" y="266.0" type="line"/>
+      <point x="172.0" y="266.0" type="line"/>
+      <point x="177.0" y="291.0" type="line"/>
+      <point x="64.0" y="291.0" type="line"/>
+    </contour>
+  </outline>
+</glyph>

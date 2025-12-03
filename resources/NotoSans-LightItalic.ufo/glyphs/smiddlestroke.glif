@@ -1,0 +1,24 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="smiddlestroke" format="2">
+  <advance width="423.0"/>
+  <unicode hex="A7CA"/>
+  <anchor x="156.0" y="0.0" name="bottom"/>
+  <anchor x="205.0" y="264.0" name="center"/>
+  <anchor x="268.0" y="528.0" name="top"/>
+  <anchor x="459.0" y="528.0" name="topright"/>
+  <outline>
+    <contour>
+      <point x="21.0" y="263.0" type="line"/>
+      <point x="403.0" y="263.0" type="line"/>
+      <point x="409.0" y="288.0" type="line"/>
+      <point x="27.0" y="288.0" type="line"/>
+    </contour>
+    <component base="s"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.shapeOrder</key>
+      <string>PC</string>
+    </dict>
+  </lib>
+</glyph>

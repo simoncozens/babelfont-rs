@@ -1,0 +1,34 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Lturned" format="2">
+  <advance width="491.0"/>
+  <unicode hex="A780"/>
+  <anchor x="341.65" y="714.0" name="top"/>
+  <anchor x="265.0" y="357.0" name="center"/>
+  <anchor x="189.885" y="0.0" name="bottom"/>
+  <anchor x="54.0" y="0.0" name="bottomleft"/>
+  <anchor x="482.0" y="714.0" name="topright"/>
+  <outline>
+    <component base="L" xScale="-1.0" yScale="-1.0" xOffset="531" yOffset="714"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>L</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>latin</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Uppercase</string>
+    </dict>
+  </lib>
+</glyph>

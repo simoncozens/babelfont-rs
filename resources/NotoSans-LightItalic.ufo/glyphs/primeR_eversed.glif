@@ -1,0 +1,21 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="primeReversed" format="2">
+  <advance width="159.0"/>
+  <unicode hex="2035"/>
+  <outline>
+    <contour>
+      <point x="150.0" y="456.0" type="line"/>
+      <point x="167.0" y="456.0" type="line"/>
+      <point x="134.0" y="714.0" type="line"/>
+      <point x="108.0" y="714.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Punctuation</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Quote</string>
+    </dict>
+  </lib>
+</glyph>

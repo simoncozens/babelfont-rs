@@ -1,0 +1,49 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="divide" format="2">
+  <advance width="570.0"/>
+  <unicode hex="00F7"/>
+  <outline>
+    <contour>
+      <point x="75.0" y="341.0" type="line"/>
+      <point x="535.0" y="341.0" type="line"/>
+      <point x="535.0" y="365.0" type="line"/>
+      <point x="75.0" y="365.0" type="line"/>
+    </contour>
+    <contour>
+      <point x="304.0" y="144.0" type="curve" smooth="yes"/>
+      <point x="328.0" y="144.0"/>
+      <point x="331.0" y="158.0"/>
+      <point x="331.0" y="175.0" type="curve" smooth="yes"/>
+      <point x="331.0" y="191.0"/>
+      <point x="328.0" y="206.0"/>
+      <point x="304.0" y="206.0" type="curve" smooth="yes"/>
+      <point x="284.0" y="206.0"/>
+      <point x="279.0" y="191.0"/>
+      <point x="279.0" y="175.0" type="curve" smooth="yes"/>
+      <point x="279.0" y="158.0"/>
+      <point x="284.0" y="144.0"/>
+    </contour>
+    <contour>
+      <point x="304.0" y="500.0" type="curve" smooth="yes"/>
+      <point x="328.0" y="500.0"/>
+      <point x="331.0" y="514.0"/>
+      <point x="331.0" y="531.0" type="curve" smooth="yes"/>
+      <point x="331.0" y="547.0"/>
+      <point x="328.0" y="562.0"/>
+      <point x="304.0" y="562.0" type="curve" smooth="yes"/>
+      <point x="284.0" y="562.0"/>
+      <point x="279.0" y="547.0"/>
+      <point x="279.0" y="531.0" type="curve" smooth="yes"/>
+      <point x="279.0" y="514.0"/>
+      <point x="284.0" y="500.0"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Symbol</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Math</string>
+    </dict>
+  </lib>
+</glyph>

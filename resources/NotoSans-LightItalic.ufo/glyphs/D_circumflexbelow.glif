@@ -1,0 +1,42 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Dcircumflexbelow" format="2">
+  <advance width="677.0"/>
+  <unicode hex="1E12"/>
+  <anchor x="240.0" y="-202.0" name="bottom"/>
+  <anchor x="359.0" y="357.0" name="center"/>
+  <anchor x="435.0" y="714.0" name="top"/>
+  <anchor x="753.0" y="714.0" name="topright"/>
+  <outline>
+    <component base="D"/>
+    <component base="circumflex" xOffset="8" yOffset="-808"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>D</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>1</integer>
+          <key>name</key>
+          <string>circumflex</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>latin</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Uppercase</string>
+    </dict>
+  </lib>
+</glyph>

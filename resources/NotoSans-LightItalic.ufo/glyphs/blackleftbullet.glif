@@ -1,0 +1,32 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="blackleftbullet" format="2">
+  <advance width="610.0"/>
+  <unicode hex="204C"/>
+  <outline>
+    <contour>
+      <point x="285.0" y="33.0" type="curve" smooth="yes"/>
+      <point x="539.0" y="33.0" type="line"/>
+      <point x="539.0" y="528.0" type="line"/>
+      <point x="257.0" y="528.0" type="line" smooth="yes"/>
+      <point x="143.0" y="528.0"/>
+      <point x="60.0" y="472.0"/>
+      <point x="60.0" y="287.0" type="curve" smooth="yes"/>
+      <point x="60.0" y="87.0"/>
+      <point x="157.0" y="33.0"/>
+    </contour>
+    <contour>
+      <point x="379.0" y="68.0" type="line"/>
+      <point x="379.0" y="493.0" type="line"/>
+      <point x="496.0" y="493.0" type="line"/>
+      <point x="496.0" y="68.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Punctuation</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Other</string>
+    </dict>
+  </lib>
+</glyph>

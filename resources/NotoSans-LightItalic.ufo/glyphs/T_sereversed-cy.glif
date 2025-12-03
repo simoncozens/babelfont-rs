@@ -1,0 +1,32 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Tsereversed-cy" format="2">
+  <advance width="671.0"/>
+  <unicode hex="A660"/>
+  <anchor x="340.0" y="269.0" name="center"/>
+  <outline>
+    <contour>
+      <point x="-74.0" y="-155.0" type="line"/>
+      <point x="-48.0" y="-155.0" type="line"/>
+      <point x="-15.0" y="0.0" type="line"/>
+      <point x="514.0" y="0.0" type="line"/>
+      <point x="667.0" y="714.0" type="line"/>
+      <point x="640.0" y="714.0" type="line"/>
+      <point x="493.0" y="25.0" type="line"/>
+      <point x="82.0" y="25.0" type="line"/>
+      <point x="229.0" y="714.0" type="line"/>
+      <point x="202.0" y="714.0" type="line"/>
+      <point x="55.0" y="25.0" type="line"/>
+      <point x="-35.0" y="25.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>cyrillic</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Uppercase</string>
+    </dict>
+  </lib>
+</glyph>

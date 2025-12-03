@@ -1,0 +1,46 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="rumsmall" format="2">
+  <advance width="579.0"/>
+  <unicode hex="A776"/>
+  <anchor x="154.0" y="0.0" name="bottom"/>
+  <anchor x="216.0" y="264.0" name="center"/>
+  <anchor x="266.0" y="528.0" name="top"/>
+  <outline>
+    <contour>
+      <point x="312.0" y="-145.0" type="line"/>
+      <point x="341.0" y="-145.0" type="line"/>
+      <point x="523.0" y="164.0" type="line"/>
+      <point x="495.0" y="164.0" type="line"/>
+    </contour>
+    <contour>
+      <point x="320.0" y="0.0" type="line"/>
+      <point x="523.0" y="0.0" type="line"/>
+      <point x="528.0" y="25.0" type="line"/>
+      <point x="326.0" y="25.0" type="line"/>
+    </contour>
+    <component base="Rsmall" xOffset="4"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>Rsmall</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>latin</string>
+      <key>com.schriftgestaltung.Glyphs.shapeOrder</key>
+      <string>PPC</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Lowercase</string>
+    </dict>
+  </lib>
+</glyph>

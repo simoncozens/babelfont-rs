@@ -1,0 +1,38 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="uni1DF15" format="2">
+  <advance width="399.0"/>
+  <unicode hex="1DF15"/>
+  <anchor x="118.0" y="-8.0" name="bottom"/>
+  <anchor x="135.0" y="260.0" name="center"/>
+  <anchor x="232.115" y="528.0" name="top"/>
+  <anchor x="317.0" y="528.0" name="topright"/>
+  <outline>
+    <contour>
+      <point x="146.0" y="-186.0" type="curve" smooth="yes"/>
+      <point x="202.0" y="-186.0"/>
+      <point x="229.0" y="-155.0"/>
+      <point x="241.0" y="-101.0" type="curve" smooth="yes"/>
+      <point x="268.0" y="25.0" type="line"/>
+      <point x="194.0" y="25.0" type="line"/>
+      <point x="189.0" y="0.0" type="line"/>
+      <point x="237.0" y="0.0" type="line"/>
+      <point x="215.0" y="-101.0" type="line" smooth="yes"/>
+      <point x="206.0" y="-141.0"/>
+      <point x="187.0" y="-162.0"/>
+      <point x="149.0" y="-162.0" type="curve" smooth="yes"/>
+      <point x="132.0" y="-162.0"/>
+      <point x="116.0" y="-158.0"/>
+      <point x="106.0" y="-153.0" type="curve"/>
+      <point x="101.0" y="-177.0" type="line"/>
+      <point x="109.0" y="-181.0"/>
+      <point x="126.0" y="-186.0"/>
+    </contour>
+    <component base="rturned"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.shapeOrder</key>
+      <string>PC</string>
+    </dict>
+  </lib>
+</glyph>

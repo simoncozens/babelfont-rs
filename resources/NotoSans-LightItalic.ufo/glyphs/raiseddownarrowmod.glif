@@ -1,0 +1,25 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="raiseddownarrowmod" format="2">
+  <advance width="465.0"/>
+  <unicode hex="A71C"/>
+  <anchor x="329.0" y="760.0" name="center"/>
+  <outline>
+    <contour>
+      <point x="329.0" y="631.0" type="line"/>
+      <point x="416.0" y="760.0" type="line"/>
+      <point x="342.0" y="760.0" type="line"/>
+      <point x="342.0" y="890.0" type="line"/>
+      <point x="317.0" y="890.0" type="line"/>
+      <point x="317.0" y="760.0" type="line"/>
+      <point x="243.0" y="760.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Modifier</string>
+    </dict>
+  </lib>
+</glyph>

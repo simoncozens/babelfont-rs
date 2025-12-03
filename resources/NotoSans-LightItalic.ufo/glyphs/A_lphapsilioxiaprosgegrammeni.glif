@@ -1,0 +1,46 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Alphapsilioxiaprosgegrammeni" format="2">
+  <advance width="649.0"/>
+  <unicode hex="1F8C"/>
+  <anchor x="320.0" y="0.0" name="bottom"/>
+  <anchor x="319.696" y="-166.0" name="center"/>
+  <anchor x="481.0" y="714.0" name="top"/>
+  <anchor x="725.0" y="714.0" name="topright"/>
+  <anchor x="282.0" y="714.0" name="topleft"/>
+  <outline>
+    <component base="Alpha" xOffset="102"/>
+    <component base="psilioxia.case" xOffset="-29"/>
+    <component base="ypogegrammeni" xOffset="289"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>Alpha</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>1</integer>
+          <key>name</key>
+          <string>psilioxia.case</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>2</integer>
+          <key>name</key>
+          <string>ypogegrammeni</string>
+        </dict>
+      </array>
+    </dict>
+  </lib>
+</glyph>

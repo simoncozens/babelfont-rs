@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="uni1DF10" format="2">
+  <advance width="444.0"/>
+  <unicode hex="1DF10"/>
+  <anchor x="275.0" y="528.0" name="top"/>
+  <anchor x="185.0" y="264.0" name="center"/>
+  <anchor x="163.0" y="0.0" name="bottom"/>
+  <outline>
+    <component base="kgreenlandic" xScale="-1.0" yScale="-1.0" xOffset="439" yOffset="528"/>
+  </outline>
+</glyph>

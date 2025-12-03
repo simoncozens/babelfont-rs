@@ -1,0 +1,52 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Shhadescender-cy" format="2">
+  <advance width="591.0"/>
+  <unicode hex="0526"/>
+  <anchor x="203.0" y="-175.0" name="bottom"/>
+  <anchor x="281.0" y="269.0" name="center"/>
+  <anchor x="392.0" y="714.0" name="top"/>
+  <outline>
+    <contour>
+      <point x="421.0" y="-175.0" type="line"/>
+      <point x="446.0" y="-175.0" type="line"/>
+      <point x="489.0" y="25.0" type="line"/>
+      <point x="457.0" y="25.0" type="line"/>
+      <point x="496.0" y="215.0" type="line" smooth="yes"/>
+      <point x="506.0" y="266.0"/>
+      <point x="512.0" y="294.0"/>
+      <point x="512.0" y="321.0" type="curve" smooth="yes"/>
+      <point x="512.0" y="415.0"/>
+      <point x="443.0" y="449.0"/>
+      <point x="368.0" y="449.0" type="curve" smooth="yes"/>
+      <point x="294.0" y="449.0"/>
+      <point x="219.0" y="429.0"/>
+      <point x="163.0" y="405.0" type="curve"/>
+      <point x="228.0" y="714.0" type="line"/>
+      <point x="201.0" y="714.0" type="line"/>
+      <point x="50.0" y="0.0" type="line"/>
+      <point x="77.0" y="0.0" type="line"/>
+      <point x="158.0" y="377.0" type="line"/>
+      <point x="218.0" y="403.0"/>
+      <point x="300.0" y="424.0"/>
+      <point x="365.0" y="424.0" type="curve" smooth="yes"/>
+      <point x="459.0" y="424.0"/>
+      <point x="483.0" y="371.0"/>
+      <point x="483.0" y="322.0" type="curve" smooth="yes"/>
+      <point x="483.0" y="295.0"/>
+      <point x="477.0" y="259.0"/>
+      <point x="468.0" y="217.0" type="curve" smooth="yes"/>
+      <point x="422.0" y="0.0" type="line"/>
+      <point x="458.0" y="0.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>cyrillic</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Uppercase</string>
+    </dict>
+  </lib>
+</glyph>

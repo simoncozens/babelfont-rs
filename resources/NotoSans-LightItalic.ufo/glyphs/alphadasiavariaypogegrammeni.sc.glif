@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="alphadasiavariaypogegrammeni.sc" format="2">
+  <advance width="558.0"/>
+  <anchor x="220.0" y="0.0" name="bottom"/>
+  <anchor x="218.696" y="-166.0" name="center"/>
+  <anchor x="338.0" y="559.0" name="top"/>
+  <anchor x="519.0" y="559.0" name="topright"/>
+  <outline>
+    <component base="alpha.sc"/>
+    <component base="ypogegrammeni" xOffset="188"/>
+  </outline>
+</glyph>

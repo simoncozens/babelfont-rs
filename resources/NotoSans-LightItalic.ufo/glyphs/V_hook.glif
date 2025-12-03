@@ -1,0 +1,57 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Vhook" format="2">
+  <advance width="692.0"/>
+  <unicode hex="01B2"/>
+  <anchor x="228.0" y="0.0" name="bottom"/>
+  <anchor x="379.0" y="357.0" name="center"/>
+  <anchor x="390.0" y="714.0" name="top"/>
+  <anchor x="768.0" y="714.0" name="topright"/>
+  <outline>
+    <contour>
+      <point x="183.0" y="-10.0" type="curve" smooth="yes"/>
+      <point x="396.0" y="-10.0"/>
+      <point x="584.0" y="199.0"/>
+      <point x="653.0" y="527.0" type="curve" smooth="yes"/>
+      <point x="663.0" y="573.0"/>
+      <point x="671.0" y="611.0"/>
+      <point x="671.0" y="647.0" type="curve" smooth="yes"/>
+      <point x="671.0" y="691.0"/>
+      <point x="645.0" y="724.0"/>
+      <point x="593.0" y="724.0" type="curve" smooth="yes"/>
+      <point x="559.0" y="724.0"/>
+      <point x="542.0" y="712.0"/>
+      <point x="520.0" y="698.0" type="curve"/>
+      <point x="520.0" y="672.0" type="line"/>
+      <point x="542.0" y="688.0"/>
+      <point x="564.0" y="699.0"/>
+      <point x="590.0" y="699.0" type="curve" smooth="yes"/>
+      <point x="626.0" y="699.0"/>
+      <point x="644.0" y="677.0"/>
+      <point x="644.0" y="643.0" type="curve" smooth="yes"/>
+      <point x="644.0" y="614.0"/>
+      <point x="637.0" y="576.0"/>
+      <point x="626.0" y="527.0" type="curve" smooth="yes"/>
+      <point x="542.0" y="140.0"/>
+      <point x="324.0" y="15.0"/>
+      <point x="182.0" y="15.0" type="curve" smooth="yes"/>
+      <point x="103.0" y="15.0"/>
+      <point x="87.0" y="82.0"/>
+      <point x="124.0" y="256.0" type="curve" smooth="yes"/>
+      <point x="221.0" y="714.0" type="line"/>
+      <point x="194.0" y="714.0" type="line"/>
+      <point x="96.0" y="254.0" type="line" smooth="yes"/>
+      <point x="56.0" y="63.0"/>
+      <point x="80.0" y="-10.0"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>latin</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Uppercase</string>
+    </dict>
+  </lib>
+</glyph>

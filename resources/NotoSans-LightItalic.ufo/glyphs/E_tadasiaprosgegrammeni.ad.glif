@@ -1,0 +1,45 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Etadasiaprosgegrammeni.ad" format="2">
+  <advance width="1031.0"/>
+  <anchor x="392.0" y="0.0" name="bottom"/>
+  <anchor x="906.643" y="159.0" name="center"/>
+  <anchor x="544.0" y="714.0" name="top"/>
+  <anchor x="864.0" y="714.0" name="topright"/>
+  <anchor x="203.0" y="714.0" name="topleft"/>
+  <outline>
+    <component base="Eta" xOffset="107"/>
+    <component base="dasia.case" xOffset="-51"/>
+    <component base="prosgegrammeni" xOffset="788"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>Eta</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>1</integer>
+          <key>name</key>
+          <string>dasia.case</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>2</integer>
+          <key>name</key>
+          <string>prosgegrammeni</string>
+        </dict>
+      </array>
+    </dict>
+  </lib>
+</glyph>

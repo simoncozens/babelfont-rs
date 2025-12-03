@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="u107B3" format="2">
+  <advance width="248.0"/>
+  <unicode hex="107B3"/>
+  <anchor x="128.1" y="287.0" name="bottom"/>
+  <anchor x="192.45" y="516.2" name="center"/>
+  <anchor x="233.4" y="746.0" name="top"/>
+  <anchor x="360.15" y="744.8" name="topright"/>
+  <outline>
+    <component base="glottalstopstroke" xScale="0.65" yScale="0.6" xOffset="41" yOffset="287"/>
+  </outline>
+</glyph>

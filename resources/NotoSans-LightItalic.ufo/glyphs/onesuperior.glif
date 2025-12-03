@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="onesuperior" format="2">
+  <advance width="312.0"/>
+  <unicode hex="00B9"/>
+  <outline>
+    <contour>
+      <point x="251.0" y="695.0" type="curve" smooth="yes"/>
+      <point x="192.0" y="416.0" type="line"/>
+      <point x="219.0" y="416.0" type="line"/>
+      <point x="310.0" y="844.0" type="line"/>
+      <point x="289.0" y="844.0" type="line"/>
+      <point x="143.0" y="771.0" type="line"/>
+      <point x="154.0" y="749.0" type="line"/>
+      <point x="203.0" y="774.0" type="line" smooth="yes"/>
+      <point x="237.0" y="791.0"/>
+      <point x="256.0" y="801.0"/>
+      <point x="280.0" y="815.0" type="curve"/>
+      <point x="270.0" y="777.0"/>
+      <point x="259.0" y="734.0"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Number</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Small</string>
+    </dict>
+  </lib>
+</glyph>

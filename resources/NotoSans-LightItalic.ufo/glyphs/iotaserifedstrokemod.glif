@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="iotaserifedstrokemod" format="2">
+  <advance width="159.0"/>
+  <unicode hex="1DA7"/>
+  <anchor x="85.0" y="287.0" name="bottom"/>
+  <anchor x="118.0" y="445.4" name="center"/>
+  <anchor x="152.0" y="604.0" name="top"/>
+  <outline>
+    <component base="iotaserifedstroke" xScale="0.65" yScale="0.6" xOffset="53" yOffset="287"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>iotaserifedstroke</string>
+        </dict>
+      </array>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Modifier</string>
+    </dict>
+  </lib>
+</glyph>

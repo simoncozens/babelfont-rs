@@ -1,0 +1,24 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="caretSign" format="2">
+  <advance width="269.0"/>
+  <unicode hex="2038"/>
+  <outline>
+    <contour>
+      <point x="-92.0" y="-240.0" type="line"/>
+      <point x="-63.0" y="-240.0" type="line"/>
+      <point x="98.0" y="8.0" type="line"/>
+      <point x="172.0" y="-240.0" type="line"/>
+      <point x="201.0" y="-240.0" type="line"/>
+      <point x="114.0" y="34.0" type="line"/>
+      <point x="86.0" y="34.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Punctuation</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Other</string>
+    </dict>
+  </lib>
+</glyph>

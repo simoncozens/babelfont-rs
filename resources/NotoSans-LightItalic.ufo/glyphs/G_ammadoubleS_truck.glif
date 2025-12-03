@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="GammadoubleStruck" format="2">
+  <advance width="552.0"/>
+  <unicode hex="213E"/>
+  <anchor x="317.0" y="357.0" name="center"/>
+  <outline>
+    <contour>
+      <point x="97.0" y="0.0" type="line"/>
+      <point x="270.0" y="0.0" type="line"/>
+      <point x="270.0" y="661.0" type="line"/>
+      <point x="537.0" y="661.0" type="line"/>
+      <point x="537.0" y="714.0" type="line"/>
+      <point x="97.0" y="714.0" type="line"/>
+    </contour>
+    <contour>
+      <point x="150.0" y="53.0" type="line"/>
+      <point x="150.0" y="661.0" type="line"/>
+      <point x="217.0" y="661.0" type="line"/>
+      <point x="217.0" y="53.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Uppercase</string>
+    </dict>
+  </lib>
+</glyph>

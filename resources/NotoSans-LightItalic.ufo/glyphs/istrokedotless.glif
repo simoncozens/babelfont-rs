@@ -1,0 +1,22 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="istrokedotless" format="2">
+  <advance width="218.0"/>
+  <anchor x="48.0" y="0.0" name="bottom"/>
+  <anchor x="101.0" y="264.0" name="center"/>
+  <anchor x="160.0" y="528.0" name="top"/>
+  <outline>
+    <contour>
+      <point x="9.0" y="261.0" type="line"/>
+      <point x="193.0" y="261.0" type="line"/>
+      <point x="199.0" y="286.0" type="line"/>
+      <point x="15.0" y="286.0" type="line"/>
+    </contour>
+    <component base="idotless"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.shapeOrder</key>
+      <string>PC</string>
+    </dict>
+  </lib>
+</glyph>

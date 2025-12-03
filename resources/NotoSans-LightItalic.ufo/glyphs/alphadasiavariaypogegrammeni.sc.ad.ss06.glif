@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="alphadasiavariaypogegrammeni.sc.ad.ss06" format="2">
+  <advance width="758.0"/>
+  <anchor x="599.0" y="0.0" name="bottom"/>
+  <anchor x="661.0" y="280.0" name="center"/>
+  <anchor x="717.0" y="559.0" name="top"/>
+  <anchor x="797.0" y="559.0" name="topright"/>
+  <outline>
+    <component base="alpha.sc"/>
+    <component base="dasiavaria.sc" xOffset="61" yOffset="31"/>
+    <component base="iota.sc" xOffset="558"/>
+  </outline>
+</glyph>

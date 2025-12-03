@@ -1,0 +1,45 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Etadasiavariaprosgegrammeni.ad" format="2">
+  <advance width="1189.0"/>
+  <anchor x="550.0" y="0.0" name="bottom"/>
+  <anchor x="1064.643" y="159.0" name="center"/>
+  <anchor x="702.0" y="714.0" name="top"/>
+  <anchor x="1022.0" y="714.0" name="topright"/>
+  <anchor x="361.0" y="714.0" name="topleft"/>
+  <outline>
+    <component base="Eta" xOffset="265"/>
+    <component base="dasiavaria.case" xOffset="-51"/>
+    <component base="prosgegrammeni" xOffset="946"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>Eta</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>1</integer>
+          <key>name</key>
+          <string>dasiavaria.case</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>2</integer>
+          <key>name</key>
+          <string>prosgegrammeni</string>
+        </dict>
+      </array>
+    </dict>
+  </lib>
+</glyph>

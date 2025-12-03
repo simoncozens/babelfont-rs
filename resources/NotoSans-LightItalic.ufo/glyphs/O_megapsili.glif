@@ -1,0 +1,35 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Omegapsili" format="2">
+  <advance width="803.0"/>
+  <unicode hex="1F68"/>
+  <anchor x="425.0" y="0.0" name="bottom"/>
+  <anchor x="454.0" y="362.0" name="center"/>
+  <anchor x="258.0" y="714.0" name="topleft"/>
+  <outline>
+    <component base="Omega" xOffset="129"/>
+    <component base="psili.case" xOffset="-29"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>Omega</string>
+        </dict>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>1</integer>
+          <key>name</key>
+          <string>psili.case</string>
+        </dict>
+      </array>
+    </dict>
+  </lib>
+</glyph>

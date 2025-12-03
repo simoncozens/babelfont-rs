@@ -1,0 +1,34 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Tse-cy" format="2">
+  <advance width="675.0"/>
+  <unicode hex="0426"/>
+  <anchor x="249.0" y="-155.0" name="bottom"/>
+  <anchor x="339.0" y="269.0" name="center"/>
+  <anchor x="434.0" y="714.0" name="top"/>
+  <outline>
+    <contour>
+      <point x="545.0" y="-155.0" type="line"/>
+      <point x="571.0" y="-155.0" type="line"/>
+      <point x="609.0" y="25.0" type="line"/>
+      <point x="519.0" y="25.0" type="line"/>
+      <point x="666.0" y="714.0" type="line"/>
+      <point x="639.0" y="714.0" type="line"/>
+      <point x="492.0" y="25.0" type="line"/>
+      <point x="81.0" y="25.0" type="line"/>
+      <point x="228.0" y="714.0" type="line"/>
+      <point x="201.0" y="714.0" type="line"/>
+      <point x="49.0" y="0.0" type="line"/>
+      <point x="578.0" y="0.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>cyrillic</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Uppercase</string>
+    </dict>
+  </lib>
+</glyph>

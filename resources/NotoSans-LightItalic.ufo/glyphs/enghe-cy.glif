@@ -1,0 +1,36 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="enghe-cy" format="2">
+  <advance width="648.0"/>
+  <unicode hex="04A5"/>
+  <anchor x="268.0" y="0.0" name="bottom"/>
+  <anchor x="358.0" y="264.0" name="center"/>
+  <anchor x="380.0" y="528.0" name="top"/>
+  <outline>
+    <contour>
+      <point x="32.0" y="0.0" type="line"/>
+      <point x="58.0" y="0.0" type="line"/>
+      <point x="114.0" y="264.0" type="line"/>
+      <point x="455.0" y="264.0" type="line"/>
+      <point x="399.0" y="0.0" type="line"/>
+      <point x="425.0" y="0.0" type="line"/>
+      <point x="532.0" y="503.0" type="line"/>
+      <point x="679.0" y="503.0" type="line"/>
+      <point x="684.0" y="528.0" type="line"/>
+      <point x="511.0" y="528.0" type="line"/>
+      <point x="460.0" y="289.0" type="line"/>
+      <point x="119.0" y="289.0" type="line"/>
+      <point x="170.0" y="528.0" type="line"/>
+      <point x="144.0" y="528.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Letter</string>
+      <key>com.schriftgestaltung.Glyphs.script</key>
+      <string>cyrillic</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Lowercase</string>
+    </dict>
+  </lib>
+</glyph>

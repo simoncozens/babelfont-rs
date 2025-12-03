@@ -1,0 +1,65 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="replacementCharacter" format="2">
+  <advance width="1000.0"/>
+  <unicode hex="FFFD"/>
+  <outline>
+    <contour>
+      <point x="499.0" y="-156.0" type="line"/>
+      <point x="958.0" y="302.0" type="line"/>
+      <point x="499.0" y="760.0" type="line"/>
+      <point x="41.0" y="302.0" type="line"/>
+    </contour>
+    <contour>
+      <point x="484.0" y="-21.0" type="curve"/>
+      <point x="445.0" y="-21.0"/>
+      <point x="415.0" y="-2.0"/>
+      <point x="415.0" y="45.0" type="curve"/>
+      <point x="415.0" y="94.0"/>
+      <point x="445.0" y="112.0"/>
+      <point x="484.0" y="112.0" type="curve"/>
+      <point x="520.0" y="112.0"/>
+      <point x="552.0" y="94.0"/>
+      <point x="552.0" y="45.0" type="curve"/>
+      <point x="552.0" y="-2.0"/>
+      <point x="520.0" y="-21.0"/>
+    </contour>
+    <contour>
+      <point x="428.0" y="179.0" type="line"/>
+      <point x="428.0" y="208.0" type="line"/>
+      <point x="428.0" y="260.0"/>
+      <point x="448.0" y="292.0"/>
+      <point x="498.0" y="332.0" type="curve"/>
+      <point x="542.0" y="366.0"/>
+      <point x="557.0" y="383.0"/>
+      <point x="557.0" y="421.0" type="curve"/>
+      <point x="557.0" y="451.0"/>
+      <point x="537.0" y="472.0"/>
+      <point x="496.0" y="472.0" type="curve"/>
+      <point x="460.0" y="472.0"/>
+      <point x="418.0" y="455.0"/>
+      <point x="374.0" y="433.0" type="curve"/>
+      <point x="334.0" y="520.0" type="line"/>
+      <point x="379.0" y="546.0"/>
+      <point x="442.0" y="568.0"/>
+      <point x="498.0" y="568.0" type="curve"/>
+      <point x="604.0" y="568.0"/>
+      <point x="670.0" y="516.0"/>
+      <point x="670.0" y="427.0" type="curve"/>
+      <point x="670.0" y="361.0"/>
+      <point x="641.0" y="328.0"/>
+      <point x="584.0" y="282.0" type="curve"/>
+      <point x="540.0" y="248.0"/>
+      <point x="531.0" y="235.0"/>
+      <point x="531.0" y="202.0" type="curve"/>
+      <point x="531.0" y="179.0" type="line"/>
+    </contour>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.category</key>
+      <string>Symbol</string>
+      <key>com.schriftgestaltung.Glyphs.subCategory</key>
+      <string>Other</string>
+    </dict>
+  </lib>
+</glyph>

@@ -1,0 +1,23 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="macronacute" format="2">
+  <outline>
+    <contour>
+      <point x="40.0" y="693.0" type="curve"/>
+      <point x="40.0" y="687.0" type="line"/>
+      <point x="61.0" y="687.0" type="line"/>
+      <point x="114.0" y="731.0"/>
+      <point x="174.0" y="795.0"/>
+      <point x="209.0" y="840.0" type="curve"/>
+      <point x="209.0" y="847.0" type="line"/>
+      <point x="179.0" y="847.0" type="line"/>
+      <point x="150.0" y="804.0"/>
+      <point x="85.0" y="733.0"/>
+    </contour>
+    <contour>
+      <point x="-39.0" y="626.0" type="line"/>
+      <point x="198.0" y="626.0" type="line"/>
+      <point x="204.0" y="652.0" type="line"/>
+      <point x="-33.0" y="652.0" type="line"/>
+    </contour>
+  </outline>
+</glyph>

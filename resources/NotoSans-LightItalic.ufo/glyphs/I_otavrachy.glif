@@ -1,0 +1,27 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="Iotavrachy" format="2">
+  <advance width="279.0"/>
+  <unicode hex="1FD8"/>
+  <anchor x="84.0" y="0.0" name="bottom"/>
+  <anchor x="162.0" y="357.0" name="center"/>
+  <anchor x="276.0" y="904.0" name="top"/>
+  <anchor x="355.0" y="714.0" name="topright"/>
+  <outline>
+    <component base="Ibreve"/>
+  </outline>
+  <lib>
+    <dict>
+      <key>com.schriftgestaltung.Glyphs.ComponentInfo</key>
+      <array>
+        <dict>
+          <key>alignment</key>
+          <integer>-1</integer>
+          <key>index</key>
+          <integer>0</integer>
+          <key>name</key>
+          <string>Ibreve</string>
+        </dict>
+      </array>
+    </dict>
+  </lib>
+</glyph>
