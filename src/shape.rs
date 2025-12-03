@@ -10,6 +10,7 @@ use smol_str::SmolStr;
 /// A component in a glyph
 pub struct Component {
     /// The referenced glyph name
+    #[cfg_attr(feature = "typescript", type_def(type_of = "String"))]
     pub reference: SmolStr,
     #[serde(
         default = "kurbo::Affine::default",

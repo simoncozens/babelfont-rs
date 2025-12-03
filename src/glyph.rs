@@ -67,8 +67,10 @@ pub enum GlyphCategory {
 /// A glyph in the font
 pub struct Glyph {
     /// The name of the glyph
+    #[cfg_attr(feature = "typescript", type_def(type_of = "String"))]
     pub name: SmolStr,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "typescript", type_def(type_of = "Option<String>"))]
     /// The production name of the glyph, if any
     pub production_name: Option<SmolStr>,
     /// The category of the glyph

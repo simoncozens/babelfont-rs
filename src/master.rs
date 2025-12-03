@@ -42,6 +42,10 @@ pub struct Master {
         serialize_with = "crate::serde_helpers::kerning_map",
         deserialize_with = "crate::serde_helpers::kerning_unmap"
     )]
+    #[cfg_attr(
+        feature = "typescript",
+        type_def(type_of = "HashMap<(String, String), i16>")
+    )]
     pub kerning: HashMap<(SmolStr, SmolStr), i16>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     /// Custom OpenType values for this master

@@ -60,6 +60,10 @@ pub struct Font {
     pub custom_ot_values: Vec<OTValue>,
     /// A map of Unicode Variation Sequences to glyph names
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    #[cfg_attr(
+        feature = "typescript",
+        type_def(type_of = "BTreeMap<(u32, u32), String>")
+    )]
     pub variation_sequences: BTreeMap<(u32, u32), SmolStr>,
     /// A representation of the font's OpenType features
     pub features: Features,
@@ -68,12 +72,20 @@ pub struct Font {
     /// The key is the group name and the value is a list of glyph names in the group
     /// Group names are *not* prefixed with "@" here
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    #[cfg_attr(
+        feature = "typescript",
+        type_def(type_of = "HashMap<String, Vec<String>>")
+    )]
     pub first_kern_groups: HashMap<SmolStr, Vec<SmolStr>>,
     // A dictionary of kerning groups
     ///
     /// The key is the group name and the value is a list of glyph names in the group
     /// Group names are *not* prefixed with "@" here
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    #[cfg_attr(
+        feature = "typescript",
+        type_def(type_of = "HashMap<String, Vec<String>>")
+    )]
     pub second_kern_groups: HashMap<SmolStr, Vec<SmolStr>>,
 
     /// Format-specific data
