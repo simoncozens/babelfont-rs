@@ -2,7 +2,6 @@ use std::{str::FromStr, sync::LazyLock};
 
 use babelfont::filters::FontFilter;
 use clap::Parser;
-use smol_str::ToSmolStr;
 
 #[derive(Parser)]
 struct Cli {
@@ -79,7 +78,7 @@ fn convert_filters(filter: &[String]) -> Vec<Box<dyn FontFilter>> {
                     continue;
                 }
                 let axis_tag =
-                    fontdrasil::types::Tag::from_str(&parts[1]).expect("Invalid axis tag");
+                    fontdrasil::types::Tag::from_str(parts[1]).expect("Invalid axis tag");
                 result.push(Box::new(babelfont::filters::DropAxis::new(axis_tag)));
             }
             "dropguides" => {
@@ -146,7 +145,7 @@ fn main() {
         compilation_options.dont_use_production_names = true;
     }
 
-    if args.retain_glyphs.len() > 0 {
+    if !args.retain_glyphs.is_empty() {
         filters.push(Box::new(babelfont::filters::RetainGlyphs::new(
             args.retain_glyphs.clone(),
         )));
