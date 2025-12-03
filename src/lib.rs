@@ -104,13 +104,13 @@
 //! let font = load("MyFont.ufo")?;
 //!
 //! // Access font metadata
-//! println!("Font family: {}", font.names.family_name);
+//! println!("Font family: {:?}", font.names.family_name);
 //! println!("Units per em: {}", font.upm);
 //! println!("Number of glyphs: {}", font.glyphs.len());
 //!
 //! // Iterate over axes in a variable font
 //! for axis in &font.axes {
-//!     println!("Axis: {} ({}-{})", axis.name, axis.min, axis.max);
+//!     println!("Axis: {:?} ({:?}-{:?})", axis.name, axis.min, axis.max);
 //! }
 //!
 //! // Access glyphs
