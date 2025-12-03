@@ -63,14 +63,8 @@ impl BabelfontIrSource {
             font: Arc::new(font),
             options,
         };
-        fontc::generate_font(
-            Box::new(source),
-            std::path::Path::new("build"),
-            None,
-            fontc::Flags::default(),
-            false,
-        )
-        .map_err(|e| BabelfontError::General(format!("Font generation error: {:#?}", e)))
+        fontc::generate_font(Box::new(source), fontc::Flags::default(), false)
+            .map_err(|e| BabelfontError::General(format!("Font generation error: {:#?}", e)))
     }
 }
 

@@ -79,6 +79,32 @@ mod ufo {
     }
 }
 
+// New approach to storing OT values
+
+// use std::collections::HashMap;
+// use std::mem::Discriminant;
+
+// struct EnumMap<T>(HashMap<Discriminant<T>, T>);
+// impl<T> EnumMap<T> {
+//     fn new() -> Self {
+//         EnumMap(HashMap::new())
+//     }
+
+//     fn insert(&mut self, value: T) {
+//         self.0.insert(std::mem::discriminant(&value), value);
+//     }
+
+//     fn get(&self, dummy: T) -> Option<&T> {
+//         self.0.get(&std::mem::discriminant(&dummy))
+//     }
+// }
+
+// enum OTValue {
+//     Os2USWeightClass(u16),
+//     Os2USWidthClass(u16),
+//     Os2FSType(u16)
+// }
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
 /// A scalar value in an OpenType table
