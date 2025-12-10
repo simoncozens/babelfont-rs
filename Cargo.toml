@@ -1,6 +1,6 @@
 [package]
 name = "babelfont"
-version = "0.1.1-pre"
+version = "0.1.2-pre"
 edition = "2021"
 authors = ["Simon Cozens <simon@simon-cozens.org>"]
 license = "MIT OR Apache-2.0"
@@ -33,7 +33,7 @@ cli = [
     "dep:clap-verbosity-flag",
 ]
 typescript = ["dep:typescript-type-def"]
-rayon = ["fontc/rayon", "norad/rayon"]
+rayon = ["norad/rayon"]
 
 [dependencies]
 chrono = { version = "0.4.3", features = ["serde"] }
