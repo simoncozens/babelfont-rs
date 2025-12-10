@@ -1,6 +1,6 @@
 [package]
 name = "babelfont"
-version = "0.1.1-pre"
+version = "0.1.2-pre"
 edition = "2021"
 authors = ["Simon Cozens <simon@simon-cozens.org>"]
 license = "MIT OR Apache-2.0"
