@@ -100,18 +100,6 @@ export function createCaseConvertingProxy<T extends object>(
       return snakeCaseProp !== prop && snakeCaseProp in obj;
     },
 
-    ownKeys(obj: any) {
-      // Return all keys converted to camelCase
-      const keys = Reflect.ownKeys(obj);
-      const camelKeys = keys.map((key) => {
-        if (typeof key === "string") {
-          return snakeToCamel(key);
-        }
-        return key;
-      });
-      return camelKeys;
-    },
-
     getOwnPropertyDescriptor(obj: any, prop: string | symbol) {
       if (typeof prop === "symbol") {
         return Reflect.getOwnPropertyDescriptor(obj, prop);
