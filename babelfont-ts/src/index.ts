@@ -37,6 +37,63 @@ export type {
   I18NDictionary,
 };
 
+/**
+ * A registry for custom class implementations.
+ * Users can provide custom subclasses of the library's classes to extend functionality.
+ * Any class not in the registry will use the default implementation.
+ */
+export interface ClassRegistry {
+  Anchor?: typeof Anchor;
+  Axis?: typeof Axis;
+  Color?: typeof Color;
+  Component?: typeof Component;
+  Features?: typeof Features;
+  Instance?: typeof Instance;
+  Names?: typeof Names;
+  Position?: typeof Position;
+  Guide?: typeof Guide;
+  OTValue?: typeof OTValue;
+  Master?: typeof Master;
+  Node?: typeof Node;
+  Path?: typeof Path;
+  Layer?: typeof Layer;
+  Glyph?: typeof Glyph;
+  Font?: typeof Font;
+}
+
+// Global registry (can be overridden per Font instance)
+let globalClassRegistry: ClassRegistry = {};
+
+/**
+ * Context object that holds the class registry for the current inflation operation.
+ * This is used internally to pass the registry through nested object creation.
+ */
+class InflationContext {
+  static current?: ClassRegistry;
+
+  static with<T>(registry: ClassRegistry, fn: () => T): T {
+    const previous = InflationContext.current;
+    InflationContext.current = registry;
+    try {
+      return fn();
+    } finally {
+      InflationContext.current = previous;
+    }
+  }
+}
+
+/**
+ * Get the appropriate class constructor from the current context or use the default
+ */
+function getClassConstructor<T extends { new (data: any): any }>(
+  name: keyof ClassRegistry,
+  defaultClass: T
+): T {
+  const registry = InflationContext.current;
+  const customClass = registry?.[name] || globalClassRegistry[name];
+  return (customClass as T) || defaultClass;
+}
+
 // This is a trick to avoid duplicating the fields of the interfaces in the classes.
 // https://stackoverflow.com/questions/65787571/avoiding-fields-declaration-duplication-in-interface-and-class-definition
 export interface Anchor extends WithCamelCase<IAnchor> {}
@@ -91,7 +148,8 @@ export class Instance {
   constructor(data: IInstance) {
     // inflate the .custom_names property
     if (data.custom_names) {
-      data.custom_names = new Names(data.custom_names);
+      const NamesClass = getClassConstructor("Names", Names);
+      data.custom_names = new NamesClass(data.custom_names);
     }
     Object.assign(this, data);
     return createCaseConvertingProxy(this, Instance.prototype);
@@ -128,12 +186,14 @@ export class Master {
   constructor(data: IMaster) {
     // Inflate the .guides array
     if (data.guides) {
-      data.guides = data.guides.map((g) => new Guide(g));
+      const GuideClass = getClassConstructor("Guide", Guide);
+      data.guides = data.guides.map((g) => new GuideClass(g));
     }
     // Infate .custom_ot_values
     if (data.custom_ot_values) {
+      const OTValueClass = getClassConstructor("OTValue", OTValue);
       data.custom_ot_values = data.custom_ot_values.map(
-        (otv) => new OTValue(otv)
+        (otv) => new OTValueClass(otv)
       );
     }
     Object.assign(this, data);
@@ -214,11 +274,12 @@ export class Path {
   constructor(data: IPath) {
     // Inflate the .nodes array
     if (data.nodes) {
+      const NodeClass = getClassConstructor("Node", Node);
       // For brevity the nodes are stored as a string, but we need to inflate them
       data.nodes = Path.parseNodes(data.nodes as unknown as string).map((n) => {
-        let nObject = new Node(n);
+        let nObject = new NodeClass(n);
         nObject.parent = this;
-        return createCaseConvertingProxy(nObject, Node.prototype) as Node;
+        return createCaseConvertingProxy(nObject, NodeClass.prototype) as Node;
       });
     }
     Object.assign(this, data);
@@ -265,7 +326,7 @@ export class Path {
           break;
       }
       nodesArray.push(
-        new Node({
+        new (getClassConstructor("Node", Node))({
           x: parseFloat(tokens[i]!), // x
           y: parseFloat(tokens[i + 1]!), // y
           nodetype,
@@ -322,17 +383,21 @@ export interface Layer extends WithCamelCase<ILayer> {}
 export class Layer {
   constructor(data: ILayer) {
     if (data.guides) {
-      data.guides = data.guides.map((g) => new Guide(g));
+      const GuideClass = getClassConstructor("Guide", Guide);
+      data.guides = data.guides.map((g) => new GuideClass(g));
     }
     // Inflate the .shapes array
     if (data.shapes) {
+      const ComponentClass = getClassConstructor("Component", Component);
+      const PathClass = getClassConstructor("Path", Path);
       data.shapes = data.shapes.map((s) =>
-        isComponent(s) ? new Component(s) : new Path(s as IPath)
+        isComponent(s) ? new ComponentClass(s) : new PathClass(s as IPath)
       );
     }
     // .anchors
     if (data.anchors) {
-      data.anchors = data.anchors.map((a) => new Anchor(a));
+      const AnchorClass = getClassConstructor("Anchor", Anchor);
+      data.anchors = data.anchors.map((a) => new AnchorClass(a));
     }
     Object.assign(this, data);
     return createCaseConvertingProxy(this, Layer.prototype);
@@ -346,10 +411,11 @@ export class Glyph {
   constructor(data: IGlyph) {
     // Inflate the .layers array
     if (data.layers) {
+      const LayerClass = getClassConstructor("Layer", Layer);
       data.layers = data.layers.map((l) => {
         return createCaseConvertingProxy(
-          new Layer(l),
-          Layer.prototype
+          new LayerClass(l),
+          LayerClass.prototype
         ) as Layer;
       });
     }
@@ -377,32 +443,40 @@ export interface Font extends WithCamelCase<IFont> {
   features: Features;
 }
 export class Font {
-  constructor(data: IFont) {
-    // Inflate the .axes array
-    if (data.axes) {
-      data.axes = data.axes.map((a) => new Axis(a));
-    }
-    // .instances
-    if (data.instances) {
-      data.instances = data.instances.map((i) => new Instance(i));
-    }
-    // .glyphs
-    if (data.glyphs) {
-      data.glyphs = data.glyphs.map((g) => new Glyph(g));
-    }
-    // .masters
-    if (data.masters) {
-      data.masters = data.masters.map((m) => new Master(m));
-    }
-    // .names
-    if (data.names) {
-      data.names = new Names(data.names);
-    }
-    // .features
-    if (data.features) {
-      data.features = new Features(data.features);
-    }
-    Object.assign(this, data);
-    return createCaseConvertingProxy(this, Font.prototype) as Font;
+  constructor(data: IFont, registry?: ClassRegistry) {
+    return InflationContext.with(registry || {}, () => {
+      // Inflate the .axes array
+      if (data.axes) {
+        const AxisClass = getClassConstructor("Axis", Axis);
+        data.axes = data.axes.map((a) => new AxisClass(a));
+      }
+      // .instances
+      if (data.instances) {
+        const InstanceClass = getClassConstructor("Instance", Instance);
+        data.instances = data.instances.map((i) => new InstanceClass(i));
+      }
+      // .glyphs
+      if (data.glyphs) {
+        const GlyphClass = getClassConstructor("Glyph", Glyph);
+        data.glyphs = data.glyphs.map((g) => new GlyphClass(g));
+      }
+      // .masters
+      if (data.masters) {
+        const MasterClass = getClassConstructor("Master", Master);
+        data.masters = data.masters.map((m) => new MasterClass(m));
+      }
+      // .names
+      if (data.names) {
+        const NamesClass = getClassConstructor("Names", Names);
+        data.names = new NamesClass(data.names);
+      }
+      // .features
+      if (data.features) {
+        const FeaturesClass = getClassConstructor("Features", Features);
+        data.features = new FeaturesClass(data.features);
+      }
+      Object.assign(this, data);
+      return createCaseConvertingProxy(this, Font.prototype) as Font;
+    });
   }
 }

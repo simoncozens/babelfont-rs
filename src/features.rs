@@ -28,7 +28,7 @@ pub struct Features {
     ///
     /// Paths to search for included feature files.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    #[typeshare(python(type = "List[String]"))]
+    #[typeshare(python(type = "List[str]"))]
     #[typeshare(typescript(type = "string[]"))]
     pub include_paths: Vec<std::path::PathBuf>,
 }
