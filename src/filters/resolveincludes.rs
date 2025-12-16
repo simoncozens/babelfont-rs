@@ -55,7 +55,7 @@ fn resolve_includes(
     let mut paths = vec![base_path.clone()];
     paths.extend(font.features.include_paths.iter().cloned());
     for prefix in font.features.prefixes.values_mut() {
-        if !prefix.contains("include(") {
+        if !prefix.code.contains("include(") {
             continue;
         }
         let paths = paths.clone();
@@ -73,7 +73,7 @@ fn resolve_includes(
             )));
         }
 
-        let features_text: Arc<str> = Arc::from(prefix.as_str());
+        let features_text: Arc<str> = Arc::from(prefix.code.as_str());
         let (parse_tree, mut diagnostics) = fea_rs::parse::parse_root(
             "get_parse_tree".into(),
             Some(&glyph_map),
@@ -123,7 +123,7 @@ fn resolve_includes(
         for token in parse_tree.root().iter_tokens() {
             new_prefix.push_str(token.as_str());
         }
-        *prefix = new_prefix;
+        prefix.code = new_prefix;
     }
     Ok(())
 }

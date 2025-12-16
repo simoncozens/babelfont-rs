@@ -246,7 +246,7 @@ impl FontlabGlyph {
             layers: layers?,
             exported: true,
             direction: None,
-            formatspecific: Default::default(),
+            format_specific: Default::default(),
         })
     }
 }

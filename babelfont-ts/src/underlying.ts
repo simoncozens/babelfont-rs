@@ -36,7 +36,7 @@ export interface Axis {
 	/** Predefined values for the axis in user space coordinates */
 	values?: import('@simoncozens/fonttypes').UserspaceCoordinate[];
 	/** Format-specific data */
-	formatspecific?: Record<string, any>;
+	format_specific?: Record<string, any>;
 }
 
 export interface Color {
@@ -318,7 +318,7 @@ export interface Glyph {
 	/** The writing direction of the glyph, if any */
 	direction?: Direction;
 	/** Format-specific data */
-	formatspecific?: Record<string, any>;
+	format_specific?: Record<string, any>;
 }
 
 /** A representation of a font source file */

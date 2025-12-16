@@ -94,7 +94,7 @@ pub struct Glyph {
     /// Format-specific data
     #[typeshare(python(type = "Dict[str, Any]"))]
     #[typeshare(typescript(type = "Record<string, any>"))]
-    pub formatspecific: FormatSpecific,
+    pub format_specific: FormatSpecific,
 }
 
 impl Glyph {
@@ -128,35 +128,35 @@ pub(crate) mod glyphs {
     use glyphslib::glyphs3::Glyph as G3Glyph;
 
     pub(crate) fn from_glyphs(val: &G3Glyph, axes_order: &[Tag]) -> Glyph {
-        let mut formatspecific = FormatSpecific::default();
-        formatspecific.insert("case".to_string(), val.case.clone().into());
-        formatspecific.insert(
+        let mut format_specific = FormatSpecific::default();
+        format_specific.insert("case".to_string(), val.case.clone().into());
+        format_specific.insert(
             "color".to_string(),
             serde_json::to_value(&val.color).unwrap_or_default(),
         );
-        formatspecific.insert("kern_direction".to_string(), val.direction.clone().into());
-        formatspecific.insert("kern_bottom".to_string(), val.kern_bottom.clone().into());
-        formatspecific.insert("kern_left".to_string(), val.kern_left.clone().into());
-        formatspecific.insert("kern_right".to_string(), val.kern_right.clone().into());
-        formatspecific.insert("kern_top".to_string(), val.kern_top.clone().into());
-        formatspecific.insert("last_change".to_string(), val.last_change.clone().into());
-        formatspecific.insert("locked".to_string(), val.locked.into());
-        formatspecific.insert(
+        format_specific.insert("kern_direction".to_string(), val.direction.clone().into());
+        format_specific.insert("kern_bottom".to_string(), val.kern_bottom.clone().into());
+        format_specific.insert("kern_left".to_string(), val.kern_left.clone().into());
+        format_specific.insert("kern_right".to_string(), val.kern_right.clone().into());
+        format_specific.insert("kern_top".to_string(), val.kern_top.clone().into());
+        format_specific.insert("last_change".to_string(), val.last_change.clone().into());
+        format_specific.insert("locked".to_string(), val.locked.into());
+        format_specific.insert(
             "metric_bottom".to_string(),
             val.metric_bottom.clone().into(),
         );
-        formatspecific.insert("metric_left".to_string(), val.metric_left.clone().into());
-        formatspecific.insert("metric_right".to_string(), val.metric_right.clone().into());
-        formatspecific.insert("metric_top".to_string(), val.metric_top.clone().into());
-        formatspecific.insert(
+        format_specific.insert("metric_left".to_string(), val.metric_left.clone().into());
+        format_specific.insert("metric_right".to_string(), val.metric_right.clone().into());
+        format_specific.insert("metric_top".to_string(), val.metric_top.clone().into());
+        format_specific.insert(
             "metric_vert_width".to_string(),
             val.metric_vert_width.clone().into(),
         );
-        formatspecific.insert("metric_width".to_string(), val.metric_width.clone().into());
-        formatspecific.insert("note".to_string(), val.note.clone().into());
-        formatspecific.insert("script".to_string(), val.script.clone().into());
-        formatspecific.insert("subcategory".to_string(), val.subcategory.clone().into());
-        formatspecific.insert(
+        format_specific.insert("metric_width".to_string(), val.metric_width.clone().into());
+        format_specific.insert("note".to_string(), val.note.clone().into());
+        format_specific.insert("script".to_string(), val.script.clone().into());
+        format_specific.insert("subcategory".to_string(), val.subcategory.clone().into());
+        format_specific.insert(
             "tags".to_string(),
             serde_json::value::to_value(&val.tags).unwrap_or_default(),
         );
@@ -176,7 +176,7 @@ pub(crate) mod glyphs {
         } else {
             GlyphCategory::Unknown
         };
-        copy_user_data(&mut formatspecific, &val.user_data);
+        copy_user_data(&mut format_specific, &val.user_data);
         let mut layers = vec![];
         for layer in &val.layers {
             let mut bf_layer = layer_from_glyphs(layer, axes_order);
@@ -202,7 +202,7 @@ pub(crate) mod glyphs {
             layers,
             exported: val.export,
             direction: None,
-            formatspecific,
+            format_specific,
         }
     }
 
@@ -232,27 +232,27 @@ pub(crate) mod glyphs {
             unicode: val.codepoints.clone(),
             layers: g3_layers,
             export: val.exported,
-            case: val.formatspecific.get_string("case"),
-            category: val.formatspecific.get_optionstring("category"),
-            direction: val.formatspecific.get_optionstring("kern_direction"),
-            kern_bottom: val.formatspecific.get_optionstring("kern_bottom"),
+            case: val.format_specific.get_string("case"),
+            category: val.format_specific.get_optionstring("category"),
+            direction: val.format_specific.get_optionstring("kern_direction"),
+            kern_bottom: val.format_specific.get_optionstring("kern_bottom"),
             kern_left: kern_left.as_ref().map(|s| s.to_string()),
             kern_right: kern_right.as_ref().map(|s| s.to_string()),
-            kern_top: val.formatspecific.get_optionstring("kern_top"),
-            last_change: val.formatspecific.get_optionstring("last_change"),
-            locked: val.formatspecific.get_bool("locked"),
-            metric_bottom: val.formatspecific.get_optionstring("metric_bottom"),
-            metric_left: val.formatspecific.get_optionstring("metric_left"),
-            metric_right: val.formatspecific.get_optionstring("metric_right"),
-            metric_top: val.formatspecific.get_optionstring("metric_top"),
-            metric_vert_width: val.formatspecific.get_optionstring("metric_vert_width"),
-            metric_width: val.formatspecific.get_optionstring("metric_width"),
-            note: val.formatspecific.get_string("note"),
+            kern_top: val.format_specific.get_optionstring("kern_top"),
+            last_change: val.format_specific.get_optionstring("last_change"),
+            locked: val.format_specific.get_bool("locked"),
+            metric_bottom: val.format_specific.get_optionstring("metric_bottom"),
+            metric_left: val.format_specific.get_optionstring("metric_left"),
+            metric_right: val.format_specific.get_optionstring("metric_right"),
+            metric_top: val.format_specific.get_optionstring("metric_top"),
+            metric_vert_width: val.format_specific.get_optionstring("metric_vert_width"),
+            metric_width: val.format_specific.get_optionstring("metric_width"),
+            note: val.format_specific.get_string("note"),
             smart_component_settings: vec![], // XXX
-            script: val.formatspecific.get_optionstring("script"),
-            subcategory: val.formatspecific.get_optionstring("subcategory"),
+            script: val.format_specific.get_optionstring("script"),
+            subcategory: val.format_specific.get_optionstring("subcategory"),
             tags: val
-                .formatspecific
+                .format_specific
                 .get("tags")
                 .and_then(|x| x.as_array())
                 .map(|x| {
@@ -263,11 +263,11 @@ pub(crate) mod glyphs {
                 })
                 .unwrap_or_default(),
             user_data: val
-                .formatspecific
+                .format_specific
                 .get(KEY_USER_DATA)
                 .and_then(|x| serde_json::from_value::<UserData>(x.clone()).ok())
                 .unwrap_or_default(),
-            color: val.formatspecific.get("color").and_then(|x|
+            color: val.format_specific.get("color").and_then(|x|
                     // either a tuple -> ColorTuple or an int -> ColorInt
                     if x.is_number() {
                         Some(glyphslib::common::Color::ColorInt(x.as_i64().unwrap_or(0) as u8))

@@ -144,7 +144,7 @@ fn _load(glyphs_font: &glyphslib::Font, path: PathBuf) -> Result<Font, Babelfont
     font.features.classes = glyphs_font
         .classes
         .iter()
-        .map(|c| (SmolStr::new(&c.name), c.code.clone()))
+        .map(|c| (SmolStr::new(&c.name), c.into()))
         .collect();
     // Custom parameters
     copy_custom_parameters(&mut font.format_specific, &glyphs_font.custom_parameters);
@@ -154,21 +154,15 @@ fn _load(glyphs_font: &glyphslib::Font, path: PathBuf) -> Result<Font, Babelfont
     font.names.family_name = glyphs_font.family_name.clone().into();
     // Feature prefixes
     for prefix in glyphs_font.feature_prefixes.iter() {
-        if prefix.disabled {
-            continue;
-        } // XXX Store as comment or something?
         font.features
             .prefixes
-            .insert(SmolStr::new(&prefix.name), prefix.code.clone());
+            .insert(SmolStr::new(&prefix.name), prefix.into());
     }
     // Features
     for feature in glyphs_font.features.iter() {
-        if feature.disabled {
-            continue;
-        } // XXX Store as comment or something?
         font.features
             .features
-            .push((SmolStr::new(&feature.tag), feature.code.clone()));
+            .push((SmolStr::new(&feature.tag), feature.into()));
     }
     // Masters
     font.masters = glyphs_font
@@ -235,13 +229,13 @@ fn _load(glyphs_font: &glyphslib::Font, path: PathBuf) -> Result<Font, Babelfont
     // Copy instances
     // Copy kern groups
     for glyph in font.glyphs.iter() {
-        let left_group = glyph.formatspecific.get_string("kern_left");
+        let left_group = glyph.format_specific.get_string("kern_left");
         font.second_kern_groups
             .entry(left_group.into())
             .or_default()
             .push(glyph.name.clone());
 
-        let right_group = glyph.formatspecific.get_string("kern_right");
+        let right_group = glyph.format_specific.get_string("kern_right");
         font.first_kern_groups
             .entry(right_group.into())
             .or_default()
@@ -645,38 +639,19 @@ pub(crate) fn as_glyphs3(font: &Font) -> glyphs3::Glyphs3 {
         .features
         .classes
         .iter()
-        .map(|(name, members)| glyphslib::common::FeatureClass {
-            name: name.to_string(),
-            code: members.clone(),
-            disabled: false,
-            automatic: false,
-            notes: None,
-        })
+        .map(|(name, members)| members.to_featureclass(name))
         .collect();
     let feature_prefixes = font
         .features
         .prefixes
         .iter()
-        .map(|(name, code)| glyphslib::common::FeaturePrefix {
-            name: name.to_string(),
-            code: code.clone(),
-            automatic: false,
-            notes: None,
-            disabled: false,
-        })
+        .map(|(name, code)| code.to_featureprefix(name))
         .collect();
     let features = font
         .features
         .features
         .iter()
-        .map(|(tag, code)| glyphslib::common::Feature {
-            tag: tag.to_string(),
-            code: code.clone(),
-            disabled: false,
-            notes: None,
-            automatic: false,
-            labels: vec![],
-        })
+        .map(|(tag, code)| code.to_feature(tag))
         .collect();
 
     let custom_parameters = serialize_custom_parameters(&font.format_specific);
@@ -910,7 +885,7 @@ fn save_instance(instance: &crate::Instance, axes: &[Axis]) -> glyphs3::Instance
                 .unwrap_or(0.0),
         );
     }
-    let formatspecific = &instance.format_specific;
+    let format_specific = &instance.format_specific;
     glyphs3::Instance {
         name: instance
             .name
@@ -918,20 +893,20 @@ fn save_instance(instance: &crate::Instance, axes: &[Axis]) -> glyphs3::Instance
             .map(|x| x.to_string())
             .unwrap_or_default(),
         axes_values,
-        weight_class: formatspecific
+        weight_class: format_specific
             .get(KEY_WEIGHT_CLASS)
             .and_then(|x| x.as_i64())
             .map(glyphslib::Plist::Integer),
-        width_class: formatspecific
+        width_class: format_specific
             .get(KEY_WIDTH_CLASS)
             .and_then(|x| x.as_i64())
             .map(glyphslib::Plist::Integer),
-        exports: formatspecific
+        exports: format_specific
             .get(KEY_INSTANCE_EXPORTS)
             .and_then(|x| x.as_bool())
             .unwrap_or(true),
         custom_parameters: serialize_custom_parameters(&instance.format_specific),
-        user_data: formatspecific
+        user_data: format_specific
             .get(KEY_USER_DATA)
             .and_then(|x| serde_json::from_value::<UserData>(x.clone()).ok())
             .unwrap_or_default(),

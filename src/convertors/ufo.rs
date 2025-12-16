@@ -707,7 +707,7 @@ pub(crate) fn load_glyphs(font: &mut Font, ufo: &norad::Font) {
                 layers: vec![],
                 exported: !skipped.contains(&glyphname),
                 direction: None,
-                formatspecific: Default::default(),
+                format_specific: Default::default(),
             })
         }
     }

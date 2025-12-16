@@ -69,7 +69,7 @@ pub struct Axis {
     #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
     #[typeshare(python(type = "Dict[str, Any]"))]
     #[typeshare(typescript(type = "Record<string, any>"))]
-    pub formatspecific: FormatSpecific,
+    pub format_specific: FormatSpecific,
 }
 
 impl Axis {
