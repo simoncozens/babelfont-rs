@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 static DFLT: &str = "dflt";
 
 #[derive(Default, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+#[cfg_attr(feature = "types", typeshare::typeshare)]
 /// A dictionary for internationalized strings.
 pub struct I18NDictionary(pub HashMap<String, String>);
 

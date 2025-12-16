@@ -4,28 +4,36 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
+use typeshare::typeshare;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+#[typeshare]
 /// A component in a glyph
 pub struct Component {
     /// The referenced glyph name
-    #[cfg_attr(feature = "typescript", type_def(type_of = "String"))]
+    #[typeshare(serialized_as = "String")]
     pub reference: SmolStr,
     #[serde(
         default = "kurbo::Affine::default",
         skip_serializing_if = "crate::serde_helpers::affine_is_identity"
     )]
-    #[cfg_attr(feature = "typescript", type_def(type_of = "Vec<f32>"))]
     /// The transformation applied to the component
+    #[typeshare(serialized_as = "Vec<f32>")]
     pub transform: kurbo::Affine,
-    #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
     /// Format-specific data
+    #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
+    #[typeshare(python(type = "Dict[str, Any]"))]
+    #[typeshare(typescript(type = "Record<string, any>"))]
     pub format_specific: FormatSpecific,
 }
 
+impl Component {
+    // component_layer?
+    // pos / angle / scale
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+#[typeshare]
 /// A path in a glyph
 pub struct Path {
     #[serde(
@@ -38,6 +46,8 @@ pub struct Path {
     pub closed: bool,
     /// Format-specific data
     #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
+    #[typeshare(python(type = "Dict[str, Any]"))]
+    #[typeshare(typescript(type = "Record<string, any>"))]
     pub format_specific: FormatSpecific,
 }
 
@@ -103,9 +113,10 @@ impl Path {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
 /// A shape in a glyph, either a component or a path
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[typeshare]
+#[serde(untagged)]
 pub enum Shape {
     /// A component in a glyph
     Component(Component),

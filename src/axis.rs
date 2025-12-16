@@ -4,27 +4,25 @@ pub use crate::Tag;
 use crate::{common::FormatSpecific, i18ndictionary::I18NDictionary, BabelfontError};
 use fontdrasil::coords::{CoordConverter, DesignCoord, NormalizedCoord, UserCoord};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
+use typeshare::typeshare;
 
 /// An axis in a variable font
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+#[typeshare]
 pub struct Axis {
     /// Name of the axis
     pub name: I18NDictionary,
-    #[cfg_attr(feature = "typescript", type_def(type_of = "String"))]
+    #[typeshare(serialized_as = "String")]
     /// 4-character tag of the axis
     pub tag: Tag,
-    #[cfg_attr(feature = "typescript", type_def(type_of = "String"))]
-    /// Unique identifier for the axis
-    pub id: Uuid,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
         serialize_with = "crate::serde_helpers::usercoord_option_ser",
         deserialize_with = "crate::serde_helpers::usercoord_option_de"
     )]
-    #[cfg_attr(feature = "typescript", type_def(type_of = "Option<f64>"))]
+    #[typeshare(python(type = "Optional[float]"))]
+    #[typeshare(typescript(type = "import('fonttypes').UserspaceCoordinate"))]
     /// Minimum value of the axis in user space coordinates
     pub min: Option<UserCoord>,
     #[serde(
@@ -33,7 +31,8 @@ pub struct Axis {
         serialize_with = "crate::serde_helpers::usercoord_option_ser",
         deserialize_with = "crate::serde_helpers::usercoord_option_de"
     )]
-    #[cfg_attr(feature = "typescript", type_def(type_of = "Option<f64>"))]
+    #[typeshare(python(type = "Optional[float]"))]
+    #[typeshare(typescript(type = "import('fonttypes').UserspaceCoordinate"))]
     /// Maximum value of the axis in user space coordinates
     pub max: Option<UserCoord>,
     #[serde(
@@ -42,7 +41,8 @@ pub struct Axis {
         serialize_with = "crate::serde_helpers::usercoord_option_ser",
         deserialize_with = "crate::serde_helpers::usercoord_option_de"
     )]
-    #[cfg_attr(feature = "typescript", type_def(type_of = "Option<f64>"))]
+    #[typeshare(python(type = "Optional[float]"))]
+    #[typeshare(typescript(type = "import('fonttypes').UserspaceCoordinate"))]
     /// Default value of the axis in user space coordinates
     pub default: Option<UserCoord>,
     #[serde(
@@ -51,18 +51,24 @@ pub struct Axis {
         serialize_with = "crate::serde_helpers::axismap_ser",
         deserialize_with = "crate::serde_helpers::axismap_de"
     )]
-    #[cfg_attr(feature = "typescript", type_def(type_of = "Vec<(f32, f32)>"))]
+    #[typeshare(python(type = "Optional[List[Tuple[float, float]]]"))]
+    #[typeshare(typescript(
+        type = "Array<[import('fonttypes').UserspaceCoordinate, import('fonttypes').DesignspaceCoordinate]> | null"
+    ))]
     /// Mapping of user space coordinates to design space coordinates
     pub map: Option<Vec<(UserCoord, DesignCoord)>>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     /// Whether the axis is hidden in the font's user interface
     pub hidden: bool,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    #[cfg_attr(feature = "typescript", type_def(type_of = "Vec<f64>"))]
+    #[typeshare(python(type = "List[float]"))]
+    #[typeshare(typescript(type = "import('fonttypes').UserspaceCoordinate[]"))]
     /// Predefined values for the axis in user space coordinates
     pub values: Vec<UserCoord>,
-    #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
     /// Format-specific data
+    #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
+    #[typeshare(python(type = "Dict[str, Any]"))]
+    #[typeshare(typescript(type = "Record<string, any>"))]
     pub formatspecific: FormatSpecific,
 }
 
@@ -75,7 +81,6 @@ impl Axis {
         Axis {
             name: name.into(),
             tag,
-            id: Uuid::new_v4(),
             ..Default::default()
         }
     }
@@ -136,6 +141,8 @@ impl Axis {
     ) -> Result<NormalizedCoord, BabelfontError> {
         self._converter().map(|c| l.convert(&c))
     }
+
+    // xxx denormalize functions?
 
     /// Get the name of the axis in the default language, or "Unnamed axis" if not set
     pub fn name(&self) -> String {

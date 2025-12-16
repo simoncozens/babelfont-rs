@@ -1,10 +1,10 @@
-use crate::i18ndictionary::I18NDictionary;
-use crate::NameId;
+use crate::{i18ndictionary::I18NDictionary, NameId};
 use serde::{Deserialize, Serialize};
+use typeshare::typeshare;
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+#[typeshare]
 /// The style map style of a font
 pub enum StyleMapStyle {
     /// Bold italic style
@@ -19,7 +19,7 @@ pub enum StyleMapStyle {
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+#[typeshare]
 /// Name table values for a font or individual master
 pub struct Names {
     #[serde(default, skip_serializing_if = "I18NDictionary::is_empty")]

@@ -8,9 +8,11 @@ use crate::{
 use fontdrasil::coords::DesignLocation;
 use kurbo::Shape as KurboShape;
 use serde::{Deserialize, Serialize};
+use typeshare::typeshare;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+#[serde(tag = "type", content = "master")]
+#[typeshare]
 /// The type of a layer in relation to masters
 pub enum LayerType {
     /// A default layer for a master
@@ -28,7 +30,7 @@ impl LayerType {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+#[typeshare]
 /// A layer of a glyph in a font
 pub struct Layer {
     /// The advance width of the layer
@@ -69,14 +71,14 @@ pub struct Layer {
         serialize_with = "crate::serde_helpers::option_design_location_to_map",
         deserialize_with = "crate::serde_helpers::option_design_location_from_map"
     )]
-    #[cfg_attr(
-        feature = "typescript",
-        type_def(type_of = "Option<std::collections::HashMap<String, f32>>")
-    )]
+    #[typeshare(python(type = "Optional[Dict[str, float]]"))]
+    #[typeshare(typescript(type = "import('fonttypes').DesignspaceLocation"))]
     /// The location of the layer in design space, if it is not at the default location for a master
     pub location: Option<DesignLocation>,
     #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
     /// Format-specific data for the layer
+    #[typeshare(python(type = "Dict[str, Any]"))]
+    #[typeshare(typescript(type = "Record<string, any>"))]
     pub format_specific: FormatSpecific,
 }
 
@@ -257,6 +259,8 @@ impl Layer {
         Ok(self.width - bounds.max_x() as f32)
     }
 }
+
+// kurbo pen protocol support?
 
 #[cfg(feature = "glyphs")]
 pub(crate) mod glyphs {

@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
+use typeshare::typeshare;
 
 use crate::common::FormatSpecific;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+#[typeshare]
 /// An anchor point in a glyph
 pub struct Anchor {
     /// X coordinate
@@ -15,6 +16,8 @@ pub struct Anchor {
     pub name: String,
     /// Format-specific data
     #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
+    #[typeshare(python(type = "Dict[str, Any]"))]
+    #[typeshare(typescript(type = "Record<string, any>"))]
     pub format_specific: FormatSpecific,
 }
 

@@ -20,7 +20,7 @@ uuid = { version = "1.11.0", features = ["v4", "serde"] }
 uuid = { version = "1.11.0", features = ["v4", "js", "serde"] }
 
 [features]
-default = ["glyphs", "ufo", "fontlab", "fontra", "fontir", "rayon"]
+default = ["glyphs", "ufo", "fontlab", "fontra", "fontir", "rayon", "types"]
 glyphs = ["dep:glyphslib"]
 ufo = ["dep:norad"]
 fontra = []
@@ -32,8 +32,8 @@ cli = [
     "dep:serde_json_path_to_error",
     "dep:clap-verbosity-flag",
 ]
-typescript = ["dep:typescript-type-def"]
 rayon = ["norad/rayon"]
+types = ["dep:typeshare"]
 
 [dependencies]
 chrono = { version = "0.4.3", features = ["serde"] }
@@ -60,10 +60,8 @@ env_logger = { version = "0.11.8", optional = true }
 clap = { version = "4.5.51", optional = true, features = ["derive"] }
 serde_json_path_to_error = { version = "0.1.5", optional = true }
 clap-verbosity-flag = { version = "3.0.4", optional = true }
-typescript-type-def = { version = "0.5.13", optional = true, features = [
-    "json_value",
-] }
 fea-rs-ast = { version = "0.1.0" }
+typeshare = { version = "1.0.4", optional = true }
 
 [dev-dependencies]
 pretty_assertions = "1.4.1"

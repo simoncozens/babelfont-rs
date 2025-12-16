@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
+use typeshare::typeshare;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
-#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+#[typeshare]
 /// Types of nodes in a glyph outline
 pub enum NodeType {
     /// Move to a new position without drawing (only defined for open contours)
@@ -17,7 +18,7 @@ pub enum NodeType {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+#[typeshare]
 /// A node in a glyph outline
 pub struct Node {
     /// The x-coordinate of the node

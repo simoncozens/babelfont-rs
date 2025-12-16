@@ -6,9 +6,9 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 use std::ops::{Deref, DerefMut};
+use typeshare::typeshare;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
 /// A list of glyphs in the font
 pub struct GlyphList(pub Vec<Glyph>);
 impl GlyphList {
@@ -48,7 +48,7 @@ impl DerefMut for GlyphList {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
-#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+#[typeshare]
 /// The category of a glyph
 pub enum GlyphCategory {
     /// A base glyph
@@ -63,14 +63,14 @@ pub enum GlyphCategory {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+#[typeshare]
 /// A glyph in the font
 pub struct Glyph {
     /// The name of the glyph
-    #[cfg_attr(feature = "typescript", type_def(type_of = "String"))]
+    #[typeshare(serialized_as = "String")]
     pub name: SmolStr,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(feature = "typescript", type_def(type_of = "Option<String>"))]
+    #[typeshare(serialized_as = "Option<String>")]
     /// The production name of the glyph, if any
     pub production_name: Option<SmolStr>,
     /// The category of the glyph
@@ -92,6 +92,8 @@ pub struct Glyph {
     pub direction: Option<Direction>,
     #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
     /// Format-specific data
+    #[typeshare(python(type = "Dict[str, Any]"))]
+    #[typeshare(typescript(type = "Record<string, any>"))]
     pub formatspecific: FormatSpecific,
 }
 

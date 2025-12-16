@@ -1,37 +1,35 @@
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
+use typeshare::typeshare;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+#[typeshare]
 /// A representation of OpenType features, classes, and prefixes.
 pub struct Features {
     /// Opentype classes
     ///
     /// The key should not start with @.
-    #[cfg_attr(
-        feature = "typescript",
-        type_def(type_of = "std::collections::HashMap<String, String>")
-    )]
+    #[typeshare(serialized_as = "HashMap<String, String>")]
     pub classes: IndexMap<SmolStr, String>,
     /// Opentype prefixes
     ///
     /// A dictionary of OpenType lookups and other feature code to be placed before features are defined.
     /// The keys are user-defined names, the values are AFDKO feature code.
-    #[cfg_attr(
-        feature = "typescript",
-        type_def(type_of = "std::collections::HashMap<String, String>")
-    )]
+    #[typeshare(serialized_as = "HashMap<String, String>")]
     pub prefixes: IndexMap<SmolStr, String>,
     /// OpenType features
     ///
     /// A list of OpenType feature code, expressed as a tuple (feature tag, code).
-    #[cfg_attr(feature = "typescript", type_def(type_of = "Vec<(String, String)>"))]
+    #[typeshare(python(type = "List[Tuple[str, str]]"))]
+    #[typeshare(typescript(type = "Array<[string, string]>"))]
     pub features: Vec<(SmolStr, String)>,
     /// Include paths
     ///
     /// Paths to search for included feature files.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[typeshare(python(type = "List[String]"))]
+    #[typeshare(typescript(type = "string[]"))]
     pub include_paths: Vec<std::path::PathBuf>,
 }
 

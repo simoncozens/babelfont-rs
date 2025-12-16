@@ -19,18 +19,21 @@ use std::{
     collections::{BTreeMap, HashMap},
     path::PathBuf,
 };
+use typeshare::typeshare;
 use write_fonts::types::Tag;
 
 #[cfg(feature = "cli")]
 extern crate serde_json_path_to_error as serde_json;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+#[typeshare]
 /// A representation of a font source file
 pub struct Font {
     /// Units per em
     pub upm: u16,
     /// Font version as (major, minor)
+    #[typeshare(python(type = "Tuple[int, int]"))]
+    #[typeshare(typescript(type = "[number, number]"))]
     pub version: (u16, u16),
     /// A list of axes, in the case of variable/multiple master font.
     ///
@@ -44,12 +47,14 @@ pub struct Font {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub masters: Vec<Master>,
     /// A list of the font's glyphs
+    #[typeshare(serialized_as = "Vec<Glyph>")]
     pub glyphs: GlyphList,
     /// An optional note about the font
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
     /// The font's creation date
-    #[cfg_attr(feature = "typescript", type_def(type_of = "String"))]
+    #[typeshare(python(type = "datetime.datetime"))]
+    #[typeshare(typescript(type = "Date"))]
     pub date: chrono::DateTime<Local>,
     /// The font's naming information
     pub names: Names,
@@ -60,10 +65,8 @@ pub struct Font {
     pub custom_ot_values: Vec<OTValue>,
     /// A map of Unicode Variation Sequences to glyph names
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    #[cfg_attr(
-        feature = "typescript",
-        type_def(type_of = "BTreeMap<(u32, u32), String>")
-    )]
+    #[typeshare(python(type = "Dict[Tuple[int, int], str]"))]
+    #[typeshare(typescript(type = "Record<string, string>"))]
     pub variation_sequences: BTreeMap<(u32, u32), SmolStr>,
     /// A representation of the font's OpenType features
     pub features: Features,
@@ -72,27 +75,26 @@ pub struct Font {
     /// The key is the group name and the value is a list of glyph names in the group
     /// Group names are *not* prefixed with "@" here
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    #[cfg_attr(
-        feature = "typescript",
-        type_def(type_of = "HashMap<String, Vec<String>>")
-    )]
+    #[typeshare(python(type = "Dict[str, List[str]]"))]
+    #[typeshare(typescript(type = "Record<string, string[]>"))]
     pub first_kern_groups: HashMap<SmolStr, Vec<SmolStr>>,
     // A dictionary of kerning groups
     ///
     /// The key is the group name and the value is a list of glyph names in the group
     /// Group names are *not* prefixed with "@" here
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    #[cfg_attr(
-        feature = "typescript",
-        type_def(type_of = "HashMap<String, Vec<String>>")
-    )]
+    #[typeshare(serialized_as = "HashMap<String, Vec<String>>")]
     pub second_kern_groups: HashMap<SmolStr, Vec<SmolStr>>,
 
     /// Format-specific data
     #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
+    #[typeshare(python(type = "Dict[str, Any]"))]
+    #[typeshare(typescript(type = "Record<string, any>"))]
     pub format_specific: FormatSpecific,
 
     /// The source file path, if any, from which this font was loaded
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[typeshare(serialized_as = "Option<String>")]
     pub source: Option<PathBuf>,
 }
 impl Default for Font {
@@ -230,6 +232,11 @@ impl Font {
     {
         Ok(loc.convert(&self.fontdrasil_axes()?))
     }
+
+    // other location conversion functions could go here
+    // unicode map int -> glyph name
+    // get variable anchor
+    // exported glyphs
 
     // fn axis_order(&self) -> Vec<Tag> {
     //     self.axes.iter().map(|ax| ax.tag.clone()).collect()

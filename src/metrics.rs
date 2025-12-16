@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
+use typeshare::typeshare;
 
 /// Type of font metric
 #[derive(Debug, Clone, PartialEq, Hash, Eq, Serialize, Deserialize)]
+#[typeshare]
 pub enum MetricType {
     /// X height
     XHeight,

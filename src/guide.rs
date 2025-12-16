@@ -2,7 +2,7 @@ use crate::common::{Color, Position};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+#[cfg_attr(feature = "types", typeshare::typeshare)]
 /// A guideline in the font, whether at master or layer level
 pub struct Guide {
     /// Position of the guideline
@@ -18,6 +18,8 @@ pub struct Guide {
         default,
         skip_serializing_if = "crate::common::FormatSpecific::is_empty"
     )]
+    #[typeshare(python(type = "Dict[str, Any]"))]
+    #[typeshare(typescript(type = "Record<string, any>"))]
     pub format_specific: crate::common::FormatSpecific,
 }
 

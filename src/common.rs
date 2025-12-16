@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use typeshare::typeshare;
 use write_fonts::types::Tag;
 
 pub(crate) mod decomposition;
@@ -19,7 +20,7 @@ pub(crate) fn tag_from_string(s: &str) -> Result<Tag, BabelfontError> {
     })?))
 }
 #[derive(Debug, Copy, Clone, Default, Serialize, Deserialize)]
-#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+#[typeshare]
 /// A position in 2D space, with an optional angle
 pub struct Position {
     /// X coordinate
@@ -44,7 +45,7 @@ impl Position {
 
 #[allow(dead_code)]
 #[derive(Debug, Copy, Clone, Default, Serialize, Deserialize)]
-#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+#[typeshare]
 pub struct Color {
     r: i32,
     g: i32,
@@ -106,7 +107,8 @@ mod ufo {
 // }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+#[serde(tag = "type", content = "content")]
+#[typeshare]
 /// A scalar value in an OpenType table
 pub enum OTScalar {
     /// String value
@@ -203,7 +205,7 @@ impl From<OTScalar> for String {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+#[typeshare]
 pub struct OTValue {
     pub table: String,
     pub field: String,
@@ -211,7 +213,7 @@ pub struct OTValue {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+#[typeshare]
 /// Direction of text flow
 pub enum Direction {
     /// Left to right text flow

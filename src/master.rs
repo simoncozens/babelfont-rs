@@ -1,6 +1,7 @@
 use fontdrasil::coords::DesignLocation;
 use indexmap::IndexMap;
 use smol_str::SmolStr;
+use typeshare::typeshare;
 
 use crate::{
     common::{FormatSpecific, OTValue},
@@ -12,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
+#[typeshare]
 /// A master/source font in a design space
 pub struct Master {
     /// Name of the master
@@ -24,14 +25,16 @@ pub struct Master {
         serialize_with = "crate::serde_helpers::design_location_to_map",
         deserialize_with = "crate::serde_helpers::design_location_from_map"
     )]
-    #[cfg_attr(feature = "typescript", type_def(type_of = "HashMap<String, f32>"))]
+    #[typeshare(python(type = "Dict[str, float]"))]
+    #[typeshare(typescript(type = "import('fonttypes').DesignspaceLocation"))]
     /// Location of the master in design space coordinates
     pub location: DesignLocation,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     /// Global guidelines associated with the master
     pub guides: Vec<Guide>,
-    #[cfg_attr(feature = "typescript", type_def(type_of = "HashMap<String, i32>"))]
+
     /// Master-specific metrics
+    #[typeshare(serialized_as = "HashMap<String, i32>")]
     pub metrics: IndexMap<MetricType, i32>,
     /// Kerning for this master.
     ///
@@ -42,16 +45,16 @@ pub struct Master {
         serialize_with = "crate::serde_helpers::kerning_map",
         deserialize_with = "crate::serde_helpers::kerning_unmap"
     )]
-    #[cfg_attr(
-        feature = "typescript",
-        type_def(type_of = "HashMap<(String, String), i16>")
-    )]
+    #[typeshare(typescript(type = "Map<[string, string], number>"))]
+    #[typeshare(python(type = "Dict[Tuple[str, str], int]"))]
     pub kerning: HashMap<(SmolStr, SmolStr), i16>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     /// Custom OpenType values for this master
     pub custom_ot_values: Vec<OTValue>,
-    #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
     /// Format-specific data
+    #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
+    #[typeshare(python(type = "Dict[str, Any]"))]
+    #[typeshare(typescript(type = "Record<string, any>"))]
     pub format_specific: FormatSpecific,
 }
 
@@ -106,6 +109,9 @@ impl Master {
         }
         false
     }
+
+    // get glyph layer?
+    // normalized location?
 }
 
 #[cfg(feature = "fontra")]
