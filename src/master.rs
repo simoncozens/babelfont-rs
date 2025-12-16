@@ -26,7 +26,7 @@ pub struct Master {
         deserialize_with = "crate::serde_helpers::design_location_from_map"
     )]
     #[typeshare(python(type = "Dict[str, float]"))]
-    #[typeshare(typescript(type = "import('fonttypes').DesignspaceLocation"))]
+    #[typeshare(typescript(type = "import('@simoncozens/fonttypes').DesignspaceLocation"))]
     /// Location of the master in design space coordinates
     pub location: DesignLocation,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

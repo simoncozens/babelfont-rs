@@ -22,7 +22,7 @@ pub struct Axis {
         deserialize_with = "crate::serde_helpers::usercoord_option_de"
     )]
     #[typeshare(python(type = "Optional[float]"))]
-    #[typeshare(typescript(type = "import('fonttypes').UserspaceCoordinate"))]
+    #[typeshare(typescript(type = "import('@simoncozens/fonttypes').UserspaceCoordinate"))]
     /// Minimum value of the axis in user space coordinates
     pub min: Option<UserCoord>,
     #[serde(
@@ -32,7 +32,7 @@ pub struct Axis {
         deserialize_with = "crate::serde_helpers::usercoord_option_de"
     )]
     #[typeshare(python(type = "Optional[float]"))]
-    #[typeshare(typescript(type = "import('fonttypes').UserspaceCoordinate"))]
+    #[typeshare(typescript(type = "import('@simoncozens/fonttypes').UserspaceCoordinate"))]
     /// Maximum value of the axis in user space coordinates
     pub max: Option<UserCoord>,
     #[serde(
@@ -42,7 +42,7 @@ pub struct Axis {
         deserialize_with = "crate::serde_helpers::usercoord_option_de"
     )]
     #[typeshare(python(type = "Optional[float]"))]
-    #[typeshare(typescript(type = "import('fonttypes').UserspaceCoordinate"))]
+    #[typeshare(typescript(type = "import('@simoncozens/fonttypes').UserspaceCoordinate"))]
     /// Default value of the axis in user space coordinates
     pub default: Option<UserCoord>,
     #[serde(
@@ -53,7 +53,7 @@ pub struct Axis {
     )]
     #[typeshare(python(type = "Optional[List[Tuple[float, float]]]"))]
     #[typeshare(typescript(
-        type = "Array<[import('fonttypes').UserspaceCoordinate, import('fonttypes').DesignspaceCoordinate]> | null"
+        type = "Array<[import('@simoncozens/fonttypes').UserspaceCoordinate, import('@simoncozens/fonttypes').DesignspaceCoordinate]> | null"
     ))]
     /// Mapping of user space coordinates to design space coordinates
     pub map: Option<Vec<(UserCoord, DesignCoord)>>,
@@ -62,7 +62,7 @@ pub struct Axis {
     pub hidden: bool,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[typeshare(python(type = "List[float]"))]
-    #[typeshare(typescript(type = "import('fonttypes').UserspaceCoordinate[]"))]
+    #[typeshare(typescript(type = "import('@simoncozens/fonttypes').UserspaceCoordinate[]"))]
     /// Predefined values for the axis in user space coordinates
     pub values: Vec<UserCoord>,
     /// Format-specific data

@@ -72,7 +72,7 @@ pub struct Layer {
         deserialize_with = "crate::serde_helpers::option_design_location_from_map"
     )]
     #[typeshare(python(type = "Optional[Dict[str, float]]"))]
-    #[typeshare(typescript(type = "import('fonttypes').DesignspaceLocation"))]
+    #[typeshare(typescript(type = "import('@simoncozens/fonttypes').DesignspaceLocation"))]
     /// The location of the layer in design space, if it is not at the default location for a master
     pub location: Option<DesignLocation>,
     #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]

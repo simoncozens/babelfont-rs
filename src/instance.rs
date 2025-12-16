@@ -19,7 +19,7 @@ pub struct Instance {
         deserialize_with = "crate::serde_helpers::design_location_from_map"
     )]
     #[typeshare(python(type = "Dict[str, float]"))]
-    #[typeshare(typescript(type = "import('fonttypes').DesignspaceLocation"))]
+    #[typeshare(typescript(type = "import('@simoncozens/fonttypes').DesignspaceLocation"))]
     /// Location of the instance in design space coordinates
     pub location: DesignLocation,
     /// Any custom names for the instance if it is exported as a static font
