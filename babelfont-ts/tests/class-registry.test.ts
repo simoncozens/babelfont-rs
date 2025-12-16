@@ -3,14 +3,6 @@ import { ReviverFunc } from "../src/underlying";
 import * as fs from "fs";
 import * as path from "path";
 
-/**
- * Helper function to create a typed registry that provides better type inference
- * This pattern allows users to get full type safety when using custom classes
- */
-function createTypedRegistry<T extends ClassRegistry>(registry: T) {
-  return registry;
-}
-
 describe("Class Registry - User Extensions", () => {
   it("should allow users to extend classes with custom implementations", () => {
     // User creates their own versions of classes with custom methods
