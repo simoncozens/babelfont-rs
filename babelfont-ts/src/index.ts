@@ -1,4 +1,4 @@
-import type {
+import {
   Anchor as IAnchor,
   Axis as IAxis,
   Color as IColor,
@@ -141,28 +141,181 @@ export class Master {
   }
 }
 
-export interface Node extends WithCamelCase<INode> {}
+export interface Node extends WithCamelCase<INode> {
+  __parent?: Path;
+  nextNode(): Node | undefined;
+  previousNode(): Node | undefined;
+  nextOnCurveNode(): Node | undefined;
+  previousOnCurveNode(): Node | undefined;
+}
 export class Node {
   constructor(data: INode) {
     Object.assign(this, data);
     return createCaseConvertingProxy(this, Node.prototype);
   }
+  /** The parent Path containing this Node */
+  get parent(): Path | undefined {
+    return this.__parent;
+  }
+  set parent(value: Path | undefined) {
+    this.__parent = value;
+  }
+
+  nextNode(): Node | undefined {
+    if (!this.parent) return undefined;
+    const index = this.parent.nodes.indexOf(this);
+    // Wrap around
+    const nextIndex = (index + 1) % this.parent.nodes.length;
+    return this.parent.nodes[nextIndex] as Node;
+  }
+
+  previousNode(): Node | undefined {
+    if (!this.parent) return undefined;
+    const index = this.parent.nodes.indexOf(this);
+    // Wrap around
+    const prevIndex =
+      (index - 1 + this.parent.nodes.length) % this.parent.nodes.length;
+    return this.parent.nodes[prevIndex] as Node;
+  }
+
+  nextOnCurveNode(): Node | undefined {
+    let currentNode: Node | undefined = this;
+    do {
+      currentNode = currentNode?.nextNode();
+      if (currentNode?.nodetype != NodeType.OffCurve) {
+        return currentNode;
+      }
+    } while (currentNode && currentNode !== this);
+    return undefined;
+  }
+
+  previousOnCurveNode(): Node | undefined {
+    let currentNode: Node | undefined = this;
+    do {
+      currentNode = currentNode?.previousNode();
+      if (currentNode?.nodetype != NodeType.OffCurve) {
+        return currentNode;
+      }
+    } while (currentNode && currentNode !== this);
+    return undefined;
+  }
+
+  toJSON(): INode {
+    // Exclude the __parent property when serializing to JSON
+    const { __parent, ...rest } = this;
+    return rest;
+  }
 }
 
-export interface Path extends WithCamelCase<IPath> {}
+export interface Path extends WithCamelCase<IPath> {
+  nodes: Node[];
+}
 export class Path {
   constructor(data: IPath) {
     // Inflate the .nodes array
-    if (data.nodes && Array.isArray(data.nodes)) {
-      data.nodes = data.nodes.map((n) => new Node(n));
+    if (data.nodes) {
+      // For brevity the nodes are stored as a string, but we need to inflate them
+      data.nodes = Path.parseNodes(data.nodes as unknown as string).map((n) => {
+        let nObject = new Node(n);
+        nObject.parent = this;
+        return createCaseConvertingProxy(nObject, Node.prototype) as Node;
+      });
     }
     Object.assign(this, data);
     return createCaseConvertingProxy(this, Path.prototype);
   }
+
+  private static parseNodes(nodes: string): Node[] {
+    const nodesStr = nodes.trim();
+    if (!nodesStr) return [];
+
+    const tokens: string[] = nodesStr.split(/\s+/);
+    const nodesArray: Node[] = [];
+
+    for (let i = 0; i + 2 < tokens.length; i += 3) {
+      let nodetype = NodeType.Line;
+      let smooth = false;
+      switch (tokens[i + 2]!) {
+        case "m":
+          nodetype = NodeType.Move;
+          break;
+        case "l":
+          nodetype = NodeType.Line;
+          break;
+        case "ls":
+          nodetype = NodeType.Line;
+          smooth = true;
+          break;
+        case "o":
+          nodetype = NodeType.OffCurve;
+          break;
+        case "c":
+          nodetype = NodeType.Curve;
+          break;
+        case "cs":
+          nodetype = NodeType.Curve;
+          smooth = true;
+          break;
+        case "q":
+          nodetype = NodeType.QCurve;
+          break;
+        case "qs":
+          nodetype = NodeType.QCurve;
+          smooth = true;
+          break;
+      }
+      nodesArray.push(
+        new Node({
+          x: parseFloat(tokens[i]!), // x
+          y: parseFloat(tokens[i + 1]!), // y
+          nodetype,
+          smooth,
+        })
+      );
+    }
+    return nodesArray;
+  }
+
+  toJSON(): IPath {
+    // Serialize the .nodes array back to the string format
+    const nodesStr = this.nodes
+      .map((n) => {
+        let typeChar = "l";
+        switch (n.nodetype) {
+          case NodeType.Move:
+            typeChar = "m";
+            break;
+          case NodeType.Line:
+            typeChar = "l";
+            break;
+          case NodeType.OffCurve:
+            typeChar = "o";
+            break;
+          case NodeType.Curve:
+            typeChar = "c";
+            break;
+          case NodeType.QCurve:
+            typeChar = "q";
+            break;
+        }
+        let smoothChar = n.smooth ? "s" : "";
+        return `${n.x} ${n.y} ${typeChar}${smoothChar}`;
+      })
+      .join(" ");
+    // Exclude the nodes property and replace with the string version
+    const { nodes, ...rest } = this;
+    return {
+      ...rest,
+      nodes: nodesStr,
+    } as unknown as IPath;
+  }
 }
 
-export function isComponent(shape: Shape): shape is IComponent {
-  return (shape as IComponent).reference !== undefined;
+export function isComponent(shape: Shape): shape is Component {
+  return (shape as Component).reference !== undefined;
+}
+export function isPath(shape: Shape): shape is Path {
+  return (shape as Path).nodes !== undefined;
 }
 
 export interface Layer extends WithCamelCase<ILayer> {}
@@ -174,7 +327,7 @@ export class Layer {
     // Inflate the .shapes array
     if (data.shapes) {
       data.shapes = data.shapes.map((s) =>
-        isComponent(s) ? new Component(s) : new Path(s)
+        isComponent(s) ? new Component(s) : new Path(s as IPath)
       );
     }
     // .anchors
@@ -193,7 +346,12 @@ export class Glyph {
   constructor(data: IGlyph) {
     // Inflate the .layers array
     if (data.layers) {
-      data.layers = data.layers.map((l) => new Layer(l));
+      data.layers = data.layers.map((l) => {
+        return createCaseConvertingProxy(
+          new Layer(l),
+          Layer.prototype
+        ) as Layer;
+      });
     }
     Object.assign(this, data);
     return createCaseConvertingProxy(this, Glyph.prototype) as Glyph;
