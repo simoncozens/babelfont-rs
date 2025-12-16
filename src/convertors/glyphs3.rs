@@ -379,16 +379,12 @@ fn load_master(master: &glyphs3::Master, glyphs_font: &glyphs3::Glyphs3, font: &
             .map(|(number, axis)| (axis.tag, DesignCoord::new(*number as f64)))
             .collect()
     };
-    let mut m = Master {
-        name: master.name.clone().into(),
-        id: master.id.clone(),
-        location: designspace_to_location(&master.axes_values),
-        guides: master.guides.iter().map(Into::into).collect(),
-        metrics: IndexMap::new(),
-        kerning: HashMap::new(),
-        custom_ot_values: vec![],
-        format_specific: FormatSpecific::default(),
-    };
+    let mut m = Master::new(
+        master.name.clone(),
+        master.id.clone(),
+        designspace_to_location(&master.axes_values),
+    );
+    m.guides = master.guides.iter().map(Into::into).collect();
     for (i, metric_value) in master.metric_values.iter().enumerate() {
         let metric_name = if i < glyphs_font.metrics.len() {
             if let Some(known_type) = glyphs_font.metrics[i].metric_type {
@@ -411,7 +407,7 @@ fn load_master(master: &glyphs3::Master, glyphs_font: &glyphs3::Glyphs3, font: &
         .kerning
         .get(&m.id)
         .map(|kerndict| {
-            let mut kerns = HashMap::new();
+            let mut kerns = IndexMap::new();
             for (first, items) in kerndict {
                 // Replace "@MMK_L_"/"@MMK_R_" prefix in group names with "@"
                 let first = if let Some(stripped) = first.strip_prefix("@MMK_L_") {

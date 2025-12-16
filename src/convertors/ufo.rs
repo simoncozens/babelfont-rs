@@ -4,6 +4,7 @@ use crate::{
 };
 use chrono::{DateTime, Local, NaiveDateTime, TimeZone};
 use fontdrasil::coords::Location;
+use indexmap::IndexMap;
 use paste::paste;
 use smol_str::{SmolStr, ToSmolStr};
 use std::{
@@ -266,7 +267,7 @@ pub(crate) fn save_path(p: &Path) -> norad::Contour {
 
 pub(crate) fn save_kerning(
     norad_kerning: &mut norad::Kerning,
-    babelfont_kerning: &HashMap<(SmolStr, SmolStr), i16>,
+    babelfont_kerning: &IndexMap<(SmolStr, SmolStr), i16>,
 ) -> Result<(), BabelfontError> {
     for ((left, right), value) in babelfont_kerning.iter() {
         let left_key = if left.starts_with('@') {

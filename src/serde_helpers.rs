@@ -4,6 +4,7 @@ use fontdrasil::{
     coords::{DesignCoord, DesignLocation, UserCoord},
     types::Tag,
 };
+use indexmap::IndexMap;
 use serde::{
     ser::{SerializeMap as _, SerializeSeq as _},
     Deserialize as _,
@@ -11,7 +12,7 @@ use serde::{
 use smol_str::SmolStr;
 
 pub(crate) fn kerning_map<S>(
-    map: &HashMap<(SmolStr, SmolStr), i16>,
+    map: &IndexMap<(SmolStr, SmolStr), i16>,
     serializer: S,
 ) -> Result<S::Ok, S::Error>
 where
@@ -27,12 +28,12 @@ where
 
 pub(crate) fn kerning_unmap<'de, D>(
     deserializer: D,
-) -> Result<HashMap<(SmolStr, SmolStr), i16>, D::Error>
+) -> Result<IndexMap<(SmolStr, SmolStr), i16>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
     let raw_map: HashMap<String, i16> = HashMap::deserialize(deserializer)?;
-    let mut map = HashMap::new();
+    let mut map = IndexMap::new();
     for (key, value) in raw_map {
         let parts: Vec<&str> = key.splitn(2, ':').collect();
         if parts.len() != 2 {

@@ -47,7 +47,7 @@ pub struct Master {
     )]
     #[typeshare(typescript(type = "Map<[string, string], number>"))]
     #[typeshare(python(type = "Dict[Tuple[str, str], int]"))]
-    pub kerning: HashMap<(SmolStr, SmolStr), i16>,
+    pub kerning: IndexMap<(SmolStr, SmolStr), i16>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     /// Custom OpenType values for this master
     pub custom_ot_values: Vec<OTValue>,
@@ -71,7 +71,7 @@ impl Master {
             location,
             guides: vec![],
             metrics: IndexMap::new(),
-            kerning: HashMap::new(),
+            kerning: IndexMap::new(),
             custom_ot_values: vec![],
             format_specific: FormatSpecific::default(),
         }
