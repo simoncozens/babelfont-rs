@@ -7,11 +7,7 @@ use fontdrasil::coords::Location;
 use indexmap::IndexMap;
 use paste::paste;
 use smol_str::{SmolStr, ToSmolStr};
-use std::{
-    collections::{HashMap, HashSet},
-    fs,
-    time::SystemTime,
-};
+use std::{collections::HashSet, fs, time::SystemTime};
 
 /// Key for storing norad lib data in FormatSpecific
 pub const KEY_LIB: &str = "norad.lib";
@@ -626,11 +622,11 @@ pub(crate) fn load_kerning(master: &mut Master, kerning: &norad::Kerning) {
 pub(crate) fn load_kern_groups(
     groups: &norad::Groups,
 ) -> (
-    HashMap<SmolStr, Vec<SmolStr>>,
-    HashMap<SmolStr, Vec<SmolStr>>,
+    IndexMap<SmolStr, Vec<SmolStr>>,
+    IndexMap<SmolStr, Vec<SmolStr>>,
 ) {
-    let mut first: HashMap<SmolStr, Vec<SmolStr>> = HashMap::new();
-    let mut second: HashMap<SmolStr, Vec<SmolStr>> = HashMap::new();
+    let mut first: IndexMap<SmolStr, Vec<SmolStr>> = IndexMap::new();
+    let mut second: IndexMap<SmolStr, Vec<SmolStr>> = IndexMap::new();
     for (name, members) in groups.iter() {
         if let Some(first_name) = name.strip_prefix("public.kern1.") {
             first.insert(

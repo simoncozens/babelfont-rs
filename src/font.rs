@@ -13,12 +13,10 @@ use fontdrasil::coords::{
     DesignCoord, DesignLocation, DesignSpace, Location, NormalizedLocation, NormalizedSpace,
     UserCoord,
 };
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
-use std::{
-    collections::{BTreeMap, HashMap},
-    path::PathBuf,
-};
+use std::{collections::BTreeMap, path::PathBuf};
 use typeshare::typeshare;
 use write_fonts::types::Tag;
 
@@ -74,17 +72,17 @@ pub struct Font {
     ///
     /// The key is the group name and the value is a list of glyph names in the group
     /// Group names are *not* prefixed with "@" here
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     #[typeshare(python(type = "Dict[str, List[str]]"))]
     #[typeshare(typescript(type = "Record<string, string[]>"))]
-    pub first_kern_groups: HashMap<SmolStr, Vec<SmolStr>>,
+    pub first_kern_groups: IndexMap<SmolStr, Vec<SmolStr>>,
     // A dictionary of kerning groups
     ///
     /// The key is the group name and the value is a list of glyph names in the group
     /// Group names are *not* prefixed with "@" here
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     #[typeshare(serialized_as = "HashMap<String, Vec<String>>")]
-    pub second_kern_groups: HashMap<SmolStr, Vec<SmolStr>>,
+    pub second_kern_groups: IndexMap<SmolStr, Vec<SmolStr>>,
 
     /// Format-specific data
     #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
@@ -118,8 +116,8 @@ impl Font {
             names: Names::default(),
             custom_ot_values: vec![],
             variation_sequences: BTreeMap::new(),
-            first_kern_groups: HashMap::new(),
-            second_kern_groups: HashMap::new(),
+            first_kern_groups: IndexMap::new(),
+            second_kern_groups: IndexMap::new(),
             features: Features::default(),
             format_specific: FormatSpecific::default(),
             source: None,
