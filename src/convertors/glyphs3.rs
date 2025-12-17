@@ -8,7 +8,7 @@ use crate::{
 };
 use chrono::Local;
 use fontdrasil::coords::{DesignCoord, DesignLocation, UserCoord};
-use glyphslib::glyphs3;
+use glyphslib::glyphs3::{self, Property};
 use indexmap::IndexMap;
 use serde_json::json;
 use smol_str::SmolStr;
@@ -38,6 +38,8 @@ pub(crate) const KEY_IS_BOLD: &str = "com.schriftgestalt.Glyphs.isBold";
 pub(crate) const KEY_IS_ITALIC: &str = "com.schriftgestalt.Glyphs.isItalic";
 pub(crate) const KEY_KEEP_ALTERNATES_TOGETHER: &str =
     "com.schriftgestalt.Glyphs.keepAlternatesTogether";
+pub(crate) const KEY_KERNING_RTL: &str = "com.schriftgestalt.Glyphs.kerningRTL";
+pub(crate) const KEY_KERNING_VERTICAL: &str = "com.schriftgestalt.Glyphs.kerningVertical";
 pub(crate) const KEY_LAYER_HINTS: &str = "com.schriftgestalt.Glyphs.layerHints";
 pub(crate) const KEY_LAYER_IMAGE: &str = "com.schriftgestalt.Glyphs.layerBackgroundImage";
 pub(crate) const KEY_MASTER_VISIBLE: &str = "com.schriftgestalt.Glyphs.visible";
@@ -224,7 +226,11 @@ fn _load(glyphs_font: &glyphslib::Font, path: PathBuf) -> Result<Font, Babelfont
         glyphs_font.numbers.iter().map(|n| n.name.clone()).collect(),
     );
     // Properties
-    load_properties(&mut font, glyphs_font);
+    load_properties(
+        &mut font.names,
+        &mut font.custom_ot_values,
+        &glyphs_font.properties,
+    );
     // Settings
     font.format_specific.insert(
         KEY_SETTINGS.into(),
@@ -248,6 +254,13 @@ fn _load(glyphs_font: &glyphslib::Font, path: PathBuf) -> Result<Font, Babelfont
         glyphs_font.version.major as u16,
         glyphs_font.version.minor as u16,
     );
+
+    // RTL and vertical kerning
+    font.format_specific
+        .insert_json_non_null(KEY_KERNING_VERTICAL, &glyphs_font.kerning_vertical);
+    font.format_specific
+        .insert_json_non_null(KEY_KERNING_RTL, &glyphs_font.kerning_rtl);
+
     // Copy masters
     // Copy instances
     // Copy kern groups
@@ -303,11 +316,18 @@ fn load_instance(font: &Font, instance: &glyphs3::Instance) -> crate::Instance {
     format_specific.insert_if_ne_json(KEY_INSTANCE_EXPORTS, &instance.exports, &true);
     format_specific.insert_if_ne_json(KEY_IS_BOLD, &instance.is_bold, &false);
     format_specific.insert_if_ne_json(KEY_IS_ITALIC, &instance.is_italic, &false);
+    let mut names = Names::new();
+    let mut custom_ot_values = vec![];
+    load_properties(
+        &mut names,
+        &mut custom_ot_values, // XXX
+        &instance.properties,
+    );
     crate::Instance {
         id: instance.name.clone(),
         name: I18NDictionary::from(&instance.name),
         location: designspace_to_location(&instance.axes_values),
-        custom_names: Names::new(), // TODO instance.custom_names.clone().into(),
+        custom_names: names,
         variable: instance.export_type == glyphslib::glyphs3::ExportType::Variable,
         linked_style: instance.link_style.clone(),
         format_specific,
@@ -356,75 +376,77 @@ fn save_instance(instance: &crate::Instance, axes: &[Axis]) -> glyphs3::Instance
         is_bold: instance.format_specific.get_bool_or(KEY_IS_BOLD, false),
         is_italic: instance.format_specific.get_bool_or(KEY_IS_ITALIC, false),
         manual_interpolation: Default::default(),
-        properties: Default::default(),
+        properties: save_properties(&instance.custom_names),
         export_type: Default::default(),
     }
 }
 
-fn load_properties(font: &mut Font, glyphs_font: &glyphs3::Glyphs3) {
-    for property in glyphs_font.properties.iter() {
+fn load_properties(
+    names: &mut Names,
+    custom_ot_values: &mut Vec<OTValue>,
+    glyphs_properties: &[Property],
+) {
+    for property in glyphs_properties.iter() {
         match property {
-            glyphs3::Property::SingularProperty { key, value } => {
-                match key {
-                    glyphs3::SingularPropertyKey::Designer => {
-                        font.names.designer = I18NDictionary::from(value)
-                    }
-                    glyphs3::SingularPropertyKey::Manufacturer => {
-                        font.names.manufacturer = I18NDictionary::from(value)
-                    }
-                    glyphs3::SingularPropertyKey::DesignerUrl => {
-                        font.names.designer_url = I18NDictionary::from(value)
-                    }
-                    glyphs3::SingularPropertyKey::ManufacturerUrl => {
-                        font.names.manufacturer_url = I18NDictionary::from(value);
-                    }
-                    glyphs3::SingularPropertyKey::LicenseUrl => {
-                        font.names.license_url = I18NDictionary::from(value)
-                    }
-                    glyphs3::SingularPropertyKey::PostscriptFullName => {
-                        font.names.postscript_name = I18NDictionary::from(value)
-                    }
-                    glyphs3::SingularPropertyKey::PostscriptFontName => {
-                        //     font.names.postscript_font_name = I18NDictionary::from(value)
-                    }
-                    glyphs3::SingularPropertyKey::WwsFamilyName => {
-                        font.names.wws_family_name = I18NDictionary::from(value)
-                    }
-                    glyphs3::SingularPropertyKey::VersionString => {
-                        font.names.version = I18NDictionary::from(value)
-                    }
-                    glyphs3::SingularPropertyKey::VendorID => font.custom_ot_values.push(OTValue {
-                        table: "OS/2".into(),
-                        field: "achVendID".into(),
-                        value: crate::OTScalar::StringType(value.clone()),
-                    }),
-                    glyphs3::SingularPropertyKey::UniqueID => {
-                        font.names.unique_id = I18NDictionary::from(value)
-                    }
+            glyphs3::Property::SingularProperty { key, value } => match key {
+                glyphs3::SingularPropertyKey::Designer => {
+                    names.designer = I18NDictionary::from(value)
                 }
-            }
+                glyphs3::SingularPropertyKey::Manufacturer => {
+                    names.manufacturer = I18NDictionary::from(value)
+                }
+                glyphs3::SingularPropertyKey::DesignerUrl => {
+                    names.designer_url = I18NDictionary::from(value)
+                }
+                glyphs3::SingularPropertyKey::ManufacturerUrl => {
+                    names.manufacturer_url = I18NDictionary::from(value);
+                }
+                glyphs3::SingularPropertyKey::LicenseUrl => {
+                    names.license_url = I18NDictionary::from(value)
+                }
+                glyphs3::SingularPropertyKey::PostscriptFullName => {
+                    names.postscript_name = I18NDictionary::from(value)
+                }
+                glyphs3::SingularPropertyKey::PostscriptFontName => {
+                    names.postscript_cid_name = I18NDictionary::from(value)
+                }
+                glyphs3::SingularPropertyKey::WwsFamilyName => {
+                    names.wws_family_name = I18NDictionary::from(value)
+                }
+                glyphs3::SingularPropertyKey::VersionString => {
+                    names.version = I18NDictionary::from(value)
+                }
+                glyphs3::SingularPropertyKey::VendorID => custom_ot_values.push(OTValue {
+                    table: "OS/2".into(),
+                    field: "achVendID".into(),
+                    value: crate::OTScalar::StringType(value.clone()),
+                }),
+                glyphs3::SingularPropertyKey::UniqueID => {
+                    names.unique_id = I18NDictionary::from(value)
+                }
+            },
             glyphs3::Property::LocalizedProperty { key, values } => {
-                let value = I18NDictionary::new();
-                for _localized_value in values.iter() {
-                    // value.insert(
-                    //     localized_value.language.clone(),
-                    //     localized_value.value.clone(),
-                    // );
+                let mut value = I18NDictionary::new();
+                for localized_value in values.iter() {
+                    value.insert(
+                        localized_value.language.clone(),
+                        localized_value.value.clone(),
+                    );
                 }
                 match key {
-                    glyphs3::LocalizedPropertyKey::FamilyNames => font.names.family_name = value,
-                    glyphs3::LocalizedPropertyKey::Copyrights => font.names.copyright = value,
-                    glyphs3::LocalizedPropertyKey::Designers => font.names.designer = value,
-                    glyphs3::LocalizedPropertyKey::Manufacturers => font.names.manufacturer = value,
-                    glyphs3::LocalizedPropertyKey::Licenses => font.names.license = value,
-                    glyphs3::LocalizedPropertyKey::Trademarks => font.names.trademark = value,
-                    glyphs3::LocalizedPropertyKey::Descriptions => font.names.description = value,
-                    glyphs3::LocalizedPropertyKey::SampleTexts => font.names.sample_text = value,
+                    glyphs3::LocalizedPropertyKey::FamilyNames => names.family_name = value,
+                    glyphs3::LocalizedPropertyKey::Copyrights => names.copyright = value,
+                    glyphs3::LocalizedPropertyKey::Designers => names.designer = value,
+                    glyphs3::LocalizedPropertyKey::Manufacturers => names.manufacturer = value,
+                    glyphs3::LocalizedPropertyKey::Licenses => names.license = value,
+                    glyphs3::LocalizedPropertyKey::Trademarks => names.trademark = value,
+                    glyphs3::LocalizedPropertyKey::Descriptions => names.description = value,
+                    glyphs3::LocalizedPropertyKey::SampleTexts => names.sample_text = value,
                     glyphs3::LocalizedPropertyKey::CompatibleFullNames => {
-                        font.names.compatible_full_name = value
+                        names.compatible_full_name = value
                     }
                     glyphs3::LocalizedPropertyKey::StyleNames => {
-                        font.names.typographic_subfamily = value;
+                        names.typographic_subfamily = value;
                     }
                 }
             }
@@ -435,18 +457,127 @@ fn load_properties(font: &mut Font, glyphs_font: &glyphs3::Glyphs3) {
 
 fn save_properties(names: &Names) -> Vec<glyphs3::Property> {
     let mut properties: Vec<glyphs3::Property> = vec![];
-    if let Some(designer) = names.designer.get_default() {
-        properties.push(glyphs3::Property::SingularProperty {
-            key: glyphs3::SingularPropertyKey::Designer,
-            value: designer.clone(),
-        });
+
+    // Macro for singular-only properties (no localized variant)
+    macro_rules! push_singular {
+        ($field:expr, $key:expr) => {
+            if let Some(value) = $field.get_default() {
+                properties.push(glyphs3::Property::SingularProperty {
+                    key: $key,
+                    value: value.clone(),
+                });
+            }
+        };
     }
-    if let Some(manufacturer) = names.manufacturer.get_default() {
-        properties.push(glyphs3::Property::SingularProperty {
-            key: glyphs3::SingularPropertyKey::Manufacturer,
-            value: manufacturer.clone(),
-        });
+
+    // Macro for properties that can be singular or localized
+    macro_rules! push_property {
+        ($field:expr, $singular_key:expr, $localized_key:expr) => {
+            if !$field.is_empty() {
+                if $field.is_single() {
+                    if let Some(value) = $field.get_default() {
+                        properties.push(glyphs3::Property::SingularProperty {
+                            key: $singular_key,
+                            value: value.clone(),
+                        });
+                    }
+                } else {
+                    let values: Vec<glyphslib::glyphs3::LocalizedValue> = $field
+                        .0
+                        .iter()
+                        .map(|(language, value)| glyphslib::glyphs3::LocalizedValue {
+                            language: language.clone(),
+                            value: value.clone(),
+                        })
+                        .collect();
+                    properties.push(glyphs3::Property::LocalizedProperty {
+                        key: $localized_key,
+                        values,
+                    });
+                }
+            }
+        };
     }
+
+    // Macro for localized-only properties (no singular variant)
+    macro_rules! push_localized {
+        ($field:expr, $key:expr) => {
+            if !$field.is_empty() {
+                let values: Vec<glyphslib::glyphs3::LocalizedValue> = $field
+                    .0
+                    .iter()
+                    .map(|(language, value)| glyphslib::glyphs3::LocalizedValue {
+                        language: language.clone(),
+                        value: value.clone(),
+                    })
+                    .collect();
+                properties.push(glyphs3::Property::LocalizedProperty { key: $key, values });
+            }
+        };
+    }
+
+    // Singular-only properties
+    push_singular!(
+        names.designer_url,
+        glyphs3::SingularPropertyKey::DesignerUrl
+    );
+    push_singular!(
+        names.manufacturer_url,
+        glyphs3::SingularPropertyKey::ManufacturerUrl
+    );
+    push_singular!(names.license_url, glyphs3::SingularPropertyKey::LicenseUrl);
+    push_singular!(
+        names.postscript_name,
+        glyphs3::SingularPropertyKey::PostscriptFullName
+    );
+    push_singular!(
+        names.postscript_cid_name,
+        glyphs3::SingularPropertyKey::PostscriptFontName
+    );
+    push_singular!(
+        names.wws_family_name,
+        glyphs3::SingularPropertyKey::WwsFamilyName
+    );
+    push_singular!(names.version, glyphs3::SingularPropertyKey::VersionString);
+    push_singular!(names.unique_id, glyphs3::SingularPropertyKey::UniqueID);
+
+    // Properties that can be singular or localized
+    push_property!(
+        names.designer,
+        glyphs3::SingularPropertyKey::Designer,
+        glyphs3::LocalizedPropertyKey::Designers
+    );
+    push_property!(
+        names.manufacturer,
+        glyphs3::SingularPropertyKey::Manufacturer,
+        glyphs3::LocalizedPropertyKey::Manufacturers
+    );
+
+    // Localized-only properties
+    push_localized!(
+        names.family_name,
+        glyphs3::LocalizedPropertyKey::FamilyNames
+    );
+    push_localized!(names.copyright, glyphs3::LocalizedPropertyKey::Copyrights);
+    push_localized!(names.license, glyphs3::LocalizedPropertyKey::Licenses);
+    push_localized!(names.trademark, glyphs3::LocalizedPropertyKey::Trademarks);
+    push_localized!(
+        names.description,
+        glyphs3::LocalizedPropertyKey::Descriptions
+    );
+    push_localized!(
+        names.sample_text,
+        glyphs3::LocalizedPropertyKey::SampleTexts
+    );
+    push_localized!(
+        names.compatible_full_name,
+        glyphs3::LocalizedPropertyKey::CompatibleFullNames
+    );
+    push_localized!(
+        names.typographic_subfamily,
+        glyphs3::LocalizedPropertyKey::StyleNames
+    );
+
     properties
 }
 
@@ -840,8 +971,12 @@ pub(crate) fn as_glyphs3(font: &Font) -> glyphs3::Glyphs3 {
             .collect(),
         keep_alternates_together: false,
         kerning,
-        kerning_rtl: BTreeMap::new(),
-        kerning_vertical: BTreeMap::new(),
+        kerning_rtl: font
+            .format_specific
+            .get_parse_or(KEY_KERNING_RTL, BTreeMap::new()),
+        kerning_vertical: font
+            .format_specific
+            .get_parse_or(KEY_KERNING_VERTICAL, BTreeMap::new()),
         masters,
         metrics: our_metrics.iter().map(Into::into).collect(),
         note: font.note.clone().unwrap_or_default(),

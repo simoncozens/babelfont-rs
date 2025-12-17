@@ -38,6 +38,11 @@ impl I18NDictionary {
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
+
+    /// Check if the dictionary has only a single entry.
+    pub fn is_single(&self) -> bool {
+        self.0.len() == 1
+    }
 }
 
 impl Debug for I18NDictionary {
