@@ -205,6 +205,7 @@ pub(crate) fn load_component(c: &norad::Component) -> Component {
             t.x_scale, t.xy_scale, t.yx_scale, t.y_scale, t.x_offset, t.y_offset,
         ]),
         format_specific: stash_lib(c.lib()),
+        location: IndexMap::new(),
     }
 }
 
@@ -705,6 +706,7 @@ pub(crate) fn load_glyphs(font: &mut Font, ufo: &norad::Font) {
                 exported: !skipped.contains(&glyphname),
                 direction: None,
                 format_specific: Default::default(),
+                component_axes: Default::default(),
             })
         }
     }

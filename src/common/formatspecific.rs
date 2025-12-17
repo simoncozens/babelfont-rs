@@ -64,6 +64,15 @@ impl FormatSpecific {
         }
     }
 
+    /// Get any deserializable value under the given key, or return default.
+    #[inline]
+    pub fn get_json<K: Into<String>, T: DeserializeOwned + Default>(&self, key: K) -> T {
+        self.0
+            .get(&key.into())
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
+            .unwrap_or_default()
+    }
+
     /// Insert a serializable value only if it does not serialize to JSON null.
     #[inline]
     pub fn insert_json_non_null<K: Into<String>, T: Serialize>(&mut self, key: K, value: &T) {

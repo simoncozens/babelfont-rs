@@ -2,6 +2,8 @@ use crate::{
     common::{decomposition::DecomposedAffine, FormatSpecific, Node, NodeType},
     BabelfontError,
 };
+use fontdrasil::coords::DesignCoord;
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 use typeshare::typeshare;
@@ -13,13 +15,17 @@ pub struct Component {
     /// The referenced glyph name
     #[typeshare(serialized_as = "String")]
     pub reference: SmolStr,
+    /// The transformation applied to the component
     #[serde(
         default = "kurbo::Affine::default",
         skip_serializing_if = "crate::serde_helpers::affine_is_identity"
     )]
-    /// The transformation applied to the component
     #[typeshare(serialized_as = "Vec<f32>")]
     pub transform: kurbo::Affine,
+    /// A location for a variable component
+    // We don't use a DesignLocation here because we want to allow axis names
+    // rather than tags
+    pub location: IndexMap<String, DesignCoord>,
     /// Format-specific data
     #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
     #[typeshare(python(type = "Dict[str, Any]"))]
@@ -126,6 +132,9 @@ pub enum Shape {
 
 #[cfg(feature = "glyphs")]
 mod glyphs {
+    use fontdrasil::coords::DesignCoord;
+    use indexmap::IndexMap;
+
     use crate::convertors::glyphs3::{KEY_ALIGNMENT, KEY_ATTR, KEY_COMPONENT_ANCHOR};
 
     use super::*;
@@ -168,11 +177,17 @@ mod glyphs {
                 &val.alignment,
                 &-1, // default value
             );
+            format_specific.insert_json_non_null(KEY_ATTR, &val.attr);
             format_specific.insert_some_json(KEY_COMPONENT_ANCHOR, &val.anchor);
+            let mut location = IndexMap::new();
+            for (k, v) in &val.smart_component_location {
+                location.insert(k.clone(), DesignCoord::new(*v as f64));
+            }
 
             Component {
                 reference: SmolStr::from(&val.component_glyph),
                 transform,
+                location,
                 format_specific,
             }
         }
@@ -196,8 +211,18 @@ mod glyphs {
                     .map(|s| s as i8)
                     .unwrap_or(-1),
                 anchor: val.format_specific.get_optionstring(KEY_COMPONENT_ANCHOR),
+                attr: val.format_specific.get_json(KEY_ATTR),
+                smart_component_location: val
+                    .location
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.to_f64() as f32))
+                    .collect(),
+                // attr: val
+                //     .format_specific
+                //     .get(KEY_ATTR)
+                //     .and_then(|x| serde_json::from_value(x.clone()).ok())
+                //     .unwrap_or_default(),
                 ..Default::default() // anchor_to: todo!(),
-                                     // attr: todo!(),
                                      // locked: todo!(),
                                      // master_id: todo!(),
                                      // orientation: todo!(),

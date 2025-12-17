@@ -6,6 +6,7 @@ use fontdrasil::{
     coords::{DesignCoord, DesignLocation, Location, UserCoord},
     types::Axes,
 };
+use indexmap::IndexMap;
 use kurbo::Affine;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -41,6 +42,7 @@ impl From<FontlabComponent> for Shape {
             reference: val.glyphName.into(),
             transform: Affine::IDENTITY,
             format_specific: Default::default(),
+            location: IndexMap::new(),
         })
     }
 }
@@ -247,6 +249,7 @@ impl FontlabGlyph {
             exported: true,
             direction: None,
             format_specific: Default::default(),
+            component_axes: Default::default(),
         })
     }
 }

@@ -2,6 +2,7 @@ use crate::{
     common::{Direction, FormatSpecific},
     layer::Layer,
     serde_helpers::{default_true, is_true},
+    Axis,
 };
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
@@ -90,8 +91,13 @@ pub struct Glyph {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     /// The writing direction of the glyph, if any
     pub direction: Option<Direction>,
-    #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
+
+    /// Glyph-specific axes for "smart components" / variable components
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub component_axes: Vec<Axis>,
+
     /// Format-specific data
+    #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
     #[typeshare(python(type = "Dict[str, Any]"))]
     #[typeshare(typescript(type = "Record<string, any>"))]
     pub format_specific: FormatSpecific,
@@ -126,7 +132,7 @@ pub(crate) mod glyphs {
     };
 
     use super::*;
-    use fontdrasil::types::Tag;
+    use fontdrasil::{coords::UserCoord, types::Tag};
     use glyphslib::glyphs3::Glyph as G3Glyph;
 
     pub(crate) fn from_glyphs(val: &G3Glyph, axes_order: &[Tag]) -> Glyph {
@@ -199,6 +205,11 @@ pub(crate) mod glyphs {
                     Some(Direction::from_str(d).unwrap_or(Direction::LeftToRight))
                 }
             }),
+            component_axes: val
+                .smart_component_settings
+                .iter()
+                .map(|x| x.into())
+                .collect(),
             format_specific,
         }
     }
@@ -250,7 +261,7 @@ pub(crate) mod glyphs {
             metric_vert_width: val.format_specific.get_optionstring("metric_vert_width"),
             metric_width: val.format_specific.get_optionstring("metric_width"),
             note: val.format_specific.get_string("note"),
-            smart_component_settings: vec![], // XXX
+            smart_component_settings: val.component_axes.iter().map(|x| x.into()).collect(),
             script: val.format_specific.get_optionstring("script"),
             sort_name: val.format_specific.get_optionstring("sort_name"),
             sort_name_keep: val.format_specific.get_optionstring("sort_name_keep"),
@@ -278,6 +289,33 @@ pub(crate) mod glyphs {
                         ))
                     } else { None }
                 ),
+        }
+    }
+
+    impl From<&glyphslib::glyphs3::SmartComponentSetting> for Axis {
+        fn from(val: &glyphslib::glyphs3::SmartComponentSetting) -> Self {
+            Axis {
+                name: crate::I18NDictionary::from(&val.name),
+                tag: Tag::new(b"VARC"), // placeholder
+                default: Some(UserCoord::new(val.bottom_value as f64)),
+                min: Some(UserCoord::new(val.bottom_value as f64)),
+                max: Some(UserCoord::new(val.top_value as f64)),
+                ..Default::default()
+            }
+        }
+    }
+
+    impl From<&Axis> for glyphslib::glyphs3::SmartComponentSetting {
+        fn from(val: &Axis) -> Self {
+            glyphslib::glyphs3::SmartComponentSetting {
+                bottom_value: val.min.unwrap_or(UserCoord::new(0.0)).to_f64() as i32,
+                top_value: val.max.unwrap_or(UserCoord::new(0.0)).to_f64() as i32,
+                name: val
+                    .name
+                    .get_default()
+                    .unwrap_or(&"Unnamed Axis".to_string())
+                    .to_string(),
+            }
         }
     }
 }

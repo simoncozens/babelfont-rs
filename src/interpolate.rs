@@ -202,6 +202,7 @@ impl Shape {
                         .then_scale_non_uniform(interpolated_params[2], interpolated_params[3])
                         .then_rotate(interpolated_params[4]),
                     format_specific: c.format_specific.clone(),
+                    location: c.location.clone(), // for now
                 };
                 Ok(Shape::Component(new_component))
             }
