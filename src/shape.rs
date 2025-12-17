@@ -135,7 +135,9 @@ mod glyphs {
     use fontdrasil::coords::DesignCoord;
     use indexmap::IndexMap;
 
-    use crate::convertors::glyphs3::{KEY_ALIGNMENT, KEY_ATTR, KEY_COMPONENT_ANCHOR};
+    use crate::convertors::glyphs3::{
+        KEY_ALIGNMENT, KEY_ATTR, KEY_COMPONENT_ANCHOR, KEY_COMPONENT_LOCKED,
+    };
 
     use super::*;
 
@@ -179,6 +181,11 @@ mod glyphs {
             );
             format_specific.insert_json_non_null(KEY_ATTR, &val.attr);
             format_specific.insert_some_json(KEY_COMPONENT_ANCHOR, &val.anchor);
+            format_specific.insert_if_ne_json(
+                KEY_COMPONENT_LOCKED,
+                &val.locked,
+                &false, // default value
+            );
             let mut location = IndexMap::new();
             for (k, v) in &val.smart_component_location {
                 location.insert(k.clone(), DesignCoord::new(*v as f64));
@@ -203,7 +210,7 @@ mod glyphs {
                     decomposed.translation.1 as f32,
                 ),
                 scale: (decomposed.scale.0 as f32, decomposed.scale.1 as f32),
-                angle: decomposed.rotation as f32,
+                angle: -(decomposed.rotation as f32).to_degrees(),
                 alignment: val
                     .format_specific
                     .get(KEY_ALIGNMENT)
@@ -217,6 +224,7 @@ mod glyphs {
                     .iter()
                     .map(|(k, v)| (k.clone(), v.to_f64() as f32))
                     .collect(),
+                locked: val.format_specific.get_bool(KEY_COMPONENT_LOCKED),
                 // attr: val
                 //     .format_specific
                 //     .get(KEY_ATTR)

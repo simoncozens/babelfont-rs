@@ -29,6 +29,7 @@ pub(crate) const KEY_ANNOTATIONS: &str = "com.schriftgestalt.Glyphs.annotations"
 pub(crate) const KEY_APP_VERSION: &str = "com.schriftgestalt.Glyphs.appVersion";
 pub(crate) const KEY_ATTR: &str = "com.schriftgestalt.Glyphs.attr";
 pub(crate) const KEY_COMPONENT_ANCHOR: &str = "com.schriftgestalt.Glyphs.componentAnchor";
+pub(crate) const KEY_COMPONENT_LOCKED: &str = "com.schriftgestalt.Glyphs.componentLocked";
 pub(crate) const KEY_CUSTOM_PARAMETERS: &str = "com.schriftgestalt.Glyphs.customParameters.";
 pub(crate) const KEY_DISPLAY_STRINGS: &str = "com.schriftgestalt.Glyphs.displayStrings";
 pub(crate) const KEY_ICON_NAME: &str = "com.schriftgestalt.Glyphs.iconName";
@@ -96,8 +97,7 @@ fn serialize_custom_parameters(
                     disabled: value
                         .as_object()
                         .and_then(|d| d.get("disabled"))
-                        .and_then(|v| v.as_i64())
-                        .map(|i| i != 0)
+                        .and_then(|v| v.as_bool())
                         .unwrap_or(false),
                 })
             } else {
@@ -516,7 +516,7 @@ fn load_master(master: &glyphs3::Master, glyphs_font: &glyphs3::Glyphs3, font: &
     );
     m.format_specific.insert(
         KEY_NUMBER_VALUES.into(),
-        serde_json::to_value(&master.metric_values).unwrap_or(serde_json::Value::Null),
+        serde_json::to_value(&master.number_values).unwrap_or(serde_json::Value::Null),
     );
     m.format_specific.insert(
         KEY_ICON_NAME.into(),
