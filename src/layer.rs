@@ -264,7 +264,10 @@ impl Layer {
 
 #[cfg(feature = "glyphs")]
 pub(crate) mod glyphs {
-    use crate::convertors::glyphs3::copy_user_data;
+    use crate::convertors::glyphs3::{
+        copy_user_data, KEY_ATTR, KEY_METRIC_BOTTOM, KEY_METRIC_LEFT, KEY_METRIC_RIGHT,
+        KEY_METRIC_TOP, KEY_METRIC_VERT_WIDTH, KEY_METRIC_WIDTH, KEY_VERT_ORIGIN, KEY_VERT_WIDTH,
+    };
     use std::collections::BTreeMap;
 
     use fontdrasil::{coords::DesignCoord, types::Tag};
@@ -280,28 +283,20 @@ pub(crate) mod glyphs {
     pub(crate) fn layer_from_glyphs(val: &glyphslib::glyphs3::Layer, axes_order: &[Tag]) -> Layer {
         let format_specific = {
             let mut fs = FormatSpecific::default();
-            if !val.visible {
-                fs.insert("visible".into(), serde_json::Value::Bool(false));
-            }
-            if !val.hints.is_empty() {
-                fs.insert(
-                    KEY_LAYER_HINTS.into(),
-                    serde_json::to_value(&val.hints).unwrap_or(serde_json::Value::Null),
-                );
-            }
-            if !val.annotations.is_empty() {
-                fs.insert(
-                    KEY_ANNOTATIONS.into(),
-                    serde_json::to_value(&val.annotations).unwrap_or(serde_json::Value::Null),
-                );
-            }
-            if let Some(bg_image) = &val.background_image {
-                fs.insert(
-                    KEY_LAYER_IMAGE.into(),
-                    serde_json::to_value(bg_image).unwrap_or(serde_json::Value::Null),
-                );
-            }
+            fs.insert_if_ne_json("visible", &val.visible, &true);
+            fs.insert_nonempty_json(KEY_LAYER_HINTS, &val.hints);
+            fs.insert_nonempty_json(KEY_ANNOTATIONS, &val.annotations);
+            fs.insert_some_json(KEY_LAYER_IMAGE, &val.background_image);
+            fs.insert_some_json(KEY_VERT_ORIGIN, &val.vert_origin);
+            fs.insert_some_json(KEY_VERT_WIDTH, &val.vert_width);
+            fs.insert_some_json(KEY_METRIC_WIDTH, &val.metric_width);
+            fs.insert_some_json(KEY_METRIC_VERT_WIDTH, &val.metric_vert_width);
+            fs.insert_some_json(KEY_METRIC_TOP, &val.metric_top);
+            fs.insert_some_json(KEY_METRIC_RIGHT, &val.metric_right);
+            fs.insert_some_json(KEY_METRIC_LEFT, &val.metric_left);
+            fs.insert_some_json(KEY_METRIC_BOTTOM, &val.metric_bottom);
             copy_user_data(&mut fs, &val.user_data);
+            fs.insert_json(KEY_ATTR, &val.attr);
             fs
         };
         let location = val
@@ -339,6 +334,12 @@ pub(crate) mod glyphs {
 
     pub(crate) fn layer_to_glyphs(val: &Layer, axes_order: &[Tag]) -> glyphslib::glyphs3::Layer {
         let mut attr: BTreeMap<SmolStr, _> = BTreeMap::new();
+        if let Some(attr_map) = val
+            .format_specific
+            .get_parse_opt::<BTreeMap<SmolStr, Plist>>(KEY_ATTR)
+        {
+            attr.extend(attr_map);
+        }
         if let Some(coords) = &val.location {
             attr.insert(
                 "coordinates".into(),
@@ -361,11 +362,7 @@ pub(crate) mod glyphs {
             anchors: val.anchors.iter().map(Into::into).collect(),
             annotations: val
                 .format_specific
-                .get(KEY_ANNOTATIONS)
-                .and_then(|x| {
-                    serde_json::from_value::<Vec<BTreeMap<SmolStr, Plist>>>(x.clone()).ok()
-                })
-                .unwrap_or_default(),
+                .get_parse_or::<Vec<BTreeMap<SmolStr, Plist>>>(KEY_ANNOTATIONS, Vec::new()),
             associated_master_id: match val.master {
                 LayerType::AssociatedWithMaster(ref m) => Some(m.clone()),
                 _ => None,
@@ -374,38 +371,26 @@ pub(crate) mod glyphs {
             background: None,
             background_image: val
                 .format_specific
-                .get(KEY_LAYER_IMAGE)
-                .map(|x| {
-                    serde_json::from_value::<glyphslib::glyphs3::BackgroundImage>(x.clone()).ok()
-                })
-                .unwrap_or_default(),
+                .get_parse_opt::<glyphslib::glyphs3::BackgroundImage>(KEY_LAYER_IMAGE),
             color: None,
             hints: val
                 .format_specific
-                .get(KEY_LAYER_HINTS)
-                .and_then(|x| {
-                    serde_json::from_value::<Vec<BTreeMap<SmolStr, Plist>>>(x.clone()).ok()
-                })
-                .unwrap_or_default(),
-            metric_bottom: None,
-            metric_left: None,
-            metric_right: None,
-            metric_top: None,
-            metric_vert_width: None,
-            metric_width: None,
+                .get_parse_or::<Vec<BTreeMap<SmolStr, Plist>>>(KEY_LAYER_HINTS, Vec::new()),
+            metric_bottom: val.format_specific.get_optionstring(KEY_METRIC_BOTTOM),
+            metric_left: val.format_specific.get_optionstring(KEY_METRIC_LEFT),
+            metric_right: val.format_specific.get_optionstring(KEY_METRIC_RIGHT),
+            metric_top: val.format_specific.get_optionstring(KEY_METRIC_TOP),
+            metric_vert_width: val.format_specific.get_optionstring(KEY_METRIC_VERT_WIDTH),
+            metric_width: val.format_specific.get_optionstring(KEY_METRIC_WIDTH),
             part_selection: BTreeMap::new(),
             user_data: val
                 .format_specific
                 .get(KEY_USER_DATA)
                 .and_then(|x| serde_json::from_value::<UserData>(x.clone()).ok())
                 .unwrap_or_default(),
-            vert_origin: None,
-            vert_width: None,
-            visible: val
-                .format_specific
-                .get("visible")
-                .and_then(|x| x.as_bool())
-                .unwrap_or(true),
+            vert_origin: val.format_specific.get_parse_opt::<f32>(KEY_VERT_ORIGIN),
+            vert_width: val.format_specific.get_parse_opt::<f32>(KEY_VERT_WIDTH),
+            visible: val.format_specific.get_bool_or("visible", true),
         }
     }
 }

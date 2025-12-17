@@ -118,6 +118,8 @@ impl Glyph {
 
 #[cfg(feature = "glyphs")]
 pub(crate) mod glyphs {
+    use std::str::FromStr;
+
     use crate::{
         convertors::glyphs3::{copy_user_data, UserData, KEY_USER_DATA},
         layer::glyphs::{layer_from_glyphs, layer_to_glyphs},
@@ -129,37 +131,26 @@ pub(crate) mod glyphs {
 
     pub(crate) fn from_glyphs(val: &G3Glyph, axes_order: &[Tag]) -> Glyph {
         let mut format_specific = FormatSpecific::default();
-        format_specific.insert("case".to_string(), val.case.clone().into());
-        format_specific.insert(
-            "color".to_string(),
-            serde_json::to_value(&val.color).unwrap_or_default(),
-        );
-        format_specific.insert("kern_direction".to_string(), val.direction.clone().into());
-        format_specific.insert("kern_bottom".to_string(), val.kern_bottom.clone().into());
-        format_specific.insert("kern_left".to_string(), val.kern_left.clone().into());
-        format_specific.insert("kern_right".to_string(), val.kern_right.clone().into());
-        format_specific.insert("kern_top".to_string(), val.kern_top.clone().into());
-        format_specific.insert("last_change".to_string(), val.last_change.clone().into());
-        format_specific.insert("locked".to_string(), val.locked.into());
-        format_specific.insert(
-            "metric_bottom".to_string(),
-            val.metric_bottom.clone().into(),
-        );
-        format_specific.insert("metric_left".to_string(), val.metric_left.clone().into());
-        format_specific.insert("metric_right".to_string(), val.metric_right.clone().into());
-        format_specific.insert("metric_top".to_string(), val.metric_top.clone().into());
-        format_specific.insert(
-            "metric_vert_width".to_string(),
-            val.metric_vert_width.clone().into(),
-        );
-        format_specific.insert("metric_width".to_string(), val.metric_width.clone().into());
-        format_specific.insert("note".to_string(), val.note.clone().into());
-        format_specific.insert("script".to_string(), val.script.clone().into());
-        format_specific.insert("subcategory".to_string(), val.subcategory.clone().into());
-        format_specific.insert(
-            "tags".to_string(),
-            serde_json::value::to_value(&val.tags).unwrap_or_default(),
-        );
+        format_specific.insert_json_non_null("case", &val.case);
+        format_specific.insert_json_non_null("color", &val.color);
+        format_specific.insert_some_json("kern_bottom", &val.kern_bottom);
+        format_specific.insert_some_json("kern_left", &val.kern_left);
+        format_specific.insert_some_json("kern_right", &val.kern_right);
+        format_specific.insert_some_json("kern_top", &val.kern_top);
+        format_specific.insert_json_non_null("last_change", &val.last_change);
+        format_specific.insert_json("locked", &val.locked);
+        format_specific.insert_json_non_null("metric_bottom", &val.metric_bottom);
+        format_specific.insert_json_non_null("metric_left", &val.metric_left);
+        format_specific.insert_json_non_null("metric_right", &val.metric_right);
+        format_specific.insert_json_non_null("metric_top", &val.metric_top);
+        format_specific.insert_json_non_null("metric_vert_width", &val.metric_vert_width);
+        format_specific.insert_json_non_null("metric_width", &val.metric_width);
+        format_specific.insert_json_non_null("note", &val.note);
+        format_specific.insert_json_non_null("script", &val.script);
+        format_specific.insert_json_non_null("sort_name", &val.sort_name);
+        format_specific.insert_json_non_null("sort_name_keep", &val.sort_name_keep);
+        format_specific.insert_json_non_null("subcategory", &val.subcategory);
+        format_specific.insert_nonempty_json("tags", &val.tags);
         let category = if let Some(cat) = &val.category {
             match cat.as_str() {
                 "Base" => GlyphCategory::Base,
@@ -201,7 +192,13 @@ pub(crate) mod glyphs {
             codepoints: val.unicode.clone(),
             layers,
             exported: val.export,
-            direction: None,
+            direction: val.direction.as_ref().and_then(|d| {
+                if d.is_empty() {
+                    None
+                } else {
+                    Some(Direction::from_str(d).unwrap_or(Direction::LeftToRight))
+                }
+            }),
             format_specific,
         }
     }
@@ -234,7 +231,12 @@ pub(crate) mod glyphs {
             export: val.exported,
             case: val.format_specific.get_string("case"),
             category: val.format_specific.get_optionstring("category"),
-            direction: val.format_specific.get_optionstring("kern_direction"),
+            direction: val.direction.as_ref().map(|d| match d {
+                Direction::LeftToRight => "LTR".to_string(),
+                Direction::RightToLeft => "RTL".to_string(),
+                Direction::TopToBottom => "VTR".to_string(),
+                Direction::Bidi => "BIDI".to_string(),
+            }),
             kern_bottom: val.format_specific.get_optionstring("kern_bottom"),
             kern_left: kern_left.as_ref().map(|s| s.to_string()),
             kern_right: kern_right.as_ref().map(|s| s.to_string()),
@@ -250,18 +252,12 @@ pub(crate) mod glyphs {
             note: val.format_specific.get_string("note"),
             smart_component_settings: vec![], // XXX
             script: val.format_specific.get_optionstring("script"),
+            sort_name: val.format_specific.get_optionstring("sort_name"),
+            sort_name_keep: val.format_specific.get_optionstring("sort_name_keep"),
             subcategory: val.format_specific.get_optionstring("subcategory"),
             tags: val
                 .format_specific
-                .get("tags")
-                .and_then(|x| x.as_array())
-                .map(|x| {
-                    x.iter()
-                        .filter_map(|x| x.as_str())
-                        .map(|x| x.to_string())
-                        .collect()
-                })
-                .unwrap_or_default(),
+                .get_parse_or::<Vec<String>>("tags", Vec::new()),
             user_data: val
                 .format_specific
                 .get(KEY_USER_DATA)

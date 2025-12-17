@@ -10,6 +10,7 @@ use chrono::Local;
 use fontdrasil::coords::{DesignCoord, DesignLocation, UserCoord};
 use glyphslib::glyphs3;
 use indexmap::IndexMap;
+use serde_json::json;
 use smol_str::SmolStr;
 use std::{
     collections::{BTreeMap, HashMap},
@@ -21,28 +22,40 @@ use write_fonts::types::Tag;
 
 pub(crate) type UserData = BTreeMap<SmolStr, glyphslib::Plist>;
 
-pub(crate) const KEY_CUSTOM_PARAMETERS: &str = "com.schriftgestalt.Glyphs.customParameters.";
-pub(crate) const KEY_WEIGHT_CLASS: &str = "com.schriftgestalt.Glyphs.weightClass";
-pub(crate) const KEY_WIDTH_CLASS: &str = "com.schriftgestalt.Glyphs.widthClass";
-pub(crate) const KEY_INSTANCE_EXPORTS: &str = "com.schriftgestalt.Glyphs.exports";
+pub(crate) const KEY_ALIGNMENT: &str = "com.schriftgestalt.Glyphs.alignment";
+pub(crate) const KEY_ANCHOR_LOCKED: &str = "com.schriftgestalt.Glyphs.anchorLocked";
+pub(crate) const KEY_ANCHOR_ORIENTATION: &str = "com.schriftgestalt.Glyphs.anchorOrientation";
+pub(crate) const KEY_ANNOTATIONS: &str = "com.schriftgestalt.Glyphs.annotations";
 pub(crate) const KEY_APP_VERSION: &str = "com.schriftgestalt.Glyphs.appVersion";
+pub(crate) const KEY_ATTR: &str = "com.schriftgestalt.Glyphs.attr";
+pub(crate) const KEY_COMPONENT_ANCHOR: &str = "com.schriftgestalt.Glyphs.componentAnchor";
+pub(crate) const KEY_CUSTOM_PARAMETERS: &str = "com.schriftgestalt.Glyphs.customParameters.";
 pub(crate) const KEY_DISPLAY_STRINGS: &str = "com.schriftgestalt.Glyphs.displayStrings";
-pub(crate) const KEY_USER_DATA: &str = "com.schriftgestalt.Glyphs.userData";
+pub(crate) const KEY_ICON_NAME: &str = "com.schriftgestalt.Glyphs.iconName";
+pub(crate) const KEY_INSTANCE_EXPORTS: &str = "com.schriftgestalt.Glyphs.exports";
+pub(crate) const KEY_IS_BOLD: &str = "com.schriftgestalt.Glyphs.isBold";
+pub(crate) const KEY_IS_ITALIC: &str = "com.schriftgestalt.Glyphs.isItalic";
 pub(crate) const KEY_KEEP_ALTERNATES_TOGETHER: &str =
     "com.schriftgestalt.Glyphs.keepAlternatesTogether";
+pub(crate) const KEY_LAYER_HINTS: &str = "com.schriftgestalt.Glyphs.layerHints";
+pub(crate) const KEY_LAYER_IMAGE: &str = "com.schriftgestalt.Glyphs.layerBackgroundImage";
+pub(crate) const KEY_MASTER_VISIBLE: &str = "com.schriftgestalt.Glyphs.visible";
+pub(crate) const KEY_METRIC_BOTTOM: &str = "com.schriftgestalt.Glyphs.metricBottom";
+pub(crate) const KEY_METRIC_LEFT: &str = "com.schriftgestalt.Glyphs.metricLeft";
+pub(crate) const KEY_METRIC_RIGHT: &str = "com.schriftgestalt.Glyphs.metricRight";
+pub(crate) const KEY_METRIC_TOP: &str = "com.schriftgestalt.Glyphs.metricTop";
+pub(crate) const KEY_METRIC_VERT_WIDTH: &str = "com.schriftgestalt.Glyphs.metricVertWidth";
+pub(crate) const KEY_METRIC_WIDTH: &str = "com.schriftgestalt.Glyphs.metricWidth";
 pub(crate) const KEY_NUMBER_NAMES: &str = "com.schriftgestalt.Glyphs.numberNames";
 pub(crate) const KEY_NUMBER_VALUES: &str = "com.schriftgestalt.Glyphs.numberValues";
 pub(crate) const KEY_SETTINGS: &str = "com.schriftgestalt.Glyphs.settings";
-pub(crate) const KEY_STEMS: &str = "com.schriftgestalt.Glyphs.stems";
 pub(crate) const KEY_STEM_VALUES: &str = "com.schriftgestalt.Glyphs.stemValues";
-pub(crate) const KEY_ICON_NAME: &str = "com.schriftgestalt.Glyphs.iconName";
-pub(crate) const KEY_MASTER_VISIBLE: &str = "com.schriftgestalt.Glyphs.visible";
-pub(crate) const KEY_LAYER_HINTS: &str = "com.schriftgestalt.Glyphs.layerHints";
-pub(crate) const KEY_LAYER_IMAGE: &str = "com.schriftgestalt.Glyphs.layerBackgroundImage";
-pub(crate) const KEY_ATTR: &str = "com.schriftgestalt.Glyphs.attr";
-pub(crate) const KEY_ANNOTATIONS: &str = "com.schriftgestalt.Glyphs.annotations";
-pub(crate) const KEY_ANCHOR_LOCKED: &str = "com.schriftgestalt.Glyphs.anchorLocked";
-pub(crate) const KEY_ANCHOR_ORIENTATION: &str = "com.schriftgestalt.Glyphs.anchorOrientation";
+pub(crate) const KEY_STEMS: &str = "com.schriftgestalt.Glyphs.stems";
+pub(crate) const KEY_USER_DATA: &str = "com.schriftgestalt.Glyphs.userData";
+pub(crate) const KEY_VERT_WIDTH: &str = "com.schriftgestalt.Glyphs.vertWidth";
+pub(crate) const KEY_VERT_ORIGIN: &str = "com.schriftgestalt.Glyphs.vertOrigin";
+pub(crate) const KEY_WEIGHT_CLASS: &str = "com.schriftgestalt.Glyphs.weightClass";
+pub(crate) const KEY_WIDTH_CLASS: &str = "com.schriftgestalt.Glyphs.widthClass";
 
 fn copy_custom_parameters(
     format_specific: &mut FormatSpecific,
@@ -52,7 +65,10 @@ fn copy_custom_parameters(
         if let Ok(value) = serde_json::to_value(&cp.value) {
             format_specific.insert(
                 format!("{}{}", KEY_CUSTOM_PARAMETERS, cp.name.clone()),
-                value,
+                json!({
+                            "value": value,
+                            "disabled": cp.disabled,
+                }),
             );
         }
     }
@@ -70,13 +86,20 @@ fn serialize_custom_parameters(
         .filter_map(|(key, value)| {
             if key.starts_with(KEY_CUSTOM_PARAMETERS) {
                 let name = key.trim_start_matches(KEY_CUSTOM_PARAMETERS).to_string();
-                serde_json::from_value::<glyphslib::Plist>(value.clone())
-                    .ok()
-                    .map(|cp| glyphslib::common::CustomParameter {
-                        name,
-                        value: cp,
-                        disabled: false,
-                    })
+                Some(glyphslib::common::CustomParameter {
+                    name,
+                    value: value
+                        .as_object()
+                        .and_then(|d| d.get("value").cloned())
+                        .and_then(|v| serde_json::from_value(v).ok())
+                        .unwrap_or_default(),
+                    disabled: value
+                        .as_object()
+                        .and_then(|d| d.get("disabled"))
+                        .and_then(|v| v.as_i64())
+                        .map(|i| i != 0)
+                        .unwrap_or(false),
+                })
             } else {
                 None
             }
@@ -230,17 +253,24 @@ fn _load(glyphs_font: &glyphslib::Font, path: PathBuf) -> Result<Font, Babelfont
     // Copy kern groups
     for glyph in font.glyphs.iter() {
         let left_group = glyph.format_specific.get_string("kern_left");
+        if left_group.is_empty() {
+            continue;
+        }
         font.second_kern_groups
             .entry(left_group.into())
             .or_default()
             .push(glyph.name.clone());
 
         let right_group = glyph.format_specific.get_string("kern_right");
+        if right_group.is_empty() {
+            continue;
+        }
         font.first_kern_groups
             .entry(right_group.into())
             .or_default()
             .push(glyph.name.clone());
     }
+
     // Interpret metrics
     // Interpret axes
     interpret_axes(&mut font);
@@ -262,15 +292,17 @@ fn load_instance(font: &Font, instance: &glyphs3::Instance) -> crate::Instance {
     let mut format_specific = FormatSpecific::default();
     copy_custom_parameters(&mut format_specific, &instance.custom_parameters);
     copy_user_data(&mut format_specific, &instance.user_data);
-    if let Some(weight_class) = instance.weight_class.as_ref().and_then(|x| x.as_i64()) {
-        format_specific.insert(KEY_WEIGHT_CLASS.into(), weight_class.into());
-    }
-    if let Some(width_class) = instance.width_class.as_ref().and_then(|x| x.as_i64()) {
-        format_specific.insert(KEY_WIDTH_CLASS.into(), width_class.into());
-    }
-    if !instance.exports {
-        format_specific.insert(KEY_INSTANCE_EXPORTS.into(), serde_json::Value::Bool(false));
-    }
+    format_specific.insert_some_json(
+        KEY_WEIGHT_CLASS,
+        &instance.weight_class.as_ref().and_then(|x| x.as_i64()),
+    );
+    format_specific.insert_some_json(
+        KEY_WIDTH_CLASS,
+        &instance.width_class.as_ref().and_then(|x| x.as_i64()),
+    );
+    format_specific.insert_if_ne_json(KEY_INSTANCE_EXPORTS, &instance.exports, &true);
+    format_specific.insert_if_ne_json(KEY_IS_BOLD, &instance.is_bold, &false);
+    format_specific.insert_if_ne_json(KEY_IS_ITALIC, &instance.is_italic, &false);
     crate::Instance {
         id: instance.name.clone(),
         name: I18NDictionary::from(&instance.name),
@@ -279,6 +311,53 @@ fn load_instance(font: &Font, instance: &glyphs3::Instance) -> crate::Instance {
         variable: instance.export_type == glyphslib::glyphs3::ExportType::Variable,
         linked_style: instance.link_style.clone(),
         format_specific,
+    }
+}
+
+fn save_instance(instance: &crate::Instance, axes: &[Axis]) -> glyphs3::Instance {
+    let mut axes_values = vec![];
+    for axis in axes {
+        axes_values.push(
+            instance
+                .location
+                .get(axis.tag)
+                .map(|x| x.to_f64())
+                .map(|x| x as f32)
+                .unwrap_or(0.0),
+        );
+    }
+    let format_specific = &instance.format_specific;
+    glyphs3::Instance {
+        name: instance
+            .name
+            .get_default()
+            .map(|x| x.to_string())
+            .unwrap_or_default(),
+        axes_values,
+        weight_class: format_specific
+            .get(KEY_WEIGHT_CLASS)
+            .and_then(|x| x.as_i64())
+            .map(glyphslib::Plist::Integer),
+        width_class: format_specific
+            .get(KEY_WIDTH_CLASS)
+            .and_then(|x| x.as_i64())
+            .map(glyphslib::Plist::Integer),
+        exports: format_specific
+            .get(KEY_INSTANCE_EXPORTS)
+            .and_then(|x| x.as_bool())
+            .unwrap_or(true),
+        custom_parameters: serialize_custom_parameters(&instance.format_specific),
+        user_data: format_specific
+            .get(KEY_USER_DATA)
+            .and_then(|x| serde_json::from_value::<UserData>(x.clone()).ok())
+            .unwrap_or_default(),
+        link_style: instance.linked_style.clone(),
+        instance_interpolations: Default::default(),
+        is_bold: instance.format_specific.get_bool_or(KEY_IS_BOLD, false),
+        is_italic: instance.format_specific.get_bool_or(KEY_IS_ITALIC, false),
+        manual_interpolation: Default::default(),
+        properties: Default::default(),
+        export_type: Default::default(),
     }
 }
 
@@ -623,14 +702,9 @@ pub(crate) fn as_glyphs3(font: &Font) -> glyphs3::Glyphs3 {
         .and_then(|x| x.as_str())
         .unwrap_or("")
         .to_string();
-    let display_strings = font
+    let display_strings: Vec<String> = font
         .format_specific
-        .get(KEY_DISPLAY_STRINGS)
-        .and_then(|x| x.as_array())
-        .unwrap_or(&vec![])
-        .iter()
-        .flat_map(|v| v.as_str().map(|s| s.to_string()))
-        .collect();
+        .get_parse_or(KEY_DISPLAY_STRINGS, Vec::new());
     let classes = font
         .features
         .classes
@@ -665,24 +739,15 @@ pub(crate) fn as_glyphs3(font: &Font) -> glyphs3::Glyphs3 {
         .map(|x| save_master(x, &font.axes, &our_metrics))
         .collect();
 
-    let settings = font
+    let settings: glyphs3::Settings = font
         .format_specific
-        .get(KEY_SETTINGS)
-        .and_then(|x| serde_json::from_value::<glyphs3::Settings>(x.clone()).ok())
-        .unwrap_or_default();
-    let stems = font
-        .format_specific
-        .get(KEY_STEMS)
-        .and_then(|x| serde_json::from_value::<Vec<glyphs3::Stem>>(x.clone()).ok())
-        .unwrap_or_default();
+        .get_parse_or(KEY_SETTINGS, glyphs3::Settings::default());
+    let stems: Vec<glyphs3::Stem> = font.format_specific.get_parse_or(KEY_STEMS, Vec::new());
 
-    let numbers = font
+    let numbers: Vec<glyphslib::glyphs3::Number> = font
         .format_specific
-        .get(KEY_NUMBER_NAMES)
-        .and_then(|x| x.as_array())
-        .unwrap_or(&vec![])
-        .iter()
-        .flat_map(|v| v.as_str().map(|s| s.to_string()))
+        .get_parse_or::<Vec<String>>(KEY_NUMBER_NAMES, Vec::new())
+        .into_iter()
         .map(|x| glyphslib::glyphs3::Number { name: x })
         .collect();
 
@@ -841,14 +906,10 @@ fn save_master(master: &Master, axes: &[Axis], metrics: &[crate::MetricType]) ->
         custom_parameters: serialize_custom_parameters(&master.format_specific),
         stem_values: master
             .format_specific
-            .get(KEY_STEM_VALUES)
-            .and_then(|x| serde_json::from_value::<Vec<f32>>(x.clone()).ok())
-            .unwrap_or_default(),
+            .get_parse_or::<Vec<f32>>(KEY_STEM_VALUES, Vec::new()),
         number_values: master
             .format_specific
-            .get(KEY_NUMBER_VALUES)
-            .and_then(|x| serde_json::from_value::<Vec<f32>>(x.clone()).ok())
-            .unwrap_or_default(),
+            .get_parse_or::<Vec<f32>>(KEY_NUMBER_VALUES, Vec::new()),
         icon_name: master
             .format_specific
             .get(KEY_ICON_NAME)
@@ -869,54 +930,12 @@ fn save_master(master: &Master, axes: &[Axis], metrics: &[crate::MetricType]) ->
     }
 }
 
-fn save_instance(instance: &crate::Instance, axes: &[Axis]) -> glyphs3::Instance {
-    let mut axes_values = vec![];
-    for axis in axes {
-        axes_values.push(
-            instance
-                .location
-                .get(axis.tag)
-                .map(|x| x.to_f64())
-                .map(|x| x as f32)
-                .unwrap_or(0.0),
-        );
-    }
-    let format_specific = &instance.format_specific;
-    glyphs3::Instance {
-        name: instance
-            .name
-            .get_default()
-            .map(|x| x.to_string())
-            .unwrap_or_default(),
-        axes_values,
-        weight_class: format_specific
-            .get(KEY_WEIGHT_CLASS)
-            .and_then(|x| x.as_i64())
-            .map(glyphslib::Plist::Integer),
-        width_class: format_specific
-            .get(KEY_WIDTH_CLASS)
-            .and_then(|x| x.as_i64())
-            .map(glyphslib::Plist::Integer),
-        exports: format_specific
-            .get(KEY_INSTANCE_EXPORTS)
-            .and_then(|x| x.as_bool())
-            .unwrap_or(true),
-        custom_parameters: serialize_custom_parameters(&instance.format_specific),
-        user_data: format_specific
-            .get(KEY_USER_DATA)
-            .and_then(|x| serde_json::from_value::<UserData>(x.clone()).ok())
-            .unwrap_or_default(),
-        link_style: instance.linked_style.clone(),
-        ..Default::default()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used)]
     use crate::Shape;
     use pretty_assertions::assert_eq;
-    // use similar::TextDiff;
+    use similar::TextDiff;
 
     use super::*;
 
@@ -945,36 +964,28 @@ mod tests {
         }
     }
 
-    // #[test]
-    // fn test_roundtrip() {
-    //     let there = load("resources/GlyphsFileFormatv3.glyphs".into()).unwrap();
-    //     let backagain = glyphslib::Font::Glyphs3(as_glyphs3(&there));
-    //     let orig = glyphslib::Font::load_str(
-    //         &fs::read_to_string("resources/GlyphsFileFormatv3.glyphs").unwrap(),
-    //     )
-    //     .unwrap();
+    #[test]
+    fn test_roundtrip() {
+        let there = load("resources/GlyphsFileFormatv3.glyphs".into()).unwrap();
+        let backagain = glyphslib::Font::Glyphs3(as_glyphs3(&there));
+        let orig = glyphslib::Font::load_str(
+            &fs::read_to_string("resources/GlyphsFileFormatv3.glyphs").unwrap(),
+        )
+        .unwrap();
 
-    //     assert!(there.format_specific.get(KEY_STEMS).is_some());
-    //     println!("Original stems: {:?}", there.format_specific.get(KEY_STEMS));
-    //     assert!(!backagain.as_glyphs3().unwrap().stems.is_empty());
+        assert!(there.format_specific.get(KEY_STEMS).is_some());
+        println!("Original stems: {:?}", there.format_specific.get(KEY_STEMS));
+        assert!(!backagain.as_glyphs3().unwrap().stems.is_empty());
 
-    //     let old_string = orig.to_string().unwrap();
-    //     let new_string = backagain.to_string().unwrap();
-    //     let diff = TextDiff::from_lines(&old_string, &new_string);
-    //     let text_diff = diff.unified_diff().to_string();
-    //     println!("Diff between original and roundtrip:\n{}", text_diff);
-    //     // for change in diff.iter_all_changes() {
-    //     //     let sign = match change.tag() {
-    //     //         ChangeTag::Delete => "-",
-    //     //         ChangeTag::Insert => "+",
-    //     //         ChangeTag::Equal => " ",
-    //     //     };
-    //     //     print!("{}{}", sign, change);
-    //     // }
-    //     if diff.ratio() < 1.0 {
-    //         panic!("Roundtrip produced different output");
-    //     }
-    // }
+        let old_string = orig.to_string().unwrap();
+        let new_string = backagain.to_string().unwrap();
+        let diff = TextDiff::from_lines(&old_string, &new_string);
+        let text_diff = diff.unified_diff().to_string();
+        println!("Diff between original and roundtrip:\n{}", text_diff);
+        if diff.ratio() < 1.0 {
+            panic!("Roundtrip produced different output");
+        }
+    }
 
     #[test]
     fn test_load_open_shape() {

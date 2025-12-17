@@ -126,7 +126,7 @@ pub enum Shape {
 
 #[cfg(feature = "glyphs")]
 mod glyphs {
-    use crate::convertors::glyphs3::KEY_ATTR;
+    use crate::convertors::glyphs3::{KEY_ALIGNMENT, KEY_ATTR, KEY_COMPONENT_ANCHOR};
 
     use super::*;
 
@@ -162,10 +162,18 @@ mod glyphs {
             //     val.position.0 as f64,
             //     val.position.1 as f64,
             // ]);
+            let mut format_specific = FormatSpecific::default();
+            format_specific.insert_if_ne_json(
+                KEY_ALIGNMENT,
+                &val.alignment,
+                &-1, // default value
+            );
+            format_specific.insert_some_json(KEY_COMPONENT_ANCHOR, &val.anchor);
+
             Component {
                 reference: SmolStr::from(&val.component_glyph),
                 transform,
-                format_specific: Default::default(),
+                format_specific,
             }
         }
     }
@@ -181,8 +189,21 @@ mod glyphs {
                 ),
                 scale: (decomposed.scale.0 as f32, decomposed.scale.1 as f32),
                 angle: decomposed.rotation as f32,
-                // For now
-                ..Default::default()
+                alignment: val
+                    .format_specific
+                    .get(KEY_ALIGNMENT)
+                    .and_then(|v| v.as_i64())
+                    .map(|s| s as i8)
+                    .unwrap_or(-1),
+                anchor: val.format_specific.get_optionstring(KEY_COMPONENT_ANCHOR),
+                ..Default::default() // anchor_to: todo!(),
+                                     // attr: todo!(),
+                                     // locked: todo!(),
+                                     // master_id: todo!(),
+                                     // orientation: todo!(),
+                                     // smart_component_location: todo!(),
+                                     // slant: todo!(),
+                                     // user_data: todo!(),
             }
         }
     }

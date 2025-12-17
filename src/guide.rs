@@ -106,6 +106,30 @@ mod glyphs {
                 "locked".to_string(),
                 serde_json::to_value(val.locked).unwrap_or_default(),
             );
+            format_specific.insert(
+                "lockAngle".to_string(),
+                serde_json::to_value(val.lock_angle).unwrap_or_default(),
+            );
+            format_specific.insert(
+                "orientation".to_string(),
+                serde_json::to_value(val.orientation).unwrap_or_default(),
+            );
+            format_specific.insert(
+                "showMeasurement".to_string(),
+                serde_json::to_value(val.show_measurement).unwrap_or_default(),
+            );
+            format_specific.insert(
+                "size".to_string(),
+                serde_json::to_value(val.size).unwrap_or_default(),
+            );
+            format_specific.insert(
+                "type".to_string(),
+                serde_json::to_value(val.guide_type).unwrap_or_default(),
+            );
+            format_specific.insert(
+                "userData".to_string(),
+                serde_json::to_value(&val.user_data).unwrap_or_default(),
+            );
 
             Guide {
                 pos: Position {
@@ -125,13 +149,41 @@ mod glyphs {
             G3Guide {
                 pos: (val.pos.x, val.pos.y),
                 angle: val.pos.angle,
-                alignment: Orientation::Left,
                 locked: val
                     .format_specific
                     .get("locked")
                     .and_then(|x| serde_json::from_value(x.clone()).ok())
                     .unwrap_or(false),
-                scale: (1.0, 1.0),
+                lock_angle: val
+                    .format_specific
+                    .get("lockAngle")
+                    .and_then(|x| serde_json::from_value(x.clone()).ok())
+                    .unwrap_or(false),
+                orientation: val
+                    .format_specific
+                    .get("orientation")
+                    .and_then(|x| serde_json::from_value(x.clone()).ok())
+                    .unwrap_or(Orientation::Left),
+                show_measurement: val
+                    .format_specific
+                    .get("showMeasurement")
+                    .and_then(|x| serde_json::from_value(x.clone()).ok())
+                    .unwrap_or(false),
+                size: val
+                    .format_specific
+                    .get("size")
+                    .and_then(|x| serde_json::from_value(x.clone()).ok())
+                    .unwrap_or((0.0, 0.0)),
+                guide_type: val
+                    .format_specific
+                    .get("type")
+                    .and_then(|x| serde_json::from_value(x.clone()).ok())
+                    .unwrap_or_default(),
+                user_data: val
+                    .format_specific
+                    .get("userData")
+                    .and_then(|x| serde_json::from_value(x.clone()).ok())
+                    .unwrap_or_default(),
             }
         }
     }

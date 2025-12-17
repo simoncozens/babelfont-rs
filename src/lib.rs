@@ -156,7 +156,7 @@ mod master;
 mod metrics;
 mod names;
 mod serde_helpers;
-mod shape;
+mod shape; // exported macro_rules! helpers for FormatSpecific
 
 pub use crate::{
     anchor::Anchor,

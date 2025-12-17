@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 use write_fonts::types::Tag;
@@ -222,4 +224,23 @@ pub enum Direction {
     RightToLeft,
     /// Top to bottom text flow
     TopToBottom,
+    /// Bidirectional,
+    Bidi,
+}
+
+impl FromStr for Direction {
+    type Err = BabelfontError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "lefttoright" | "ltr" => Ok(Direction::LeftToRight),
+            "righttoleft" | "rtl" => Ok(Direction::RightToLeft),
+            "toptobottom" | "ttb" | "vtr" => Ok(Direction::TopToBottom),
+            "bidi" => Ok(Direction::Bidi),
+            _ => Err(BabelfontError::General(format!(
+                "Invalid direction string: {}",
+                s
+            ))),
+        }
+    }
 }
