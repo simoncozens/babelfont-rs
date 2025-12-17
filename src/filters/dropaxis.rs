@@ -1,5 +1,4 @@
-use crate::Tag;
-use crate::{filters::FontFilter, LayerType};
+use crate::{filters::FontFilter, LayerType, Tag};
 
 /// A filter that drops a given axis from the font, removing any masters,
 /// layers, and instances that depend on that axis.

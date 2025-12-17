@@ -1,7 +1,6 @@
 use crate::{convertors::fontir::CompilationOptions, Component, Font, Layer, NodeType, Shape};
 use fontdrasil::{
-    coords::NormalizedCoord,
-    coords::NormalizedLocation,
+    coords::{NormalizedCoord, NormalizedLocation},
     orchestration::{Access, AccessBuilder, Work},
     types::GlyphName,
 };
