@@ -184,7 +184,7 @@ impl Layer {
 
         let mut stack: Vec<(&Component, kurbo::Affine)> = Vec::new();
         for component in self.components() {
-            stack.push((component, component.transform));
+            stack.push((component, component.transform.to_affine()));
             while let Some((component, transform)) = stack.pop() {
                 let referenced_glyph = match font.glyphs.get(&component.reference) {
                     Some(g) => g,
@@ -218,7 +218,7 @@ impl Layer {
                 // Depth-first decomposition means we need to extend the stack reversed, so
                 // the first component is taken out next.
                 for new_component in new_outline.components().rev() {
-                    let new_transform: kurbo::Affine = new_component.transform;
+                    let new_transform: kurbo::Affine = new_component.transform.to_affine();
                     stack.push((new_component, transform * new_transform));
                 }
             }
@@ -266,8 +266,9 @@ impl Layer {
 #[cfg(feature = "glyphs")]
 pub(crate) mod glyphs {
     use crate::convertors::glyphs3::{
-        copy_user_data, KEY_ATTR, KEY_METRIC_BOTTOM, KEY_METRIC_LEFT, KEY_METRIC_RIGHT,
-        KEY_METRIC_TOP, KEY_METRIC_VERT_WIDTH, KEY_METRIC_WIDTH, KEY_VERT_ORIGIN, KEY_VERT_WIDTH,
+        copy_user_data, KEY_ATTR, KEY_COLOR_LABEL, KEY_METRIC_BOTTOM, KEY_METRIC_LEFT,
+        KEY_METRIC_RIGHT, KEY_METRIC_TOP, KEY_METRIC_VERT_WIDTH, KEY_METRIC_WIDTH, KEY_VERT_ORIGIN,
+        KEY_VERT_WIDTH,
     };
     use std::collections::BTreeMap;
 
@@ -295,6 +296,9 @@ pub(crate) mod glyphs {
             fs.insert_some_json(KEY_METRIC_TOP, &val.metric_top);
             fs.insert_some_json(KEY_METRIC_RIGHT, &val.metric_right);
             fs.insert_some_json(KEY_METRIC_LEFT, &val.metric_left);
+            // Note this is the color of the label, not the index of the color
+            // palette in a color font
+            fs.insert_some_json(KEY_COLOR_LABEL, &val.color);
             fs.insert_some_json(KEY_METRIC_BOTTOM, &val.metric_bottom);
             copy_user_data(&mut fs, &val.user_data);
             fs.insert_json(KEY_ATTR, &val.attr);
@@ -373,7 +377,10 @@ pub(crate) mod glyphs {
             background_image: val
                 .format_specific
                 .get_parse_opt::<glyphslib::glyphs3::BackgroundImage>(KEY_LAYER_IMAGE),
-            color: None,
+            color: val
+                .format_specific
+                .get_parse_opt::<u8>(KEY_COLOR_LABEL)
+                .map(glyphslib::common::Color::ColorInt),
             hints: val
                 .format_specific
                 .get_parse_or::<Vec<BTreeMap<SmolStr, Plist>>>(KEY_LAYER_HINTS, Vec::new()),

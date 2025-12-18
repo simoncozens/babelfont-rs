@@ -6,7 +6,6 @@ use fontdrasil::{
     types::Axes,
     variations::VariationModel,
 };
-use kurbo::Affine;
 
 pub(crate) fn interpolate_layer(
     glyphname: &str,
@@ -175,15 +174,17 @@ impl Shape {
                     HashMap::new();
                 for (shape, location) in shapes.iter().zip(locations.iter()) {
                     if let Shape::Component(comp) = shape {
-                        let decomposed: DecomposedAffine = comp.transform.into();
+                        // comp.transform is already a DecomposedAffine
                         position_lists.insert(
                             location.clone(),
                             vec![
-                                decomposed.translation.0,
-                                decomposed.translation.1,
-                                decomposed.scale.0,
-                                decomposed.scale.1,
-                                decomposed.rotation,
+                                comp.transform.translation.0,
+                                comp.transform.translation.1,
+                                comp.transform.scale.0,
+                                comp.transform.scale.1,
+                                comp.transform.rotation,
+                                comp.transform.skew.0,
+                                comp.transform.skew.1,
                             ],
                         );
                     } else {
@@ -197,10 +198,13 @@ impl Shape {
                 let interpolated_params = model.interpolate_from_deltas(target_location, &deltas);
                 let new_component = crate::shape::Component {
                     reference: c.reference.clone(),
-                    transform: Affine::IDENTITY
-                        .then_translate((interpolated_params[0], interpolated_params[1]).into())
-                        .then_scale_non_uniform(interpolated_params[2], interpolated_params[3])
-                        .then_rotate(interpolated_params[4]),
+                    transform: DecomposedAffine {
+                        translation: (interpolated_params[0], interpolated_params[1]),
+                        scale: (interpolated_params[2], interpolated_params[3]),
+                        rotation: interpolated_params[4],
+                        skew: (interpolated_params[5], interpolated_params[6]),
+                        order: c.transform.order, // Preserve the order from the source
+                    },
                     format_specific: c.format_specific.clone(),
                     location: c.location.clone(), // for now
                 };

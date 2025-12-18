@@ -1,16 +1,15 @@
-use std::{
-    collections::HashMap,
-    fmt::{Debug, Formatter},
-};
-
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use std::fmt::{Debug, Formatter};
+use typeshare::typeshare;
 
 static DFLT: &str = "dflt";
 
-#[derive(Default, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "types", typeshare::typeshare)]
 /// A dictionary for internationalized strings.
-pub struct I18NDictionary(pub HashMap<String, String>);
+#[derive(Default, Clone, Serialize, Deserialize)]
+#[typeshare]
+#[typeshare(serialize_as = "HashMap<String, String>")]
+pub struct I18NDictionary(pub IndexMap<String, String>);
 
 impl I18NDictionary {
     /// Create a new, empty I18NDictionary.
@@ -82,7 +81,7 @@ impl From<&String> for I18NDictionary {
     }
 }
 
-impl From<I18NDictionary> for HashMap<String, String> {
+impl From<I18NDictionary> for IndexMap<String, String> {
     fn from(dict: I18NDictionary) -> Self {
         dict.0
     }

@@ -1,6 +1,7 @@
 use crate::{
-    features::Features, glyph::GlyphCategory, BabelfontError, Component, Font, Glyph, Layer,
-    LayerType, Master, MetricType, Node, OTScalar, Path, Shape,
+    common::decomposition::DecomposedAffine, features::Features, glyph::GlyphCategory,
+    BabelfontError, Component, Font, Glyph, Layer, LayerType, Master, MetricType, Node, OTScalar,
+    Path, Shape,
 };
 use chrono::{DateTime, Local, NaiveDateTime, TimeZone};
 use fontdrasil::coords::Location;
@@ -199,24 +200,39 @@ pub(crate) fn norad_glyph_to_babelfont_layer(
 
 pub(crate) fn load_component(c: &norad::Component) -> Component {
     let t = c.transform;
+    // norad uses the convention:
+    //   x' = x_scale * x + xy_scale * y + x_offset
+    //   y' = yx_scale * x + y_scale * y + y_offset
+    // kurbo::Affine::new expects [xx, yx, xy, yy, dx, dy]
+    let affine = kurbo::Affine::new([
+        t.x_scale, t.yx_scale, t.xy_scale, t.y_scale, t.x_offset, t.y_offset,
+    ]);
+    // UFO uses the same transform representation as Fontra
+    let decomposed: DecomposedAffine = affine.into();
     Component {
         reference: c.base.to_smolstr(),
-        transform: kurbo::Affine::new([
-            t.x_scale, t.xy_scale, t.yx_scale, t.y_scale, t.x_offset, t.y_offset,
-        ]),
+        transform: decomposed,
         format_specific: stash_lib(c.lib()),
         location: IndexMap::new(),
     }
 }
 
 pub(crate) fn save_component(c: &Component) -> Result<norad::Component, BabelfontError> {
-    let t = c.transform.as_coeffs();
+    let affine = c.transform.to_affine();
+    let mut t = affine.as_coeffs();
+    // Clamp floating point noise to zero to avoid epsilon drift in roundtrips
+    for v in t.iter_mut() {
+        if v.abs() < 1e-7 {
+            *v = 0.0;
+        }
+    }
     let mut comp = norad::Component::new(
         norad::Name::new(c.reference.as_str())?,
         norad::AffineTransform {
+            // Map back from kurbo coefficients [xx, yx, xy, yy, dx, dy]
             x_scale: t[0],
-            xy_scale: t[1],
-            yx_scale: t[2],
+            xy_scale: t[2],
+            yx_scale: t[1],
             y_scale: t[3],
             x_offset: t[4],
             y_offset: t[5],

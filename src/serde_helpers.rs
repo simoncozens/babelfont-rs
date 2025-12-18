@@ -104,8 +104,13 @@ where
     }))
 }
 
-pub(crate) fn affine_is_identity(affine: &kurbo::Affine) -> bool {
-    *affine == kurbo::Affine::IDENTITY
+pub(crate) fn decomposed_is_identity(
+    decomposed: &crate::common::decomposition::DecomposedAffine,
+) -> bool {
+    decomposed.translation == (0.0, 0.0)
+        && decomposed.scale == (1.0, 1.0)
+        && decomposed.rotation == 0.0
+        && decomposed.skew == (0.0, 0.0)
 }
 
 pub(crate) fn serialize_nodes<S>(
@@ -285,4 +290,11 @@ pub(crate) fn default_true() -> bool {
 }
 pub(crate) fn is_true(value: &bool) -> bool {
     *value
+}
+
+pub(crate) fn is_default<T>(value: &T) -> bool
+where
+    T: Default + PartialEq,
+{
+    *value == T::default()
 }

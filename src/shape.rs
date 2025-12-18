@@ -17,14 +17,18 @@ pub struct Component {
     pub reference: SmolStr,
     /// The transformation applied to the component
     #[serde(
-        default = "kurbo::Affine::default",
-        skip_serializing_if = "crate::serde_helpers::affine_is_identity"
+        default = "DecomposedAffine::default",
+        skip_serializing_if = "crate::serde_helpers::decomposed_is_identity"
     )]
-    #[typeshare(serialized_as = "Vec<f32>")]
-    pub transform: kurbo::Affine,
+    pub transform: DecomposedAffine,
     /// A location for a variable component
     // We don't use a DesignLocation here because we want to allow axis names
     // rather than tags
+    #[serde(skip_serializing_if = "IndexMap::is_empty", default)]
+    #[typeshare(typescript(
+        type = "Record<string, import('@simoncozens/fonttypes').DesignCoord>"
+    ))]
+    #[typeshare(python(type = "Dict[str, float]"))]
     pub location: IndexMap<String, DesignCoord>,
     /// Format-specific data
     #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
@@ -161,25 +165,22 @@ mod glyphs {
 
     impl From<&glyphslib::glyphs3::Component> for Component {
         fn from(val: &glyphslib::glyphs3::Component) -> Self {
-            let transform = kurbo::Affine::IDENTITY
-                * kurbo::Affine::translate((val.position.0 as f64, val.position.1 as f64))
-                * kurbo::Affine::rotate((val.angle as f64).to_radians())
-                * kurbo::Affine::scale_non_uniform(val.scale.0 as f64, val.scale.1 as f64);
-            // let transform = kurbo::Affine::new([
-            //     val.scale.0 as f64,
-            //     0.0, // XXX
-            //     0.0, // XXX
-            //     val.scale.1 as f64,
-            //     val.position.0 as f64,
-            //     val.position.1 as f64,
-            // ]);
+            use crate::common::decomposition::TransformOrder;
+            // Glyphs uses: translate → skew → rotate → scale
+            let transform = DecomposedAffine {
+                translation: (val.position.0 as f64, val.position.1 as f64),
+                skew: (val.slant.0 as f64, val.slant.1 as f64),
+                rotation: (val.angle as f64).to_radians(),
+                scale: (val.scale.0 as f64, val.scale.1 as f64),
+                order: TransformOrder::Glyphs,
+            };
             let mut format_specific = FormatSpecific::default();
             format_specific.insert_if_ne_json(
                 KEY_ALIGNMENT,
                 &val.alignment,
                 &-1, // default value
             );
-            format_specific.insert_json_non_null(KEY_ATTR, &val.attr);
+            format_specific.insert_nonempty_json(KEY_ATTR, &val.attr);
             format_specific.insert_some_json(KEY_COMPONENT_ANCHOR, &val.anchor);
             format_specific.insert_if_ne_json(
                 KEY_COMPONENT_LOCKED,
@@ -202,15 +203,16 @@ mod glyphs {
 
     impl From<&Component> for glyphslib::glyphs3::Component {
         fn from(val: &Component) -> Self {
-            let decomposed: DecomposedAffine = val.transform.into();
+            // val.transform is already a DecomposedAffine, use it directly
             glyphslib::glyphs3::Component {
                 component_glyph: val.reference.to_string(),
                 position: (
-                    decomposed.translation.0 as f32,
-                    decomposed.translation.1 as f32,
+                    val.transform.translation.0 as f32,
+                    val.transform.translation.1 as f32,
                 ),
-                scale: (decomposed.scale.0 as f32, decomposed.scale.1 as f32),
-                angle: -(decomposed.rotation as f32).to_degrees(),
+                scale: (val.transform.scale.0 as f32, val.transform.scale.1 as f32),
+                angle: (val.transform.rotation as f32).to_degrees(),
+                slant: (val.transform.skew.0 as f32, val.transform.skew.1 as f32),
                 alignment: val
                     .format_specific
                     .get(KEY_ALIGNMENT)
@@ -225,18 +227,7 @@ mod glyphs {
                     .map(|(k, v)| (k.clone(), v.to_f64() as f32))
                     .collect(),
                 locked: val.format_specific.get_bool(KEY_COMPONENT_LOCKED),
-                // attr: val
-                //     .format_specific
-                //     .get(KEY_ATTR)
-                //     .and_then(|x| serde_json::from_value(x.clone()).ok())
-                //     .unwrap_or_default(),
-                ..Default::default() // anchor_to: todo!(),
-                                     // locked: todo!(),
-                                     // master_id: todo!(),
-                                     // orientation: todo!(),
-                                     // smart_component_location: todo!(),
-                                     // slant: todo!(),
-                                     // user_data: todo!(),
+                ..Default::default()
             }
         }
     }
@@ -290,10 +281,9 @@ mod fontra {
 
     impl From<&Component> for fontra::Component {
         fn from(val: &Component) -> Self {
-            let decomposed: DecomposedAffine = val.transform.into();
             fontra::Component {
                 name: val.reference.to_string(),
-                transformation: decomposed.into(),
+                transformation: val.transform.clone().into(),
                 location: HashMap::new(),
             }
         }

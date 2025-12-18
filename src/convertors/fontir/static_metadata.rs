@@ -27,7 +27,7 @@ fn make_glyph_categories(font: &Font) -> GdefCategories {
                     crate::GlyphCategory::Base => GlyphClassDef::Base,
                     crate::GlyphCategory::Mark => GlyphClassDef::Mark,
                     crate::GlyphCategory::Ligature => GlyphClassDef::Ligature,
-                    crate::GlyphCategory::Unknown => GlyphClassDef::Base, // default to Base
+                    _ => GlyphClassDef::Base, // default to Base
                 },
             )
         })

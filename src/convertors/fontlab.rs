@@ -7,7 +7,6 @@ use fontdrasil::{
     types::Axes,
 };
 use indexmap::IndexMap;
-use kurbo::Affine;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, convert::TryInto, fs, path::PathBuf, sync::LazyLock};
@@ -38,9 +37,10 @@ struct FontlabComponent {
 
 impl From<FontlabComponent> for Shape {
     fn from(val: FontlabComponent) -> Self {
+        use crate::common::decomposition::DecomposedAffine;
         Shape::Component(Component {
             reference: val.glyphName.into(),
-            transform: Affine::IDENTITY,
+            transform: DecomposedAffine::default(),
             format_specific: Default::default(),
             location: IndexMap::new(),
         })

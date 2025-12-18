@@ -61,6 +61,20 @@ pub enum GlyphCategory {
     Unknown,
     /// A ligature glyph
     Ligature,
+    /// Custom
+    Custom(SmolStr),
+}
+
+impl From<&GlyphCategory> for Option<String> {
+    fn from(val: &GlyphCategory) -> Self {
+        match val {
+            GlyphCategory::Base => Some("Base".to_string()),
+            GlyphCategory::Mark => Some("Mark".to_string()),
+            GlyphCategory::Ligature => Some("Ligature".to_string()),
+            GlyphCategory::Custom(s) => Some(s.to_string()),
+            GlyphCategory::Unknown => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -168,7 +182,7 @@ pub(crate) mod glyphs {
                     }
                 }
                 "Ligature" => GlyphCategory::Ligature,
-                _ => GlyphCategory::Unknown,
+                o => GlyphCategory::Custom(SmolStr::from(o)),
             }
         } else {
             GlyphCategory::Unknown
@@ -241,7 +255,7 @@ pub(crate) mod glyphs {
             layers: g3_layers,
             export: val.exported,
             case: val.format_specific.get_string("case"),
-            category: val.format_specific.get_optionstring("category"),
+            category: (&val.category).into(),
             direction: val.direction.as_ref().map(|d| match d {
                 Direction::LeftToRight => "LTR".to_string(),
                 Direction::RightToLeft => "RTL".to_string(),

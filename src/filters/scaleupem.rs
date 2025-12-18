@@ -55,12 +55,8 @@ impl FontFilter for ScaleUpem {
                         }
                         crate::Shape::Component(comp) => {
                             // Just scale any translations in the transform
-                            let coeffs = comp.transform.as_coeffs();
-                            let new_tx = coeffs[4] * scale_factor;
-                            let new_ty = coeffs[5] * scale_factor;
-                            comp.transform = kurbo::Affine::new([
-                                coeffs[0], coeffs[1], coeffs[2], coeffs[3], new_tx, new_ty,
-                            ]);
+                            comp.transform.translation.0 *= scale_factor;
+                            comp.transform.translation.1 *= scale_factor;
                         }
                     }
                 }

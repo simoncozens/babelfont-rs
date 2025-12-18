@@ -46,7 +46,7 @@ fn test_load_babelfont() -> Result<(), BabelfontError> {
     let first_layer = &aacute.layers[0];
     assert_eq!(first_layer.shapes.len(), 2);
     if let Shape::Component(c) = &first_layer.shapes[1] {
-        assert_eq!(c.transform, Affine::translate((87.0, 0.0)));
+        assert_eq!(c.transform.to_affine(), Affine::translate((87.0, 0.0)));
     } else {
         panic!("Should be a component");
     }

@@ -28,6 +28,7 @@ pub(crate) const KEY_ANCHOR_ORIENTATION: &str = "com.schriftgestalt.Glyphs.ancho
 pub(crate) const KEY_ANNOTATIONS: &str = "com.schriftgestalt.Glyphs.annotations";
 pub(crate) const KEY_APP_VERSION: &str = "com.schriftgestalt.Glyphs.appVersion";
 pub(crate) const KEY_ATTR: &str = "com.schriftgestalt.Glyphs.attr";
+pub(crate) const KEY_COLOR_LABEL: &str = "com.schriftgestalt.Glyphs.colorLabel";
 pub(crate) const KEY_COMPONENT_ANCHOR: &str = "com.schriftgestalt.Glyphs.componentAnchor";
 pub(crate) const KEY_COMPONENT_LOCKED: &str = "com.schriftgestalt.Glyphs.componentLocked";
 pub(crate) const KEY_CUSTOM_PARAMETERS: &str = "com.schriftgestalt.Glyphs.customParameters.";
@@ -1086,7 +1087,7 @@ fn save_master(master: &Master, axes: &[Axis], metrics: &[crate::MetricType]) ->
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used)]
-    use crate::Shape;
+    use crate::{common::Color, Shape};
     use pretty_assertions::assert_eq;
     use similar::TextDiff;
 
@@ -1109,7 +1110,7 @@ mod tests {
         if let Shape::Component(p) = shape {
             assert_eq!(p.reference, "acutecomb");
             assert_eq!(
-                p.transform,
+                p.transform.to_affine(),
                 kurbo::Affine::new([1.0, 0.0, 0.0, 1.0, 152.0, 0.0])
             );
         } else {
@@ -1125,6 +1126,10 @@ mod tests {
             &fs::read_to_string("resources/GlyphsFileFormatv3.glyphs").unwrap(),
         )
         .unwrap();
+
+        // First layer of A should have a color of Some(0)
+        let a_glyph = there.glyphs.get("A").unwrap();
+        let first_layer = a_glyph.layers.first().unwrap();
 
         assert!(there.format_specific.get(KEY_STEMS).is_some());
         println!("Original stems: {:?}", there.format_specific.get(KEY_STEMS));
