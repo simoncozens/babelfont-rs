@@ -49,6 +49,7 @@ impl DerefMut for GlyphList {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(untagged)]
 #[typeshare]
 /// The category of a glyph
 pub enum GlyphCategory {
@@ -62,7 +63,7 @@ pub enum GlyphCategory {
     /// A ligature glyph
     Ligature,
     /// Custom
-    Custom(SmolStr),
+    Custom(String),
 }
 
 impl From<&GlyphCategory> for Option<String> {
@@ -182,7 +183,7 @@ pub(crate) mod glyphs {
                     }
                 }
                 "Ligature" => GlyphCategory::Ligature,
-                o => GlyphCategory::Custom(SmolStr::from(o)),
+                o => GlyphCategory::Custom(o.to_string()),
             }
         } else {
             GlyphCategory::Unknown

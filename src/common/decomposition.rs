@@ -1,8 +1,10 @@
 use serde::{Deserialize, Serialize};
+use typeshare::typeshare;
 
 /// The order in which transform operations should be applied
 // See https://github.com/googlefonts/fontc/issues/1127
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[typeshare]
 pub enum TransformOrder {
     /// Glyphs order: translate → skew → rotate → scale
     Glyphs,
@@ -13,10 +15,17 @@ pub enum TransformOrder {
 
 /// A decomposed affine transformation with separate translation, rotation, scale, and skew components
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[typeshare]
 pub struct DecomposedAffine {
+    #[typeshare(typescript(type = "[number, number]"))]
+    #[typeshare(python(type = "(float, float)"))]
     pub translation: (f64, f64),
+    #[typeshare(typescript(type = "[number, number]"))]
+    #[typeshare(python(type = "(float, float)"))]
     pub scale: (f64, f64),
-    pub rotation: f64,    // in radians
+    pub rotation: f64, // in radians
+    #[typeshare(typescript(type = "[number, number]"))]
+    #[typeshare(python(type = "(float, float)"))]
     pub skew: (f64, f64), // (skew_x, skew_y) in radians
     #[serde(default, skip_serializing_if = "crate::serde_helpers::is_default")]
     pub order: TransformOrder,

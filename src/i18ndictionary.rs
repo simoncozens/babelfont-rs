@@ -8,7 +8,7 @@ static DFLT: &str = "dflt";
 /// A dictionary for internationalized strings.
 #[derive(Default, Clone, Serialize, Deserialize)]
 #[typeshare]
-#[typeshare(serialize_as = "HashMap<String, String>")]
+#[typeshare(serialized_as = "HashMap<String, String>")]
 pub struct I18NDictionary(pub IndexMap<String, String>);
 
 impl I18NDictionary {

@@ -26,7 +26,7 @@ pub struct Component {
     // rather than tags
     #[serde(skip_serializing_if = "IndexMap::is_empty", default)]
     #[typeshare(typescript(
-        type = "Record<string, import('@simoncozens/fonttypes').DesignCoord>"
+        type = "Record<string, import('@simoncozens/fonttypes').DesignspaceCoordinate>"
     ))]
     #[typeshare(python(type = "Dict[str, float]"))]
     pub location: IndexMap<String, DesignCoord>,
