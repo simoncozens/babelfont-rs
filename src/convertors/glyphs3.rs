@@ -1,6 +1,6 @@
 use crate::{
     common::{FormatSpecific, OTValue},
-    filters::{DropSparseMasters, FontFilter as _, GlyphsData},
+    filters::{DropSparseMasters, FontFilter as _},
     glyph::{self, glyphs::glyph_to_glyphs},
     i18ndictionary::I18NDictionary,
     names::Names,
@@ -266,30 +266,28 @@ fn _load(glyphs_font: &glyphslib::Font, path: PathBuf) -> Result<Font, Babelfont
     // Copy kern groups
     for glyph in font.glyphs.iter() {
         let left_group = glyph.format_specific.get_string("kern_left");
-        if left_group.is_empty() {
-            continue;
+        if !left_group.is_empty() {
+            font.first_kern_groups
+                .entry(left_group.into())
+                .or_default()
+                .push(glyph.name.clone());
         }
-        font.second_kern_groups
-            .entry(left_group.into())
-            .or_default()
-            .push(glyph.name.clone());
 
         let right_group = glyph.format_specific.get_string("kern_right");
-        if right_group.is_empty() {
-            continue;
+        if !right_group.is_empty() {
+            font.second_kern_groups
+                .entry(right_group.into())
+                .or_default()
+                .push(glyph.name.clone());
         }
-        font.first_kern_groups
-            .entry(right_group.into())
-            .or_default()
-            .push(glyph.name.clone());
     }
 
     // Interpret metrics
     // Interpret axes
     interpret_axes(&mut font);
 
-    // Bake in Glyphs data
-    GlyphsData.apply(&mut font)?;
+    // Bake in Glyphs data ??? When is best to do this?
+    // GlyphsData.apply(&mut font)?;
 
     Ok(font)
 }
@@ -336,15 +334,17 @@ fn load_instance(font: &Font, instance: &glyphs3::Instance) -> crate::Instance {
 
 fn save_instance(instance: &crate::Instance, axes: &[Axis]) -> glyphs3::Instance {
     let mut axes_values = vec![];
-    for axis in axes {
-        axes_values.push(
-            instance
-                .location
-                .get(axis.tag)
-                .map(|x| x.to_f64())
-                .map(|x| x as f32)
-                .unwrap_or(0.0),
-        );
+    if !instance.variable {
+        for axis in axes {
+            axes_values.push(
+                instance
+                    .location
+                    .get(axis.tag)
+                    .map(|x| x.to_f64())
+                    .map(|x| x as f32)
+                    .unwrap_or(0.0),
+            );
+        }
     }
     let format_specific = &instance.format_specific;
     glyphs3::Instance {
@@ -377,7 +377,11 @@ fn save_instance(instance: &crate::Instance, axes: &[Axis]) -> glyphs3::Instance
         is_italic: instance.format_specific.get_bool_or(KEY_IS_ITALIC, false),
         manual_interpolation: Default::default(),
         properties: save_properties(&instance.custom_names),
-        export_type: Default::default(),
+        export_type: if instance.variable {
+            glyphslib::glyphs3::ExportType::Variable
+        } else {
+            glyphslib::glyphs3::ExportType::Static
+        },
     }
 }
 
@@ -538,8 +542,13 @@ fn save_properties(names: &Names) -> Vec<glyphs3::Property> {
         names.wws_family_name,
         glyphs3::SingularPropertyKey::WwsFamilyName
     );
-    push_singular!(names.version, glyphs3::SingularPropertyKey::VersionString);
-    push_singular!(names.unique_id, glyphs3::SingularPropertyKey::UniqueID);
+
+    push_localized!(
+        names.compatible_full_name,
+        glyphs3::LocalizedPropertyKey::CompatibleFullNames
+    );
+
+    push_localized!(names.copyright, glyphs3::LocalizedPropertyKey::Copyrights);
 
     // Properties that can be singular or localized
     push_property!(
@@ -547,19 +556,24 @@ fn save_properties(names: &Names) -> Vec<glyphs3::Property> {
         glyphs3::SingularPropertyKey::Designer,
         glyphs3::LocalizedPropertyKey::Designers
     );
+
+    // Localized-only properties
+    // Only do family name if there's more than one language
+    if !names.family_name.is_single() {
+        push_localized!(
+            names.family_name,
+            glyphs3::LocalizedPropertyKey::FamilyNames
+        );
+    }
+
+    push_localized!(names.license, glyphs3::LocalizedPropertyKey::Licenses);
+
     push_property!(
         names.manufacturer,
         glyphs3::SingularPropertyKey::Manufacturer,
         glyphs3::LocalizedPropertyKey::Manufacturers
     );
 
-    // Localized-only properties
-    push_localized!(
-        names.family_name,
-        glyphs3::LocalizedPropertyKey::FamilyNames
-    );
-    push_localized!(names.copyright, glyphs3::LocalizedPropertyKey::Copyrights);
-    push_localized!(names.license, glyphs3::LocalizedPropertyKey::Licenses);
     push_localized!(names.trademark, glyphs3::LocalizedPropertyKey::Trademarks);
     push_localized!(
         names.description,
@@ -570,13 +584,11 @@ fn save_properties(names: &Names) -> Vec<glyphs3::Property> {
         glyphs3::LocalizedPropertyKey::SampleTexts
     );
     push_localized!(
-        names.compatible_full_name,
-        glyphs3::LocalizedPropertyKey::CompatibleFullNames
-    );
-    push_localized!(
         names.typographic_subfamily,
         glyphs3::LocalizedPropertyKey::StyleNames
     );
+    push_singular!(names.unique_id, glyphs3::SingularPropertyKey::UniqueID);
+    push_singular!(names.version, glyphs3::SingularPropertyKey::VersionString);
 
     properties
 }
@@ -597,8 +609,14 @@ fn load_master(master: &glyphs3::Master, glyphs_font: &glyphs3::Glyphs3, font: &
     m.guides = master.guides.iter().map(Into::into).collect();
     for (i, metric_value) in master.metric_values.iter().enumerate() {
         let metric_name = if i < glyphs_font.metrics.len() {
+            let glyphs_metric = &glyphs_font.metrics[i];
             if let Some(known_type) = glyphs_font.metrics[i].metric_type {
-                crate::MetricType::from(&known_type)
+                let typ = crate::MetricType::from(&known_type);
+                if let Some(filter) = &glyphs_metric.filter {
+                    crate::MetricType::Custom(format!("{} (filter {})", typ.as_str(), filter))
+                } else {
+                    typ
+                }
             } else {
                 crate::MetricType::Custom(glyphs_font.metrics[i].name.clone())
             }
@@ -1177,5 +1195,21 @@ mod tests {
                 .to_f64(),
             7.0
         );
+    }
+
+    #[test]
+    fn test_kern_groups() {
+        let font = load("resources/KernGroupTest.glyphs".into()).unwrap();
+        println!("First kern groups: {:?}", font.first_kern_groups);
+        println!("Second kern groups: {:?}", font.second_kern_groups);
+        let h_group = font.first_kern_groups.get("H").unwrap();
+        let o_group = font.second_kern_groups.get("O").unwrap();
+        assert_eq!(h_group.len(), 2);
+        assert!(h_group.contains(&"D".into()));
+        assert!(h_group.contains(&"Dcaron".into()));
+        assert_eq!(o_group.len(), 3);
+        assert!(o_group.contains(&"D".into()));
+        assert!(o_group.contains(&"Dcaron".into()));
+        assert!(o_group.contains(&"Dcroat".into()));
     }
 }

@@ -74,6 +74,7 @@ fn nodestring_to_nodes(s: String) -> Vec<Node> {
                     y: mat[2].parse().unwrap(),
                     nodetype,
                     smooth: false, // XXX
+                    format_specific: Default::default(),
                 })
             } else {
                 None

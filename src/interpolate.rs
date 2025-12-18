@@ -245,6 +245,7 @@ impl Path {
                 y,
                 nodetype: node.nodetype,
                 smooth: node.smooth,
+                format_specific: node.format_specific.clone(),
             });
         }
         new_path.closed = self.closed;

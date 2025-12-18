@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
+use crate::common::formatspecific::FormatSpecific;
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
 #[typeshare]
 /// Types of nodes in a glyph outline
@@ -30,9 +32,11 @@ pub struct Node {
     /// Whether the node is smooth
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub smooth: bool, // Not keen on the idea that we can have a smooth OffCurve node, may change
-                      // /// Format-specific data
-                      // #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
-                      // format_specific: crate::common::FormatSpecific,
+    /// Format-specific data
+    #[typeshare(typescript(type = "Record<string, any>"))]
+    #[typeshare(python(type = "Dict[str, Any]"))]
+    #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
+    pub format_specific: FormatSpecific,
 }
 
 impl Node {
@@ -44,6 +48,8 @@ impl Node {
 
 #[cfg(feature = "ufo")]
 mod ufo {
+    use crate::convertors::ufo::stash_lib;
+
     use super::*;
 
     impl From<&norad::PointType> for NodeType {
@@ -77,6 +83,7 @@ mod ufo {
                 y: p.y,
                 nodetype: (&p.typ).into(),
                 smooth: p.smooth,
+                format_specific: stash_lib(p.lib()),
             }
         }
     }
@@ -90,6 +97,8 @@ mod ufo {
 
 #[cfg(feature = "glyphs")]
 mod glyphs {
+    use crate::convertors::glyphs3::{copy_user_data, KEY_USER_DATA};
+
     use super::*;
     use glyphslib::{glyphs2::Node as G2Node, glyphs3::Node as G3Node};
 
@@ -121,6 +130,10 @@ mod glyphs {
 
     impl From<&G3Node> for Node {
         fn from(val: &G3Node) -> Self {
+            let mut format_specific = FormatSpecific::default();
+            if let Some(user_data) = &val.user_data {
+                copy_user_data(&mut format_specific, &user_data);
+            }
             Node {
                 x: val.x as f64,
                 y: val.y as f64,
@@ -131,6 +144,7 @@ mod glyphs {
                         | glyphslib::common::NodeType::CurveSmooth
                         | glyphslib::common::NodeType::QCurveSmooth
                 ),
+                format_specific,
             }
         }
     }
@@ -146,7 +160,7 @@ mod glyphs {
                     (NodeType::QCurve, true) => glyphslib::common::NodeType::QCurveSmooth,
                     (nt, _) => nt.into(),
                 },
-                user_data: None,
+                user_data: val.format_specific.get_json(KEY_USER_DATA),
             }
         }
     }
@@ -163,6 +177,7 @@ mod glyphs {
                         | glyphslib::common::NodeType::CurveSmooth
                         | glyphslib::common::NodeType::QCurveSmooth
                 ),
+                format_specific: FormatSpecific::default(),
             }
         }
     }

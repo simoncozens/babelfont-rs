@@ -11,6 +11,8 @@ use serde::{
 };
 use smol_str::SmolStr;
 
+use crate::FormatSpecific;
+
 pub(crate) fn kerning_map<S>(
     map: &IndexMap<(SmolStr, SmolStr), i16>,
     serializer: S,
@@ -116,7 +118,7 @@ where
     let mut s = String::new();
     for node in nodes {
         s.push_str(&format!(
-            "{} {} {}{} ",
+            "{} {} {}{} {}",
             node.x,
             node.y,
             match node.nodetype {
@@ -126,7 +128,16 @@ where
                 crate::NodeType::QCurve => "q",
                 crate::NodeType::Curve => "c",
             },
-            if node.smooth { "s" } else { "" }
+            if node.smooth { "s" } else { "" },
+            if FormatSpecific::is_empty(&node.format_specific) {
+                "".to_string()
+            } else {
+                format!(
+                    "{} ",
+                    serde_json::to_string(&node.format_specific)
+                        .map_err(serde::ser::Error::custom)?
+                )
+            }
         ));
     }
     s.pop(); // Remove trailing space
@@ -174,11 +185,26 @@ where
                 )))
             }
         };
+        let format_specific = if let Some(next_token) = tokens.clone().next() {
+            if next_token.starts_with('{') {
+                let fs_str = tokens
+                    .next()
+                    .ok_or_else(|| serde::de::Error::custom("Expected format specific JSON"))?;
+                serde_json::from_str(fs_str).map_err(|e| {
+                    serde::de::Error::custom(format!("Invalid format specific JSON: {}", e))
+                })?
+            } else {
+                FormatSpecific::default()
+            }
+        } else {
+            FormatSpecific::default()
+        };
         nodes.push(crate::common::Node {
             x,
             y,
             nodetype,
             smooth,
+            format_specific,
         });
     }
     Ok(nodes)

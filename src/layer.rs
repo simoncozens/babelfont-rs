@@ -208,6 +208,7 @@ impl Layer {
                             y: new_point.y,
                             nodetype: node.nodetype,
                             smooth: node.smooth,
+                            format_specific: node.format_specific.clone(),
                         })
                     }
                     decomposed_contour.closed = contour.closed;

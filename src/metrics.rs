@@ -183,16 +183,21 @@ mod glyphs {
 
     impl From<&MetricType> for G3Metric {
         fn from(value: &MetricType) -> Self {
-            let metric_type = G3MetricType::try_from(value).ok();
-            G3Metric {
-                filter: None,
-                name: if metric_type.is_some() {
-                    ""
-                } else {
-                    value.as_str()
+            let mut filter = None;
+            let mut mt = G3MetricType::try_from(&value.clone()).ok();
+            // If it's custom and name contains "(filter )", extract filter and try again.
+            if let MetricType::Custom(name) = value {
+                if name.contains("(filter") {
+                    let parts: Vec<&str> = name.split("(filter").collect();
+                    let value = parts[0].trim();
+                    mt = G3MetricType::try_from(&MetricType::from(value)).ok();
+                    filter = Some(parts[1].trim_end_matches(')').trim().to_string());
                 }
-                .to_string(),
-                metric_type,
+            }
+            G3Metric {
+                filter,
+                name: if mt.is_some() { "" } else { value.as_str() }.to_string(),
+                metric_type: mt,
             }
         }
     }
