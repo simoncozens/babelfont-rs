@@ -61,9 +61,10 @@ describe("Babelfont-TS", () => {
     expect(isComponent(firstLayer.shapes![1])).toBe(true);
     const shape = firstLayer.shapes![1] as Component;
     expect(shape.reference).toBe("acutecomb.case");
-    expect(shape.transform instanceof DecomposedAffine).toBe(true);
+    let transform: DecomposedAffine = shape.transform as DecomposedAffine;
+    expect(transform instanceof DecomposedAffine).toBe(true);
 
-    expect(shape.transform.toAffine()).toEqual([1, 0, 0, 1, 87, 0]);
+    expect(transform.toAffine()).toEqual([1, 0, 0, 1, 87, 0]);
 
     expect(font.names.familyName?.["dflt"]).toBe("Radio Canada Display");
 
@@ -139,5 +140,66 @@ describe("Babelfont-TS", () => {
     expect(firstNode.parent?.formatSpecific!.marker!).toBe(true);
     expect(firstNode.nextNode()).toBeDefined();
     expect(firstNode.previousNode()).toBeDefined();
+  });
+
+  it("should set parent links during inflation", () => {
+    const babelfontPath = path.join(
+      __dirname,
+      "../../resources/RadioCanadaDisplay.babelfont"
+    );
+    const fileContents = fs.readFileSync(babelfontPath, "utf8");
+    const rawFont = JSON.parse(fileContents, ReviverFunc);
+    const font = new Font(rawFont);
+
+    expect(font.glyphs[0].parent).toBe(font);
+    const glyph = font.glyphs[0];
+    const layer = glyph.layers[0];
+    expect(layer.parent).toBe(glyph);
+
+    const shape0 = layer.shapes![0];
+    if (isPath(shape0)) {
+      expect(shape0.parent).toBe(layer);
+      const node0 = shape0.nodes[0];
+      expect(node0.parent).toBe(shape0);
+    }
+
+    const compGlyph = font.glyphs.find((g) => g.name === "Aacute");
+    expect(compGlyph).toBeDefined();
+    if (compGlyph) {
+      const compLayer = compGlyph.layers[0];
+      const componentShape = compLayer.shapes!.find(isComponent);
+      expect(componentShape && componentShape.parent).toBe(compLayer);
+    }
+
+    const anchor = layer.anchors?.[0];
+    if (anchor) {
+      expect(anchor.parent).toBe(layer);
+    }
+
+    const axis = font.axes?.[0];
+    if (axis) {
+      expect(axis.parent).toBe(font);
+    }
+
+    const instance = font.instances?.[0];
+    if (instance) {
+      expect(instance.parent).toBe(font);
+    }
+
+    const master = font.masters?.[0];
+    if (master) {
+      expect(master.parent).toBe(font);
+      const guide = master.guides?.[0];
+      if (guide) {
+        expect(guide.parent).toBe(master);
+      }
+      const otv = master.custom_ot_values?.[0];
+      if (otv) {
+        expect(otv.parent).toBe(master);
+      }
+    }
+
+    expect(font.names.parent).toBe(font);
+    expect(font.features.parent).toBe(font);
   });
 });

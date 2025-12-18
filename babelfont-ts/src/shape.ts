@@ -5,15 +5,21 @@ import {
   Shape,
   NodeType,
 } from "./underlying";
+import type { Layer } from "./layer";
 import { createCaseConvertingProxy } from "./proxyUtils";
 import type { WithCamelCase } from "./typeUtils";
+import { WithParent, ensureParentAccessors, setParent } from "./parent";
 import { getClassConstructor } from "./registry";
 import { DecomposedAffine } from "./decomposedAffine";
 
-export interface Component extends WithCamelCase<IComponent> {}
+export interface Component
+  extends WithCamelCase<IComponent>, WithParent<Layer> {
+  transform: DecomposedAffine;
+}
 export class Component {
   constructor(data: IComponent) {
     Object.assign(this, data);
+    ensureParentAccessors(this);
     if (data.transform) {
       const DecomposedAffineClass = getClassConstructor(
         "DecomposedAffine",
@@ -25,8 +31,7 @@ export class Component {
   }
 }
 
-export interface Node extends WithCamelCase<INode> {
-  __parent?: Path;
+export interface Node extends WithCamelCase<INode>, WithParent<Path> {
   nextNode(): Node | undefined;
   previousNode(): Node | undefined;
   nextOnCurveNode(): Node | undefined;
@@ -35,14 +40,8 @@ export interface Node extends WithCamelCase<INode> {
 export class Node {
   constructor(data: INode) {
     Object.assign(this, data);
+    ensureParentAccessors(this);
     return createCaseConvertingProxy(this, Node.prototype);
-  }
-
-  get parent(): Path | undefined {
-    return this.__parent;
-  }
-  set parent(value: Path | undefined) {
-    this.__parent = value;
   }
 
   nextNode(): Node | undefined {
@@ -83,26 +82,30 @@ export class Node {
   }
 
   toJSON(): INode {
-    const { __parent, ...rest } = this;
+    const { __parent, ...rest } = this as Node;
     return rest;
   }
 }
 
-export interface Path extends WithCamelCase<IPath> {
+export interface Path extends WithCamelCase<IPath>, WithParent<Layer> {
   nodes: Node[];
 }
 export class Path {
   constructor(data: IPath) {
+    ensureParentAccessors(this);
     if (data.nodes) {
       const NodeClass = getClassConstructor("Node", Node);
       data.nodes = Path.parseNodes(data.nodes as unknown as string).map((n) => {
         const nObject = new NodeClass(n);
-        nObject.parent = this;
-        return createCaseConvertingProxy(nObject, NodeClass.prototype) as Node;
+        return nObject as Node;
       });
     }
     Object.assign(this, data);
-    return createCaseConvertingProxy(this, Path.prototype);
+    const proxied = createCaseConvertingProxy(this, Path.prototype) as Path;
+    proxied.nodes?.forEach((n) =>
+      setParent(n as unknown as WithParent<Path>, proxied)
+    );
+    return proxied;
   }
 
   private static parseNodes(nodes: string): Node[] {
@@ -181,7 +184,7 @@ export class Path {
         return `${n.x} ${n.y} ${typeChar}${smoothChar}`;
       })
       .join(" ");
-    const { nodes, ...rest } = this;
+    const { nodes, __parent, ...rest } = this as Path;
     return {
       ...rest,
       nodes: nodesStr,

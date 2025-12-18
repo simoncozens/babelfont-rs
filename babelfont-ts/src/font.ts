@@ -12,8 +12,9 @@ import { Glyph } from "./glyph";
 import { Master } from "./master";
 import { Names } from "./names";
 import { Features } from "./features";
+import { WithParent, ensureParentAccessors, setParent } from "./parent";
 
-export interface Font extends WithCamelCase<IFont> {
+export interface Font extends WithCamelCase<IFont>, WithParent<Font> {
   names: Names;
   glyphs: Glyph[];
   axes?: Axis[];
@@ -24,6 +25,8 @@ export interface Font extends WithCamelCase<IFont> {
 export class Font {
   constructor(data: IFont, registry?: ClassRegistry) {
     return InflationContext.with(registry || {}, () => {
+      ensureParentAccessors(this);
+
       if (data.axes) {
         const AxisClass = getClassConstructor("Axis", Axis);
         data.axes = data.axes.map((a) => new AxisClass(a));
@@ -48,8 +51,28 @@ export class Font {
         const FeaturesClass = getClassConstructor("Features", Features);
         data.features = new FeaturesClass(data.features);
       }
+
       Object.assign(this, data);
-      return createCaseConvertingProxy(this, Font.prototype) as Font;
+      const proxied = createCaseConvertingProxy(this, Font.prototype) as Font;
+
+      proxied.axes?.forEach((axis) =>
+        setParent(axis as unknown as WithParent<Font>, proxied)
+      );
+      proxied.instances?.forEach((inst) =>
+        setParent(inst as unknown as WithParent<Font>, proxied)
+      );
+      proxied.glyphs?.forEach((glyph) =>
+        setParent(glyph as unknown as WithParent<Font>, proxied)
+      );
+      proxied.masters?.forEach((master) =>
+        setParent(master as unknown as WithParent<Font>, proxied)
+      );
+      if (proxied.names)
+        setParent(proxied.names as unknown as WithParent<Font>, proxied);
+      if (proxied.features)
+        setParent(proxied.features as unknown as WithParent<Font>, proxied);
+
+      return proxied;
     });
   }
 }
