@@ -180,7 +180,7 @@ pub(crate) mod glyphs {
             if let Some(bg_layer) = &layer.background {
                 let mut background = layer_from_glyphs(bg_layer.deref(), axes_order);
                 background.is_background = true;
-                if background.id.is_none() {
+                if background.id.is_none() || background.id == Some("".to_string()) {
                     background.id =
                         Some(format!("{}.bg", bf_layer.id.as_deref().unwrap_or("layer")));
                 }
