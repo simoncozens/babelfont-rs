@@ -1087,7 +1087,7 @@ fn save_master(master: &Master, axes: &[Axis], metrics: &[crate::MetricType]) ->
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used)]
-    use crate::{common::Color, Shape};
+    use crate::Shape;
     use pretty_assertions::assert_eq;
     use similar::TextDiff;
 
@@ -1126,10 +1126,6 @@ mod tests {
             &fs::read_to_string("resources/GlyphsFileFormatv3.glyphs").unwrap(),
         )
         .unwrap();
-
-        // First layer of A should have a color of Some(0)
-        let a_glyph = there.glyphs.get("A").unwrap();
-        let first_layer = a_glyph.layers.first().unwrap();
 
         assert!(there.format_specific.get(KEY_STEMS).is_some());
         println!("Original stems: {:?}", there.format_specific.get(KEY_STEMS));
