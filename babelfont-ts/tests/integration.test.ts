@@ -1,4 +1,11 @@
-import { Font, isComponent, Path, Node, isPath } from "../src/index";
+import {
+  Font,
+  isComponent,
+  Path,
+  Node,
+  isPath,
+  DecomposedAffine,
+} from "../src/index";
 import { ReviverFunc, ReplacerFunc } from "../src/underlying";
 import * as fs from "fs";
 import * as path from "path";
@@ -54,7 +61,9 @@ describe("Babelfont-TS", () => {
     expect(isComponent(firstLayer.shapes![1])).toBe(true);
     const shape = firstLayer.shapes![1] as Component;
     expect(shape.reference).toBe("acutecomb.case");
-    expect(shape.transform).toEqual([1, 0, 0, 1, 87, 0]);
+    expect(shape.transform instanceof DecomposedAffine).toBe(true);
+
+    expect(shape.transform.toAffine()).toEqual([1, 0, 0, 1, 87, 0]);
 
     expect(font.names.familyName?.["dflt"]).toBe("Radio Canada Display");
 
