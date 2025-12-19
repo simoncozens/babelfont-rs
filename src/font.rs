@@ -8,7 +8,6 @@ use crate::{
     names::Names,
     BabelfontError, Layer, MetricType,
 };
-use chrono::Local;
 use fontdrasil::coords::{
     DesignCoord, DesignLocation, DesignSpace, Location, NormalizedLocation, NormalizedSpace,
     UserCoord,
@@ -53,7 +52,7 @@ pub struct Font {
     /// The font's creation date
     #[typeshare(python(type = "datetime.datetime"))]
     #[typeshare(typescript(type = "Date"))]
-    pub date: chrono::DateTime<Local>,
+    pub date: chrono::DateTime<chrono::Utc>,
     /// The font's naming information
     pub names: Names,
     /// Any values to be placed in OpenType tables on export to override defaults
@@ -71,7 +70,9 @@ pub struct Font {
     /// A dictionary of kerning groups
     ///
     /// The key is the group name and the value is a list of glyph names in the group
-    /// Group names are *not* prefixed with "@" here
+    /// Group names are *not* prefixed with "@" here. This is the first item in a kerning pair.
+    /// and so these are generally organized based on the profile of *right side* of the
+    /// glyph (for LTR scripts).
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     #[typeshare(python(type = "Dict[str, List[str]]"))]
     #[typeshare(typescript(type = "Record<string, string[]>"))]
@@ -79,7 +80,9 @@ pub struct Font {
     // A dictionary of kerning groups
     ///
     /// The key is the group name and the value is a list of glyph names in the group
-    /// Group names are *not* prefixed with "@" here
+    /// Group names are *not* prefixed with "@" here. This is the second item in a kerning pair.
+    /// and so these are generally organized based on the profile of *left side* of the
+    /// glyph (for LTR scripts).
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     #[typeshare(serialized_as = "HashMap<String, Vec<String>>")]
     pub second_kern_groups: IndexMap<SmolStr, Vec<SmolStr>>,
@@ -112,7 +115,7 @@ impl Font {
             masters: vec![],
             glyphs: GlyphList(vec![]),
             note: None,
-            date: chrono::Local::now(),
+            date: chrono::Utc::now(),
             names: Names::default(),
             custom_ot_values: vec![],
             variation_sequences: BTreeMap::new(),

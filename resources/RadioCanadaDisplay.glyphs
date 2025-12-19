@@ -71872,19 +71872,12 @@ instances = (
 axesValues = (
 400
 );
-instanceInterpolations = {
-"0EB46722-B91C-41F5-AE00-C58F8D8E3AB4" = 1;
-};
 name = Regular;
 },
 {
 axesValues = (
 500
 );
-instanceInterpolations = {
-"0EB46722-B91C-41F5-AE00-C58F8D8E3AB4" = 0.66667;
-m001 = 0.33333;
-};
 name = Medium;
 weightClass = 500;
 },
@@ -71892,10 +71885,6 @@ weightClass = 500;
 axesValues = (
 600
 );
-instanceInterpolations = {
-"0EB46722-B91C-41F5-AE00-C58F8D8E3AB4" = 0.33333;
-m001 = 0.66667;
-};
 name = SemiBold;
 weightClass = 600;
 },
@@ -71903,9 +71892,6 @@ weightClass = 600;
 axesValues = (
 700
 );
-instanceInterpolations = {
-m001 = 1;
-};
 isBold = 1;
 name = Bold;
 weightClass = 700;

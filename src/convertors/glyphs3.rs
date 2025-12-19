@@ -6,7 +6,6 @@ use crate::{
     names::Names,
     Axis, BabelfontError, Font, GlyphList, Master,
 };
-use chrono::Local;
 use fontdrasil::coords::{DesignCoord, DesignLocation, UserCoord};
 use glyphslib::glyphs3::{self, Property};
 use indexmap::IndexMap;
@@ -175,7 +174,10 @@ fn _load(glyphs_font: &glyphslib::Font, path: PathBuf) -> Result<Font, Babelfont
     // Custom parameters
     copy_custom_parameters(&mut font.format_specific, &glyphs_font.custom_parameters);
     // Date
-    font.date = glyphs_font.date.parse().unwrap_or_else(|_| Local::now());
+    font.date = glyphs_font
+        .date
+        .parse()
+        .unwrap_or_else(|_| chrono::Utc::now());
     // Family name
     font.names.family_name = glyphs_font.family_name.clone().into();
     // Feature prefixes
@@ -266,17 +268,21 @@ fn _load(glyphs_font: &glyphslib::Font, path: PathBuf) -> Result<Font, Babelfont
     // Copy instances
     // Copy kern groups
     for glyph in font.glyphs.iter() {
+        // The *left side* of the glyph is relevant when the glyph is
+        // on the *right side* (second item) of a kerning pair.
         let left_group = glyph.format_specific.get_string("kern_left");
         if !left_group.is_empty() {
-            font.first_kern_groups
+            font.second_kern_groups
                 .entry(left_group.into())
                 .or_default()
                 .push(glyph.name.clone());
         }
 
+        // The *right side* of the glyph is relevant when the glyph is
+        // on the *left side* (first item) of a kerning pair.
         let right_group = glyph.format_specific.get_string("kern_right");
         if !right_group.is_empty() {
-            font.second_kern_groups
+            font.first_kern_groups
                 .entry(right_group.into())
                 .or_default()
                 .push(glyph.name.clone());
@@ -377,7 +383,7 @@ fn save_instance(instance: &crate::Instance, axes: &[Axis]) -> glyphs3::Instance
         is_bold: instance.format_specific.get_bool_or(KEY_IS_BOLD, false),
         is_italic: instance.format_specific.get_bool_or(KEY_IS_ITALIC, false),
         manual_interpolation: Default::default(),
-        properties: save_properties(&instance.custom_names),
+        properties: save_properties(&instance.custom_names, &[]),
         export_type: if instance.variable {
             glyphslib::glyphs3::ExportType::Variable
         } else {
@@ -460,7 +466,7 @@ fn load_properties(
     }
 }
 
-fn save_properties(names: &Names) -> Vec<glyphs3::Property> {
+fn save_properties(names: &Names, custom_ot_values: &[OTValue]) -> Vec<glyphs3::Property> {
     let mut properties: Vec<glyphs3::Property> = vec![];
 
     // Macro for singular-only properties (no localized variant)
@@ -521,29 +527,6 @@ fn save_properties(names: &Names) -> Vec<glyphs3::Property> {
         };
     }
 
-    // Singular-only properties
-    push_singular!(
-        names.designer_url,
-        glyphs3::SingularPropertyKey::DesignerUrl
-    );
-    push_singular!(
-        names.manufacturer_url,
-        glyphs3::SingularPropertyKey::ManufacturerUrl
-    );
-    push_singular!(names.license_url, glyphs3::SingularPropertyKey::LicenseUrl);
-    push_singular!(
-        names.postscript_name,
-        glyphs3::SingularPropertyKey::PostscriptFullName
-    );
-    push_singular!(
-        names.postscript_cid_name,
-        glyphs3::SingularPropertyKey::PostscriptFontName
-    );
-    push_singular!(
-        names.wws_family_name,
-        glyphs3::SingularPropertyKey::WwsFamilyName
-    );
-
     push_localized!(
         names.compatible_full_name,
         glyphs3::LocalizedPropertyKey::CompatibleFullNames
@@ -551,11 +534,15 @@ fn save_properties(names: &Names) -> Vec<glyphs3::Property> {
 
     push_localized!(names.copyright, glyphs3::LocalizedPropertyKey::Copyrights);
 
-    // Properties that can be singular or localized
     push_property!(
         names.designer,
         glyphs3::SingularPropertyKey::Designer,
         glyphs3::LocalizedPropertyKey::Designers
+    );
+
+    push_singular!(
+        names.designer_url,
+        glyphs3::SingularPropertyKey::DesignerUrl
     );
 
     // Localized-only properties
@@ -568,11 +555,29 @@ fn save_properties(names: &Names) -> Vec<glyphs3::Property> {
     }
 
     push_localized!(names.license, glyphs3::LocalizedPropertyKey::Licenses);
+    push_singular!(names.license_url, glyphs3::SingularPropertyKey::LicenseUrl);
 
     push_property!(
         names.manufacturer,
         glyphs3::SingularPropertyKey::Manufacturer,
         glyphs3::LocalizedPropertyKey::Manufacturers
+    );
+
+    push_singular!(
+        names.manufacturer_url,
+        glyphs3::SingularPropertyKey::ManufacturerUrl
+    );
+    push_singular!(
+        names.postscript_name,
+        glyphs3::SingularPropertyKey::PostscriptFullName
+    );
+    push_singular!(
+        names.postscript_cid_name,
+        glyphs3::SingularPropertyKey::PostscriptFontName
+    );
+    push_singular!(
+        names.wws_family_name,
+        glyphs3::SingularPropertyKey::WwsFamilyName
     );
 
     push_localized!(names.trademark, glyphs3::LocalizedPropertyKey::Trademarks);
@@ -589,6 +594,19 @@ fn save_properties(names: &Names) -> Vec<glyphs3::Property> {
         glyphs3::LocalizedPropertyKey::StyleNames
     );
     push_singular!(names.unique_id, glyphs3::SingularPropertyKey::UniqueID);
+
+    // Output vendor ID from custom OT values if present
+    if let Some(ot_value) = custom_ot_values
+        .iter()
+        .find(|otv| otv.table.as_str() == "OS/2" && otv.field.as_str() == "achVendID")
+    {
+        if let crate::OTScalar::StringType(vendor_id) = &ot_value.value {
+            properties.push(glyphs3::Property::SingularProperty {
+                key: glyphs3::SingularPropertyKey::VendorID,
+                value: vendor_id.clone(),
+            });
+        }
+    }
     push_singular!(names.version, glyphs3::SingularPropertyKey::VersionString);
 
     properties
@@ -932,7 +950,7 @@ pub(crate) fn as_glyphs3(font: &Font) -> glyphs3::Glyphs3 {
 
     let axes_order = font.axes.iter().map(|a| a.tag).collect::<Vec<_>>();
 
-    let properties = save_properties(&font.names);
+    let properties = save_properties(&font.names, &font.custom_ot_values);
     let mut glyph_to_first_kern_group = HashMap::new();
     let mut glyph_to_second_kern_group = HashMap::new();
     for (group, glyph) in font.first_kern_groups.iter() {
@@ -1089,6 +1107,7 @@ mod tests {
     #![allow(clippy::unwrap_used)]
     use crate::Shape;
     use pretty_assertions::assert_eq;
+    use rstest::rstest;
     use similar::TextDiff;
 
     use super::*;
@@ -1118,18 +1137,19 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_roundtrip() {
-        let there = load("resources/GlyphsFileFormatv3.glyphs".into()).unwrap();
+    #[rstest]
+    fn test_roundtrip(
+        #[files("resources/*glyphs")]
+        // Small but insignificant difference in property serialization.
+        // Glyphs sometimes stores a singular property as a localized property
+        // with only one entry, and vice versa.
+        #[exclude("RadioCanadaDisplay.glyphs")]
+        #[exclude("Nunito.glyphs")]
+        path: PathBuf,
+    ) {
+        let there = load(path.clone()).unwrap();
         let backagain = glyphslib::Font::Glyphs3(as_glyphs3(&there));
-        let orig = glyphslib::Font::load_str(
-            &fs::read_to_string("resources/GlyphsFileFormatv3.glyphs").unwrap(),
-        )
-        .unwrap();
-
-        assert!(there.format_specific.get(KEY_STEMS).is_some());
-        println!("Original stems: {:?}", there.format_specific.get(KEY_STEMS));
-        assert!(!backagain.as_glyphs3().unwrap().stems.is_empty());
+        let orig = glyphslib::Font::load_str(&fs::read_to_string(path).unwrap()).unwrap();
 
         let old_string = orig.to_string().unwrap();
         let new_string = backagain.to_string().unwrap();
@@ -1201,16 +1221,26 @@ mod tests {
     #[test]
     fn test_kern_groups() {
         let font = load("resources/KernGroupTest.glyphs".into()).unwrap();
-        println!("First kern groups: {:?}", font.first_kern_groups);
-        println!("Second kern groups: {:?}", font.second_kern_groups);
-        let h_group = font.first_kern_groups.get("H").unwrap();
-        let o_group = font.second_kern_groups.get("O").unwrap();
+        // *Left* side of D looks like an H, so is used when D is the *second*
+        // glyph in a pair.
+        let h_group = font.second_kern_groups.get("H").unwrap();
         assert_eq!(h_group.len(), 2);
         assert!(h_group.contains(&"D".into()));
         assert!(h_group.contains(&"Dcaron".into()));
+        // *Right* side of D looks like an O, so is used when D is the *first*
+        // glyph in a pair.
+        let o_group = font.first_kern_groups.get("O").unwrap();
         assert_eq!(o_group.len(), 3);
         assert!(o_group.contains(&"D".into()));
         assert!(o_group.contains(&"Dcaron".into()));
         assert!(o_group.contains(&"Dcroat".into()));
+    }
+
+    #[test]
+    fn test_timezone() {
+        let font_date = "2024-05-08 05:56:55 +0000";
+        let date = font_date.parse().unwrap_or_else(|_| chrono::Utc::now());
+        let formatted_date = date.format("%Y-%m-%d %H:%M:%S +0000").to_string();
+        assert_eq!(formatted_date, font_date);
     }
 }

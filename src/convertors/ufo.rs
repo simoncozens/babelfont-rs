@@ -3,7 +3,7 @@ use crate::{
     BabelfontError, Component, Font, Glyph, Layer, LayerType, Master, MetricType, Node, OTScalar,
     Path, Shape,
 };
-use chrono::{DateTime, Local, NaiveDateTime, TimeZone};
+use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use fontdrasil::coords::Location;
 use indexmap::IndexMap;
 use paste::paste;
@@ -51,7 +51,7 @@ pub(crate) fn stat(path: &std::path::Path) -> Option<DateTime<chrono::Local>> {
 /// Load a UFO font from a file path
 pub fn load<T: AsRef<std::path::Path>>(path: T) -> Result<Font, BabelfontError> {
     let mut font = Font::new();
-    let created_time: Option<DateTime<Local>> = stat(path.as_ref());
+    let created_time: Option<DateTime<Utc>> = stat(path.as_ref()).map(DateTime::<Utc>::from);
     let ufo = norad::Font::load(&path)?;
     font.format_specific = stash_lib(Some(&ufo.lib));
     load_glyphs(&mut font, &ufo);
@@ -518,7 +518,7 @@ macro_rules! copy_name {
 pub(crate) fn load_font_info(
     font: &mut Font,
     info: &norad::FontInfo,
-    created: Option<DateTime<Local>>,
+    created: Option<DateTime<Utc>>,
 ) {
     if let Some(v) = &info.copyright {
         font.names.copyright = v.into();
@@ -531,11 +531,11 @@ pub(crate) fn load_font_info(
     }
     if let Some(v) = &info.open_type_head_created {
         if let Ok(Some(date)) = NaiveDateTime::parse_from_str(v, "%Y/%m/%d %H:%M:%S")
-            .map(|x| chrono::Local.from_local_datetime(&x).single())
+            .map(|x| chrono::Utc.from_local_datetime(&x).single())
         {
             font.date = date;
         } else {
-            font.date = created.unwrap_or_else(chrono::Local::now);
+            font.date = created.unwrap_or_else(chrono::Utc::now);
         }
     }
     if let Some(v) = &info.open_type_head_flags {

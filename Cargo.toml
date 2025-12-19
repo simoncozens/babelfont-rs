@@ -65,6 +65,7 @@ typeshare = { version = "1.0.4", optional = true }
 
 [dev-dependencies]
 pretty_assertions = "1.4.1"
+rstest = "0.26.1"
 similar = "2.7.0"
 
 [build-dependencies]

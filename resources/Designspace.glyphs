@@ -115,9 +115,6 @@ instances = (
 axesValues = (
 1
 );
-instanceInterpolations = {
-m01 = 1;
-};
 name = Thin;
 weightClass = 100;
 },
@@ -125,10 +122,6 @@ weightClass = 100;
 axesValues = (
 7
 );
-instanceInterpolations = {
-"24FD6942-D883-4640-B01C-A93DC3C2FEFD" = 0.0303;
-m01 = 0.9697;
-};
 name = Extralight;
 weightClass = 200;
 },
@@ -136,10 +129,6 @@ weightClass = 200;
 axesValues = (
 23
 );
-instanceInterpolations = {
-"24FD6942-D883-4640-B01C-A93DC3C2FEFD" = 0.11111;
-m01 = 0.88889;
-};
 name = Light;
 weightClass = 300;
 },
@@ -147,20 +136,12 @@ weightClass = 300;
 axesValues = (
 53
 );
-instanceInterpolations = {
-"24FD6942-D883-4640-B01C-A93DC3C2FEFD" = 0.26263;
-m01 = 0.73737;
-};
 name = Regular;
 },
 {
 axesValues = (
 105
 );
-instanceInterpolations = {
-"24FD6942-D883-4640-B01C-A93DC3C2FEFD" = 0.52525;
-m01 = 0.47475;
-};
 name = Medium;
 weightClass = 500;
 },
@@ -168,9 +149,6 @@ weightClass = 500;
 axesValues = (
 199
 );
-instanceInterpolations = {
-"24FD6942-D883-4640-B01C-A93DC3C2FEFD" = 1;
-};
 name = Semibold;
 weightClass = 600;
 }
