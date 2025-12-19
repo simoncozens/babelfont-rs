@@ -161,7 +161,7 @@ mod shape; // exported macro_rules! helpers for FormatSpecific
 pub use crate::{
     anchor::Anchor,
     axis::Axis,
-    common::{Direction, FormatSpecific, Node, NodeType, OTScalar, Position},
+    common::{CustomOTValues, Direction, FormatSpecific, Node, NodeType, Position},
     error::BabelfontError,
     features::Features,
     font::Font,

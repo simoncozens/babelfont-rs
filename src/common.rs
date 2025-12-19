@@ -7,10 +7,12 @@ use write_fonts::types::Tag;
 pub(crate) mod decomposition;
 pub(crate) mod formatspecific;
 mod node;
+pub(crate) mod otvalue;
 pub use node::{Node, NodeType};
 
 use crate::BabelfontError;
 pub use formatspecific::FormatSpecific;
+pub use otvalue::CustomOTValues;
 
 pub(crate) fn tag_from_string(s: &str) -> Result<Tag, BabelfontError> {
     let mut chars = s.bytes().collect::<Vec<u8>>();
@@ -80,138 +82,6 @@ mod ufo {
             )?)
         }
     }
-}
-
-// New approach to storing OT values
-
-// use std::collections::HashMap;
-// use std::mem::Discriminant;
-
-// struct EnumMap<T>(HashMap<Discriminant<T>, T>);
-// impl<T> EnumMap<T> {
-//     fn new() -> Self {
-//         EnumMap(HashMap::new())
-//     }
-
-//     fn insert(&mut self, value: T) {
-//         self.0.insert(std::mem::discriminant(&value), value);
-//     }
-
-//     fn get(&self, dummy: T) -> Option<&T> {
-//         self.0.get(&std::mem::discriminant(&dummy))
-//     }
-// }
-
-// enum OTValue {
-//     Os2USWeightClass(u16),
-//     Os2USWidthClass(u16),
-//     Os2FSType(u16)
-// }
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", content = "content")]
-#[typeshare]
-/// A scalar value in an OpenType table
-pub enum OTScalar {
-    /// String value
-    StringType(String),
-    /// Boolean value
-    Bool(bool),
-    /// Unsigned integer value
-    Unsigned(u32),
-    /// Signed integer value
-    Signed(i32),
-    /// Floating-point value
-    Float(f32),
-    /// Bit field value
-    BitField(Vec<u8>),
-    /// Array of floating-point values
-    Array(Vec<f64>),
-}
-
-impl OTScalar {
-    /// Returns the bit field value if this scalar is a BitField, otherwise None.
-    pub fn as_bitfield(&self) -> Option<Vec<u8>> {
-        if let OTScalar::BitField(u) = self {
-            Some(u.to_vec())
-        } else {
-            None
-        }
-    }
-}
-
-impl From<OTScalar> for f32 {
-    fn from(p: OTScalar) -> f32 {
-        match p {
-            OTScalar::Unsigned(u) => u as f32,
-            OTScalar::Signed(u) => u as f32,
-            OTScalar::Float(f) => f,
-            _ => 0.0,
-        }
-    }
-}
-
-impl From<OTScalar> for i16 {
-    fn from(p: OTScalar) -> i16 {
-        match p {
-            OTScalar::Unsigned(u) => u as i16,
-            OTScalar::Signed(u) => u as i16,
-            OTScalar::Float(f) => f as i16,
-            _ => 0,
-        }
-    }
-}
-
-impl From<OTScalar> for u16 {
-    fn from(p: OTScalar) -> u16 {
-        match p {
-            OTScalar::Unsigned(u) => u as u16,
-            OTScalar::Signed(u) => u as u16,
-            OTScalar::Float(f) => f as u16,
-            _ => 0,
-        }
-    }
-}
-impl From<OTScalar> for i32 {
-    fn from(p: OTScalar) -> i32 {
-        match p {
-            OTScalar::Unsigned(u) => u as i32,
-            OTScalar::Signed(u) => u,
-            OTScalar::Float(f) => f as i32,
-            _ => 0,
-        }
-    }
-}
-
-impl From<OTScalar> for bool {
-    fn from(p: OTScalar) -> bool {
-        match p {
-            OTScalar::Bool(b) => b,
-            _ => false,
-        }
-    }
-}
-
-impl From<OTScalar> for String {
-    fn from(p: OTScalar) -> String {
-        match p {
-            OTScalar::StringType(s) => s,
-            OTScalar::Unsigned(p) => format!("{}", p),
-            OTScalar::Signed(p) => format!("{}", p),
-            OTScalar::Bool(p) => format!("{}", p),
-            OTScalar::Float(p) => format!("{}", p),
-            OTScalar::BitField(p) => format!("{:?}", p),
-            OTScalar::Array(p) => format!("{:?}", p),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[typeshare]
-pub struct OTValue {
-    pub table: String,
-    pub field: String,
-    pub value: OTScalar,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

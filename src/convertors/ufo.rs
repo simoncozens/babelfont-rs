@@ -1,14 +1,14 @@
 use crate::{
     common::decomposition::DecomposedAffine, features::Features, glyph::GlyphCategory,
-    BabelfontError, Component, Font, Glyph, Layer, LayerType, Master, MetricType, Node, OTScalar,
-    Path, Shape,
+    BabelfontError, Component, Font, Glyph, Layer, LayerType, Master, MetricType, Node, Path,
+    Shape,
 };
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
-use fontdrasil::coords::Location;
+use fontdrasil::{coords::Location, types::Tag};
 use indexmap::IndexMap;
 use paste::paste;
 use smol_str::{SmolStr, ToSmolStr};
-use std::{collections::HashSet, fs, time::SystemTime};
+use std::{collections::HashSet, fs, str::FromStr, time::SystemTime};
 
 /// Key for storing norad lib data in FormatSpecific
 pub const KEY_LIB: &str = "norad.lib";
@@ -324,10 +324,7 @@ pub(crate) fn save_info(info: &mut norad::FontInfo, font: &Font) {
     info.note = font.note.clone();
     // gasp range records
     info.open_type_head_created = font.date.format("%Y/%m/%d %H:%M:%S").to_string().into();
-    info.open_type_head_flags = font.ot_value("head", "flags", true).and_then(|x| match x {
-        OTScalar::BitField(v) => Some(v.clone()),
-        _ => None,
-    });
+    info.open_type_head_flags = font.custom_ot_values.head_flags.map(to_bitarray);
     // lowest rec ppem
     info.open_type_hhea_ascender = get_metric(MetricType::HheaAscender).map(|x| x as i32);
     info.open_type_hhea_caret_offset = get_metric(MetricType::HheaCaretOffset).map(|x| x as i32);
@@ -366,77 +363,47 @@ pub(crate) fn save_info(info: &mut norad::FontInfo, font: &Font) {
         .get_default()
         .map(|x| x.to_string());
     // and more
-    info.open_type_os2_code_page_ranges = font
-        .ot_value("OS/2", "ulCodePageRange", true)
-        .and_then(|x| x.as_bitfield());
-    info.open_type_os2_selection = font
-        .ot_value("OS/2", "fsSelection", true)
-        .and_then(|x| x.as_bitfield());
-    info.open_type_os2_type = font
-        .ot_value("OS/2", "fsType", true)
-        .and_then(|x| x.as_bitfield());
+    let codepage_ranges: Vec<u8> =
+        to_bitarray(font.custom_ot_values.os2_code_page_range1.unwrap_or(0))
+            .iter()
+            .copied()
+            .chain(
+                to_bitarray(font.custom_ot_values.os2_code_page_range2.unwrap_or(0))
+                    .iter()
+                    .map(|&bit| bit + 32),
+            )
+            .collect();
+    if !codepage_ranges.is_empty() {
+        info.open_type_os2_code_page_ranges = Some(codepage_ranges);
+    }
+    info.open_type_os2_selection = font.custom_ot_values.os2_fs_selection.map(to_bitarray);
+    info.open_type_os2_type = font.custom_ot_values.os2_fs_type.map(to_bitarray);
     info.open_type_os2_typo_ascender = get_metric(MetricType::TypoAscender).map(|x| x as i32);
     info.open_type_os2_typo_descender = get_metric(MetricType::TypoDescender).map(|x| x as i32);
     info.open_type_os2_typo_line_gap = get_metric(MetricType::TypoLineGap).map(|x| x as i32);
-    info.open_type_os2_unicode_ranges = font
-        .ot_value("OS/2", "ulUnicodeRange", true)
-        .and_then(|x| x.as_bitfield());
-    info.open_type_os2_vendor_id = font
-        .ot_value("OS/2", "achVendID", true)
-        .and_then(|x| match x {
-            OTScalar::StringType(v) => Some(v),
-            _ => None,
-        });
+    let mut bit_array = vec![];
+    let unicode_range_1 = font.custom_ot_values.os2_unicode_range1.unwrap_or(0) as u64;
+    bit_array.extend(to_bitarray(unicode_range_1));
+    let unicode_range_2 = font.custom_ot_values.os2_unicode_range2.unwrap_or(0) as u64;
+    bit_array.extend(to_bitarray(unicode_range_2).iter().map(|&bit| bit + 64));
+    let unicode_range_3 = font.custom_ot_values.os2_unicode_range3.unwrap_or(0) as u64;
+    bit_array.extend(to_bitarray(unicode_range_3).iter().map(|&bit| bit + 128));
+    let unicode_range_4 = font.custom_ot_values.os2_unicode_range4.unwrap_or(0) as u64;
+    bit_array.extend(to_bitarray(unicode_range_4).iter().map(|&bit| bit + 192));
+    if !bit_array.is_empty() {
+        info.open_type_os2_unicode_ranges = Some(bit_array);
+    }
+    info.open_type_os2_vendor_id = font.custom_ot_values.os2_vendor_id.map(|x| x.to_string());
     info.open_type_os2_win_ascent = get_metric(MetricType::WinAscent).map(|x| x as u32);
     info.open_type_os2_win_descent = get_metric(MetricType::WinDescent).map(|x| x as u32);
-    info.postscript_underline_position =
-        font.ot_value("post", "underlinePosition", true)
-            .and_then(|x| match x {
-                OTScalar::Signed(v) => Some(v as f64),
-                _ => None,
-            });
-    info.postscript_underline_thickness = font
-        .ot_value("post", "underlineThickness", true)
-        .and_then(|x| match x {
-            OTScalar::Signed(v) => Some(v as f64),
-            _ => None,
-        });
-    info.postscript_other_blues = font
-        .ot_value("CFF", "otherBlues", true)
-        .and_then(|x| match x {
-            OTScalar::Array(v) => Some(v),
-            _ => None,
-        });
-    info.postscript_blue_values = font
-        .ot_value("CFF", "blueValues", true)
-        .and_then(|x| match x {
-            OTScalar::Array(v) => Some(v),
-            _ => None,
-        });
-    info.postscript_family_blues =
-        font.ot_value("CFF", "familyBlues", true)
-            .and_then(|x| match x {
-                OTScalar::Array(v) => Some(v),
-                _ => None,
-            });
-    info.postscript_family_other_blues =
-        font.ot_value("CFF", "familyOtherBlues", true)
-            .and_then(|x| match x {
-                OTScalar::Array(v) => Some(v),
-                _ => None,
-            });
-    info.postscript_stem_snap_h = font
-        .ot_value("CFF", "stemSnapH", true)
-        .and_then(|x| match x {
-            OTScalar::Array(v) => Some(v),
-            _ => None,
-        });
-    info.postscript_stem_snap_v = font
-        .ot_value("CFF", "stemSnapV", true)
-        .and_then(|x| match x {
-            OTScalar::Array(v) => Some(v),
-            _ => None,
-        });
+    info.postscript_underline_position = get_metric(MetricType::UnderlinePosition);
+    info.postscript_underline_thickness = get_metric(MetricType::UnderlineThickness);
+    info.postscript_other_blues = font.custom_ot_values.cff_other_blues.clone();
+    info.postscript_blue_values = font.custom_ot_values.cff_blue_values.clone();
+    info.postscript_family_blues = font.custom_ot_values.cff_family_blues.clone();
+    info.postscript_family_other_blues = font.custom_ot_values.cff_family_other_blues.clone();
+    info.postscript_stem_snap_h = font.custom_ot_values.cff_stem_snap_h.clone();
+    info.postscript_stem_snap_v = font.custom_ot_values.cff_stem_snap_v.clone();
     info.style_map_family_name = font
         .names
         .preferred_subfamily_name
@@ -538,51 +505,54 @@ pub(crate) fn load_font_info(
             font.date = created.unwrap_or_else(chrono::Utc::now);
         }
     }
-    if let Some(v) = &info.open_type_head_flags {
-        font.set_ot_value("head", "flags", OTScalar::BitField(v.to_vec()))
-    }
-    if let Some(v) = info.open_type_head_lowest_rec_ppem {
-        font.set_ot_value("head", "lowestRecPPEM", OTScalar::Unsigned(v))
-    }
-    if let Some(v) = &info.open_type_os2_selection {
-        font.set_ot_value("OS/2", "fsSelection", OTScalar::BitField(v.to_vec()))
-    }
-    if let Some(v) = &info.open_type_os2_type {
-        font.set_ot_value("OS/2", "fsType", OTScalar::BitField(v.to_vec()))
-    }
-    if let Some(v) = &info.open_type_os2_code_page_ranges {
-        font.set_ot_value("OS/2", "ulCodePageRange", OTScalar::BitField(v.to_vec()))
+    font.custom_ot_values.head_flags = info.open_type_head_flags.as_ref().map(|x| from_bitarray(x));
+    font.custom_ot_values.head_lowest_rec_ppem =
+        info.open_type_head_lowest_rec_ppem.map(|x| x as u16);
+    font.custom_ot_values.os2_fs_selection = info
+        .open_type_os2_selection
+        .as_ref()
+        .map(|x| from_bitarray(x));
+    font.custom_ot_values.os2_fs_type = info.open_type_os2_type.as_ref().map(|x| from_bitarray(x));
+    if let Some(v) = &info
+        .open_type_os2_code_page_ranges
+        .as_ref()
+        .map(|x| from_bitarray(x))
+    {
+        let v: u64 = *v;
+        // Split into top and bottom 32 bits
+        font.custom_ot_values.os2_code_page_range1 = Some(v as u32);
+        font.custom_ot_values.os2_code_page_range2 = Some((v >> 32) as u32);
     }
     if let Some(v) = &info.open_type_os2_unicode_ranges {
-        font.set_ot_value("OS/2", "ulUnicodeRange", OTScalar::BitField(v.to_vec()))
+        // This one's a bit trickier since there are 128 bits split over four u32s.
+        let mut ur1 = 0;
+        let mut ur2 = 0;
+        let mut ur3 = 0;
+        let mut ur4 = 0;
+        for bit in v.iter() {
+            match bit {
+                0..=31 => ur1 |= 1 << bit,
+                32..=63 => ur2 |= 1 << (bit - 32),
+                64..=95 => ur3 |= 1 << (bit - 64),
+                96..=127 => ur4 |= 1 << (bit - 96),
+                _ => {}
+            }
+        }
+        font.custom_ot_values.os2_unicode_range1 = Some(ur1);
+        font.custom_ot_values.os2_unicode_range2 = Some(ur2);
+        font.custom_ot_values.os2_unicode_range3 = Some(ur3);
+        font.custom_ot_values.os2_unicode_range4 = Some(ur4);
     }
-    if let Some(v) = &info.postscript_underline_position {
-        font.set_ot_value("post", "underlinePosition", OTScalar::Signed(*v as i32))
-    }
-    if let Some(v) = &info.postscript_underline_thickness {
-        font.set_ot_value("post", "underlineThickness", OTScalar::Signed(*v as i32))
-    }
-    if let Some(v) = &info.postscript_blue_values {
-        font.set_ot_value("CFF", "blueValues", OTScalar::Array(v.clone()))
-    }
-    if let Some(v) = &info.postscript_other_blues {
-        font.set_ot_value("CFF", "otherBlues", OTScalar::Array(v.clone()))
-    }
-    if let Some(v) = &info.postscript_family_blues {
-        font.set_ot_value("CFF", "familyBlues", OTScalar::Array(v.clone()))
-    }
-    if let Some(v) = &info.postscript_family_other_blues {
-        font.set_ot_value("CFF", "familyOtherBlues", OTScalar::Array(v.clone()))
-    }
-    if let Some(v) = &info.postscript_stem_snap_h {
-        font.set_ot_value("CFF", "stemSnapH", OTScalar::Array(v.clone()))
-    }
-    if let Some(v) = &info.postscript_stem_snap_v {
-        font.set_ot_value("CFF", "stemSnapV", OTScalar::Array(v.clone()))
-    }
-    if let Some(v) = &info.open_type_os2_vendor_id {
-        font.set_ot_value("OS/2", "achVendID", OTScalar::StringType(v.clone()))
-    }
+    font.custom_ot_values.cff_blue_values = info.postscript_blue_values.clone();
+    font.custom_ot_values.cff_other_blues = info.postscript_other_blues.clone();
+    font.custom_ot_values.cff_family_blues = info.postscript_family_blues.clone();
+    font.custom_ot_values.cff_family_other_blues = info.postscript_family_other_blues.clone();
+    font.custom_ot_values.cff_stem_snap_h = info.postscript_stem_snap_h.clone();
+    font.custom_ot_values.cff_stem_snap_v = info.postscript_stem_snap_v.clone();
+    font.custom_ot_values.os2_vendor_id = info
+        .open_type_os2_vendor_id
+        .as_ref()
+        .and_then(|x| Tag::from_str(x).ok());
     // XXX and much more
     if let Some(v) = &info.trademark {
         font.names.trademark = v.into();
@@ -636,6 +606,33 @@ pub(crate) fn load_kerning(master: &mut Master, kerning: &norad::Kerning) {
     }
 }
 
+fn from_bitarray<T>(v: &[u8]) -> T
+where
+    T: num_traits::PrimInt + num_traits::FromPrimitive,
+{
+    let mut result = T::zero();
+    for bit in v.iter() {
+        result = result | (T::one() << usize::from(*bit));
+    }
+    result
+}
+
+fn to_bitarray<T>(v: T) -> Vec<u8>
+where
+    T: num_traits::PrimInt,
+{
+    let mut bits = vec![];
+    let mut bit_index = 0;
+    let mut value = v;
+    while !value.is_zero() {
+        if (value & T::one()) == T::one() {
+            bits.push(bit_index);
+        }
+        value = value >> 1;
+        bit_index += 1;
+    }
+    bits
+}
 pub(crate) fn load_kern_groups(
     groups: &norad::Groups,
 ) -> (

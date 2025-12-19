@@ -11,7 +11,7 @@ export interface ClassRegistry {
   Names?: AnyConstructor;
   Position?: AnyConstructor;
   Guide?: AnyConstructor;
-  OTValue?: AnyConstructor;
+  CustomOTValues?: AnyConstructor;
   Master?: AnyConstructor;
   Node?: AnyConstructor;
   Path?: AnyConstructor;
@@ -45,7 +45,7 @@ export class InflationContext {
  */
 export function getClassConstructor<T extends AnyConstructor>(
   name: keyof ClassRegistry,
-  defaultClass: T,
+  defaultClass: T
 ): T {
   const registry = InflationContext.current;
   const customClass = registry?.[name] || globalClassRegistry[name];

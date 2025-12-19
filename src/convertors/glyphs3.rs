@@ -1,10 +1,10 @@
 use crate::{
-    common::{FormatSpecific, OTValue},
+    common::FormatSpecific,
     filters::{DropSparseMasters, FontFilter as _},
     glyph::{self, glyphs::glyph_to_glyphs},
     i18ndictionary::I18NDictionary,
     names::Names,
-    Axis, BabelfontError, Font, GlyphList, Master,
+    Axis, BabelfontError, CustomOTValues, Font, GlyphList, Master,
 };
 use fontdrasil::coords::{DesignCoord, DesignLocation, UserCoord};
 use glyphslib::glyphs3::{self, Property};
@@ -322,7 +322,7 @@ fn load_instance(font: &Font, instance: &glyphs3::Instance) -> crate::Instance {
     format_specific.insert_if_ne_json(KEY_IS_BOLD, &instance.is_bold, &false);
     format_specific.insert_if_ne_json(KEY_IS_ITALIC, &instance.is_italic, &false);
     let mut names = Names::new();
-    let mut custom_ot_values = vec![];
+    let mut custom_ot_values = CustomOTValues::default();
     load_properties(
         &mut names,
         &mut custom_ot_values, // XXX
@@ -383,7 +383,7 @@ fn save_instance(instance: &crate::Instance, axes: &[Axis]) -> glyphs3::Instance
         is_bold: instance.format_specific.get_bool_or(KEY_IS_BOLD, false),
         is_italic: instance.format_specific.get_bool_or(KEY_IS_ITALIC, false),
         manual_interpolation: Default::default(),
-        properties: save_properties(&instance.custom_names, &[]),
+        properties: save_properties(&instance.custom_names, &CustomOTValues::default()),
         export_type: if instance.variable {
             glyphslib::glyphs3::ExportType::Variable
         } else {
@@ -394,7 +394,7 @@ fn save_instance(instance: &crate::Instance, axes: &[Axis]) -> glyphs3::Instance
 
 fn load_properties(
     names: &mut Names,
-    custom_ot_values: &mut Vec<OTValue>,
+    custom_ot_values: &mut CustomOTValues,
     glyphs_properties: &[Property],
 ) {
     for property in glyphs_properties.iter() {
@@ -427,11 +427,11 @@ fn load_properties(
                 glyphs3::SingularPropertyKey::VersionString => {
                     names.version = I18NDictionary::from(value)
                 }
-                glyphs3::SingularPropertyKey::VendorID => custom_ot_values.push(OTValue {
-                    table: "OS/2".into(),
-                    field: "achVendID".into(),
-                    value: crate::OTScalar::StringType(value.clone()),
-                }),
+                glyphs3::SingularPropertyKey::VendorID => {
+                    if let Ok(x) = Tag::from_str(value) {
+                        custom_ot_values.os2_vendor_id = Some(x);
+                    }
+                }
                 glyphs3::SingularPropertyKey::UniqueID => {
                     names.unique_id = I18NDictionary::from(value)
                 }
@@ -466,7 +466,7 @@ fn load_properties(
     }
 }
 
-fn save_properties(names: &Names, custom_ot_values: &[OTValue]) -> Vec<glyphs3::Property> {
+fn save_properties(names: &Names, custom_ot_values: &CustomOTValues) -> Vec<glyphs3::Property> {
     let mut properties: Vec<glyphs3::Property> = vec![];
 
     // Macro for singular-only properties (no localized variant)
@@ -596,16 +596,11 @@ fn save_properties(names: &Names, custom_ot_values: &[OTValue]) -> Vec<glyphs3::
     push_singular!(names.unique_id, glyphs3::SingularPropertyKey::UniqueID);
 
     // Output vendor ID from custom OT values if present
-    if let Some(ot_value) = custom_ot_values
-        .iter()
-        .find(|otv| otv.table.as_str() == "OS/2" && otv.field.as_str() == "achVendID")
-    {
-        if let crate::OTScalar::StringType(vendor_id) = &ot_value.value {
-            properties.push(glyphs3::Property::SingularProperty {
-                key: glyphs3::SingularPropertyKey::VendorID,
-                value: vendor_id.clone(),
-            });
-        }
+    if let Some(vendor_id) = custom_ot_values.os2_vendor_id {
+        properties.push(glyphs3::Property::SingularProperty {
+            key: glyphs3::SingularPropertyKey::VendorID,
+            value: vendor_id.to_string(),
+        });
     }
     push_singular!(names.version, glyphs3::SingularPropertyKey::VersionString);
 

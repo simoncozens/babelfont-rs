@@ -124,6 +124,7 @@ dependencies = [
  "kurbo 0.12.0",
  "log",
  "norad",
+ "num-traits",
  "ordered-float",
  "paste",
  "pretty_assertions",

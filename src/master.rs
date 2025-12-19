@@ -4,10 +4,10 @@ use smol_str::SmolStr;
 use typeshare::typeshare;
 
 use crate::{
-    common::{FormatSpecific, OTValue},
+    common::{CustomOTValues, FormatSpecific},
     guide::Guide,
     i18ndictionary::I18NDictionary,
-    LayerType, MetricType, OTScalar,
+    LayerType, MetricType,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -48,9 +48,9 @@ pub struct Master {
     #[typeshare(typescript(type = "Map<[string, string], number>"))]
     #[typeshare(python(type = "Dict[Tuple[str, str], int]"))]
     pub kerning: IndexMap<(SmolStr, SmolStr), i16>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     /// Custom OpenType values for this master
-    pub custom_ot_values: Vec<OTValue>,
+    #[serde(default, skip_serializing_if = "CustomOTValues::is_empty")]
+    pub custom_ot_values: CustomOTValues,
     /// Format-specific data
     #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
     #[typeshare(python(type = "Dict[str, Any]"))]
@@ -69,31 +69,12 @@ impl Master {
             name: name.into(),
             id: id.into(),
             location,
-            guides: vec![],
-            metrics: IndexMap::new(),
-            kerning: IndexMap::new(),
-            custom_ot_values: vec![],
+            guides: Default::default(),
+            metrics: Default::default(),
+            kerning: Default::default(),
+            custom_ot_values: Default::default(),
             format_specific: FormatSpecific::default(),
         }
-    }
-
-    /// Get a custom OpenType value for this master
-    pub fn ot_value(&self, table: &str, field: &str) -> Option<OTScalar> {
-        for i in &self.custom_ot_values {
-            if i.table == table && i.field == field {
-                return Some(i.value.clone());
-            }
-        }
-        None
-    }
-
-    /// Set a custom OpenType value for this master
-    pub fn set_ot_value(&mut self, table: &str, field: &str, value: OTScalar) {
-        self.custom_ot_values.push(OTValue {
-            table: table.to_string(),
-            field: field.to_string(),
-            value,
-        })
     }
 
     /// Check if this master is sparse in the given font (i.e., if any glyphs lack a layer for this master)

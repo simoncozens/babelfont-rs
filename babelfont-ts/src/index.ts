@@ -19,7 +19,7 @@ export type {
   Names as INames,
   Position as IPosition,
   Guide as IGuide,
-  OTValue as IOTValue,
+  CustomOTValues as ICustomOTValues,
   Master as IMaster,
   Layer as ILayer,
   Glyph as IGlyph,
@@ -38,7 +38,7 @@ export { Names } from "./names";
 export { Instance } from "./instance";
 export { Position } from "./position";
 export { Guide } from "./guide";
-export { OTValue } from "./otvalue";
+export { CustomOTValues } from "./otvalue";
 export { Master } from "./master";
 export { Layer } from "./layer";
 export { Glyph } from "./glyph";

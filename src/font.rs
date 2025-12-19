@@ -1,6 +1,6 @@
 use crate::{
     axis::Axis,
-    common::{FormatSpecific, OTScalar, OTValue},
+    common::{CustomOTValues, FormatSpecific},
     features::Features,
     glyph::GlyphList,
     instance::Instance,
@@ -58,8 +58,8 @@ pub struct Font {
     /// Any values to be placed in OpenType tables on export to override defaults
     ///
     /// These must be font-wide. Metrics which may vary by master should be placed in the `metrics` field of a Master
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub custom_ot_values: Vec<OTValue>,
+    #[serde(default, skip_serializing_if = "CustomOTValues::is_empty")]
+    pub custom_ot_values: CustomOTValues,
     /// A map of Unicode Variation Sequences to glyph names
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     #[typeshare(python(type = "Dict[Tuple[int, int], str]"))]
@@ -110,19 +110,21 @@ impl Font {
         Font {
             upm: 1000,
             version: (1, 0),
-            axes: vec![],
-            instances: vec![],
-            masters: vec![],
-            glyphs: GlyphList(vec![]),
+            // We use a lot of Default::default()s here to avoid having
+            // to change this if we change the type of any of these fields.
+            axes: Default::default(),
+            instances: Default::default(),
+            masters: Default::default(),
+            glyphs: Default::default(),
             note: None,
             date: chrono::Utc::now(),
-            names: Names::default(),
-            custom_ot_values: vec![],
-            variation_sequences: BTreeMap::new(),
-            first_kern_groups: IndexMap::new(),
-            second_kern_groups: IndexMap::new(),
-            features: Features::default(),
-            format_specific: FormatSpecific::default(),
+            names: Default::default(),
+            custom_ot_values: Default::default(),
+            variation_sequences: Default::default(),
+            first_kern_groups: Default::default(),
+            second_kern_groups: Default::default(),
+            features: Default::default(),
+            format_specific: Default::default(),
             source: None,
         }
     }
@@ -177,36 +179,6 @@ impl Font {
             }
         }
         None
-    }
-
-    /// Get an OpenType value for a given table and field
-    pub fn ot_value(
-        &self,
-        table: &str,
-        field: &str,
-        search_default_master: bool,
-    ) -> Option<OTScalar> {
-        for i in &self.custom_ot_values {
-            if i.table == table && i.field == field {
-                return Some(i.value.clone());
-            }
-        }
-        if !search_default_master {
-            return None;
-        }
-        if let Some(dm) = self.default_master() {
-            return dm.ot_value(table, field);
-        }
-        None
-    }
-
-    /// Set an OpenType value for a given table and field
-    pub fn set_ot_value(&mut self, table: &str, field: &str, value: OTScalar) {
-        self.custom_ot_values.push(OTValue {
-            table: table.to_string(),
-            field: field.to_string(),
-            value,
-        })
     }
 
     /// Get a named metric from the default master, if present

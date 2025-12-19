@@ -3,13 +3,11 @@ import { createCaseConvertingProxy } from "./proxyUtils";
 import type { WithCamelCase } from "./typeUtils";
 import { getClassConstructor } from "./registry";
 import { Guide } from "./guide";
-import { OTValue } from "./otvalue";
 import type { Font } from "./font";
 import { WithParent, ensureParentAccessors, setParent } from "./parent";
+import { CustomOTValues } from "./otvalue";
 
-export interface Master extends WithCamelCase<IMaster>, WithParent<Font> {
-  customOtValues?: OTValue[];
-}
+export interface Master extends WithCamelCase<IMaster>, WithParent<Font> {}
 export class Master {
   constructor(data: IMaster) {
     ensureParentAccessors(this);
@@ -22,12 +20,12 @@ export class Master {
       });
     }
     if (data.custom_ot_values) {
-      const OTValueClass = getClassConstructor("OTValue", OTValue);
-      data.custom_ot_values = data.custom_ot_values.map((otv) => {
-        const otValue = new OTValueClass(otv);
-        setParent(otValue as unknown as WithParent<Master>, this);
-        return otValue;
-      });
+      const CustomOTValuesClass = getClassConstructor(
+        "CustomOTValues",
+        CustomOTValues
+      );
+      data.custom_ot_values = new CustomOTValuesClass(data.custom_ot_values);
+      setParent(data.custom_ot_values as unknown as WithParent<Master>, this);
     }
     Object.assign(this, data);
     return createCaseConvertingProxy(this, Master.prototype);
