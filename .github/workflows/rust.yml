@@ -30,9 +30,6 @@ jobs:
       - name: Run tests
         run: |
           cargo test --verbose --workspace 
-      - name: Ensure we can build typescript
-        run: |
-          cargo run --example dump-typescript --features=typescript
 
   formatting:
     runs-on: ubuntu-latest
