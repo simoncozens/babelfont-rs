@@ -16,7 +16,7 @@ describe("Babelfont-TS", () => {
   it("should load a .babelfont file and access its properties", () => {
     const babelfontPath = path.join(
       __dirname,
-      "../../resources/RadioCanadaDisplay.babelfont"
+      "../../resources/RadioCanadaDisplay.babelfont",
     );
     const fileContents = fs.readFileSync(babelfontPath, "utf8");
     const rawFont = JSON.parse(fileContents, ReviverFunc);
@@ -39,7 +39,7 @@ describe("Babelfont-TS", () => {
     const wghtLoc = firstMaster!.location!;
     let wghtLocUserspace = designspaceToUserspace(
       wghtLoc,
-      font.axes! as unknown as FTAxis[]
+      font.axes! as unknown as FTAxis[],
     );
     expect(wghtLocUserspace["wght"]).toBe(400);
 
@@ -76,7 +76,7 @@ describe("Babelfont-TS", () => {
   it("should serialize a .babelfont file and skip internal properties", () => {
     const babelfontPath = path.join(
       __dirname,
-      "../../resources/RadioCanadaDisplay.babelfont"
+      "../../resources/RadioCanadaDisplay.babelfont",
     );
     const fileContents = fs.readFileSync(babelfontPath, "utf8");
     const rawFont = JSON.parse(fileContents, ReviverFunc);
@@ -110,7 +110,7 @@ describe("Babelfont-TS", () => {
           .map(([key, val]) => [
             key,
             key == "nodes" ? stripPrecision(val as string) : normalize(val),
-          ])
+          ]),
       );
     };
 
@@ -120,7 +120,7 @@ describe("Babelfont-TS", () => {
   it("should be able to navigate around nodes and their parent paths", () => {
     const babelfontPath = path.join(
       __dirname,
-      "../../resources/RadioCanadaDisplay.babelfont"
+      "../../resources/RadioCanadaDisplay.babelfont",
     );
     const fileContents = fs.readFileSync(babelfontPath, "utf8");
     const rawFont = JSON.parse(fileContents, ReviverFunc);
@@ -145,7 +145,7 @@ describe("Babelfont-TS", () => {
   it("should set parent links during inflation", () => {
     const babelfontPath = path.join(
       __dirname,
-      "../../resources/RadioCanadaDisplay.babelfont"
+      "../../resources/RadioCanadaDisplay.babelfont",
     );
     const fileContents = fs.readFileSync(babelfontPath, "utf8");
     const rawFont = JSON.parse(fileContents, ReviverFunc);

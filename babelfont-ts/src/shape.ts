@@ -23,7 +23,7 @@ export class Component {
     if (data.transform) {
       const DecomposedAffineClass = getClassConstructor(
         "DecomposedAffine",
-        DecomposedAffine
+        DecomposedAffine,
       );
       this.transform = new DecomposedAffineClass(data.transform);
     }
@@ -103,7 +103,7 @@ export class Path {
     Object.assign(this, data);
     const proxied = createCaseConvertingProxy(this, Path.prototype) as Path;
     proxied.nodes?.forEach((n) =>
-      setParent(n as unknown as WithParent<Path>, proxied)
+      setParent(n as unknown as WithParent<Path>, proxied),
     );
     return proxied;
   }
@@ -153,7 +153,7 @@ export class Path {
           y: parseFloat(tokens[i + 1]!),
           nodetype,
           smooth,
-        })
+        }),
       );
     }
     return nodesArray;

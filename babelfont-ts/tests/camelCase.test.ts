@@ -7,7 +7,7 @@ describe("CamelCase Property Access", () => {
   it("should allow camelCase access to snake_case properties", () => {
     const babelfontPath = path.join(
       __dirname,
-      "../../resources/RadioCanadaDisplay.babelfont"
+      "../../resources/RadioCanadaDisplay.babelfont",
     );
     const fileContents = fs.readFileSync(babelfontPath, "utf8");
     const rawFont = JSON.parse(fileContents, ReviverFunc);
@@ -38,7 +38,7 @@ describe("CamelCase Property Access", () => {
   it("should work with methods on proxied objects", () => {
     const babelfontPath = path.join(
       __dirname,
-      "../../resources/RadioCanadaDisplay.babelfont"
+      "../../resources/RadioCanadaDisplay.babelfont",
     );
     const fileContents = fs.readFileSync(babelfontPath, "utf8");
     const rawFont = JSON.parse(fileContents, ReviverFunc);

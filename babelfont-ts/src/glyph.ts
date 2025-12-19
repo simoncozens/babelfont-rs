@@ -22,7 +22,7 @@ export class Glyph {
     Object.assign(this, data);
     const proxied = createCaseConvertingProxy(this, Glyph.prototype) as Glyph;
     proxied.layers?.forEach((layer) =>
-      setParent(layer as unknown as WithParent<Glyph>, proxied)
+      setParent(layer as unknown as WithParent<Glyph>, proxied),
     );
     return proxied;
   }

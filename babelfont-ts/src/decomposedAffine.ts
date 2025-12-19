@@ -30,7 +30,7 @@ export class DecomposedAffine {
         translate(this.translation[0], this.translation[1]),
         rotate(angle),
         skew(skewX, skewY),
-        scale(scaleX, scaleY)
+        scale(scaleX, scaleY),
       );
     } else {
       // Default order: translate, scale, skew, rotate
@@ -38,7 +38,7 @@ export class DecomposedAffine {
         translate(this.translation[0], this.translation[1]),
         scale(scaleX, scaleY),
         skew(skewX, skewY),
-        rotate(angle)
+        rotate(angle),
       );
     }
   }
