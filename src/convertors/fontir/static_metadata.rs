@@ -95,8 +95,13 @@ fn names(font: &Font, flags: SelectionFlags) -> HashMap<NameKey, String> {
             typographic_subfamily.to_string(),
         );
     }
+    let vendor_id = font
+        .custom_ot_values
+        .os2_vendor_id
+        .map(|id| id.to_string())
+        .unwrap_or("NONE".to_string());
 
-    builder.into_inner()
+    builder.build(&vendor_id)
 }
 
 #[derive(Debug)]

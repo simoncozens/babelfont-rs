@@ -1,4 +1,5 @@
 use crate::{BabelfontError, Font};
+use fontc::Options;
 use fontdrasil::{coords::NormalizedLocation, orchestration::Work, types::GlyphName};
 use fontir::{
     error::Error,
@@ -63,7 +64,7 @@ impl BabelfontIrSource {
             font: Arc::new(font),
             options,
         };
-        fontc::generate_font(Box::new(source), fontc::Flags::default(), false)
+        fontc::generate_font(Box::new(source), Options::default())
             .map_err(|e| BabelfontError::General(format!("Font generation error: {:#?}", e)))
     }
 }
