@@ -1,0 +1,34 @@
+name: Test Typescript Bindings
+
+on:
+  - push
+  - pull_request
+  - merge_group
+
+permissions:
+  contents: read
+
+jobs:
+  test-typescript-bindings:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./babelfont-ts
+    steps:
+        - uses: actions/checkout@v6
+          with:
+            submodules: recursive
+        - name: Set up Node.js
+          uses: actions/setup-node@v6
+        - name: Install dependencies
+          run: |
+            npm install
+        - name: Build project
+          run: |
+            npm run build
+        - name: Run tests
+          run: |
+            npm test
+        - name: Check for formatting
+          run: |
+            npx prettier --check .
