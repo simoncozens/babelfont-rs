@@ -132,7 +132,7 @@ mod glyphs {
         fn from(val: &G3Node) -> Self {
             let mut format_specific = FormatSpecific::default();
             if let Some(user_data) = &val.user_data {
-                copy_user_data(&mut format_specific, &user_data);
+                copy_user_data(&mut format_specific, user_data);
             }
             Node {
                 x: val.x as f64,

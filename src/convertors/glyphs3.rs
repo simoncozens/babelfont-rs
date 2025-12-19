@@ -1144,7 +1144,7 @@ mod tests {
         // Glyphs sometimes stores a singular property as a localized property
         // with only one entry, and vice versa.
         #[exclude("RadioCanadaDisplay.glyphs")]
-        #[exclude("Nunito.glyphs")]
+        #[exclude("Nunito3.glyphs")]
         path: PathBuf,
     ) {
         let there = load(path.clone()).unwrap();
