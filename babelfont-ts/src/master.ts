@@ -22,7 +22,7 @@ export class Master {
     if (data.custom_ot_values) {
       const CustomOTValuesClass = getClassConstructor(
         "CustomOTValues",
-        CustomOTValues
+        CustomOTValues,
       );
       data.custom_ot_values = new CustomOTValuesClass(data.custom_ot_values);
       setParent(data.custom_ot_values as unknown as WithParent<Master>, this);
