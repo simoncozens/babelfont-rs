@@ -1,22 +1,26 @@
 use crate::error::FontmergeError;
+use babelfont::SmolStr;
 use clap::Parser;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CodepointArgs(pub Vec<char>);
 
-/// font font merger
+/// Font merger
+///
+/// Merges two font source files together, copying selected glyphs from the donor font into the host font,
+/// along with any necessary OpenType layout features.
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {
-    /// font font file to merge into
+    /// Font file to merge into ("host" font)
     pub font_1: String,
 
-    /// font font file to merge
+    /// Font file to merge ("donor" font)
     pub font_2: String,
 
-    /// Output font font file
+    /// Output font file
     #[arg(short, long)]
-    pub output: Option<String>,
+    pub output: String,
 
     /// Include directory for feature files
     #[arg(long)]
@@ -62,27 +66,27 @@ pub struct Args {
 #[derive(clap::Args, Debug)]
 #[command(next_help_heading = "Glyph selection")]
 pub struct GlyphSelection {
-    /// Space-separated list of glyphs to add from font 2
+    /// Space-separated list of glyphs to add from donor font
     #[arg(short, long, value_delimiter = ' ')]
-    pub glyphs: Vec<String>,
+    pub glyphs: Vec<SmolStr>,
 
-    /// File containing glyphs to add from font 2
+    /// File containing glyphs to add from donor font
     #[arg(short = 'G', long)]
     pub glyphs_file: Option<String>,
 
-    /// Unicode codepoints to add from font 2
+    /// Unicode codepoints to add from donor font
     #[arg(short = 'u', long, value_parser = crate::args::parse_codepoints)]
     pub codepoints: Option<CodepointArgs>,
 
-    /// File containing Unicode codepoints to add from font 2
+    /// File containing Unicode codepoints to add from donor font
     #[arg(short = 'U', long)]
     pub codepoints_file: Option<String>,
 
-    /// Glyphs to exclude from font 2
+    /// Glyphs to exclude from donor font
     #[arg(short = 'x', long, value_delimiter = ' ')]
-    pub exclude_glyphs: Vec<String>,
+    pub exclude_glyphs: Vec<SmolStr>,
 
-    /// File containing glyphs to exclude from font 2
+    /// File containing glyphs to exclude from donor font
     #[arg(short = 'X', long)]
     pub exclude_glyphs_file: Option<String>,
 }
@@ -91,9 +95,9 @@ pub struct GlyphSelection {
 #[derive(clap::ValueEnum, Debug, Clone, Default, Copy, PartialEq, Eq)]
 pub enum ExistingGlyphHandling {
     #[default]
-    /// Skip glyphs already present in font 1
+    /// Skip glyphs already present in host font
     Skip,
-    /// Replace glyphs already present in font 1
+    /// Replace glyphs already present in host font
     Replace,
 }
 
@@ -103,7 +107,7 @@ pub enum LayoutHandling {
     /// Drop layout rules concerning glyphs not selected
     #[default]
     Subset,
-    /// Add glyphs from font 2 contained in layout rules, even if not in glyph set
+    /// Add glyphs from donor font contained in layout rules, even if not in glyph set
     Closure,
     /// Don't try to parse the layout rules
     Ignore,
@@ -196,8 +200,8 @@ pub fn parse_codepoints(input: &str) -> Result<CodepointArgs, FontmergeError> {
 }
 
 impl GlyphSelection {
-    /// Get the set of glyph names to include from font 2
-    pub fn get_include_glyphs(&self) -> Result<Vec<String>, FontmergeError> {
+    /// Get the set of glyph names to include from donor font
+    pub fn get_include_glyphs(&self) -> Result<Vec<SmolStr>, FontmergeError> {
         let mut glyphs = self.glyphs.clone();
 
         // Glyphs from file
@@ -207,7 +211,7 @@ impl GlyphSelection {
             for line in content.lines() {
                 let glyph_name = line.trim();
                 if !glyph_name.is_empty() && !glyph_name.starts_with('#') {
-                    glyphs.push(glyph_name.to_string());
+                    glyphs.push(glyph_name.into());
                 }
             }
         }
@@ -215,8 +219,8 @@ impl GlyphSelection {
         Ok(glyphs)
     }
 
-    /// Get the set of glyph names to exclude from font 2
-    pub fn get_exclude_glyphs(&self) -> Result<Vec<String>, FontmergeError> {
+    /// Get the set of glyph names to exclude from donor font
+    pub fn get_exclude_glyphs(&self) -> Result<Vec<SmolStr>, FontmergeError> {
         // Glyphs from command line
         let mut glyphs = self.exclude_glyphs.clone();
 
@@ -227,7 +231,7 @@ impl GlyphSelection {
             for line in content.lines() {
                 let glyph_name = line.trim();
                 if !glyph_name.is_empty() && !glyph_name.starts_with('#') {
-                    glyphs.push(glyph_name.to_string());
+                    glyphs.push(glyph_name.into());
                 }
             }
         }

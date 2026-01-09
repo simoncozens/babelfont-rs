@@ -3,7 +3,7 @@ use crate::{
     error::FontmergeError,
     layout::{closure::LayoutClosureVisitor, visitor::LayoutVisitor},
 };
-use babelfont::Font;
+use babelfont::{Font, SmolStr};
 use indexmap::{IndexMap, IndexSet};
 
 pub(crate) struct GlyphsetFilter {
@@ -11,31 +11,31 @@ pub(crate) struct GlyphsetFilter {
     // exclude_glyphs: Vec<String>,
     // include_codepoints: Vec<char>,
     // blacklist: IndexSet<String>,
-    pub(crate) incoming_glyphset: IndexSet<String>,
-    pub(crate) existing_glyphs: IndexSet<String>,
+    pub(crate) incoming_glyphset: IndexSet<SmolStr>,
+    pub(crate) existing_glyphs: IndexSet<SmolStr>,
     // existing_map: IndexMap<char, String>,
-    pub(crate) mappings_to_delete: IndexMap<String, Vec<char>>,
+    pub(crate) mappings_to_delete: IndexMap<SmolStr, Vec<char>>,
     existing_glyph_handling: ExistingGlyphHandling,
 }
 
 impl GlyphsetFilter {
     /// Create a new GlyphsetFilter
     pub fn new(
-        include_glyphs: Vec<String>,
-        exclude_glyphs: Vec<String>,
+        include_glyphs: Vec<SmolStr>,
+        exclude_glyphs: Vec<SmolStr>,
         include_codepoints: Vec<char>,
         font1: &mut babelfont::Font,
         font2: &babelfont::Font,
         existing_glyph_handling: ExistingGlyphHandling,
     ) -> Self {
-        let mut blacklist: IndexSet<String> = exclude_glyphs.iter().cloned().collect();
+        let mut blacklist: IndexSet<SmolStr> = exclude_glyphs.iter().cloned().collect();
         let mut existing_map = IndexMap::new();
         let existing_glyphs = font1
             .glyphs
             .iter()
             .map(|g| g.name.clone())
-            .collect::<IndexSet<String>>();
-        let mut mappings_to_delete: IndexMap<String, Vec<char>> = IndexMap::new();
+            .collect::<IndexSet<SmolStr>>();
+        let mut mappings_to_delete: IndexMap<SmolStr, Vec<char>> = IndexMap::new();
         for glyph in font1.glyphs.iter() {
             for cp in glyph.codepoints.iter().flat_map(|cp| char::from_u32(*cp)) {
                 existing_map.insert(cp, glyph.name.clone());
@@ -138,8 +138,8 @@ impl GlyphsetFilter {
             .glyphs
             .iter()
             .map(|g| g.name.clone())
-            .collect::<IndexSet<String>>();
-        let not_there: IndexSet<String> = self
+            .collect::<IndexSet<SmolStr>>();
+        let not_there: IndexSet<SmolStr> = self
             .incoming_glyphset
             .difference(&font2_glyphs)
             .cloned()
@@ -179,7 +179,7 @@ impl GlyphsetFilter {
                 babelfont::Shape::Component(comp) => Some(comp.reference.clone()),
                 _ => None,
             })
-            .collect::<IndexSet<String>>();
+            .collect::<IndexSet<SmolStr>>();
         if component_set.is_empty() {
             return;
         }
@@ -223,7 +223,7 @@ impl GlyphsetFilter {
             .glyphs
             .iter()
             .map(|g| g.name.clone())
-            .collect::<Vec<String>>();
+            .collect::<Vec<SmolStr>>();
         self.incoming_glyphset.sort_by_key(|g| {
             font2_glyphorder
                 .iter()
@@ -235,7 +235,7 @@ impl GlyphsetFilter {
     pub(crate) fn perform_layout_closure(
         &mut self,
         features: &babelfont::Features,
-        glyph_names: &[&str],
+        glyph_names: &[&SmolStr],
         project_root: impl Into<std::path::PathBuf>,
     ) -> Result<(), FontmergeError> {
         let parse_tree =
@@ -259,7 +259,7 @@ impl GlyphsetFilter {
         Ok(())
     }
 
-    pub(crate) fn final_glyphset(&self) -> Vec<String> {
+    pub(crate) fn final_glyphset(&self) -> Vec<SmolStr> {
         self.existing_glyphs
             .union(&self.incoming_glyphset)
             .cloned()

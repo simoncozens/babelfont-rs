@@ -1,3 +1,4 @@
+use babelfont::SmolStr;
 use fea_rs_ast::fea_rs;
 use fea_rs::Kind;
 use fea_rs::parse::ParseTree;
@@ -9,11 +10,11 @@ use crate::layout::{find_first_glyph_or_class, glyph_names};
 
 pub(crate) struct LayoutClosureVisitor<'a> {
     parse_tree: &'a ParseTree,
-    pub glyphset: IndexSet<String>,
+    pub glyphset: IndexSet<SmolStr>,
 }
 
 impl<'a> LayoutClosureVisitor<'a> {
-    pub fn new(parse_tree: &'a ParseTree, glyphset: IndexSet<String>) -> Self {
+    pub fn new(parse_tree: &'a ParseTree, glyphset: IndexSet<SmolStr>) -> Self {
         Self {
             parse_tree,
             glyphset,
@@ -107,7 +108,7 @@ impl LayoutVisitor for LayoutClosureVisitor<'_> {
                         // .filter(|t| !t.kind().is_trivia())
                         .flat_map(|i| i.token_text())
                     {
-                        self.glyphset.insert(item.to_string());
+                        self.glyphset.insert(item.into());
                     }
                 }
             }
@@ -132,7 +133,7 @@ impl LayoutVisitor for LayoutClosureVisitor<'_> {
         if let fea_rs::typed::Glyph::Named(glyph_name) = glyph
             && target.all(|t| self.is_in_glyphset(&t))
         {
-            let name = glyph_name.text().to_string();
+            let name: SmolStr = glyph_name.text().clone();
             if !self.glyphset.contains(&name) {
                 log::debug!(
                     "Adding glyph '{}' by closing over GSUB substitution: {}",
@@ -142,7 +143,7 @@ impl LayoutVisitor for LayoutClosureVisitor<'_> {
                         .map(|t| t.as_str())
                         .collect::<String>(),
                 );
-                self.glyphset.insert(glyph_name.text().to_string());
+                self.glyphset.insert(name);
             }
         }
         true

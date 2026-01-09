@@ -3,6 +3,7 @@ use std::{
     sync::Arc,
 };
 
+use babelfont::SmolStr;
 use fea_rs_ast::fea_rs;
 use fea_rs_ast::fea_rs::{
     compile::NopVariationInfo,
@@ -20,13 +21,10 @@ pub(crate) mod visitor;
 
 pub(crate) fn get_parse_tree(
     features: &str,
-    glyph_names: &[&str],
+    glyph_names: &[&SmolStr],
     project_root: impl Into<PathBuf>,
 ) -> Result<ParseTree, FontmergeError> {
-    let glyph_map = glyph_names
-        .iter()
-        .map(fontdrasil::types::GlyphName::new)
-        .collect::<GlyphMap>();
+    let glyph_map = glyph_names.iter().cloned().collect::<GlyphMap>();
     let resolver: FileSystemResolver = FileSystemResolver::new(project_root.into());
     let features_text: Arc<str> = Arc::from(features);
     let (parse_tree, diagnostics) = fea_rs::parse::parse_root(
@@ -87,14 +85,14 @@ pub(crate) fn find_first_glyph_or_class(
     None
 }
 
-pub(crate) fn glyph_names(gc: &GlyphOrClass) -> Vec<String> {
+pub(crate) fn glyph_names(gc: &GlyphOrClass) -> Vec<SmolStr> {
     match gc {
-        GlyphOrClass::Glyph(name) => vec![name.text().to_string()],
+        GlyphOrClass::Glyph(name) => vec![name.text().to_string().into()],
         GlyphOrClass::Class(names) => names
             .iter()
             .filter_map(|n| {
                 if n.is_glyph_or_glyph_class() {
-                    n.token_text().map(|t| t.to_string())
+                    n.token_text().map(|t| t.to_string().into())
                 } else {
                     None
                 }

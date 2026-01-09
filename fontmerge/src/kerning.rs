@@ -1,10 +1,11 @@
 use std::collections::{HashMap, HashSet};
 
-use babelfont::{BabelfontError, Font};
+use babelfont::{BabelfontError, Font, SmolStr};
 use fontdrasil::{
     coords::{Location, NormalizedSpace},
     variations::VariationModel,
 };
+use indexmap::IndexMap;
 
 use crate::{
     designspace::{fontdrasil_axes, Strategy},
@@ -16,10 +17,10 @@ use crate::{
 // importing the source kerning then does not lead to duplicate group
 // membership if their membership changed. Return a vec of group names to clean.
 fn clean_groups(
-    f1_groups: &mut HashMap<String, Vec<String>>,
-    f2_groups: &HashMap<String, Vec<String>>,
+    f1_groups: &mut IndexMap<SmolStr, Vec<SmolStr>>,
+    f2_groups: &IndexMap<SmolStr, Vec<SmolStr>>,
     glyphset_filter: &GlyphsetFilter,
-) -> HashSet<String> {
+) -> HashSet<SmolStr> {
     let mut kerning_groups_to_be_cleaned = HashSet::new();
     for (group_name, group) in f1_groups {
         // If the exact same group exists in font2, we're fine, ignore
@@ -49,7 +50,7 @@ fn clean_groups(
 fn get_kerning_table_for_master(
     font: &Font,
     strategy: &Strategy,
-) -> Result<HashMap<(String, String), i16>, BabelfontError> {
+) -> Result<IndexMap<(SmolStr, SmolStr), i16>, BabelfontError> {
     match strategy {
         Strategy::Exact {
             layer,
@@ -75,7 +76,7 @@ fn get_kerning_table_for_master(
                 .iter()
                 .filter(|m| !m.is_sparse(font))
                 .collect::<Vec<_>>();
-            let mut result = HashMap::new();
+            let mut result = IndexMap::new();
             let locations_in_order = non_sparse_masters
                 .iter()
                 .map(|m| m.location.to_normalized(&axes))
@@ -83,7 +84,7 @@ fn get_kerning_table_for_master(
             let locations: HashSet<Location<NormalizedSpace>> =
                 locations_in_order.iter().cloned().collect();
             let model = VariationModel::new(locations, axes.axis_order());
-            let all_keys: HashSet<(String, String)> = font
+            let all_keys: HashSet<(SmolStr, SmolStr)> = font
                 .masters
                 .iter()
                 .flat_map(|m| m.kerning.keys().cloned())
@@ -107,7 +108,7 @@ fn get_kerning_table_for_master(
             }
             Ok(result)
         }
-        Strategy::Failed(_) => Ok(HashMap::default()),
+        Strategy::Failed(_) => Ok(IndexMap::default()),
     }
 }
 
@@ -129,7 +130,7 @@ pub(crate) fn merge_kerning(
     font2
         .second_kern_groups
         .retain(|_, group| !group.is_empty());
-    let final_glyphset: HashSet<String> =
+    let final_glyphset: HashSet<SmolStr> =
         glyphset_filter.final_glyphset().iter().cloned().collect();
     let first_groups_to_clean = clean_groups(
         &mut font1.first_kern_groups,
@@ -194,7 +195,7 @@ pub(crate) fn merge_kerning(
                 } else {
                     font1
                         .first_kern_groups
-                        .insert(groupname.to_string(), first_glyphs);
+                        .insert(groupname.into(), first_glyphs);
                 }
             }
             if let Some(groupname) = second.strip_prefix("@") {
@@ -206,7 +207,7 @@ pub(crate) fn merge_kerning(
                 } else {
                     font1
                         .second_kern_groups
-                        .insert(second[1..].to_string(), second_glyphs);
+                        .insert(second[1..].into(), second_glyphs);
                 }
             }
 

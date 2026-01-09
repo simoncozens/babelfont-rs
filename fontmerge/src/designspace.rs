@@ -82,6 +82,7 @@ pub enum Strategy {
         location: Location<DesignSpace>,
         clamped: bool,
     },
+    #[allow(dead_code)]
     Failed(String),
 }
 
@@ -203,6 +204,7 @@ pub(crate) fn add_needed_masters(
     let ds1 = fontdrasil_axes(&font1.axes)?;
     let ds2 = fontdrasil_axes(&font2.axes)?;
 
+    assert!(sanity_check(font1), "Font failed sanity check *before* adding needed masters, file was insane");
 
     // If there are axis mappings in font2 that don't exist in font1 we need to
     // make intermediate masters for them in font2! This may get messy.
@@ -374,6 +376,7 @@ pub(crate) fn sanity_check(font: &Font) -> bool {
     for glyph in font.glyphs.iter() {
         // Check that non-master layer locations do not duplicate master locations
         for layer in glyph.layers.iter() {
+            if layer.is_background { continue } // I don't care about background layers here
             if let Some(loc) = &layer.location
                 && seen_locations.contains(loc)
             {
@@ -389,6 +392,7 @@ pub(crate) fn sanity_check(font: &Font) -> bool {
         let layer_ids = glyph
             .layers
             .iter()
+            .filter(|layer| !layer.is_background)
             .filter_map(|l| match &l.master {
                 babelfont::LayerType::DefaultForMaster(id) => Some(id),
                 babelfont::LayerType::AssociatedWithMaster(_) => None,

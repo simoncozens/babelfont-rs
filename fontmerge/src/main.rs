@@ -12,48 +12,47 @@ mod kerning;
 mod layout;
 mod merge;
 
-use crate::args::{DuplicateLookupHandling, ExistingGlyphHandling, LayoutHandling};
+use crate::args::{ExistingGlyphHandling, LayoutHandling};
 use crate::designspace::{add_needed_masters, fontdrasil_axes, map_designspaces, sanity_check};
 use crate::kerning::merge_kerning;
-use crate::layout::lookupgatherer::LookupGathererVisitor;
-use crate::layout::visitor::LayoutVisitor;
 use crate::merge::merge_glyph;
-use babelfont::load;
-use regex::Regex;
+use babelfont::{load, SmolStr};
 
 use std::path::PathBuf;
-use std::sync::LazyLock;
 
-#[allow(clippy::unwrap_used)] // Static regex is safe to unwrap
-static GLYPH_CLASS_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r#"\b(@[^\s,@]+)"#).unwrap());
+/* For later */
+// use regex::Regex;
+// use std::sync::LazyLock;
+// #[allow(clippy::unwrap_used)] // Static regex is safe to unwrap
+// static GLYPH_CLASS_REGEX: LazyLock<Regex> =
+//     LazyLock::new(|| Regex::new(r#"\b(@[^\s,@]+)"#).unwrap());
 
-fn discover_hidden_classes(font: &babelfont::Font) -> IndexSet<String> {
-    let mut hidden_classes = IndexSet::new();
-    for glyph in font.glyphs.iter() {
-        for layer in glyph.layers.iter() {
-            for anchor in layer.anchors.iter() {
-                // GPOS context is either stored in ["com.schriftgestalt.Glyphs.userData"]["GPOS_Context"]
-                // or in ["norad.lib"]["GPOS_Context"] depending on source format.
-                let context_root = anchor.format_specific.get("norad.lib").or_else(|| {
-                    anchor
-                        .format_specific
-                        .get("com.schriftgestalt.Glyphs.userData")
-                });
-                if let Some(context) = context_root
-                    .and_then(|v| v.get("GPOS_Context"))
-                    .and_then(|v| v.as_str())
-                {
-                    // parse out anything that looks like a glyph class
-                    for cap in GLYPH_CLASS_REGEX.captures_iter(context) {
-                        hidden_classes.insert(cap[1].to_string());
-                    }
-                }
-            }
-        }
-    }
-    hidden_classes
-}
+// fn discover_hidden_classes(font: &babelfont::Font) -> IndexSet<String> {
+//     let mut hidden_classes = IndexSet::new();
+//     for glyph in font.glyphs.iter() {
+//         for layer in glyph.layers.iter() {
+//             for anchor in layer.anchors.iter() {
+//                 // GPOS context is either stored in ["com.schriftgestalt.Glyphs.userData"]["GPOS_Context"]
+//                 // or in ["norad.lib"]["GPOS_Context"] depending on source format.
+//                 let context_root = anchor.format_specific.get("norad.lib").or_else(|| {
+//                     anchor
+//                         .format_specific
+//                         .get("com.schriftgestalt.Glyphs.userData")
+//                 });
+//                 if let Some(context) = context_root
+//                     .and_then(|v| v.get("GPOS_Context"))
+//                     .and_then(|v| v.as_str())
+//                 {
+//                     // parse out anything that looks like a glyph class
+//                     for cap in GLYPH_CLASS_REGEX.captures_iter(context) {
+//                         hidden_classes.insert(cap[1].to_string());
+//                     }
+//                 }
+//             }
+//         }
+//     }
+//     hidden_classes
+// }
 
 fn main() {
     let args = args::Args::parse();
@@ -64,6 +63,25 @@ fn main() {
     let mut font1 = load(&args.font_1).expect("Failed to load font 1");
     log::debug!("Loading font 2");
     let font2 = load(&args.font_2).expect("Failed to load font 2");
+
+    // Check the output file is supported
+    // File name should end with `.glyphs`, `.glyphspackage`, `.babelfont` or `.ttf`.
+    // We can't save designspace or UFO files yet.
+    {
+        let output_path = PathBuf::from(&args.output);
+        let output_ext = output_path
+            .extension()
+            .and_then(|s| s.to_str())
+            .unwrap_or("");
+        match output_ext {
+            "glyphs" | "glyphspackage" | "babelfont" | "ttf" | "otf" => {}
+            _ => {
+                log::error!("Output file extension '{}' is not supported. Please use .glyphs, .glyphspackage, .babelfont, .ttf or .otf", output_ext);
+                return;
+            }
+        }
+    }
+
     let font1_root = PathBuf::from(&args.font_1)
         .parent()
         .unwrap_or_else(|| std::path::Path::new("."))
@@ -91,8 +109,8 @@ fn main() {
     let font2_glyphnames = font2
         .glyphs
         .iter()
-        .map(|g| g.name.as_str())
-        .collect::<Vec<&str>>();
+        .map(|g| &g.name)
+        .collect::<Vec<&SmolStr>>();
     if args.layout_handling == LayoutHandling::Closure {
         glyphset_filter
             .perform_layout_closure(&font2.features, &font2_glyphnames, &font2_root)
@@ -124,7 +142,7 @@ fn main() {
         glyphset_filter
             .incoming_glyphset
             .iter()
-            .cloned()
+            .map(|x| x.to_string())
             .collect::<Vec<_>>(),
     )
     .apply(&mut font2)
@@ -182,7 +200,7 @@ fn main() {
         if has_dflt {
             unique_languagesystems.insert_before(0, ("DFLT".to_string(), "dflt".to_string()));
         }
-        let mut final_statements = unique_languagesystems
+        let final_statements = unique_languagesystems
             .into_iter()
             .map(|(script, language)| {
                 fea_rs_ast::ToplevelItem::LanguageSystem(fea_rs_ast::LanguageSystemStatement::new(
@@ -271,17 +289,14 @@ fn main() {
 
     sanity_check_features(&font1);
 
-    log::info!(
-        "Saving merged font to {}",
-        args.output.as_deref().unwrap_or("stdout")
-    );
+    log::info!("Saving merged font to {}", args.output);
 
-    if let Some(output) = &args.output {
-        font1.save(output).expect("Failed to save merged font");
-    }
+    font1
+        .save(&args.output)
+        .expect("Failed to save merged font");
 }
 
-fn set_layer_locations(glyph_name: &String, font: &mut babelfont::Font) {
+fn set_layer_locations(glyph_name: &SmolStr, font: &mut babelfont::Font) {
     let Some(glyph) = font.glyphs.get_mut(glyph_name) else {
         log::warn!(
             "Glyph '{}' not found in font when setting layer locations",
@@ -326,6 +341,7 @@ fn set_layer_locations(glyph_name: &String, font: &mut babelfont::Font) {
 
 fn sanity_check_features(font: &babelfont::Font) {
     let features_text = font.features.to_fea();
+    #[allow(clippy::unwrap_used)] // We loaded the font from a file, so it has a source path
     let resolver: Box<dyn fea_rs::parse::SourceResolver> = Box::new(
         fea_rs::parse::FileSystemResolver::new(font.source.clone().unwrap()),
     );
