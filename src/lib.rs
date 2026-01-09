@@ -182,6 +182,7 @@ use std::path::PathBuf;
 // Ensure we export any types re-exported that we use in our public API
 pub use fontdrasil::types::Tag;
 pub use kurbo::Rect;
+pub use smol_str::SmolStr;
 pub use write_fonts::read::tables::name::NameId;
 
 /// Load a Babelfont Font from a file
