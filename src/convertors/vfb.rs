@@ -4,10 +4,14 @@ use fontdrasil::{
     coords::{DesignCoord, Location, UserCoord},
     types::Tag,
 };
+use indexmap::IndexMap;
 use uuid::Uuid;
 use vfbreader::{read_vfb, GlyphEntry, Node as VFBNode, Vfb, VfbEntry};
 
-use crate::{Axis, BabelfontError, Font, Glyph, Layer, LayerType, Master, OutlinePen as _, Shape};
+use crate::{
+    common::decomposition::DecomposedAffine, features::PossiblyAutomaticCode, Axis, BabelfontError,
+    Features, Font, FormatSpecific, Glyph, Layer, LayerType, Master, OutlinePen as _, Shape,
+};
 /// VFB convertor
 pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
     let vfb: Vfb = read_vfb(&path).map_err(|e| BabelfontError::VfbLoad(e.into()))?;
@@ -31,9 +35,9 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
         match entry {
             VfbEntry::EncodingDefault(encoding) => {} // => todo!(),
             VfbEntry::Encoding(encoding) => {}        // => todo!(),
-            VfbEntry::Unknown1502(_) => {}            // => todo!(),
-            VfbEntry::Unknown518 => {}                // => todo!(),
-            VfbEntry::Unknown257(_) => {}             // => todo!(),
+            VfbEntry::MMEncodingType(_) => {}         // => todo!(),
+            VfbEntry::BlockNamesEnd(_) => {}
+            VfbEntry::BlockFontInfoStart(_) => {}
             VfbEntry::FontName(s) => {
                 font.names.family_name = s.into();
             }
@@ -47,7 +51,9 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
                     ));
                 }
             }
-            VfbEntry::Version(_) => {} // => todo!(),
+            VfbEntry::Version(v) => {
+                font.names.version = v.into();
+            }
             VfbEntry::Notice(s) => font.names.description = s.into(),
             VfbEntry::FullName(s) => font.names.full_name = s.into(),
             VfbEntry::FamilyName(_) => {} // => todo!(),
@@ -64,19 +70,27 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
             VfbEntry::DesignerUrl(s) => font.names.designer_url = s.into(),
             VfbEntry::VendorUrl(s) => font.names.manufacturer_url = s.into(),
             VfbEntry::Source(s) => font.names.manufacturer = s.into(),
-            VfbEntry::IsFixedPitch(_) => {}       // => todo!(),
-            VfbEntry::UnderlineThickness(_) => {} // => todo!(),
-            VfbEntry::MsCharset(_) => {}          // => todo!(),
-            VfbEntry::Panose(_) => {}             // => todo!(),
-            VfbEntry::TtVersion(_) => {}          // => todo!(),
-            VfbEntry::TtUId(_) => {}              // => todo!(),
-            VfbEntry::StyleName(_) => {}          // => todo!(),
-            VfbEntry::PrefStyleName(_) => {}      // => todo!(),
-            VfbEntry::MacCompatible(_) => {}      // => todo!(),
-            VfbEntry::Vendor(_) => {}             // => todo!(),
-            VfbEntry::Year(_) => {}               // => todo!(),
-            VfbEntry::VersionMajor(_) => {}       // => todo!(),
-            VfbEntry::VersionMinor(_) => {}       // => todo!(),
+            VfbEntry::IsFixedPitch(_) => {} // => todo!(),
+            VfbEntry::UnderlineThickness(ut) => {
+                font.masters[0]
+                    .metrics
+                    .insert(crate::MetricType::UnderlineThickness, ut as i32);
+            }
+            VfbEntry::MsCharset(_) => {}     // => todo!(),
+            VfbEntry::Panose(_) => {}        // => todo!(),
+            VfbEntry::TtVersion(_) => {}     // => todo!(),
+            VfbEntry::TtUId(_) => {}         // => todo!(),
+            VfbEntry::StyleName(_) => {}     // => todo!(),
+            VfbEntry::PrefStyleName(_) => {} // => todo!(),
+            VfbEntry::MacCompatible(_) => {} // => todo!(),
+            VfbEntry::Vendor(_) => {}        // => todo!(),
+            VfbEntry::Year(_) => {}          // => todo!(),
+            VfbEntry::VersionMajor(v) => {
+                font.version = (v, font.version.1);
+            }
+            VfbEntry::VersionMinor(v) => {
+                font.version = (font.version.0, v);
+            }
             VfbEntry::Upm(u) => {
                 font.upm = u;
             }
@@ -96,78 +110,114 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
             VfbEntry::StemSnapLimit(_) => {}       // => todo!(),
             VfbEntry::ZonePpm(_) => {}             // => todo!(),
             VfbEntry::CodePpm(_) => {}             // => todo!(),
-            VfbEntry::Unknown1604(_) => {}         // => todo!(),
-            VfbEntry::Unknown2032(_) => {}         // => todo!(),
+            VfbEntry::DropoutPpm(_) => {}          // => todo!(),
+            VfbEntry::MeasurementLine(_) => {}     // => todo!(),
             VfbEntry::ExportPcltTable(_) => {}     // => todo!(),
             VfbEntry::Note(_) => {}                // => todo!(),
             VfbEntry::CustomData(_) => {}          // => todo!(),
-            VfbEntry::OpenTypeClass(_) => {}       // => todo!(),
-            VfbEntry::AxisCount(_) => {}           // => todo!(),
-            VfbEntry::AxisName(_) => {}            // => todo!(),
-            VfbEntry::MasterName(_) => {}          // => todo!(),
-            VfbEntry::DefaultCharacter(_) => {}    // => todo!(),
-            VfbEntry::Unknown2034(_) => {}         // => todo!(),
-            VfbEntry::Mark(_) => {}                // => todo!(),
-            VfbEntry::GlyphCustomData(_) => {}     // => todo!(),
-            VfbEntry::GlyphNote(_) => {}           // => todo!(),
-            VfbEntry::WeightVector(items) => {}    // => todo!(),
-            VfbEntry::UniqueId(_) => {}            // => todo!(),
-            VfbEntry::WeightCode(_) => {}          // => todo!(),
-            VfbEntry::ItalicAngle(_) => {}         // => todo!(),
-            VfbEntry::SlantAngle(_) => {}          // => todo!(),
-            VfbEntry::UnderlinePosition(_) => {}   // => todo!(),
-            VfbEntry::E1140(raw_data) => {}        // => todo!(),
-            VfbEntry::Xuid(items) => {}            // => todo!(),
-            VfbEntry::XuidNum(_) => {}             // => todo!(),
+            VfbEntry::OpenTypeClass(s) => {
+                let splits = s.splitn(2, ":").collect::<Vec<_>>();
+                if splits.len() == 2 {
+                    let (classname, contents) = (splits[0], splits[1]);
+                    // Not sure what this is for,
+                    let contents = contents.replace("'", "");
+                    font.features
+                        .classes
+                        .insert(classname.into(), PossiblyAutomaticCode::new(contents));
+                }
+            }
+            VfbEntry::AxisCount(_) => {}        // => todo!(),
+            VfbEntry::AxisName(_) => {}         // => todo!(),
+            VfbEntry::MasterName(_) => {}       // => todo!(),
+            VfbEntry::DefaultCharacter(_) => {} // => todo!(),
+            VfbEntry::CustomDict(_) => {}       // => todo!(),
+            VfbEntry::Mark(_) => {}             // => todo!(),
+            VfbEntry::GlyphCustomData(_) => {}  // => todo!(),
+            VfbEntry::GlyphNote(_) => {}        // => todo!(),
+            VfbEntry::WeightVector(items) => {} // => todo!(),
+            VfbEntry::UniqueId(_) => {}         // => todo!(),
+            VfbEntry::WeightCode(_) => {}       // => todo!(),
+            VfbEntry::ItalicAngle(angle) => {
+                // XXX angle conversion?
+                font.masters[0]
+                    .metrics
+                    .insert(crate::MetricType::ItalicAngle, angle as i32);
+            } // => todo!(),
+            VfbEntry::SlantAngle(_) => {}       // => todo!(),
+            VfbEntry::UnderlinePosition(_) => {} // => todo!(),
+            VfbEntry::SampleText(s) => {
+                font.names.sample_text = s.into();
+            }
+            VfbEntry::Xuid(items) => {} // => todo!(),
+            VfbEntry::XuidNum(_) => {}  // => todo!(),
             VfbEntry::PostScriptHintingOptions(post_script_global_hinting_options) => {} // => todo!(),
-            VfbEntry::E1068(items) => {}                // => todo!(),
-            VfbEntry::TtInfo(true_type_values) => {}    // => todo!(),
-            VfbEntry::UnicodeRanges(items) => {}        // => todo!(),
-            VfbEntry::FontNames(name_records) => {}     // => todo!(),
-            VfbEntry::CustomCmaps(raw_data) => {}       // => todo!(),
-            VfbEntry::PcltTable(raw_data) => {}         // => todo!(),
-            VfbEntry::E2030(raw_data) => {}             // => todo!(),
+            VfbEntry::Collection(items) => {}        // => todo!(),
+            VfbEntry::TtInfo(true_type_values) => {} // => todo!(),
+            VfbEntry::UnicodeRanges(items) => {}     // => todo!(),
+            VfbEntry::FontNames(name_records) => {}  // => todo!(),
+            VfbEntry::CustomCmaps(raw_data) => {}    // => todo!(),
+            VfbEntry::PcltTable(raw_data) => {}      // => todo!(),
+            VfbEntry::FontFlags(raw_data) => {}      // => todo!(),
             VfbEntry::MetricsClassFlags(raw_data) => {} // => todo!(),
             VfbEntry::KerningClassFlags(raw_data) => {} // => todo!(),
             VfbEntry::TrueTypeTable(binary_table) => {} // => todo!(),
-            VfbEntry::Features(_) => {}                 // => todo!(),
-            VfbEntry::E513(raw_data) => {}              // => todo!(),
-            VfbEntry::E271(raw_data) => {}              // => todo!(),
+            VfbEntry::Features(code) => {
+                let features = Features::from_fea(&code);
+                font.features.features = features.features;
+                font.features.prefixes = features.prefixes;
+            }
+            VfbEntry::BlockFontInfoEnd(raw_data) => {}
+            VfbEntry::BlockMMFontInfoStart(raw_data) => {}
             VfbEntry::AnisotropicInterpolationMappings(raw_data) => {} // => todo!(),
-            VfbEntry::AxisMappingsCount(_) => {}        // => todo!(),
-            VfbEntry::AxisMappings(raw_data) => {}      // => todo!(),
-            VfbEntry::PrimaryInstanceLocations(items) => {} // => todo!(),
-            VfbEntry::PrimaryInstances(raw_data) => {}  // => todo!(),
-            VfbEntry::E527(raw_data) => {}              // => todo!(),
-            VfbEntry::GlobalGuides(guides) => {}        // => todo!(),
+            VfbEntry::AxisMappingsCount(_) => {}                       // => todo!(),
+            VfbEntry::AxisMappings(raw_data) => {}                     // => todo!(),
+            VfbEntry::PrimaryInstanceLocations(items) => {}            // => todo!(),
+            VfbEntry::PrimaryInstances(raw_data) => {}                 // => todo!(),
+            VfbEntry::BlockMMFontInfoEnd(raw_data) => {}
+            VfbEntry::GlobalGuides(guides) => {} // => todo!(),
             VfbEntry::GlobalGuideProperties(raw_data) => {} // => todo!(),
-            VfbEntry::GlobalMask(raw_data) => {}        // => todo!(),
+            VfbEntry::GlobalMask(raw_data) => {} // => todo!(),
             VfbEntry::OpenTypeExportOptions(raw_data) => {} // => todo!(),
             VfbEntry::ExportOptions(export_options) => {} // => todo!(),
-            VfbEntry::MappingMode(raw_data) => {}       // => todo!(),
-            VfbEntry::E272(raw_data) => {}              // => todo!(),
-            VfbEntry::E1410(raw_data) => {}             // => todo!(),
-            VfbEntry::E528(raw_data) => {}              // => todo!(),
-            VfbEntry::MasterLocation(raw_data) => {}    // => todo!(),
-            VfbEntry::PostScriptInfo(raw_data) => {}    // => todo!(),
-            VfbEntry::Cvt(raw_data) => {}               // => todo!(),
-            VfbEntry::Prep(raw_data) => {}              // => todo!(),
-            VfbEntry::Fpgm(raw_data) => {}              // => todo!(),
-            VfbEntry::Gasp(raw_data) => {}              // => todo!(),
-            VfbEntry::Vdmx(raw_data) => {}              // => todo!(),
-            VfbEntry::HheaAscender(_) => {}             // => todo!(),
-            VfbEntry::HheaDescender(_) => {}            // => todo!(),
+            VfbEntry::MappingMode(raw_data) => {} // => todo!(),
+            VfbEntry::BlockMMKerningStart(raw_data) => {}
+            VfbEntry::MMKernPair(raw_data) => {} // => todo!(),
+            VfbEntry::BlockMMKerningEnd(raw_data) => {}
+            VfbEntry::MasterLocation(raw_data) => {} // => todo!(),
+            VfbEntry::PostScriptInfo(raw_data) => {} // => todo!(),
+            VfbEntry::Cvt(raw_data) => {}            // => todo!(),
+            VfbEntry::Prep(raw_data) => {}           // => todo!(),
+            VfbEntry::Fpgm(raw_data) => {}           // => todo!(),
+            VfbEntry::Gasp(raw_data) => {}           // => todo!(),
+            VfbEntry::Vdmx(raw_data) => {}           // => todo!(),
+            VfbEntry::HheaAscender(asc) => {
+                font.masters[0]
+                    .metrics
+                    .insert(crate::MetricType::Ascender, asc.into());
+                font.masters[0]
+                    .metrics
+                    .insert(crate::MetricType::HheaAscender, asc.into());
+            }
+
+            VfbEntry::HheaDescender(desc) => {
+                font.masters[0]
+                    .metrics
+                    .insert(crate::MetricType::Descender, desc.into());
+                font.masters[0]
+                    .metrics
+                    .insert(crate::MetricType::HheaDescender, desc.into());
+            }
             VfbEntry::TrueTypeStemPpems2And3(raw_data) => {} // => todo!(),
-            VfbEntry::TrueTypeStemPpems(raw_data) => {} // => todo!(),
-            VfbEntry::TrueTypeStems(raw_data) => {}     // => todo!(),
-            VfbEntry::TrueTypeStemPpems1(raw_data) => {} // => todo!(),
-            VfbEntry::TrueTypeZones(raw_data) => {}     // => todo!(),
-            VfbEntry::TrueTypeZoneDeltas(raw_data) => {} // => todo!(),
+            VfbEntry::TrueTypeStemPpems(raw_data) => {}      // => todo!(),
+            VfbEntry::TrueTypeStems(raw_data) => {}          // => todo!(),
+            VfbEntry::TrueTypeStemPpems1(raw_data) => {}     // => todo!(),
+            VfbEntry::TrueTypeZones(raw_data) => {}          // => todo!(),
+            VfbEntry::TrueTypeZoneDeltas(raw_data) => {}     // => todo!(),
             VfbEntry::Glyph(items) => load_glyph(&mut font, items)?,
             VfbEntry::Links(links) => {}      // => todo!(),
             VfbEntry::Image(raw_data) => {}   // => todo!(),
             VfbEntry::Bitmaps(raw_data) => {} // => todo!(),
-            VfbEntry::E2023(raw_data) => {}   // => todo!(),
+            VfbEntry::VSB(raw_data) => {}     // => todo!(),
             VfbEntry::Sketch(raw_data) => {}  // => todo!(),
             VfbEntry::HintingOptions(post_script_glyph_hinting_options) => {} // => todo!(),
             VfbEntry::Mask(raw_data) => {}    // => todo!(),
@@ -193,6 +243,25 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
         }
     }
 
+    // Fix up component ID->name references
+    let names = font
+        .glyphs
+        .iter()
+        .map(|g| g.name.clone())
+        .collect::<Vec<_>>();
+    for glyph in font.glyphs.iter_mut() {
+        for layer in glyph.layers.iter_mut() {
+            for shape in layer.shapes.iter_mut() {
+                if let Shape::Component(component) = shape {
+                    #[allow(clippy::unwrap_used)] // We put it there
+                    let ref_id: usize = component.reference.parse().unwrap();
+                    if let Some(ref_glyph) = names.get(ref_id) {
+                        component.reference = ref_glyph.clone();
+                    }
+                }
+            }
+        }
+    }
     Ok(font)
 }
 
@@ -219,10 +288,56 @@ fn load_glyph(font: &mut Font, items: Vec<GlyphEntry>) -> Result<(), BabelfontEr
                     }
                 }
             }
-            GlyphEntry::Hints(hints) => {}           // => todo!(),
-            GlyphEntry::Guides(guides) => {}         // => todo!(),
-            GlyphEntry::Components(components) => {} // => todo!(),
-            GlyphEntry::Kerning(hash_map) => {}      // => todo!(),
+            GlyphEntry::Hints(hints) => {}   // => todo!(),
+            GlyphEntry::Guides(guides) => {} // => todo!(),
+            GlyphEntry::Components(components) => {
+                for (index, layer) in glyph.layers.iter_mut().enumerate() {
+                    for component in components.iter() {
+                        let our_component = crate::shape::Component {
+                            reference: component.glyph_index.to_string().into(), // Will fix later
+                            transform: DecomposedAffine {
+                                translation: (
+                                    *component.x_offset.get(index).ok_or_else(|| {
+                                        BabelfontError::GlyphNotInterpolatable {
+                                            glyph: glyph.name.clone().into(),
+                                            reason: "Not enough coordinates for component"
+                                                .to_string(),
+                                        }
+                                    })? as f64,
+                                    *component.y_offset.get(index).ok_or_else(|| {
+                                        BabelfontError::GlyphNotInterpolatable {
+                                            glyph: glyph.name.clone().into(),
+                                            reason: "Not enough coordinates for component"
+                                                .to_string(),
+                                        }
+                                    })? as f64,
+                                ),
+                                scale: (
+                                    *component.x_scale.get(index).ok_or_else(|| {
+                                        BabelfontError::GlyphNotInterpolatable {
+                                            glyph: glyph.name.clone().into(),
+                                            reason: "Not enough coordinates for component"
+                                                .to_string(),
+                                        }
+                                    })? as f64,
+                                    *component.y_scale.get(index).ok_or_else(|| {
+                                        BabelfontError::GlyphNotInterpolatable {
+                                            glyph: glyph.name.clone().into(),
+                                            reason: "Not enough coordinates for component"
+                                                .to_string(),
+                                        }
+                                    })? as f64,
+                                ),
+                                ..Default::default()
+                            },
+                            location: IndexMap::new(),
+                            format_specific: FormatSpecific::default(),
+                        };
+                        layer.shapes.push(Shape::Component(our_component));
+                    }
+                }
+            } // => todo!(),
+            GlyphEntry::Kerning(hash_map) => {} // => todo!(),
             GlyphEntry::Outlines(nodes) => {
                 // For each layer, build the path
                 for (index, layer) in glyph.layers.iter_mut().enumerate() {
