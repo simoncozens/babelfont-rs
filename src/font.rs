@@ -249,7 +249,7 @@ impl Font {
         #[cfg(feature = "glyphs")]
         {
             if path.extension().and_then(|x| x.to_str()) == Some("glyphs") {
-                let glyphs3_font = self.as_glyphslib();
+                let glyphs3_font = self.as_glyphslib()?;
                 return glyphs3_font
                     .save(&path)
                     .map_err(|x| BabelfontError::PlistParse(x.to_string()));
@@ -312,12 +312,16 @@ impl Font {
 
 #[cfg(feature = "glyphs")]
 mod glyphs {
+    use crate::BabelfontError;
+
     use super::Font;
 
     impl Font {
         /// Convert to a glyphslib::Font in glyphs 3 format
-        pub fn as_glyphslib(&self) -> glyphslib::Font {
-            glyphslib::Font::Glyphs3(crate::convertors::glyphs3::as_glyphs3(self))
+        pub fn as_glyphslib(&self) -> Result<glyphslib::Font, BabelfontError> {
+            Ok(glyphslib::Font::Glyphs3(
+                crate::convertors::glyphs3::as_glyphs3(self)?,
+            ))
         }
     }
 }

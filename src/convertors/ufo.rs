@@ -109,7 +109,7 @@ pub fn as_norad(font: &Font) -> Result<norad::Font, BabelfontError> {
     let first_master = font
         .masters
         .first()
-        .ok_or_else(|| BabelfontError::NoDefaultMaster { path: "UFO".into() })?;
+        .ok_or(BabelfontError::NoDefaultMaster)?;
     for g in font.glyphs.iter() {
         for layer in g.layers.iter() {
             let norad_layer = babelfont_layer_to_norad_glyph(g, layer)?;

@@ -40,8 +40,7 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
         .iter()
         .map(|ax| (ax.name.get_default().unwrap().clone(), ax.tag))
         .collect();
-    let default_master = default_master(&ds, &axes)
-        .ok_or_else(|| BabelfontError::NoDefaultMaster { path: path.clone() })?;
+    let default_master = default_master(&ds, &axes).ok_or(BabelfontError::NoDefaultMaster)?;
     let relative_path_to_default_master = if let Some(r) = relative {
         r.join(default_master.filename.clone())
     } else {

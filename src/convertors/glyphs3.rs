@@ -19,6 +19,10 @@ use std::{
 };
 use write_fonts::types::Tag;
 
+mod customparameters;
+
+use customparameters::{export_font_level_cps, interpret_custom_parameters};
+
 pub(crate) type UserData = BTreeMap<SmolStr, glyphslib::Plist>;
 
 pub(crate) const KEY_ALIGNMENT: &str = "com.schriftgestalt.Glyphs.alignment";
@@ -291,7 +295,9 @@ fn _load(glyphs_font: &glyphslib::Font, path: PathBuf) -> Result<Font, Babelfont
 
     // Interpret metrics
     // Interpret axes
-    interpret_axes(&mut font);
+    interpret_axes(&mut font)?;
+    // Interpret font-level custom parameters
+    interpret_custom_parameters(&mut font)?;
 
     // Bake in Glyphs data ??? When is best to do this?
     // GlyphsData.apply(&mut font)?;
@@ -697,7 +703,7 @@ fn load_master(master: &glyphs3::Master, glyphs_font: &glyphs3::Glyphs3, font: &
     m
 }
 
-fn interpret_axes(font: &mut Font) {
+fn interpret_axes(font: &mut Font) -> Result<(), BabelfontError> {
     // This is going to look very wrong, but after much trial and error I can confirm
     // it works. First: load the axes assuming that userspace=designspace. Then
     // work out the axis mappings. Then apply the mappings to the axis locations.
@@ -729,7 +735,9 @@ fn interpret_axes(font: &mut Font) {
             }
         }
     }
-    interpret_axis_mappings(font);
+    // println!("After initial axis load: {:#?}", font.axes);
+    interpret_axis_mappings(font)?;
+    // println!("After interpreting axis mappings: {:#?}", font.axes);
 
     // Now treat as designspace and to userspace
     for axis in font.axes.iter_mut() {
@@ -742,9 +750,11 @@ fn interpret_axes(font: &mut Font) {
             axis.max = map.iter().map(|(user, _)| *user).max();
         }
     }
+    println!("After smashing designspace and userspace: {:#?}", font.axes);
+    Ok(())
 }
 
-fn interpret_axis_mappings(font: &mut Font) {
+fn interpret_axis_mappings(font: &mut Font) -> Result<(), BabelfontError> {
     if let Some(mappings) =
         get_cp(&font.format_specific, "Axis Mappings").and_then(|x| x.as_object())
     {
@@ -820,19 +830,37 @@ fn interpret_axis_mappings(font: &mut Font) {
                 .find(|a| a.name.get_default().map(|x| x.as_str()) == Some(axis_name))
             {
                 if let Some(design_location) = instance.location.get(axis.tag) {
+                    let axis_name = axis.name();
                     if axis.map.is_none() {
                         axis.map = Some(vec![]);
                     }
                     if let Some(axis_map) = &mut axis.map {
+                        // Check we don't already have this mapping
+                        if let Some(map_entry) = axis_map
+                            .iter()
+                            .find(|(u, _)| *u == UserCoord::new(user_location))
+                        {
+                            // If we're mapped to somewhere else, complain
+                            if map_entry.1 != design_location {
+                                return Err(BabelfontError::IllDefinedAxis { axis_name: axis_name.clone(), reason: format!(
+                                    "Conflicting mappings for user location {}: design location {} vs {}",
+                                    user_location,
+                                    map_entry.1.to_f64(),
+                                    design_location.to_f64()
+                                ) });
+                            }
+                            continue;
+                        }
                         axis_map.push((UserCoord::new(user_location), design_location));
                     }
                 }
             }
         }
     }
+    Ok(())
 }
 
-pub(crate) fn as_glyphs3(font: &Font) -> glyphs3::Glyphs3 {
+pub(crate) fn as_glyphs3(font: &Font) -> Result<glyphs3::Glyphs3, BabelfontError> {
     // Do some cleanups.
     let mut font = font.clone();
     #[allow(clippy::unwrap_used)] // Surely this can't fail
@@ -887,7 +915,10 @@ pub(crate) fn as_glyphs3(font: &Font) -> glyphs3::Glyphs3 {
         .map(|(tag, code)| code.to_feature(tag))
         .collect();
 
-    let custom_parameters = serialize_custom_parameters(&font.format_specific);
+    // This serializes the ones we have in .format_specific
+    let mut custom_parameters = serialize_custom_parameters(&font.format_specific);
+    // Now overlay any font-level custom parameters in the font structure (custom_ot_values etc)
+    export_font_level_cps(&mut custom_parameters, &mut font)?;
 
     let family_name = font
         .names
@@ -1027,7 +1058,7 @@ pub(crate) fn as_glyphs3(font: &Font) -> glyphs3::Glyphs3 {
             .and_then(|x| serde_json::from_value::<UserData>(x.clone()).ok())
             .unwrap_or_default(),
     };
-    glyphs_font
+    Ok(glyphs_font)
 }
 
 fn save_master(master: &Master, axes: &[Axis], metrics: &[crate::MetricType]) -> glyphs3::Master {
@@ -1101,6 +1132,7 @@ fn save_master(master: &Master, axes: &[Axis], metrics: &[crate::MetricType]) ->
 mod tests {
     #![allow(clippy::unwrap_used)]
     use crate::Shape;
+    use fontdrasil::coords::Location;
     use pretty_assertions::assert_eq;
     use rstest::rstest;
     use similar::TextDiff;
@@ -1132,6 +1164,26 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_default_master() {
+        let font = load("resources/GlyphsFileFormatv3.glyphs".into()).unwrap();
+        assert_eq!(font.masters.len(), 2);
+        assert_eq!(
+            font.masters[0].location,
+            Location::from(vec![(Tag::new(b"wght"), DesignCoord::new(100.0))])
+        );
+        assert_eq!(
+            font.masters[1].location,
+            vec![(Tag::new(b"wght"), DesignCoord::new(900.0))].into()
+        );
+        assert_eq!(font.axes.len(), 1);
+        assert_eq!(font.axes[0].tag, Tag::new(b"wght"));
+        assert_eq!(font.axes[0].min.unwrap().to_f64(), 100.0);
+        assert_eq!(font.axes[0].max.unwrap().to_f64(), 900.0);
+        assert_eq!(font.axes[0].default.unwrap().to_f64(), 100.0);
+        assert!(font.default_master().is_some());
+    }
+
     #[rstest]
     fn test_roundtrip(
         #[files("resources/*glyphs")]
@@ -1143,7 +1195,7 @@ mod tests {
         path: PathBuf,
     ) {
         let there = load(path.clone()).unwrap();
-        let backagain = glyphslib::Font::Glyphs3(as_glyphs3(&there));
+        let backagain = glyphslib::Font::Glyphs3(as_glyphs3(&there).unwrap());
         let orig = glyphslib::Font::load_str(&fs::read_to_string(path).unwrap()).unwrap();
 
         let old_string = orig.to_string().unwrap();
