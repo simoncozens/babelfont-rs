@@ -18,6 +18,13 @@ pub const KEY_GROUPS: &str = "norad.groups";
 const KEY_CATEGORIES: &str = "public.openTypeCategories";
 const KEY_PSNAMES: &str = "public.postscriptNames";
 const KEY_SKIP_EXPORT: &str = "public.skipExportGlyphs";
+// Format-specific names
+/// Key for storing style map family name in FormatSpecific
+pub const KEY_STYLE_MAP_FAMILY_NAME: &str = "ufo.styleMapFamilyName";
+/// Key for storing style map style name in FormatSpecific
+pub const KEY_STYLE_MAP_STYLE_NAME: &str = "ufo.styleMapStyleName";
+/// Key for storing style name in FormatSpecific
+pub const KEY_STYLE_NAME: &str = "ufo.styleName";
 
 pub(crate) fn stash_lib(lib: Option<&norad::Plist>) -> crate::common::FormatSpecific {
     let mut fs = crate::common::FormatSpecific::default();
@@ -126,7 +133,11 @@ pub fn as_norad(font: &Font) -> Result<norad::Font, BabelfontError> {
 
     save_kerning(&mut ufo.kerning, &first_master.kerning)?;
     save_info(&mut ufo.font_info, font);
-    // Save kerning groups
+    save_kern_groups(
+        &mut ufo.groups,
+        &font.first_kern_groups,
+        &font.second_kern_groups,
+    )?;
 
     ufo.features = font.features.to_fea();
     Ok(ufo)
@@ -301,6 +312,31 @@ pub(crate) fn save_kerning(
     Ok(())
 }
 
+pub(crate) fn save_kern_groups(
+    norad_groups: &mut norad::Groups,
+    first: &IndexMap<SmolStr, Vec<SmolStr>>,
+    second: &IndexMap<SmolStr, Vec<SmolStr>>,
+) -> Result<(), BabelfontError> {
+    // Prefix with public.kern1. and public.kern2.
+    for (group_name, glyphs) in first.iter() {
+        let norad_group_name = norad::Name::new(&format!("public.kern1.{}", group_name))?;
+        let norad_glyph_names: Vec<norad::Name> = glyphs
+            .iter()
+            .map(|g| norad::Name::new(g.as_str()))
+            .collect::<Result<_, _>>()?;
+        norad_groups.insert(norad_group_name, norad_glyph_names);
+    }
+    for (group_name, glyphs) in second.iter() {
+        let norad_group_name = norad::Name::new(&format!("public.kern2.{}", group_name))?;
+        let norad_glyph_names: Vec<norad::Name> = glyphs
+            .iter()
+            .map(|g| norad::Name::new(g.as_str()))
+            .collect::<Result<_, _>>()?;
+        norad_groups.insert(norad_group_name, norad_glyph_names);
+    }
+    Ok(())
+}
+
 pub(crate) fn save_info(info: &mut norad::FontInfo, font: &Font) {
     let get_metric = |mt: MetricType| {
         font.masters
@@ -346,11 +382,14 @@ pub(crate) fn save_info(info: &mut norad::FontInfo, font: &Font) {
         .manufacturer_url
         .get_default()
         .map(|x| x.to_string());
-    info.open_type_name_preferred_family_name =
-        font.names.family_name.get_default().map(|x| x.to_string());
+    info.open_type_name_preferred_family_name = font
+        .names
+        .wws_family_name
+        .get_default()
+        .map(|x| x.to_string());
     info.open_type_name_preferred_subfamily_name = font
         .names
-        .preferred_subfamily_name
+        .wws_subfamily_name
         .get_default()
         .map(|x| x.to_string());
     info.open_type_name_sample_text = font.names.sample_text.get_default().map(|x| x.to_string());
@@ -385,14 +424,29 @@ pub(crate) fn save_info(info: &mut norad::FontInfo, font: &Font) {
     let unicode_range_1 = font.custom_ot_values.os2_unicode_range1.unwrap_or(0) as u64;
     bit_array.extend(to_bitarray(unicode_range_1));
     let unicode_range_2 = font.custom_ot_values.os2_unicode_range2.unwrap_or(0) as u64;
-    bit_array.extend(to_bitarray(unicode_range_2).iter().map(|&bit| bit + 64));
+    bit_array.extend(to_bitarray(unicode_range_2).iter().map(|&bit| bit + 32));
     let unicode_range_3 = font.custom_ot_values.os2_unicode_range3.unwrap_or(0) as u64;
-    bit_array.extend(to_bitarray(unicode_range_3).iter().map(|&bit| bit + 128));
+    bit_array.extend(to_bitarray(unicode_range_3).iter().map(|&bit| bit + 64));
     let unicode_range_4 = font.custom_ot_values.os2_unicode_range4.unwrap_or(0) as u64;
-    bit_array.extend(to_bitarray(unicode_range_4).iter().map(|&bit| bit + 192));
+    bit_array.extend(to_bitarray(unicode_range_4).iter().map(|&bit| bit + 96));
     if !bit_array.is_empty() {
         info.open_type_os2_unicode_ranges = Some(bit_array);
     }
+    info.open_type_os2_panose =
+        font.custom_ot_values
+            .os2_panose
+            .map(|x| norad::fontinfo::Os2Panose {
+                family_type: x[0].into(),
+                serif_style: x[1].into(),
+                weight: x[2].into(),
+                proportion: x[3].into(),
+                contrast: x[4].into(),
+                stroke_variation: x[5].into(),
+                arm_style: x[6].into(),
+                letterform: x[7].into(),
+                midline: x[8].into(),
+                x_height: x[9].into(),
+            });
     info.open_type_os2_vendor_id = font.custom_ot_values.os2_vendor_id.map(|x| x.to_string());
     info.open_type_os2_win_ascent = get_metric(MetricType::WinAscent).map(|x| x as u32);
     info.open_type_os2_win_descent = get_metric(MetricType::WinDescent).map(|x| x as u32);
@@ -405,11 +459,26 @@ pub(crate) fn save_info(info: &mut norad::FontInfo, font: &Font) {
     info.postscript_stem_snap_h = font.custom_ot_values.cff_stem_snap_h.clone();
     info.postscript_stem_snap_v = font.custom_ot_values.cff_stem_snap_v.clone();
     info.style_map_family_name = font
-        .names
-        .preferred_subfamily_name
-        .get_default()
+        .format_specific
+        .get(KEY_STYLE_MAP_FAMILY_NAME)
+        .and_then(|x| x.as_str())
         .map(|x| x.to_string());
-    // Style map style name
+    info.style_map_style_name = font
+        .format_specific
+        .get(KEY_STYLE_MAP_STYLE_NAME)
+        .and_then(|x| x.as_str())
+        .map(|x| match x {
+            "Regular" => norad::fontinfo::StyleMapStyle::Regular,
+            "Bold" => norad::fontinfo::StyleMapStyle::Bold,
+            "Italic" => norad::fontinfo::StyleMapStyle::Italic,
+            "Bold Italic" => norad::fontinfo::StyleMapStyle::BoldItalic,
+            _ => norad::fontinfo::StyleMapStyle::Regular,
+        });
+    info.style_name = font
+        .format_specific
+        .get(KEY_STYLE_NAME)
+        .and_then(|x| x.as_str())
+        .map(|x| x.to_string());
     info.trademark = font.names.trademark.get_default().map(|x| x.to_string());
     info.units_per_em = Some((font.upm as u32).into());
     info.version_major = Some(font.version.0 as i32);
@@ -418,54 +487,91 @@ pub(crate) fn save_info(info: &mut norad::FontInfo, font: &Font) {
     info.x_height = get_metric(MetricType::XHeight);
 }
 
+macro_rules! load_metric {
+    ($info:ident, $metrics:ident, $field:ident, $metric_type:expr) => {
+        if let Some(v) = $info.$field {
+            $metrics.insert($metric_type, v as i32);
+        }
+    };
+}
+
 pub(crate) fn load_master_info(master: &mut Master, info: &norad::FontInfo) {
     let metrics = &mut master.metrics;
-    if let Some(v) = info.ascender {
-        metrics.insert(MetricType::Ascender, v as i32);
-    }
-    if let Some(v) = info.cap_height {
-        metrics.insert(MetricType::CapHeight, v as i32);
-    }
-    if let Some(v) = info.descender {
-        metrics.insert(MetricType::Descender, v as i32);
-    }
+    load_metric!(info, metrics, ascender, MetricType::Ascender);
+    load_metric!(info, metrics, cap_height, MetricType::CapHeight);
+    load_metric!(info, metrics, descender, MetricType::Descender);
+    load_metric!(info, metrics, italic_angle, MetricType::ItalicAngle);
+    load_metric!(info, metrics, x_height, MetricType::XHeight);
+    load_metric!(
+        info,
+        metrics,
+        open_type_hhea_ascender,
+        MetricType::HheaAscender
+    );
+    load_metric!(
+        info,
+        metrics,
+        open_type_hhea_descender,
+        MetricType::HheaDescender
+    );
+    load_metric!(
+        info,
+        metrics,
+        open_type_hhea_line_gap,
+        MetricType::HheaLineGap
+    );
+    load_metric!(
+        info,
+        metrics,
+        open_type_hhea_caret_offset,
+        MetricType::HheaCaretOffset
+    );
+    load_metric!(
+        info,
+        metrics,
+        open_type_os2_typo_ascender,
+        MetricType::TypoAscender
+    );
+    load_metric!(
+        info,
+        metrics,
+        open_type_os2_typo_descender,
+        MetricType::TypoDescender
+    );
+    load_metric!(
+        info,
+        metrics,
+        open_type_os2_typo_line_gap,
+        MetricType::TypoLineGap
+    );
+    load_metric!(
+        info,
+        metrics,
+        open_type_os2_win_ascent,
+        MetricType::WinAscent
+    );
+    load_metric!(
+        info,
+        metrics,
+        open_type_os2_win_descent,
+        MetricType::WinDescent
+    );
+    load_metric!(
+        info,
+        metrics,
+        postscript_underline_position,
+        MetricType::UnderlinePosition
+    );
+    load_metric!(
+        info,
+        metrics,
+        postscript_underline_thickness,
+        MetricType::UnderlineThickness
+    );
     if let Some(v) = &info.guidelines {
         for g in v.iter() {
             master.guides.push(g.into())
         }
-    }
-    if let Some(v) = info.italic_angle {
-        metrics.insert(MetricType::ItalicAngle, v as i32); // XXX i32 won't cut it
-    }
-    if let Some(v) = info.x_height {
-        metrics.insert(MetricType::XHeight, v as i32);
-    }
-    if let Some(v) = info.open_type_hhea_ascender {
-        metrics.insert(MetricType::HheaAscender, v);
-    }
-    if let Some(v) = info.open_type_hhea_descender {
-        metrics.insert(MetricType::HheaDescender, v);
-    }
-    if let Some(v) = info.open_type_hhea_line_gap {
-        metrics.insert(MetricType::HheaLineGap, v);
-    }
-    if let Some(v) = info.open_type_hhea_caret_offset {
-        metrics.insert(MetricType::HheaCaretOffset, v);
-    }
-    if let Some(v) = info.open_type_os2_typo_ascender {
-        metrics.insert(MetricType::TypoAscender, v);
-    }
-    if let Some(v) = info.open_type_os2_typo_descender {
-        metrics.insert(MetricType::TypoDescender, v);
-    }
-    if let Some(v) = info.open_type_os2_typo_line_gap {
-        metrics.insert(MetricType::TypoLineGap, v);
-    }
-    if let Some(v) = info.open_type_os2_win_ascent {
-        metrics.insert(MetricType::WinAscent, v as i32);
-    }
-    if let Some(v) = info.open_type_os2_win_descent {
-        metrics.insert(MetricType::WinDescent, v as i32);
     }
 }
 
@@ -583,6 +689,48 @@ pub(crate) fn load_font_info(
     copy_name!(font, info, sample_text);
     copy_name!(font, info, unique_id);
     copy_name!(font, info, version);
+    if let Some(smfn) = &info.style_map_family_name {
+        font.format_specific.insert(
+            KEY_STYLE_MAP_FAMILY_NAME.into(),
+            serde_json::to_value(smfn).unwrap_or_default(),
+        );
+    }
+    if let Some(smsn) = &info.style_map_style_name {
+        font.format_specific.insert(
+            KEY_STYLE_MAP_STYLE_NAME.into(),
+            match smsn {
+                norad::fontinfo::StyleMapStyle::Regular => "Regular",
+                norad::fontinfo::StyleMapStyle::Bold => "Bold",
+                norad::fontinfo::StyleMapStyle::Italic => "Italic",
+                norad::fontinfo::StyleMapStyle::BoldItalic => "Bold Italic",
+            }
+            .into(),
+        );
+    }
+    if let Some(stylename) = &info.style_name {
+        font.format_specific
+            .insert(KEY_STYLE_NAME.into(), stylename.clone().into());
+    }
+    if let Some(v) = info.open_type_name_preferred_family_name.as_ref() {
+        font.names.wws_family_name = v.into(); // Is this the right place?
+    }
+    if let Some(v) = info.open_type_name_preferred_subfamily_name.as_ref() {
+        font.names.wws_subfamily_name = v.into();
+    }
+    if let Some(panose) = &info.open_type_os2_panose {
+        font.custom_ot_values.os2_panose = Some([
+            panose.family_type.try_into().unwrap_or(0),
+            panose.serif_style.try_into().unwrap_or(0),
+            panose.weight.try_into().unwrap_or(0),
+            panose.proportion.try_into().unwrap_or(0),
+            panose.contrast.try_into().unwrap_or(0),
+            panose.stroke_variation.try_into().unwrap_or(0),
+            panose.arm_style.try_into().unwrap_or(0),
+            panose.letterform.try_into().unwrap_or(0),
+            panose.midline.try_into().unwrap_or(0),
+            panose.x_height.try_into().unwrap_or(0),
+        ]);
+    }
 }
 
 pub(crate) fn load_kerning(master: &mut Master, kerning: &norad::Kerning) {
@@ -776,13 +924,20 @@ mod tests {
             assert_eq!(g1, g2, "Glyph {} differs", name);
         }
 
-        // assert_eq!(backagain.lib, once_more.lib);
-        // assert_eq!(backagain.groups, once_more.groups);
+        assert_eq!(
+            there.custom_ot_values.os2_unicode_range2,
+            Some(
+                // 0,1,2,3,4,13,30 should be set
+                1 << 0 | 1 << 1 | 1 << 2 | 1 << 3 | 1 << 4 | 1 << 13 | 1 << 30
+            )
+        );
+
+        assert_eq!(backagain.lib, once_more.lib);
+        assert_eq!(backagain.groups, once_more.groups);
         assert_eq!(backagain.kerning, once_more.kerning);
         assert_eq!(backagain.features.trim(), once_more.features.trim());
         assert_eq!(backagain.data, once_more.data);
         assert_eq!(backagain.images, once_more.images);
-        //assert_eq!(backagain.font_info, once_more.font_info);
-        // These are expected failures for now.
+        assert_eq!(backagain.font_info, once_more.font_info);
     }
 }
