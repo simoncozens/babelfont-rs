@@ -1,4 +1,6 @@
-use crate::{convertors::fontir::CompilationOptions, Component, Font, Layer, NodeType, Shape};
+use crate::{
+    convertors::fontir::CompilationOptions, Component, Font, Layer, LayerType, NodeType, Shape,
+};
 use fontdrasil::{
     coords::{NormalizedCoord, NormalizedLocation},
     orchestration::{Access, AccessBuilder, Work},
@@ -96,13 +98,19 @@ impl Work<Context, WorkId, Error> for GlyphIrWork {
             .map(|m| (m.id.clone(), m))
             .collect::<HashMap<_, _>>();
         for layer in layers.iter() {
-            let master_id = &layer.id;
-            let master = master_id.as_ref().and_then(|id| master_ids.get(id));
-            let Some(design_location) = layer
-                .location
-                .as_ref()
-                .or_else(|| master.map(|m| &m.location))
-            else {
+            let maybe_location = if let LayerType::DefaultForMaster(mid) = &layer.master {
+                let master = master_ids.get(mid);
+                master.map(|m| &m.location)
+            } else {
+                layer.location.as_ref()
+            };
+            let design_location = if let Some(loc) = maybe_location {
+                loc
+            } else {
+                println!(
+                    "Skipping layer without location for glyph {}, layer was {:?}",
+                    self.glyph_name, layer.master
+                );
                 continue;
             };
             let location = design_location.to_normalized(axes);
