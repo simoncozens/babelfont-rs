@@ -134,6 +134,127 @@ pub enum Shape {
     Path(Path),
 }
 
+// This code stolen from Skrifa.
+/// Interface for accepting a sequence of path commands.
+pub trait OutlinePen {
+    /// Emit a command to begin a new subpath at (x, y).
+    fn move_to(&mut self, x: f32, y: f32);
+
+    /// Emit a line segment from the current point to (x, y).
+    fn line_to(&mut self, x: f32, y: f32);
+
+    /// Emit a quadratic bezier segment from the current point with a control
+    /// point at (cx0, cy0) and ending at (x, y).
+    fn quad_to(&mut self, cx0: f32, cy0: f32, x: f32, y: f32);
+
+    /// Emit a cubic bezier segment from the current point with control
+    /// points at (cx0, cy0) and (cx1, cy1) and ending at (x, y).
+    fn curve_to(&mut self, cx0: f32, cy0: f32, cx1: f32, cy1: f32, x: f32, y: f32);
+
+    /// Emit a command to close the current subpath.
+    fn close(&mut self);
+}
+
+/// A pen which builds paths
+///
+/// ```rust
+/// use babelfont::{OutlinePen, PathBuilder};
+/// let mut pen = PathBuilder::new();
+/// pen.move_to(0.0, 0.0);
+/// pen.line_to(100.0, 0.0);
+/// pen.line_to(100.0, 100.0);
+/// pen.close();
+/// let paths = pen.build();
+/// assert_eq!(paths.len(), 1);
+/// assert_eq!(paths[0].nodes.len(), 3); // move, line, line
+/// assert!(paths[0].closed);
+/// ```
+#[derive(Debug, Clone, Default)]
+pub struct PathBuilder {
+    paths: Vec<Path>,
+    current_path: Option<Path>,
+}
+impl PathBuilder {
+    /// Create a new PathBuilder
+    pub fn new() -> Self {
+        Self {
+            paths: Vec::new(),
+            current_path: None,
+        }
+    }
+    /// Build and return the paths
+    pub fn build(self) -> Vec<Path> {
+        if let Some(path) = self.current_path {
+            let mut paths = self.paths;
+            paths.push(path);
+            return paths;
+        }
+        self.paths
+    }
+
+    fn current_path_mut(&mut self) -> &mut Path {
+        if self.current_path.is_none() {
+            self.current_path = Some(Path::default());
+        }
+        #[allow(clippy::unwrap_used)] // we just checked it's Some
+        self.current_path.as_mut().unwrap()
+    }
+}
+
+impl OutlinePen for PathBuilder {
+    fn move_to(&mut self, x: f32, y: f32) {
+        // Start a new path if we have an existing one
+        if let Some(path) = self.current_path.take() {
+            self.paths.push(path);
+        }
+        self.current_path_mut().nodes.push(Node::new_move(x, y));
+    }
+
+    fn line_to(&mut self, x: f32, y: f32) {
+        self.current_path_mut().nodes.push(Node::new_line(x, y));
+    }
+
+    fn quad_to(&mut self, cx0: f32, cy0: f32, x: f32, y: f32) {
+        self.current_path_mut()
+            .nodes
+            .push(Node::new_offcurve(cx0, cy0));
+        self.current_path_mut().nodes.push(Node::new_qcurve(x, y));
+    }
+
+    fn curve_to(&mut self, cx0: f32, cy0: f32, cx1: f32, cy1: f32, x: f32, y: f32) {
+        self.current_path_mut()
+            .nodes
+            .push(Node::new_offcurve(cx0, cy0));
+        self.current_path_mut()
+            .nodes
+            .push(Node::new_offcurve(cx1, cy1));
+        self.current_path_mut().nodes.push(Node::new_curve(x, y));
+    }
+
+    fn close(&mut self) {
+        if let Some(path) = self.current_path.as_mut() {
+            // End-of-path fixups; first, close the current path
+            path.closed = true;
+            // The first node is currently a move, but we don't want a move
+            // in a closed path. If the final node brought us back to the start
+            // point, then drop the first node. Otherwise, convert it to a line.
+            if let Some(first_node) = path.nodes.first() {
+                if let Some(last_node) = path.nodes.last() {
+                    if first_node.x == last_node.x && first_node.y == last_node.y {
+                        // Drop the first node
+                        path.nodes.remove(0);
+                    } else {
+                        // Convert the first node to a line
+                        if let Some(first_node) = path.nodes.first_mut() {
+                            first_node.nodetype = NodeType::Line;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 #[cfg(feature = "glyphs")]
 mod glyphs {
     use fontdrasil::coords::DesignCoord;
