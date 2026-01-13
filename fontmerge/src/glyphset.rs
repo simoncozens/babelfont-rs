@@ -6,16 +6,11 @@ use crate::{
 use babelfont::{Font, SmolStr};
 use indexmap::{IndexMap, IndexSet};
 
-pub(crate) struct GlyphsetFilter {
-    // include_glyphs: Vec<String>,
-    // exclude_glyphs: Vec<String>,
-    // include_codepoints: Vec<char>,
-    // blacklist: IndexSet<String>,
-    pub(crate) incoming_glyphset: IndexSet<SmolStr>,
-    pub(crate) existing_glyphs: IndexSet<SmolStr>,
-    // existing_map: IndexMap<char, String>,
-    pub(crate) mappings_to_delete: IndexMap<SmolStr, Vec<char>>,
-    existing_glyph_handling: ExistingGlyphHandling,
+pub struct GlyphsetFilter {
+    pub incoming_glyphset: IndexSet<SmolStr>,
+    pub existing_glyphs: IndexSet<SmolStr>,
+    mappings_to_delete: IndexMap<SmolStr, Vec<char>>,
+    pub existing_glyph_handling: ExistingGlyphHandling,
 }
 
 impl GlyphsetFilter {

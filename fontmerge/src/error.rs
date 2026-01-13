@@ -30,4 +30,7 @@ pub enum FontmergeError {
     /// Source manipulation error
     #[error("Source manipulation error: {0}")]
     SourceManipulationError(#[from] BabelfontError),
+    /// No glyphs selected for merging
+    #[error("No glyphs selected for merging from donor font")]
+    NoGlyphsSelected,
 }
