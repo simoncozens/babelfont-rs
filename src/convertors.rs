@@ -17,3 +17,6 @@ pub mod glyphs3;
 #[cfg(feature = "ufo")]
 /// Bare UFO convertor
 pub mod ufo;
+#[cfg(feature = "vfb")]
+/// VFB convertor
+pub mod vfb;

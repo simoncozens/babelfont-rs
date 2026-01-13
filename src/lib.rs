@@ -173,7 +173,7 @@ pub use crate::{
     master::Master,
     metrics::MetricType,
     names::Names,
-    shape::{Component, Path, Shape},
+    shape::{Component, OutlinePen, Path, PathBuilder, Shape},
 };
 pub use fontdrasil::coords::{
     DesignCoord, DesignLocation, NormalizedCoord, NormalizedLocation, UserCoord, UserLocation,
@@ -206,6 +206,8 @@ pub fn load(filename: impl Into<PathBuf>) -> Result<Font, BabelfontError> {
         Some(ext) if ext == "vfj" => crate::convertors::fontlab::load(pb),
         #[cfg(feature = "ufo")]
         Some(ext) if ext == "ufo" => crate::convertors::ufo::load(pb),
+        #[cfg(feature = "vfb")]
+        Some(ext) if ext == "vfb" => crate::convertors::vfb::load(pb),
         #[cfg(feature = "glyphs")]
         Some(ext) if ext == "glyphs" || ext == "glyphspackage" => {
             crate::convertors::glyphs3::load(pb)

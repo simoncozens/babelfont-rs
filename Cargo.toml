@@ -21,6 +21,7 @@ uuid = { version = "1.11.0", features = ["v4", "js", "serde"] }
 
 [features]
 default = ["glyphs", "ufo", "fontlab", "fontra", "fontir", "rayon", "types"]
+vfb = ["dep:vfbreader"]
 glyphs = ["dep:glyphslib"]
 ufo = ["dep:norad"]
 fontra = []
@@ -63,6 +64,7 @@ clap-verbosity-flag = { version = "3.0.4", optional = true }
 fea-rs-ast = { version = "0.1.0" }
 typeshare = { version = "1.0.4", optional = true }
 num-traits = "0.2.19"
+vfbreader = { git = "https://github.com/simoncozens/vfbLib-rust", optional = true }
 
 [dev-dependencies]
 pretty_assertions = "1.4.1"

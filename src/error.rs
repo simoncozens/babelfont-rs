@@ -58,6 +58,11 @@ pub enum BabelfontError {
     /// Error in UFO color
     UfoColor(#[from] norad::error::ColorError),
 
+    #[cfg(feature = "vfb")]
+    #[error("Error loading VFB: {0}")]
+    /// Error loading VFB
+    VfbLoad(Box<dyn std::error::Error>),
+
     /// Could not find default master for the font at the given path
     #[error("Could not find default master")]
     NoDefaultMaster,
@@ -210,6 +215,12 @@ impl From<BabelfontError> for fontir::error::Error {
             )
             .into(),
             BabelfontError::JsonSerialize(e) => fontir::error::BadSource::new(
+                "Unknown",
+                fontir::error::BadSourceKind::Custom(e.to_string()),
+            )
+            .into(),
+            #[cfg(feature = "vfb")]
+            BabelfontError::VfbLoad(e) => fontir::error::BadSource::new(
                 "Unknown",
                 fontir::error::BadSourceKind::Custom(e.to_string()),
             )

@@ -49,6 +49,8 @@ static SUPPORTED_EXTENSIONS: LazyLock<Vec<&'static str>> = LazyLock::new(|| {
         "glyphspackage",
         #[cfg(feature = "fontir")]
         "ttf",
+        #[cfg(feature = "vfb")]
+        "vfb",
     ]
 });
 
