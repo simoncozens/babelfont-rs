@@ -3,10 +3,11 @@ use typeshare::typeshare;
 
 use crate::common::formatspecific::FormatSpecific;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize, Default)]
 #[typeshare]
 /// Types of nodes in a glyph outline
 pub enum NodeType {
+    #[default] // arbitrary
     /// Move to a new position without drawing (only defined for open contours)
     Move,
     /// Draw a straight line to this node
@@ -19,7 +20,7 @@ pub enum NodeType {
     QCurve,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[typeshare]
 /// A node in a glyph outline
 pub struct Node {
@@ -43,6 +44,57 @@ impl Node {
     /// Convert the Node to a [kurbo::Point]
     pub fn to_kurbo(&self) -> kurbo::Point {
         kurbo::Point::new(self.x, self.y)
+    }
+
+    /// Create a new Move node with default properties
+    pub fn new_offcurve(x: impl Into<f64>, y: impl Into<f64>) -> Self {
+        Node {
+            x: x.into(),
+            y: y.into(),
+            nodetype: NodeType::OffCurve,
+            ..Default::default()
+        }
+    }
+
+    /// Create a new Curve node with default properties
+    pub fn new_curve(x: impl Into<f64>, y: impl Into<f64>) -> Self {
+        Node {
+            x: x.into(),
+            y: y.into(),
+            nodetype: NodeType::Curve,
+            ..Default::default()
+        }
+    }
+
+    /// Create a new Move node with default properties
+    pub fn new_move(x: impl Into<f64>, y: impl Into<f64>) -> Self {
+        Node {
+            x: x.into(),
+            y: y.into(),
+            nodetype: NodeType::Move,
+            ..Default::default()
+        }
+    }
+
+    /// Create a new Line node with default properties
+    pub fn new_line(x: impl Into<f64>, y: impl Into<f64>) -> Self {
+        Node {
+            x: x.into(),
+            y: y.into(),
+            nodetype: NodeType::Line,
+            ..Default::default()
+        }
+    }
+
+    /// Create a new QCurve node with default properties
+    pub fn new_qcurve(x: impl Into<f64>, y: impl Into<f64>) -> Self {
+        Node {
+            x: x.into(),
+            y: y.into(),
+            nodetype: NodeType::QCurve,
+            smooth: false,
+            format_specific: FormatSpecific::default(),
+        }
     }
 }
 
