@@ -1,3 +1,4 @@
+mod decomposesmartcomponents;
 mod dropaxis;
 mod dropfeatures;
 mod dropguides;
@@ -11,6 +12,7 @@ mod resolveincludes;
 mod retainglyphs;
 mod scaleupem;
 
+pub use decomposesmartcomponents::DecomposeSmartComponents;
 pub use dropaxis::DropAxis;
 pub use dropfeatures::DropFeatures;
 pub use dropguides::DropGuides;

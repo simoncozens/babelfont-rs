@@ -1,7 +1,9 @@
 use std::{str::FromStr, sync::LazyLock};
 
 use babelfont::filters::FontFilter;
+use babelfont::SmolStr;
 use clap::Parser;
+use indexmap::IndexSet;
 
 #[derive(Parser)]
 struct Cli {
@@ -100,6 +102,20 @@ fn convert_filters(filter: &[String]) -> Vec<Box<dyn FontFilter>> {
                     None
                 };
                 result.push(Box::new(babelfont::filters::ResolveIncludes::new(
+                    filter_arg,
+                )));
+            }
+            "decomposesmartcomponents" => {
+                let filter_arg: Option<IndexSet<SmolStr>> = if parts.len() == 2 {
+                    let glyphs: IndexSet<SmolStr> = parts[1]
+                        .split(',')
+                        .map(|s| SmolStr::new(s.trim()))
+                        .collect();
+                    Some(glyphs)
+                } else {
+                    None
+                };
+                result.push(Box::new(babelfont::filters::DecomposeSmartComponents::new(
                     filter_arg,
                 )));
             }

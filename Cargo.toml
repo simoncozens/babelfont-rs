@@ -39,8 +39,7 @@ types = ["dep:typeshare"]
 [dependencies]
 chrono = { version = "0.4.3", features = ["serde"] }
 kurbo = "0.12"
-# glyphslib = { version = "0.2.1", optional = true }
-glyphslib = { path = "../glyphslib-rs/glyphslib", optional = true }
+glyphslib = { version = "0.2.2", optional = true }
 norad = { version = "0.17.0", features = ["kurbo"], optional = true }
 log = "0.4.14"
 serde_json = "1.0"

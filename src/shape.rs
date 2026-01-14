@@ -134,6 +134,43 @@ pub enum Shape {
     Path(Path),
 }
 
+impl Shape {
+    pub(crate) fn is_smart_component(&self) -> bool {
+        match self {
+            Shape::Component(c) => !c.location.is_empty(),
+            Shape::Path(_) => false,
+        }
+    }
+
+    /// Apply a DecomposedAffine transform to the shape
+    pub fn apply_transform(&self, transform: DecomposedAffine) -> Self {
+        match self {
+            Shape::Component(c) => {
+                let new_transform = transform.to_affine() * c.transform.to_affine();
+                let mut new_component = c.clone();
+                new_component.transform = new_transform.into();
+                Shape::Component(new_component)
+            }
+            Shape::Path(p) => {
+                let mut contour = Path::default();
+                for node in &p.nodes {
+                    let new_point = transform.to_affine() * kurbo::Point::new(node.x, node.y);
+                    contour.nodes.push(Node {
+                        x: new_point.x,
+                        y: new_point.y,
+                        nodetype: node.nodetype,
+                        smooth: node.smooth,
+                        format_specific: node.format_specific.clone(),
+                    })
+                }
+                contour.closed = p.closed;
+
+                Shape::Path(contour)
+            }
+        }
+    }
+}
+
 // This code stolen from Skrifa.
 /// Interface for accepting a sequence of path commands.
 pub trait OutlinePen {

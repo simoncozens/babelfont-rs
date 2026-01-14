@@ -14,7 +14,7 @@ pub enum TransformOrder {
 }
 
 /// A decomposed affine transformation with separate translation, rotation, scale, and skew components
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Copy)]
 #[typeshare]
 pub struct DecomposedAffine {
     #[typeshare(typescript(type = "[number, number]"))]
