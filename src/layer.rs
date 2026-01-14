@@ -5,7 +5,8 @@ use crate::{
     shape::Shape,
     BabelfontError, Component, Font, Node, Path,
 };
-use fontdrasil::coords::DesignLocation;
+use fontdrasil::coords::{DesignCoord, DesignLocation};
+use indexmap::IndexMap;
 use kurbo::Shape as KurboShape;
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
@@ -65,6 +66,7 @@ pub struct Layer {
     /// The ID of the background layer for this layer, if any
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub background_layer_id: Option<String>,
+    /// The location of the layer in design space, if it is not at the default location for a master
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
@@ -73,10 +75,22 @@ pub struct Layer {
     )]
     #[typeshare(python(type = "Optional[Dict[str, float]]"))]
     #[typeshare(typescript(type = "import('@simoncozens/fonttypes').DesignspaceLocation"))]
-    /// The location of the layer in design space, if it is not at the default location for a master
     pub location: Option<DesignLocation>,
-    #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
+    /// The location of the layer in smart component (glyph-specific axes) space
+    // Note we don't use DesignLocation here because smart component locations are not
+    // named by axis tags but by axis names.
+    #[serde(
+        default,
+        skip_serializing_if = "IndexMap::is_empty",
+        serialize_with = "crate::serde_helpers::string_design_location_to_map",
+        deserialize_with = "crate::serde_helpers::string_design_location_from_map"
+    )]
+    #[typeshare(python(type = "Optional[Dict[str, float]]"))]
+    #[typeshare(typescript(type = "import('@simoncozens/fonttypes').DesignspaceLocation"))]
+    pub smart_component_location: IndexMap<String, DesignCoord>,
+
     /// Format-specific data for the layer
+    #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
     #[typeshare(python(type = "Dict[str, Any]"))]
     #[typeshare(typescript(type = "Record<string, any>"))]
     pub format_specific: FormatSpecific,
@@ -167,6 +181,7 @@ impl Layer {
             is_background: self.is_background,
             background_layer_id: self.background_layer_id.clone(),
             location: self.location.clone(),
+            smart_component_location: self.smart_component_location.clone(),
             shapes: self
                 .shapes
                 .iter()
@@ -282,7 +297,11 @@ pub(crate) mod glyphs {
 
     use super::*;
 
-    pub(crate) fn layer_from_glyphs(val: &glyphslib::glyphs3::Layer, axes_order: &[Tag]) -> Layer {
+    pub(crate) fn layer_from_glyphs(
+        val: &glyphslib::glyphs3::Layer,
+        axes_order: &[Tag],
+        glyph_specific_axes: &[(String, DesignCoord, DesignCoord)], // name, bottom, top
+    ) -> Result<Layer, BabelfontError> {
         let format_specific = {
             let mut fs = FormatSpecific::default();
             fs.insert_if_ne_json("visible", &val.visible, &true);
@@ -317,7 +336,25 @@ pub(crate) mod glyphs {
                     })
                     .collect::<DesignLocation>()
             });
-        Layer {
+        let mut smart_location = IndexMap::new();
+        for (axis, index) in val.part_selection.iter() {
+            if let Some((_, bottom, top)) =
+                glyph_specific_axes.iter().find(|(name, _, _)| name == axis)
+            {
+                let coord = match index {
+                    1 => *bottom,
+                    2 => *top,
+                    _ => continue,
+                };
+                smart_location.insert(axis.clone(), coord);
+            } else {
+                return Err(BabelfontError::UnknownSmartComponentAxis {
+                    axis: axis.clone(),
+                    layer: val.layer_id.clone(),
+                });
+            }
+        }
+        Ok(Layer {
             id: Some(val.layer_id.clone()),
             master: match &val.associated_master_id {
                 Some(m) => LayerType::AssociatedWithMaster(m.clone()),
@@ -333,11 +370,16 @@ pub(crate) mod glyphs {
             is_background: false,
             background_layer_id: None,
             location,
+            smart_component_location: smart_location,
             format_specific,
-        }
+        })
     }
 
-    pub(crate) fn layer_to_glyphs(val: &Layer, axes_order: &[Tag]) -> glyphslib::glyphs3::Layer {
+    pub(crate) fn layer_to_glyphs(
+        val: &Layer,
+        axes_order: &[Tag],
+        glyph_specific_axes: &[(String, DesignCoord, DesignCoord)],
+    ) -> glyphslib::glyphs3::Layer {
         let mut attr: BTreeMap<SmolStr, _> = BTreeMap::new();
         if let Some(attr_map) = val
             .format_specific
@@ -354,6 +396,16 @@ pub(crate) mod glyphs {
                     .collect::<Vec<_>>()
                     .into(),
             );
+        }
+        let mut part_selection: BTreeMap<String, u8> = BTreeMap::new();
+        for (axis, bottom, top) in glyph_specific_axes {
+            if let Some(coord) = val.smart_component_location.get(axis) {
+                if *coord == *bottom {
+                    part_selection.insert(axis.clone(), 1);
+                } else if *coord == *top {
+                    part_selection.insert(axis.clone(), 2);
+                }
+            }
         }
         glyphslib::glyphs3::Layer {
             layer_id: match val.master {
@@ -390,7 +442,7 @@ pub(crate) mod glyphs {
             metric_top: val.format_specific.get_optionstring(KEY_METRIC_TOP),
             metric_vert_width: val.format_specific.get_optionstring(KEY_METRIC_VERT_WIDTH),
             metric_width: val.format_specific.get_optionstring(KEY_METRIC_WIDTH),
-            part_selection: BTreeMap::new(),
+            part_selection,
             user_data: val
                 .format_specific
                 .get(KEY_USER_DATA)

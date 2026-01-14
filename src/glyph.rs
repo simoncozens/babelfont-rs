@@ -144,13 +144,17 @@ pub(crate) mod glyphs {
     use crate::{
         convertors::glyphs3::{copy_user_data, UserData, KEY_USER_DATA},
         layer::glyphs::{layer_from_glyphs, layer_to_glyphs},
+        BabelfontError,
     };
 
     use super::*;
-    use fontdrasil::{coords::UserCoord, types::Tag};
+    use fontdrasil::{
+        coords::{DesignCoord, UserCoord},
+        types::Tag,
+    };
     use glyphslib::glyphs3::Glyph as G3Glyph;
 
-    pub(crate) fn from_glyphs(val: &G3Glyph, axes_order: &[Tag]) -> Glyph {
+    pub(crate) fn from_glyphs(val: &G3Glyph, axes_order: &[Tag]) -> Result<Glyph, BabelfontError> {
         let mut format_specific = FormatSpecific::default();
         format_specific.insert_json_non_null("case", &val.case);
         format_specific.insert_json_non_null("color", &val.color);
@@ -190,10 +194,17 @@ pub(crate) mod glyphs {
         };
         copy_user_data(&mut format_specific, &val.user_data);
         let mut layers = vec![];
+        let component_axes: Vec<Axis> = val
+            .smart_component_settings
+            .iter()
+            .map(|x| x.into())
+            .collect();
+        // Now pre-chew them for easy layer generation
+        let sc_axes = glyph_specific_axes(&component_axes);
         for layer in &val.layers {
-            let mut bf_layer = layer_from_glyphs(layer, axes_order);
+            let mut bf_layer = layer_from_glyphs(layer, axes_order, &sc_axes)?;
             if let Some(bg_layer) = &layer.background {
-                let mut background = layer_from_glyphs(bg_layer.deref(), axes_order);
+                let mut background = layer_from_glyphs(bg_layer.deref(), axes_order, &sc_axes)?;
                 background.is_background = true;
                 if background.id.is_none() || background.id == Some("".to_string()) {
                     background.id =
@@ -206,7 +217,7 @@ pub(crate) mod glyphs {
                 layers.push(bf_layer);
             }
         }
-        Glyph {
+        Ok(Glyph {
             name: SmolStr::from(&val.name),
             production_name: val.production.as_ref().map(SmolStr::from),
             category,
@@ -220,13 +231,31 @@ pub(crate) mod glyphs {
                     Some(Direction::from_str(d).unwrap_or(Direction::LeftToRight))
                 }
             }),
-            component_axes: val
-                .smart_component_settings
-                .iter()
-                .map(|x| x.into())
-                .collect(),
+            component_axes,
             format_specific,
-        }
+        })
+    }
+
+    fn glyph_specific_axes(
+        component_axes: &Vec<Axis>,
+    ) -> Vec<(
+        String,
+        fontdrasil::coords::Coord<fontdrasil::coords::DesignSpace>,
+        fontdrasil::coords::Coord<fontdrasil::coords::DesignSpace>,
+    )> {
+        component_axes
+            .iter()
+            .map(|axis| {
+                (
+                    axis.name
+                        .get_default()
+                        .unwrap_or(&"Unnamed Axis".to_string())
+                        .to_string(),
+                    DesignCoord::new(axis.min.unwrap_or(UserCoord::new(0.0)).to_f64()), // There is no mapping
+                    DesignCoord::new(axis.max.unwrap_or(UserCoord::new(0.0)).to_f64()),
+                )
+            })
+            .collect()
     }
 
     pub(crate) fn glyph_to_glyphs(
@@ -236,14 +265,16 @@ pub(crate) mod glyphs {
         kern_right: Option<&SmolStr>,
     ) -> glyphslib::glyphs3::Glyph {
         let mut g3_layers = vec![];
+        let sc_axes = glyph_specific_axes(&val.component_axes);
         for layer in &val.layers {
             if layer.is_background {
                 continue;
             }
-            let mut g3_layer = layer_to_glyphs(layer, axis_order);
+            let mut g3_layer = layer_to_glyphs(layer, axis_order, &sc_axes);
             if let Some(bg_id) = &layer.background_layer_id {
                 if let Some(bg_layer) = val.get_layer(bg_id) {
-                    g3_layer.background = Some(Box::new(layer_to_glyphs(bg_layer, axis_order)));
+                    g3_layer.background =
+                        Some(Box::new(layer_to_glyphs(bg_layer, axis_order, &sc_axes)));
                 }
             }
             g3_layers.push(g3_layer);

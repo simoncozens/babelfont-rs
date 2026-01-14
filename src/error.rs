@@ -119,6 +119,10 @@ pub enum BabelfontError {
     #[error("Filter error: {0}")]
     /// General error when running a filter
     FilterError(String),
+
+    #[error("Layer '{layer}' refered to a smart component axis '{axis}' which was not defined in its glyph")]
+    /// Unknown smart component axis
+    UnknownSmartComponentAxis { axis: String, layer: String },
 }
 
 #[cfg(feature = "fontir")]
@@ -234,6 +238,13 @@ impl From<BabelfontError> for fontir::error::Error {
                 fontir::error::BadSourceKind::Custom(format!("Master not found: {}", master_name)),
             )
             .into(),
+            BabelfontError::UnknownSmartComponentAxis { axis, layer } => fontir::error::BadSource::new(
+                "Unknown",
+                fontir::error::BadSourceKind::Custom(format!(
+                    "Layer '{}' refered to a smart component axis '{}' which was not defined in its glyph",
+                    layer, axis
+                )),
+            ).into()
         }
     }
 }

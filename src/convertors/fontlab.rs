@@ -213,6 +213,7 @@ impl FontlabLayer {
             is_background: false,
             background_layer_id: None,
             location: None,
+            smart_component_location: Default::default(),
             format_specific: Default::default(),
         })
     }

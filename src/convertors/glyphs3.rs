@@ -208,7 +208,7 @@ fn _load(glyphs_font: &glyphslib::Font, path: PathBuf) -> Result<Font, Babelfont
             .glyphs
             .iter()
             .map(|g| glyph::glyphs::from_glyphs(g, &axes_order))
-            .collect(),
+            .collect::<Result<Vec<_>, BabelfontError>>()?,
     );
     // Instances
     font.instances = glyphs_font
@@ -750,7 +750,7 @@ fn interpret_axes(font: &mut Font) -> Result<(), BabelfontError> {
             axis.max = map.iter().map(|(user, _)| *user).max();
         }
     }
-    println!("After smashing designspace and userspace: {:#?}", font.axes);
+    // println!("After smashing designspace and userspace: {:#?}", font.axes);
     Ok(())
 }
 
@@ -1289,5 +1289,54 @@ mod tests {
         let date = font_date.parse().unwrap_or_else(|_| chrono::Utc::now());
         let formatted_date = date.format("%Y-%m-%d %H:%M:%S +0000").to_string();
         assert_eq!(formatted_date, font_date);
+    }
+
+    #[test]
+    fn test_smart_components() {
+        let font = load("resources/NotoSansGrantha-SmartComponent.glyphs".into()).unwrap();
+        let glyph = font.glyphs.get("_part.iMatra").unwrap();
+        assert_eq!(glyph.component_axes.len(), 5);
+        assert_eq!(glyph.component_axes[0].name.get_default().unwrap(), "Width");
+        assert_eq!(glyph.component_axes[0].min, Some(UserCoord::new(0.0)));
+        assert_eq!(glyph.component_axes[0].max, Some(UserCoord::new(800.0)));
+        assert_eq!(glyph.component_axes[1].name.get_default().unwrap(), "Dip");
+        assert_eq!(glyph.component_axes[1].min, Some(UserCoord::new(0.0)));
+        assert_eq!(glyph.component_axes[1].max, Some(UserCoord::new(100.0)));
+        // Each layer should have some location in those axes
+        // Layer one is called Wide
+        assert_eq!(glyph.layers[1].name.as_ref().unwrap(), "Wide");
+        let layer_location = &glyph.layers[1].smart_component_location;
+        assert!(!layer_location.is_empty());
+        println!("Layer location: {:?}", layer_location);
+        assert_eq!(layer_location.len(), 1);
+        assert_eq!(
+            layer_location.get("Width").unwrap(),
+            &DesignCoord::new(800.0)
+        );
+
+        // Test the user end
+        let layer = font
+            .glyphs
+            .get("ny_ji_gran")
+            .unwrap()
+            .layers
+            .first()
+            .unwrap();
+        let shapes = &layer.shapes;
+        let Shape::Component(first) = shapes.first().unwrap() else {
+            panic!("Expected component shape");
+        };
+        assert_eq!(first.reference, "ny_ja_gran");
+        assert_eq!(first.location, IndexMap::<String, DesignCoord>::default());
+        // But the second is a smart component
+        let Shape::Component(smart) = &shapes[1] else {
+            panic!("Expected component shape");
+        };
+        assert_eq!(smart.reference, "_part.iMatra");
+        assert_eq!(smart.location.len(), 3);
+        assert_eq!(
+            smart.location.get("Width").unwrap(),
+            &DesignCoord::new(520.0)
+        );
     }
 }

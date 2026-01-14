@@ -251,6 +251,34 @@ where
     Ok(location)
 }
 
+pub(crate) fn string_design_location_to_map<S>(
+    location: &IndexMap<String, DesignCoord>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let mut ser_map = serializer.serialize_map(Some(location.iter().count()))?;
+    for (axis, coord) in location.iter() {
+        ser_map.serialize_entry(axis, &coord.to_f64())?;
+    }
+    ser_map.end()
+}
+
+pub(crate) fn string_design_location_from_map<'de, D>(
+    deserializer: D,
+) -> Result<IndexMap<String, DesignCoord>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let raw_map: HashMap<String, f64> = HashMap::deserialize(deserializer)?;
+    let mut location = IndexMap::default();
+    for (axis, value) in raw_map {
+        location.insert(axis, DesignCoord::new(value));
+    }
+    Ok(location)
+}
+
 pub(crate) fn option_design_location_to_map<S>(
     location: &Option<DesignLocation>,
     serializer: S,
