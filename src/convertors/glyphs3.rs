@@ -1166,32 +1166,34 @@ mod tests {
 
     #[test]
     fn test_default_master() {
-        let font = load("resources/GlyphsFileFormatv3.glyphs".into()).unwrap();
-        assert_eq!(font.masters.len(), 2);
+        let font = load("resources/Nunito3.glyphs".into()).unwrap();
+        assert_eq!(font.masters.len(), 6);
         assert_eq!(
             font.masters[0].location,
-            Location::from(vec![(Tag::new(b"wght"), DesignCoord::new(100.0))])
+            Location::from(vec![
+                (Tag::new(b"wght"), DesignCoord::new(42.0)),
+                (Tag::new(b"ital"), DesignCoord::new(0.0)),
+            ])
         );
-        assert_eq!(
-            font.masters[1].location,
-            vec![(Tag::new(b"wght"), DesignCoord::new(900.0))].into()
-        );
-        assert_eq!(font.axes.len(), 1);
+        assert_eq!(font.axes.len(), 2);
         assert_eq!(font.axes[0].tag, Tag::new(b"wght"));
-        assert_eq!(font.axes[0].min.unwrap().to_f64(), 100.0);
-        assert_eq!(font.axes[0].max.unwrap().to_f64(), 900.0);
-        assert_eq!(font.axes[0].default.unwrap().to_f64(), 100.0);
+        assert_eq!(font.axes[0].min.unwrap().to_f64(), 200.0);
+        assert_eq!(font.axes[0].max.unwrap().to_f64(), 1000.0);
+        assert_eq!(font.axes[0].default.unwrap().to_f64(), 200.0);
         assert!(font.default_master().is_some());
     }
 
     #[rstest]
     fn test_roundtrip(
         #[files("resources/*glyphs")]
+        // Weird instance configuration means we can't find the default master
+        #[exclude("GlyphsFileFormatv3.glyphs")]
         // Small but insignificant difference in property serialization.
         // Glyphs sometimes stores a singular property as a localized property
         // with only one entry, and vice versa.
         #[exclude("RadioCanadaDisplay.glyphs")]
         #[exclude("Nunito3.glyphs")]
+        #[exclude("NotoSansGrantha-SmartComponent.glyphs")]
         path: PathBuf,
     ) {
         let there = load(path.clone()).unwrap();

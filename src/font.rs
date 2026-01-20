@@ -1,5 +1,5 @@
 use crate::{
-    axis::Axis,
+    axis::{Axis, CrossAxisMapping},
     common::{CustomOTValues, FormatSpecific},
     features::Features,
     glyph::GlyphList,
@@ -37,6 +37,9 @@ pub struct Font {
     /// May be empty.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub axes: Vec<Axis>,
+    /// A list of cross-axis mappings (avar2 mappings)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cross_axis_mappings: Vec<CrossAxisMapping>,
     /// A list of named/static instances
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub instances: Vec<Instance>,
@@ -113,6 +116,7 @@ impl Font {
             // We use a lot of Default::default()s here to avoid having
             // to change this if we change the type of any of these fields.
             axes: Default::default(),
+            cross_axis_mappings: Default::default(),
             instances: Default::default(),
             masters: Default::default(),
             glyphs: Default::default(),

@@ -2,7 +2,9 @@ use std::collections::HashMap;
 
 pub use crate::Tag;
 use crate::{common::FormatSpecific, i18ndictionary::I18NDictionary, BabelfontError};
-use fontdrasil::coords::{CoordConverter, DesignCoord, NormalizedCoord, UserCoord};
+use fontdrasil::coords::{
+    CoordConverter, DesignCoord, DesignSpace, Location, NormalizedCoord, UserCoord,
+};
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
@@ -206,6 +208,21 @@ impl TryInto<fontdrasil::types::Axis> for &Axis {
             localized_names: HashMap::new(),
         })
     }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[typeshare]
+pub struct CrossAxisMapping {
+    /// Description
+    pub description: Option<String>,
+    /// Source designspace locations
+    #[typeshare(python(type = "List[Dict[str, float]]"))]
+    #[typeshare(typescript(type = "import('@simoncozens/fonttypes').DesignspaceLocation[]"))]
+    pub input: Vec<Location<DesignSpace>>,
+    /// Target designspace locations
+    #[typeshare(python(type = "List[Dict[str, float]]"))]
+    #[typeshare(typescript(type = "import('@simoncozens/fonttypes').DesignspaceLocation[]"))]
+    pub output: Vec<Location<DesignSpace>>,
 }
 
 #[cfg(feature = "fontra")]
