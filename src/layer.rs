@@ -274,6 +274,24 @@ impl Layer {
         let bounds = self.bounds()?;
         Ok(self.width - bounds.max_x() as f32)
     }
+
+    /// Is the layer a smart composite? (i.e. contains smart/variable components)
+    pub fn is_smart_composite(&self) -> bool {
+        self.shapes.iter().any(|shape| match shape {
+            Shape::Component(c) => !c.location.is_empty(),
+            _ => false,
+        })
+    }
+
+    pub(crate) fn debug_name(&self) -> String {
+        if let Some(name) = &self.name {
+            name.clone()
+        } else if let Some(id) = &self.id {
+            id.clone()
+        } else {
+            "Unnamed Layer".to_string()
+        }
+    }
 }
 
 // kurbo pen protocol support?
