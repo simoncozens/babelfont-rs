@@ -201,17 +201,6 @@ fn decompose_smart_component(
         "Normalized location: {:?}",
         target_location.to_normalized(&axes)
     );
-    log::debug!(
-        "'Master' locations are: {:?}",
-        layers_locations
-            .iter()
-            .map(|(loc, layer)| format!(
-                "{}: {:?}",
-                layer.name.as_ref().unwrap_or(layer.id.as_ref().unwrap()),
-                loc
-            ))
-            .collect::<Vec<_>>()
-    );
     let normalized_location = target_location.to_normalized(&axes);
     // Now we can hand the designspace off to our interpolation engine
     let interpolated_layer = interpolate_layer(
