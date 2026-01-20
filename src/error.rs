@@ -122,7 +122,12 @@ pub enum BabelfontError {
 
     #[error("Layer '{layer}' refered to a smart component axis '{axis}' which was not defined in its glyph")]
     /// Unknown smart component axis
-    UnknownSmartComponentAxis { axis: String, layer: String },
+    UnknownSmartComponentAxis {
+        /// The axis name
+        axis: String,
+        /// The layer name
+        layer: String,
+    },
 }
 
 #[cfg(feature = "fontir")]
