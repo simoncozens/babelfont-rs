@@ -128,6 +128,10 @@ pub enum BabelfontError {
         /// The layer name
         layer: String,
     },
+
+    #[error("Binary font reading error: {0}")]
+    /// Binary font reading error
+    BinaryFontRead(#[from] write_fonts::read::ReadError),
 }
 
 #[cfg(feature = "fontir")]
@@ -249,7 +253,11 @@ impl From<BabelfontError> for fontir::error::Error {
                     "Layer '{}' refered to a smart component axis '{}' which was not defined in its glyph",
                     layer, axis
                 )),
-            ).into()
+            ).into(),
+            BabelfontError::BinaryFontRead(e) => fontir::error::BadSource::new(
+                "Unknown",
+                fontir::error::BadSourceKind::Custom(e.to_string()),
+            ).into(),
         }
     }
 }
