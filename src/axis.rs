@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
 /// An axis in a variable font
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[typeshare]
 pub struct Axis {
     /// Name of the axis
