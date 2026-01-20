@@ -83,6 +83,15 @@ export interface Component {
   format_specific?: Record<string, any>;
 }
 
+export interface CrossAxisMapping {
+  /** Description */
+  description?: string;
+  /** Source designspace locations */
+  input: import("@simoncozens/fonttypes").DesignspaceLocation[];
+  /** Target designspace locations */
+  output: import("@simoncozens/fonttypes").DesignspaceLocation[];
+}
+
 /** Custom OpenType values that can be set per-master or per-font */
 export interface CustomOTValues {
   /**
@@ -414,6 +423,8 @@ export interface Layer {
   background_layer_id?: string;
   /** The location of the layer in design space, if it is not at the default location for a master */
   location?: import("@simoncozens/fonttypes").DesignspaceLocation;
+  /** The location of the layer in smart component (glyph-specific axes) space */
+  smart_component_location?: import("@simoncozens/fonttypes").DesignspaceLocation;
   /** Format-specific data for the layer */
   format_specific?: Record<string, any>;
 }
@@ -469,6 +480,8 @@ export interface Font {
    * May be empty.
    */
   axes?: Axis[];
+  /** A list of cross-axis mappings (avar2 mappings) */
+  cross_axis_mappings?: CrossAxisMapping[];
   /** A list of named/static instances */
   instances?: Instance[];
   /** A list of the font's masters */
