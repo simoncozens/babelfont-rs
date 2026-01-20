@@ -6,7 +6,7 @@ use typeshare::typeshare;
 static DFLT: &str = "dflt";
 
 /// A dictionary for internationalized strings.
-#[derive(Default, Clone, Serialize, Deserialize)]
+#[derive(Default, Clone, Serialize, Deserialize, PartialEq)]
 #[typeshare]
 #[typeshare(serialized_as = "HashMap<String, String>")]
 pub struct I18NDictionary(pub IndexMap<String, String>);
