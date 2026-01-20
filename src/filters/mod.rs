@@ -10,6 +10,7 @@ mod dropvariations;
 mod glyphsdata;
 mod resolveincludes;
 mod retainglyphs;
+mod rewritesmartaxes;
 mod scaleupem;
 
 pub use decomposesmartcomponents::DecomposeSmartComponents;
@@ -24,6 +25,7 @@ pub use dropvariations::DropVariations;
 pub use glyphsdata::GlyphsData;
 pub use resolveincludes::ResolveIncludes;
 pub use retainglyphs::RetainGlyphs;
+pub use rewritesmartaxes::RewriteSmartAxes;
 pub use scaleupem::ScaleUpem;
 
 /// A trait for font filters that can be applied to a font

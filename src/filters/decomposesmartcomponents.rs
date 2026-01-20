@@ -111,7 +111,6 @@ fn decompose_smart_component(
     shape: &shape::Shape,
     referenced_glyph: &Glyph,
 ) -> Result<Vec<shape::Shape>, crate::BabelfontError> {
-    // Dummy implementation for borrow checker testing
     let Shape::Component(component) = shape else {
         // I mean this can't happen.
         return Ok(vec![shape.clone()]);

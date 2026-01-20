@@ -1,7 +1,6 @@
 use std::{str::FromStr, sync::LazyLock};
 
-use babelfont::filters::FontFilter;
-use babelfont::SmolStr;
+use babelfont::{filters::FontFilter, SmolStr};
 use clap::Parser;
 use indexmap::IndexSet;
 
@@ -118,6 +117,9 @@ fn convert_filters(filter: &[String]) -> Vec<Box<dyn FontFilter>> {
                 result.push(Box::new(babelfont::filters::DecomposeSmartComponents::new(
                     filter_arg,
                 )));
+            }
+            "rewritesmartaxes" => {
+                result.push(Box::new(babelfont::filters::RewriteSmartAxes::new()));
             }
             _ => {
                 log::warn!("Unknown filter: {}", parts[0]);
