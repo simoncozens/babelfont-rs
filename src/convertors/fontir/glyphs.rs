@@ -2,7 +2,7 @@ use crate::{
     convertors::fontir::CompilationOptions, Component, Font, Layer, LayerType, NodeType, Shape,
 };
 use fontdrasil::{
-    coords::{NormalizedCoord, NormalizedLocation},
+    coords::{Location, NormalizedCoord, NormalizedLocation},
     orchestration::{Access, AccessBuilder, Work},
     types::GlyphName,
 };
@@ -86,32 +86,25 @@ impl Work<Context, WorkId, Error> for GlyphIrWork {
         let layers: Vec<&Layer> = glyph
             .layers
             .iter()
-            .filter(|l| l.location.is_none())
+            // .filter(|l| l.location.is_none())
             .collect();
 
         // Glyphs have layers that match up with masters, and masters have locations
         let mut axis_positions: HashMap<Tag, HashSet<NormalizedCoord>> = HashMap::new();
-        let master_ids = self
-            .font
-            .masters
-            .iter()
-            .map(|m| (m.id.clone(), m))
-            .collect::<HashMap<_, _>>();
         for layer in layers.iter() {
-            let maybe_location = if let LayerType::DefaultForMaster(mid) = &layer.master {
-                let master = master_ids.get(mid);
-                master.map(|m| &m.location)
-            } else {
-                layer.location.as_ref()
-            };
+            let maybe_location = resolve_layer_location(layer, &self.font);
             let design_location = if let Some(loc) = maybe_location {
-                loc
+                loc.clone()
             } else {
-                println!(
-                    "Skipping layer without location for glyph {}, layer was {:?}",
-                    self.glyph_name, layer.master
-                );
-                continue;
+                if !self.options.produce_varc_table || !layer.is_smart_composite() {
+                    log::warn!(
+                        "Layer {} for glyph {} missing location info, skipping",
+                        layer.debug_name(),
+                        self.glyph_name
+                    );
+                    continue;
+                }
+                Location::new()
             };
             let location = design_location.to_normalized(axes);
             if self.options.skip_outlines && !location.is_default() {
@@ -155,6 +148,24 @@ impl Work<Context, WorkId, Error> for GlyphIrWork {
         context.glyphs.set(ir_glyph);
         Ok(())
     }
+}
+
+pub(crate) fn resolve_layer_location(
+    layer: &Layer,
+    font: &Font,
+) -> Option<Location<fontdrasil::coords::DesignSpace>> {
+    let master_ids = font
+        .masters
+        .iter()
+        .map(|m| (m.id.clone(), m))
+        .collect::<HashMap<_, _>>();
+    let maybe_location = if let LayerType::DefaultForMaster(mid) = &layer.master {
+        let master = master_ids.get(mid);
+        master.map(|m| &m.location)
+    } else {
+        layer.location.as_ref()
+    };
+    maybe_location.cloned()
 }
 
 fn process_layer(
