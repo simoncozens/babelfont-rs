@@ -228,11 +228,14 @@ pub struct CrossAxisMapping {
 #[cfg(feature = "fontra")]
 mod fontra {
     use super::Axis;
-    use crate::convertors::fontra;
+    use crate::{convertors::fontra, BabelfontError};
 
-    impl From<&Axis> for fontra::Axis {
-        fn from(value: &Axis) -> Self {
-            fontra::Axis {
+    impl TryFrom<&Axis> for fontra::Axis {
+        type Error = BabelfontError;
+
+        fn try_from(value: &Axis) -> Result<Self, Self::Error> {
+            let converter = value._converter()?;
+            Ok(fontra::Axis {
                 name: value.tag.to_string(), // XXX: This should be the name, but for expediency
                 label: "".to_string(),
                 tag: value.tag.to_string(),
@@ -240,7 +243,16 @@ mod fontra {
                 max_value: value.max.map(|x| x.to_f64()).unwrap_or(0.0),
                 default_value: value.default.map(|x| x.to_f64()).unwrap_or(0.0),
                 hidden: value.hidden,
-            }
+                mapping: value
+                    .map
+                    .as_ref()
+                    .map(|map| {
+                        map.iter()
+                            .map(|(u, d)| (*u, d.to_normalized(&converter)))
+                            .collect()
+                    })
+                    .unwrap_or_default(),
+            })
         }
     }
 }

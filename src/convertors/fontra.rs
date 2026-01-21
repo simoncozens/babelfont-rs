@@ -1,3 +1,4 @@
+use fontdrasil::coords::{NormalizedCoord, UserCoord};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -22,6 +23,8 @@ pub struct Axis {
     pub default_value: f64,
     /// Whether the axis is hidden
     pub hidden: bool,
+    /// The map of user to normalized coordinates
+    pub mapping: Vec<(UserCoord, NormalizedCoord)>,
 }
 
 /// A Fontra axes definition
