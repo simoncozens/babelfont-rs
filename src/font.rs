@@ -337,7 +337,7 @@ mod fontra {
     use fontdrasil::coords::DesignLocation;
 
     use super::Font;
-    use crate::convertors::fontra;
+    use crate::{convertors::fontra, BabelfontError};
     impl Font {
         /// Return a [fontra::FontInfo] representation of this font's naming and version data
         pub fn as_fontra_info(&self) -> fontra::FontInfo {
@@ -361,12 +361,16 @@ mod fontra {
         }
 
         /// Return a [fontra::Axes] representation of this font's axes
-        pub fn as_fontra_axes(&self) -> fontra::Axes {
-            fontra::Axes {
-                axes: self.axes.iter().map(Into::into).collect(),
+        pub fn as_fontra_axes(&self) -> Result<fontra::Axes, BabelfontError> {
+            Ok(fontra::Axes {
+                axes: self
+                    .axes
+                    .iter()
+                    .map(fontra::Axis::try_from)
+                    .collect::<Result<Vec<_>, _>>()?,
                 mappings: vec![],
                 elided_fall_backname: "".to_string(),
-            }
+            })
         }
 
         /// Get a [fontra::Glyph] representation of a glyph by name
