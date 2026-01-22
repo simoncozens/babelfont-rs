@@ -52,6 +52,8 @@ static SUPPORTED_EXTENSIONS: LazyLock<Vec<&'static str>> = LazyLock::new(|| {
         "ttf",
         #[cfg(feature = "vfb")]
         "vfb",
+        #[cfg(feature = "robocjk")]
+        "rcjk",
     ]
 });
 

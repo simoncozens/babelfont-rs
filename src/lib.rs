@@ -208,6 +208,8 @@ pub fn load(filename: impl Into<PathBuf>) -> Result<Font, BabelfontError> {
         Some(ext) if ext == "ufo" => crate::convertors::ufo::load(pb),
         #[cfg(feature = "vfb")]
         Some(ext) if ext == "vfb" => crate::convertors::vfb::load(pb),
+        #[cfg(feature = "robocjk")]
+        Some(ext) if ext == "rcjk" => crate::convertors::robocjk::load(pb),
         #[cfg(feature = "glyphs")]
         Some(ext) if ext == "glyphs" || ext == "glyphspackage" => {
             crate::convertors::glyphs3::load(pb)

@@ -14,6 +14,9 @@ pub mod fontra;
 #[cfg(feature = "glyphs")]
 /// Glyphs 3 convertor
 pub mod glyphs3;
+#[cfg(feature = "robocjk")]
+/// RoboCJK convertor
+pub mod robocjk;
 #[cfg(feature = "ufo")]
 /// Bare UFO convertor
 pub mod ufo;

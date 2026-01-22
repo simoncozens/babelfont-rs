@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 /// A Fontra axis
 pub struct Axis {
     /// The name of the axis
@@ -22,20 +22,27 @@ pub struct Axis {
     #[serde(rename = "defaultValue")]
     pub default_value: f64,
     /// Whether the axis is hidden
+    #[serde(default)]
     pub hidden: bool,
     /// The map of user to normalized coordinates
+    #[serde(
+        serialize_with = "axis_mapping_ser",
+        deserialize_with = "axis_mapping_de"
+    )]
     pub mapping: Vec<(UserCoord, NormalizedCoord)>,
+    // XXX add valueLabels here
 }
 
 /// A Fontra axes definition
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, Debug)]
 pub struct Axes {
     /// The list of axes
     pub axes: Vec<Axis>,
     /// The cross-axis mappings
+    #[serde(default)]
     pub mappings: Vec<String>, // Should be a cross-axis mapping
     /// The elided fallback name
-    #[serde(rename = "elidedFallBackname")]
+    #[serde(rename = "elidedFallBackname", default)]
     pub elided_fall_backname: String,
 }
 
@@ -62,7 +69,7 @@ pub struct Source {
     /// Whether the source is sparse
     #[serde(rename = "isSparse")]
     pub is_sparse: String,
-    /// The location of the source in ... design space coordinates?
+    /// The location of the source in ... normalized coordinates?
     pub location: HashMap<String, f64>,
     /// The italic angle of the source
     #[serde(rename = "italicAngle")]
@@ -281,4 +288,32 @@ pub struct FontInfo {
     /// Any custom data associated with the font
     #[serde(rename = "customData")]
     pub custom_data: HashMap<String, String>,
+}
+
+// Custom serialization/deserialization helpers for coordinate mappings
+
+fn axis_mapping_ser<S>(
+    mapping: &Vec<(UserCoord, NormalizedCoord)>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    use serde::ser::SerializeSeq;
+    let mut seq = serializer.serialize_seq(Some(mapping.len()))?;
+    for (user, normalized) in mapping {
+        seq.serialize_element(&(user.to_f64(), normalized.to_f64()))?;
+    }
+    seq.end()
+}
+
+fn axis_mapping_de<'de, D>(deserializer: D) -> Result<Vec<(UserCoord, NormalizedCoord)>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let pairs: Vec<(f64, f64)> = Vec::deserialize(deserializer)?;
+    Ok(pairs
+        .into_iter()
+        .map(|(u, n)| (UserCoord::new(u), NormalizedCoord::new(n)))
+        .collect())
 }
