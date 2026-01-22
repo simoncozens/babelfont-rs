@@ -192,6 +192,13 @@ fn process_layer(
     } else {
         to_ir_contours_and_components(glyph.name.clone().into(), &layer.shapes)?
     };
+    // If it's a smart composite layer, and we're doing VARC, drop components
+    // (they'll go in the VARC table later)
+    let components = if layer.is_smart_composite() && options.produce_varc_table {
+        vec![]
+    } else {
+        components
+    };
     let glyph_instance = GlyphInstance {
         // XXX https://github.com/googlefonts/fontmake-rs/issues/285 glyphs non-spacing marks are 0-width
         width: layer.width.into(),

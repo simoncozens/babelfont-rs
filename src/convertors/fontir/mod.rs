@@ -1,4 +1,8 @@
-use crate::{BabelfontError, Font};
+use crate::{
+    convertors::fontir::varc::insert_varc_table,
+    filters::{FontFilter as _, RewriteSmartAxes},
+    BabelfontError, Font,
+};
 use fontc::Options;
 use fontdrasil::{coords::NormalizedLocation, orchestration::Work, types::GlyphName};
 use fontir::{
@@ -15,9 +19,10 @@ mod global_metrics;
 mod glyphs;
 mod kerning;
 mod static_metadata;
+mod varc;
 
 /// Options for compiling a Babelfont Font to FontIR
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct CompilationOptions {
     /// Skip kerning generation
     pub skip_kerning: bool,
@@ -29,6 +34,21 @@ pub struct CompilationOptions {
     pub skip_outlines: bool,
     /// Do not use production names for glyphs
     pub dont_use_production_names: bool,
+    /// Produce VARC table (defaults to true)
+    pub produce_varc_table: bool,
+}
+
+impl Default for CompilationOptions {
+    fn default() -> Self {
+        Self {
+            skip_kerning: false,
+            skip_features: false,
+            skip_metrics: false,
+            skip_outlines: false,
+            dont_use_production_names: false,
+            produce_varc_table: true,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -60,12 +80,24 @@ impl BabelfontIrSource {
 
     /// Compile the Babelfont Font to a font binary
     pub fn compile(font: Font, options: CompilationOptions) -> Result<Vec<u8>, BabelfontError> {
+        let font = if options.produce_varc_table {
+            let mut cloned = font.clone();
+            RewriteSmartAxes.apply(&mut cloned)?;
+            cloned
+        } else {
+            font
+        };
         let source = Self {
             font: Arc::new(font),
             options,
         };
-        fontc::generate_font(Box::new(source), Options::default())
-            .map_err(|e| BabelfontError::General(format!("Font generation error: {:#?}", e)))
+        let binary = fontc::generate_font(Box::new(source.clone()), Options::default())
+            .map_err(|e| BabelfontError::General(format!("Font generation error: {:#?}", e)))?;
+        if source.options.produce_varc_table {
+            insert_varc_table(&binary, &source.font)
+        } else {
+            Ok(binary)
+        }
     }
 }
 
