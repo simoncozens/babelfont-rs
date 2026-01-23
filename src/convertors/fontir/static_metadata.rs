@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use super::BabelfontIrSource;
 use crate::{Font, MetricType};
@@ -130,26 +130,27 @@ impl Work<Context, WorkId, Error> for StaticMetadataWork {
         let named_instances = font
             .instances
             .iter()
-            .map(|inst| NamedInstance {
-                name: inst
-                    .name
-                    .get_default()
-                    .map(|x| x.to_string())
-                    .unwrap_or("<Unnamed Instance>".to_string()),
-                postscript_name: inst
-                    .custom_names
-                    .postscript_name
-                    .get_default()
-                    .map(|x| x.to_string()),
-                location: inst.location.to_user(&axes),
+            .map(|inst| {
+                inst.location.to_user(&axes).map(|loc| NamedInstance {
+                    name: inst
+                        .name
+                        .get_default()
+                        .map(|x| x.to_string())
+                        .unwrap_or("<Unnamed Instance>".to_string()),
+                    postscript_name: inst
+                        .custom_names
+                        .postscript_name
+                        .get_default()
+                        .map(|x| x.to_string()),
+                    location: loc,
+                })
             })
-            .collect();
+            .collect::<Result<Vec<_>, _>>()?;
         let global_locations = font
             .masters
             .iter()
             .map(|m| m.location.to_normalized(&axes))
-            .collect();
-
+            .collect::<Result<HashSet<_>, _>>()?;
         // negate the italic angle because it's clockwise in Glyphs.app whereas it's
         // counter-clockwise in UFO/OpenType and our GlobalMetrics follow the latter
         // https://github.com/googlefonts/glyphsLib/blob/f162e7/Lib/glyphsLib/builder/masters.py#L36

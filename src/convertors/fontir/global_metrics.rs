@@ -52,7 +52,7 @@ impl Work<Context, WorkId, Error> for GlobalMetricWork {
         let axes = self.0.fontdrasil_axes()?;
 
         for master in self.0.masters.iter() {
-            let pos = master.location.to_normalized(&axes);
+            let pos = master.location.to_normalized(&axes)?;
 
             // glyphsLib <https://github.com/googlefonts/glyphsLib/blob/1cb4fc5ae2/Lib/glyphsLib/classes.py#L1590-L1601>
             let cap_height = master

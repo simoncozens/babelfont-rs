@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::{
-    common::decomposition::DecomposedAffine, convertors::fontir::glyphs::resolve_layer_location,
-    Axis, BabelfontError, Component, Font, Glyph, Layer, LayerType,
+    common::decomposition::DecomposedAffine, Axis, BabelfontError, Component, Font, Glyph, Layer,
+    LayerType,
 };
 use fontdrasil::{
     coords::{Location, NormalizedCoord, NormalizedSpace},
@@ -74,9 +74,9 @@ pub fn insert_varc_table(binary: &[u8], font: &Font) -> Result<Vec<u8>, Babelfon
             for layer in non_default_layers.iter() {
                 if let Some(other_component) = layer.components().nth(index) {
                     // Resolve layer location
-                    let maybe_location = resolve_layer_location(layer, font);
+                    let maybe_location = layer.effective_location(font);
                     if let Some(loc) = maybe_location {
-                        other_layers.push((loc.to_normalized(&fontdrasil_axes), other_component));
+                        other_layers.push((loc.to_normalized(&fontdrasil_axes)?, other_component));
                     }
                 } else {
                     log::warn!(
@@ -319,7 +319,9 @@ fn store_axis_value_deltas(
     if axis_values_deltas.is_empty() {
         Ok(None)
     } else {
-        let temporary_index = storebuilder.add_deltas(deltas);
+        let temporary_index = storebuilder.add_deltas(deltas).map_err(|e| {
+            BabelfontError::General(format!("Error storing VARC axis value deltas: {:#?}", e))
+        })?;
         Ok(Some(VarcVariationIndex::PendingVariationIndex(
             temporary_index,
         )))

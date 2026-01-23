@@ -202,11 +202,11 @@ impl Font {
     pub fn normalize_location<Space>(
         &self,
         loc: Location<Space>,
-    ) -> Result<NormalizedLocation, Box<BabelfontError>>
+    ) -> Result<NormalizedLocation, BabelfontError>
     where
         Space: fontdrasil::coords::ConvertSpace<NormalizedSpace>,
     {
-        Ok(loc.convert(&self.fontdrasil_axes()?))
+        loc.convert(&self.fontdrasil_axes()?).map_err(|e| e.into())
     }
 
     // other location conversion functions could go here
@@ -283,7 +283,7 @@ impl Font {
                 glyph: glyphname.to_string(),
             })?;
         let axes = self.fontdrasil_axes()?;
-        let target_location = location.to_normalized(&axes);
+        let target_location = location.to_normalized(&axes)?;
 
         let mut layers: Vec<(DesignLocation, &Layer)> = vec![];
         for layer in &glyph.layers {

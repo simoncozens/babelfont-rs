@@ -16,8 +16,8 @@ pub(crate) fn interpolate_layer(
     let mut new_layer = Layer::default();
     let locations_in_order = layers_locations
         .iter()
-        .map(|(loc, _)| loc.to_normalized(axes))
-        .collect::<Vec<Location<NormalizedSpace>>>();
+        .map(|(loc, _)| loc.to_normalized(axes).map_err(|e| e.into()))
+        .collect::<Result<Vec<Location<NormalizedSpace>>, BabelfontError>>()?;
     let locations: HashSet<Location<NormalizedSpace>> =
         locations_in_order.iter().cloned().collect();
 
@@ -87,7 +87,9 @@ pub(crate) fn interpolate_layer(
                     .iter()
                     .find(|a| a.name == anchor_name)
                     .unwrap();
-                Ok((loc.to_normalized(axes), vec![anchor.x, anchor.y]))
+                loc.to_normalized(axes)
+                    .map_err(|e| e.into())
+                    .map(|loc| (loc, vec![anchor.x, anchor.y]))
             })
             .collect::<Result<HashMap<Location<NormalizedSpace>, Vec<f64>>, BabelfontError>>()?;
         let deltas = model.deltas(&anchor_positions)?;
@@ -103,7 +105,7 @@ pub(crate) fn interpolate_layer(
     // Interpolate width
     let mut width_positions: HashMap<Location<NormalizedSpace>, Vec<f64>> = HashMap::new();
     for (loc, layer) in layers_locations {
-        width_positions.insert(loc.to_normalized(axes), vec![layer.width as f64]);
+        width_positions.insert(loc.to_normalized(axes)?, vec![layer.width as f64]);
     }
     let width_deltas = model.deltas(&width_positions)?;
     let interpolated_width = model.interpolate_from_deltas(target_location, &width_deltas);

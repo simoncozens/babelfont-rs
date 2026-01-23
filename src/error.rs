@@ -108,6 +108,10 @@ pub enum BabelfontError {
     /// An error occurred while processing a delta
     Delta(#[from] fontdrasil::variations::DeltaError),
 
+    #[error("Axis conversion error: {0}")]
+    /// An error occurred while converting axes
+    AxisConversion(#[from] fontdrasil::error::Error),
+
     /// Called a method which requires a decomposed layer on a layer which had components
     #[error("Called a method which requires a decomposed layer on a layer which had components")]
     NeedsDecomposition,
@@ -227,6 +231,7 @@ impl From<BabelfontError> for fontir::error::Error {
                 fontir::error::BadSourceKind::Custom(e.to_string()),
             )
             .into(),
+            BabelfontError::AxisConversion(e) => e.into(),
             BabelfontError::JsonSerialize(e) => fontir::error::BadSource::new(
                 "Unknown",
                 fontir::error::BadSourceKind::Custom(e.to_string()),

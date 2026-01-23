@@ -67,7 +67,7 @@ impl Work<Context, WorkId, Error> for KerningGroupWork {
         Access::None
     }
 
-    fn exec(&self, context: &Context) -> Result<(), Error> {
+    fn exec(&self, context: &Context) -> Result<(), fontir::error::Error> {
         log::trace!("Generate IR for kerning groups");
         let font = &self.0;
         let axes = font.fontdrasil_axes()?;
@@ -86,13 +86,17 @@ impl Work<Context, WorkId, Error> for KerningGroupWork {
                 members.iter().map(GlyphName::new).collect(),
             );
         }
+        let mut normalized_locations = BTreeSet::new();
+        for master in &font.masters {
+            normalized_locations.insert(
+                master
+                    .location
+                    .to_normalized(&axes)
+                    .map_err(|e| fontir::error::Error::CoordinateConversionError(e))?,
+            );
+        }
 
-        groups.locations = font
-            .masters
-            .iter()
-            .map(|master| master.location.clone())
-            .map(|l| l.to_normalized(&axes))
-            .collect();
+        groups.locations = normalized_locations;
 
         context.kerning_groups.set(groups);
         Ok(())
@@ -161,10 +165,12 @@ fn kerning_at_location<'a>(
     location: &NormalizedLocation,
 ) -> Option<Cow<'a, Kerns>> {
     let axes = font.fontdrasil_axes().ok()?;
-    let master = font
-        .masters
-        .iter()
-        .find(|master| master.location.to_normalized(&axes) == *location)?;
+    let master = font.masters.iter().find(|master| {
+        master
+            .location
+            .to_normalized(&axes)
+            .map_or(false, |normalized| normalized == *location)
+    })?;
     Some(Cow::Owned(
         master
             .kerning

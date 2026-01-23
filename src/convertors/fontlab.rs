@@ -412,7 +412,7 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
             .push(master.fontMaster.into(&axes_short_name_to_tag));
     }
     if let Some(default_master) = fontlab.defaultMaster.and_then(|name| font.master(&name)) {
-        let new_loc = default_master.location.to_user(&Axes::new(vec![])); // XXX Mapping
+        let new_loc = default_master.location.to_user(&Axes::new(vec![]))?; // XXX Mapping
         for axis in font.axes.iter_mut() {
             if let Some(val) = new_loc.get(axis.tag) {
                 axis.default = Some(val);

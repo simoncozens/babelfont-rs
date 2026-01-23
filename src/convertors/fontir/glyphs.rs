@@ -1,6 +1,4 @@
-use crate::{
-    convertors::fontir::CompilationOptions, Component, Font, Layer, LayerType, NodeType, Shape,
-};
+use crate::{convertors::fontir::CompilationOptions, Component, Font, Layer, NodeType, Shape};
 use fontdrasil::{
     coords::{Location, NormalizedCoord, NormalizedLocation},
     orchestration::{Access, AccessBuilder, Work},
@@ -83,16 +81,12 @@ impl Work<Context, WorkId, Error> for GlyphIrWork {
         ir_glyph.codepoints = glyph.codepoints.iter().copied().collect();
 
         let mut ir_anchors = AnchorBuilder::new(self.glyph_name.clone());
-        let layers: Vec<&Layer> = glyph
-            .layers
-            .iter()
-            // .filter(|l| l.location.is_none())
-            .collect();
+        let layers: Vec<&Layer> = glyph.layers.iter().collect();
 
         // Glyphs have layers that match up with masters, and masters have locations
         let mut axis_positions: HashMap<Tag, HashSet<NormalizedCoord>> = HashMap::new();
         for layer in layers.iter() {
-            let maybe_location = resolve_layer_location(layer, &self.font);
+            let maybe_location = layer.effective_location(&self.font);
             let design_location = if let Some(loc) = maybe_location {
                 loc.clone()
             } else {
@@ -106,7 +100,7 @@ impl Work<Context, WorkId, Error> for GlyphIrWork {
                 }
                 Location::new()
             };
-            let location = design_location.to_normalized(axes);
+            let location = design_location.to_normalized(axes)?;
             if self.options.skip_outlines && !location.is_default() {
                 continue;
             }
@@ -148,24 +142,6 @@ impl Work<Context, WorkId, Error> for GlyphIrWork {
         context.glyphs.set(ir_glyph);
         Ok(())
     }
-}
-
-pub(crate) fn resolve_layer_location(
-    layer: &Layer,
-    font: &Font,
-) -> Option<Location<fontdrasil::coords::DesignSpace>> {
-    let master_ids = font
-        .masters
-        .iter()
-        .map(|m| (m.id.clone(), m))
-        .collect::<HashMap<_, _>>();
-    let maybe_location = if let LayerType::DefaultForMaster(mid) = &layer.master {
-        let master = master_ids.get(mid);
-        master.map(|m| &m.location)
-    } else {
-        layer.location.as_ref()
-    };
-    maybe_location.cloned()
 }
 
 fn process_layer(

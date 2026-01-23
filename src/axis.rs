@@ -97,7 +97,7 @@ impl Axis {
                     axis_name: self.name(),
                     reason: "Default value not in map".to_string(),
                 })?;
-            Ok(CoordConverter::new(map.to_vec(), default_idx))
+            Ok(CoordConverter::new(map.to_vec(), default_idx)?)
         } else {
             let (min, default, max) =
                 self.bounds()
