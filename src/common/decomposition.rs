@@ -17,13 +17,17 @@ pub enum TransformOrder {
 #[derive(Debug, Clone, Serialize, Deserialize, Copy)]
 #[typeshare]
 pub struct DecomposedAffine {
+    #[serde(default, skip_serializing_if = "crate::serde_helpers::is_default")]
     #[typeshare(typescript(type = "[number, number]"))]
     #[typeshare(python(type = "(float, float)"))]
     pub translation: (f64, f64),
+    #[serde(default, skip_serializing_if = "crate::serde_helpers::is_one_one")]
     #[typeshare(typescript(type = "[number, number]"))]
     #[typeshare(python(type = "(float, float)"))]
     pub scale: (f64, f64),
+    #[serde(default, skip_serializing_if = "crate::serde_helpers::is_default")]
     pub rotation: f64, // in radians
+    #[serde(default, skip_serializing_if = "crate::serde_helpers::is_default")]
     #[typeshare(typescript(type = "[number, number]"))]
     #[typeshare(python(type = "(float, float)"))]
     pub skew: (f64, f64), // (skew_x, skew_y) in radians
