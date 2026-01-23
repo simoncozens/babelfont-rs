@@ -340,7 +340,7 @@ impl FontFilter for DecomposeComponentReferences {
         // Build dependency graph for topological sorting
         for glyph in font.glyphs.iter() {
             manager.collect_tasks_recursive(&glyph.name, font)?;
-            all_tasks.extend(manager.tasks.drain(..));
+            all_tasks.append(&mut manager.tasks);
             manager.visited.clear();
         }
 
