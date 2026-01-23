@@ -1,4 +1,4 @@
-mod decomposesmartcomponents;
+mod decomposecomponentreferences;
 mod dropaxis;
 mod dropfeatures;
 mod dropguides;
@@ -13,7 +13,7 @@ mod retainglyphs;
 mod rewritesmartaxes;
 mod scaleupem;
 
-pub use decomposesmartcomponents::DecomposeSmartComponents;
+pub use decomposecomponentreferences::DecomposeComponentReferences;
 pub use dropaxis::DropAxis;
 pub use dropfeatures::DropFeatures;
 pub use dropguides::DropGuides;
