@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
+use crate::axis::Tag;
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
-use write_fonts::types::Tag;
 
 pub(crate) mod decomposition;
 pub(crate) mod formatspecific;

@@ -113,6 +113,10 @@ pub(crate) fn decomposed_is_identity(
         && decomposed.skew == (0.0, 0.0)
 }
 
+pub(crate) fn is_one_one(scale: &(f64, f64)) -> bool {
+    *scale == (1.0, 1.0)
+}
+
 pub(crate) fn serialize_nodes<S>(
     nodes: &Vec<crate::common::Node>,
     serializer: S,

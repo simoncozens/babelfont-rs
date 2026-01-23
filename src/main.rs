@@ -124,7 +124,7 @@ fn convert_filters(filter: &[String]) -> Vec<Box<dyn FontFilter>> {
                 result.push(Box::new(babelfont::filters::RewriteSmartAxes::new()));
             }
             _ => {
-                log::warn!("Unknown filter: {}", parts[0]);
+                log::error!("Unknown filter: {}", parts[0]);
             }
         }
     }
@@ -157,7 +157,7 @@ fn main() {
 
     let compiling = output_extension == "ttf";
 
-    let mut filters = convert_filters(&args.filter);
+    let mut filters: Vec<Box<dyn FontFilter>> = vec![];
 
     #[cfg(feature = "fontir")]
     let mut compilation_options = babelfont::convertors::fontir::CompilationOptions::default();
@@ -172,7 +172,7 @@ fn main() {
             args.retain_glyphs.clone(),
         )));
     }
-
+    filters.extend(convert_filters(&args.filter));
     #[cfg(feature = "fontir")]
     if args.drop_kerning {
         #[cfg(feature = "fontir")]

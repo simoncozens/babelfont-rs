@@ -110,8 +110,10 @@ fn export_use_typo_metrics(
 #[cfg(test)]
 mod tests {
     use crate::convertors::glyphs3::as_glyphs3;
-    use fontdrasil::coords::{DesignCoord, Location};
-    use fontdrasil::types::Tag;
+    use fontdrasil::{
+        coords::{DesignCoord, Location},
+        types::Tag,
+    };
 
     #[test]
     fn test_set_typo_metrics() {

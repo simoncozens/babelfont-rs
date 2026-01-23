@@ -1,12 +1,12 @@
 use crate::{
-    axis::{Axis, CrossAxisMapping},
+    axis::{Axis, CrossAxisMapping, Tag},
     common::{CustomOTValues, FormatSpecific},
     features::Features,
     glyph::GlyphList,
     instance::Instance,
     master::Master,
     names::Names,
-    BabelfontError, Layer, MetricType,
+    BabelfontError, Layer, LayerType, MetricType,
 };
 use fontdrasil::coords::{
     DesignCoord, DesignLocation, DesignSpace, Location, NormalizedLocation, NormalizedSpace,
@@ -17,7 +17,6 @@ use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 use std::{collections::BTreeMap, path::PathBuf};
 use typeshare::typeshare;
-use write_fonts::types::Tag;
 
 #[cfg(feature = "cli")]
 extern crate serde_json_path_to_error as serde_json;
@@ -177,7 +176,7 @@ impl Font {
     pub fn master_layer_for(&self, glyphname: &str, master: &Master) -> Option<&Layer> {
         if let Some(glyph) = self.glyphs.get(glyphname) {
             for layer in &glyph.layers {
-                if layer.id == Some(master.id.clone()) {
+                if layer.master == LayerType::DefaultForMaster(master.id.clone()) {
                     return Some(layer);
                 }
             }
