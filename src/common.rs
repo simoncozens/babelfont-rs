@@ -15,6 +15,12 @@ pub use formatspecific::FormatSpecific;
 pub use otvalue::CustomOTValues;
 
 pub(crate) fn tag_from_string(s: &str) -> Result<Tag, BabelfontError> {
+    if s.len() > 4 {
+        return Err(BabelfontError::General(format!(
+            "Tag must be 4 characters or less, got: '{}'",
+            s
+        )));
+    }
     let mut chars = s.bytes().collect::<Vec<u8>>();
     while chars.len() < 4 {
         chars.push(b' ');
