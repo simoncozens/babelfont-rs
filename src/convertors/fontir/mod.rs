@@ -204,3 +204,9 @@ impl Work<Context, WorkId, Error> for DummyWork {
         Ok(())
     }
 }
+
+pub(crate) fn debug_location(loc: &NormalizedLocation) -> String {
+    let mut loc2 = loc.clone();
+    loc2.retain(|_tag, coord| *coord != NormalizedCoord::new(0.0));
+    format!("{:?}", loc2)
+}
