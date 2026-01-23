@@ -106,7 +106,7 @@ fn convert_filters(filter: &[String]) -> Vec<Box<dyn FontFilter>> {
                     filter_arg,
                 )));
             }
-            "decomposesmartcomponents" => {
+            "decomposecomponents" => {
                 let filter_arg: Option<IndexSet<SmolStr>> = if parts.len() == 2 {
                     let glyphs: IndexSet<SmolStr> = parts[1]
                         .split(',')
@@ -116,9 +116,9 @@ fn convert_filters(filter: &[String]) -> Vec<Box<dyn FontFilter>> {
                 } else {
                     None
                 };
-                result.push(Box::new(babelfont::filters::DecomposeSmartComponents::new(
-                    filter_arg,
-                )));
+                result.push(Box::new(
+                    babelfont::filters::DecomposeComponentReferences::new(filter_arg),
+                ));
             }
             "rewritesmartaxes" => {
                 result.push(Box::new(babelfont::filters::RewriteSmartAxes::new()));

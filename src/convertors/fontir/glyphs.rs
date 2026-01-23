@@ -124,8 +124,19 @@ impl Work<Context, WorkId, Error> for GlyphIrWork {
                 }
             }
         }
-        let ir_glyph = ir_glyph.build()?;
-        let anchors = ir_anchors.build()?;
+        // Let's do our own sanity check for default locations
+        let locations = ir_glyph.sources.keys().cloned().collect::<Vec<_>>();
+        if !locations.iter().any(|loc| loc.is_default()) {
+            log::error!(
+                "Glyph '{}' has no layer at default location: locations found: {:?}",
+                self.glyph_name,
+                locations
+            );
+            return Err(Error::BadGlyph(BadGlyph::new(
+                &self.glyph_name,
+                BadGlyphKind::NoDefaultLocation,
+            )));
+        }
 
         // It's helpful if glyphs are defined at default
         for axis in axes.iter() {
@@ -135,6 +146,9 @@ impl Work<Context, WorkId, Error> for GlyphIrWork {
             })?;
             check_pos(&self.glyph_name, positions, axis, &default)?;
         }
+
+        let ir_glyph = ir_glyph.build()?;
+        let anchors = ir_anchors.build()?;
 
         //TODO: expand kerning to brackets
 

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::{
     anchor::Anchor,
     common::{Color, FormatSpecific},
@@ -5,7 +7,7 @@ use crate::{
     shape::Shape,
     BabelfontError, Component, Font, Node, Path,
 };
-use fontdrasil::coords::{DesignCoord, DesignLocation};
+use fontdrasil::coords::{DesignCoord, DesignLocation, Location};
 use indexmap::IndexMap;
 use kurbo::Shape as KurboShape;
 use serde::{Deserialize, Serialize};
@@ -153,16 +155,6 @@ impl Layer {
         self.shapes.iter().any(|sh| matches!(sh, Shape::Path(_)))
     }
 
-    /// Decompose all components in the layer, replacing them with their decomposed paths
-    pub fn decompose(&mut self, font: &Font) {
-        let decomposed_shapes = self
-            .decomposed_components(font)
-            .into_iter()
-            .map(Shape::Path);
-        self.shapes.retain(|sh| matches!(sh, Shape::Path(_)));
-        self.shapes.extend(decomposed_shapes);
-    }
-
     /// Return a new layer with all components decomposed into paths
     pub fn decomposed(&self, font: &Font) -> Layer {
         let decomposed_shapes = self
@@ -291,6 +283,24 @@ impl Layer {
         } else {
             "Unnamed Layer".to_string()
         }
+    }
+
+    pub(crate) fn effective_location(
+        &self,
+        font: &Font,
+    ) -> Option<Location<fontdrasil::coords::DesignSpace>> {
+        let master_ids = font
+            .masters
+            .iter()
+            .map(|m| (m.id.clone(), m))
+            .collect::<HashMap<_, _>>();
+        let maybe_location = if let LayerType::DefaultForMaster(mid) = &self.master {
+            let master = master_ids.get(mid);
+            master.map(|m| &m.location)
+        } else {
+            self.location.as_ref()
+        };
+        maybe_location.cloned()
     }
 }
 

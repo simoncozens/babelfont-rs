@@ -342,11 +342,3 @@ fn sparse_region_from_region(
         .collect();
     SparseRegion::new(region_axes)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_model_doesnt_crash() {}
-}

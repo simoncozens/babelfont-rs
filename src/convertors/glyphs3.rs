@@ -863,8 +863,9 @@ fn interpret_axis_mappings(font: &mut Font) -> Result<(), BabelfontError> {
 pub(crate) fn as_glyphs3(font: &Font) -> Result<glyphs3::Glyphs3, BabelfontError> {
     // Do some cleanups.
     let mut font = font.clone();
-    #[allow(clippy::unwrap_used)] // Surely this can't fail
-    DropSparseMasters.apply(&mut font).unwrap();
+    // #[allow(clippy::unwrap_used)] // Surely this can't fail
+    // DropSparseMasters.apply(&mut font).unwrap();
+    // println!("Exporting {} masters", font.masters.len());
 
     let axes = font
         .axes
@@ -927,7 +928,7 @@ pub(crate) fn as_glyphs3(font: &Font) -> Result<glyphs3::Glyphs3, BabelfontError
         .map(|x| x.to_string())
         .unwrap_or_default();
 
-    let masters = font
+    let masters: Vec<glyphs3::Master> = font
         .masters
         .iter()
         .map(|x| save_master(x, &font.axes, &our_metrics))
