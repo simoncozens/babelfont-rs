@@ -10,7 +10,9 @@ use fontdrasil::{
 use indexmap::IndexSet;
 use smol_str::SmolStr;
 
-use crate::{filters::FontFilter, interpolate::interpolate_layer, shape, Glyph, Layer, Shape};
+use crate::{
+    filters::FontFilter, interpolate::interpolate_layer, shape, Component, Glyph, Layer, Shape,
+};
 
 /// A glyph with pre-computed effective locations for each layer
 #[derive(Debug, Clone)]
@@ -65,13 +67,12 @@ impl<'a> DecompositionManager<'a> {
             let mut visited = HashSet::new();
 
             // Collect tasks only for this glyph
-            collect_tasks_recursive(
+            self.collect_tasks_recursive(
                 &glyph_to_decompose,
                 font,
                 &mut tasks,
                 &mut glyphs_needed,
                 &mut visited,
-                self.components_filter.as_ref(),
             )?;
 
             if tasks.is_empty() {
@@ -140,6 +141,82 @@ impl<'a> DecompositionManager<'a> {
             expanded
         });
     }
+
+    fn should_decompose(&self, component: &Component) -> bool {
+        self.components_filter
+            .as_ref()
+            .map(|set| set.contains(&component.reference))
+            .unwrap_or(true)
+    }
+
+    /// Recursively collect smart component decomposition tasks in depth-first order
+    fn collect_tasks_recursive(
+        &self,
+        glyph_name: &SmolStr,
+        font: &crate::Font,
+        tasks: &mut Vec<DecomposeTask>,
+        glyphs_needed: &mut HashMap<SmolStr, Option<GlyphWithLocations>>,
+        visited: &mut HashSet<SmolStr>,
+    ) -> Result<(), crate::BabelfontError> {
+        // If we've already processed this glyph, skip it to avoid cycles
+        if visited.contains(glyph_name) {
+            return Ok(());
+        }
+        visited.insert(glyph_name.clone());
+
+        let Some(glyph) = font.glyphs.get(glyph_name) else {
+            // Referenced glyph doesn't exist, skip it
+            return Ok(());
+        };
+
+        for (layer_index, layer) in glyph.layers.iter().enumerate() {
+            for (shape_index, shape) in layer.shapes.iter().enumerate() {
+                if let shape::Shape::Component(component) = shape {
+                    // Recursively process the referenced glyph first (depth-first)
+                    self.collect_tasks_recursive(
+                        &component.reference,
+                        font,
+                        tasks,
+                        glyphs_needed,
+                        visited,
+                    )?;
+
+                    if !self.should_decompose(component) {
+                        continue;
+                    }
+
+                    // Now add this component to the task list
+                    // Pre-compute effective locations for all layers of the referenced glyph
+                    if let Some(ref_glyph) = font.glyphs.get(&component.reference) {
+                        let layer_locations: Vec<Option<Location<DesignSpace>>> = ref_glyph
+                            .layers
+                            .iter()
+                            .map(|layer| layer.effective_location(font))
+                            .collect();
+                        glyphs_needed.insert(
+                            component.reference.clone(),
+                            Some(GlyphWithLocations {
+                                glyph: ref_glyph.clone(),
+                                layer_locations,
+                            }),
+                        );
+                    } else {
+                        glyphs_needed.insert(component.reference.clone(), None);
+                    }
+
+                    tasks.push(DecomposeTask {
+                        glyph_name: glyph_name.clone(),
+                        layer_index,
+                        shape_index,
+                        referenced_glyph: component.reference.clone(),
+                        layer_location: layer.effective_location(font),
+                    });
+                }
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -152,13 +229,8 @@ struct DecomposeTask {
 }
 
 impl DecomposeTask {
-    fn execute_task(
-        &self,
-        font: &mut crate::Font,
-        glyphs_needed: &HashMap<SmolStr, Option<GlyphWithLocations>>,
-        fontdrasil_axes: &[fontdrasil::types::Axis],
-    ) -> Result<(), crate::BabelfontError> {
-        let glyph = font.glyphs.get_mut(&self.glyph_name).ok_or_else(|| {
+    fn get_layer<'a>(&self, font: &'a crate::Font) -> Result<&'a Layer, crate::BabelfontError> {
+        let glyph = font.glyphs.get(&self.glyph_name).ok_or_else(|| {
             crate::BabelfontError::GlyphNotFound {
                 glyph: self.glyph_name.to_string(),
             }
@@ -169,6 +241,32 @@ impl DecomposeTask {
                 self.layer_index, self.glyph_name
             ))
         })?;
+        Ok(layer)
+    }
+    fn get_layer_mut<'a>(
+        &self,
+        font: &'a mut crate::Font,
+    ) -> Result<&'a mut Layer, crate::BabelfontError> {
+        let glyph_mut = font.glyphs.get_mut(&self.glyph_name).ok_or_else(|| {
+            crate::BabelfontError::GlyphNotFound {
+                glyph: self.glyph_name.to_string(),
+            }
+        })?;
+        let layer_mut = glyph_mut.layers.get_mut(self.layer_index).ok_or_else(|| {
+            crate::BabelfontError::FilterError(format!(
+                "Layer index {} out of bounds for glyph {}",
+                self.layer_index, self.glyph_name
+            ))
+        })?;
+        Ok(layer_mut)
+    }
+    fn execute_task(
+        &self,
+        font: &mut crate::Font,
+        glyphs_needed: &HashMap<SmolStr, Option<GlyphWithLocations>>,
+        fontdrasil_axes: &[fontdrasil::types::Axis],
+    ) -> Result<(), crate::BabelfontError> {
+        let layer = self.get_layer(font)?;
         let shape = layer.shapes.get(self.shape_index).ok_or_else(|| {
             crate::BabelfontError::FilterError(format!(
                 "Shape index {} out of bounds for glyph {} layer {}",
@@ -190,99 +288,13 @@ impl DecomposeTask {
             self.layer_location.as_ref(),
             fontdrasil_axes,
         )?;
-        let glyph_mut = font.glyphs.get_mut(&self.glyph_name).ok_or_else(|| {
-            crate::BabelfontError::GlyphNotFound {
-                glyph: self.glyph_name.to_string(),
-            }
-        })?;
-        let layer_mut = glyph_mut.layers.get_mut(self.layer_index).ok_or_else(|| {
-            crate::BabelfontError::FilterError(format!(
-                "Layer index {} out of bounds for glyph {}",
-                self.layer_index, self.glyph_name
-            ))
-        })?;
+        let layer_mut = self.get_layer_mut(font)?;
         layer_mut.shapes.remove(self.shape_index);
         for (i, new_shape) in decomposed_shapes.into_iter().enumerate() {
             layer_mut.shapes.insert(self.shape_index + i, new_shape);
         }
         Ok(())
     }
-}
-
-/// Recursively collect smart component decomposition tasks in depth-first order
-fn collect_tasks_recursive(
-    glyph_name: &SmolStr,
-    font: &crate::Font,
-    tasks: &mut Vec<DecomposeTask>,
-    glyphs_needed: &mut HashMap<SmolStr, Option<GlyphWithLocations>>,
-    visited: &mut HashSet<SmolStr>,
-    components_filter: Option<&IndexSet<SmolStr>>,
-) -> Result<(), crate::BabelfontError> {
-    // If we've already processed this glyph, skip it to avoid cycles
-    if visited.contains(glyph_name) {
-        return Ok(());
-    }
-    visited.insert(glyph_name.clone());
-
-    let Some(glyph) = font.glyphs.get(glyph_name) else {
-        // Referenced glyph doesn't exist, skip it
-        return Ok(());
-    };
-
-    for (layer_index, layer) in glyph.layers.iter().enumerate() {
-        for (shape_index, shape) in layer.shapes.iter().enumerate() {
-            if let shape::Shape::Component(component) = shape {
-                // Recursively process the referenced glyph first (depth-first)
-                collect_tasks_recursive(
-                    &component.reference,
-                    font,
-                    tasks,
-                    glyphs_needed,
-                    visited,
-                    components_filter,
-                )?;
-
-                let should_decompose = components_filter
-                    .map(|set| set.contains(&component.reference))
-                    .unwrap_or(true);
-                if !should_decompose {
-                    continue;
-                }
-
-                // Now add this component to the task list
-                // Pre-compute effective locations for all layers of the referenced glyph
-                if let Some(ref_glyph) = font.glyphs.get(&component.reference) {
-                    let layer_locations: Vec<Option<Location<DesignSpace>>> = ref_glyph
-                        .layers
-                        .iter()
-                        .map(|layer| layer.effective_location(font))
-                        .collect();
-                    glyphs_needed.insert(
-                        component.reference.clone(),
-                        Some(GlyphWithLocations {
-                            glyph: ref_glyph.clone(),
-                            layer_locations,
-                        }),
-                    );
-                } else {
-                    glyphs_needed.insert(component.reference.clone(), None);
-                }
-
-                // Pre-compute the effective location of this layer
-                let layer_location = layer.effective_location(font);
-
-                tasks.push(DecomposeTask {
-                    glyph_name: glyph_name.clone(),
-                    layer_index,
-                    shape_index,
-                    referenced_glyph: component.reference.clone(),
-                    layer_location,
-                });
-            }
-        }
-    }
-
-    Ok(())
 }
 
 /// Topologically visit glyphs based on component references
@@ -328,13 +340,12 @@ impl FontFilter for DecomposeComponentReferences {
         // For each glyph, fully decompose it before processing glyphs that reference it
         // Build dependency order first
         for glyph in font.glyphs.iter() {
-            collect_tasks_recursive(
+            manager.collect_tasks_recursive(
                 &glyph.name,
                 font,
                 &mut all_tasks,
                 &mut all_glyphs_needed,
                 &mut visited,
-                manager.components_filter.as_ref(),
             )?;
         }
 
