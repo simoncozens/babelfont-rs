@@ -199,7 +199,7 @@ impl Layer {
 
         let mut stack: Vec<(&Component, kurbo::Affine)> = Vec::new();
         for component in self.components() {
-            stack.push((component, component.transform.to_affine()));
+            stack.push((component, component.transform.as_affine()));
             while let Some((component, transform)) = stack.pop() {
                 let referenced_glyph = match font.glyphs.get(&component.reference) {
                     Some(g) => g,
@@ -233,7 +233,7 @@ impl Layer {
                 // Depth-first decomposition means we need to extend the stack reversed, so
                 // the first component is taken out next.
                 for new_component in new_outline.components().rev() {
-                    let new_transform: kurbo::Affine = new_component.transform.to_affine();
+                    let new_transform: kurbo::Affine = new_component.transform.as_affine();
                     stack.push((new_component, transform * new_transform));
                 }
             }

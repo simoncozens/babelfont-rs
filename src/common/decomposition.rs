@@ -53,7 +53,7 @@ impl DecomposedAffine {
     }
 
     /// Convert to a kurbo::Affine using the appropriate operation order
-    pub fn to_affine(&self) -> kurbo::Affine {
+    pub fn as_affine(&self) -> kurbo::Affine {
         let translate = kurbo::Vec2::new(self.translation.0, self.translation.1);
 
         match self.order {
@@ -158,7 +158,7 @@ impl From<kurbo::Affine> for DecomposedAffine {
 
 impl From<DecomposedAffine> for kurbo::Affine {
     fn from(t: DecomposedAffine) -> Self {
-        t.to_affine()
+        t.as_affine()
     }
 }
 

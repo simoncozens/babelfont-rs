@@ -244,7 +244,7 @@ fn to_ir_component(glyph_name: GlyphName, component: &Component) -> ir::Componen
     );
     ir::Component {
         base: component.reference.as_str().into(),
-        transform: component.transform.to_affine(),
+        transform: component.transform.as_affine(),
     }
 }
 

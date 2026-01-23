@@ -1156,7 +1156,7 @@ mod tests {
         if let Shape::Component(p) = shape {
             assert_eq!(p.reference, "acutecomb");
             assert_eq!(
-                p.transform.to_affine(),
+                p.transform.as_affine(),
                 kurbo::Affine::new([1.0, 0.0, 0.0, 1.0, 152.0, 0.0])
             );
         } else {

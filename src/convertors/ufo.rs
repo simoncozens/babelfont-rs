@@ -229,7 +229,7 @@ pub(crate) fn load_component(c: &norad::Component) -> Component {
 }
 
 pub(crate) fn save_component(c: &Component) -> Result<norad::Component, BabelfontError> {
-    let affine = c.transform.to_affine();
+    let affine = c.transform.as_affine();
     let mut t = affine.as_coeffs();
     // Clamp floating point noise to zero to avoid epsilon drift in roundtrips
     for v in t.iter_mut() {

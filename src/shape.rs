@@ -146,7 +146,7 @@ impl Shape {
     pub fn apply_transform(&self, transform: DecomposedAffine) -> Self {
         match self {
             Shape::Component(c) => {
-                let new_transform = transform.to_affine() * c.transform.to_affine();
+                let new_transform = transform.as_affine() * c.transform.as_affine();
                 let mut new_component = c.clone();
                 new_component.transform = new_transform.into();
                 Shape::Component(new_component)
@@ -154,7 +154,7 @@ impl Shape {
             Shape::Path(p) => {
                 let mut contour = Path::default();
                 for node in &p.nodes {
-                    let new_point = transform.to_affine() * kurbo::Point::new(node.x, node.y);
+                    let new_point = transform.as_affine() * kurbo::Point::new(node.x, node.y);
                     contour.nodes.push(Node {
                         x: new_point.x,
                         y: new_point.y,
@@ -441,7 +441,7 @@ mod fontra {
         fn from(val: &Component) -> Self {
             fontra::Component {
                 name: val.reference.to_string(),
-                transformation: val.transform.clone().into(),
+                transformation: val.transform.into(),
                 location: HashMap::new(),
             }
         }
