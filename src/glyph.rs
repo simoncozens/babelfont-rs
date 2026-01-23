@@ -135,6 +135,11 @@ impl Glyph {
     pub fn get_layer_mut(&mut self, id: &str) -> Option<&mut Layer> {
         self.layers.iter_mut().find(|l| l.id.as_deref() == Some(id))
     }
+
+    /// Check if this glyph is a smart component
+    pub fn is_smart_component(&self) -> bool {
+        !self.component_axes.is_empty() && self.layers.iter().any(|l| l.is_smart_component())
+    }
 }
 
 #[cfg(feature = "glyphs")]
@@ -149,7 +154,7 @@ pub(crate) mod glyphs {
 
     use super::*;
     use fontdrasil::{
-        coords::{DesignCoord, UserCoord},
+        coords::{Coord, DesignCoord, UserCoord},
         types::Tag,
     };
     use glyphslib::glyphs3::Glyph as G3Glyph;
@@ -236,13 +241,7 @@ pub(crate) mod glyphs {
         })
     }
 
-    fn glyph_specific_axes(
-        component_axes: &Vec<Axis>,
-    ) -> Vec<(
-        String,
-        fontdrasil::coords::Coord<fontdrasil::coords::DesignSpace>,
-        fontdrasil::coords::Coord<fontdrasil::coords::DesignSpace>,
-    )> {
+    fn glyph_specific_axes(component_axes: &[Axis]) -> Vec<(String, DesignCoord, DesignCoord)> {
         component_axes
             .iter()
             .map(|axis| {

@@ -275,6 +275,11 @@ impl Layer {
         })
     }
 
+    /// Is this layer a smart *component*? (i.e. is it used as a smart/variable component)
+    pub fn is_smart_component(&self) -> bool {
+        !self.smart_component_location.is_empty()
+    }
+
     pub(crate) fn debug_name(&self) -> String {
         if let Some(name) = &self.name {
             name.clone()
