@@ -49,7 +49,7 @@ pub(crate) struct DesignSpace {
     /// The axes definition
     pub axes: Axes,
     /// The sources definition (mapping source ID to source)
-    pub sources: HashMap<String, RCJKSource>,
+    pub sources: IndexMap<String, RCJKSource>,
 }
 
 /// Load deep components from a robocjk.deepComponents array into a layer
@@ -87,6 +87,37 @@ fn load_deep_components(layer: &mut Layer, deep_components_arr: &serde_json::Val
 
 const DEBUGGING: bool = false;
 
+/// Sort a glyph's layers to match the order of masters in the font
+fn sort_layers_by_master_order(glyph: &mut crate::Glyph, font: &Font) {
+    // Create a map of master ID to position in the font's master list
+    let master_order: std::collections::HashMap<&str, usize> = font
+        .masters
+        .iter()
+        .enumerate()
+        .map(|(idx, master)| (master.id.as_str(), idx))
+        .collect();
+
+    // Sort layers by master order
+    glyph.layers.sort_by(|a, b| {
+        let a_order = match &a.master {
+            crate::LayerType::DefaultForMaster(id) => master_order.get(id.as_str()).copied(),
+            _ => None,
+        };
+        let b_order = match &b.master {
+            crate::LayerType::DefaultForMaster(id) => master_order.get(id.as_str()).copied(),
+            _ => None,
+        };
+
+        // Layers associated with known masters come first, in master order
+        match (a_order, b_order) {
+            (Some(a_idx), Some(b_idx)) => a_idx.cmp(&b_idx),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => std::cmp::Ordering::Equal,
+        }
+    });
+}
+
 /// Load character glyphs from the RCJK directory into the font
 fn load_character_glyphs(font: &mut Font, base_path: &Path) -> Result<(), BabelfontError> {
     let glyph_dir = base_path.join("characterGlyph");
@@ -105,23 +136,29 @@ fn load_character_glyphs(font: &mut Font, base_path: &Path) -> Result<(), Babelf
                 .unwrap_or_default()
         });
 
-    for entry in std::fs::read_dir(&glyph_dir)
+    let mut glyph_paths: Vec<PathBuf> = std::fs::read_dir(&glyph_dir)
         .map_err(|e| BabelfontError::General(format!("Failed to read glyph dir: {}", e)))?
-    {
-        let entry = entry
-            .map_err(|e| BabelfontError::General(format!("Failed to read glyph entry: {}", e)))?;
-        let path = entry.path();
-        if path.extension().and_then(|e| e.to_str()) != Some("glif") {
-            continue;
-        }
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().and_then(|e| e.to_str()) == Some("glif"))
+        .collect();
+
+    // Sort for deterministic ordering
+    glyph_paths.sort();
+
+    for path in glyph_paths {
         if DEBUGGING
-            && !(path.file_name() == Some(std::ffi::OsStr::new("uni4E_09.glif"))
+            && !(path.file_name() == Some(std::ffi::OsStr::new("uni4E_01.glif"))
+                || path.file_name() == Some(std::ffi::OsStr::new("V_G__4E_85_00.glif"))
                 || path.file_name() == Some(std::ffi::OsStr::new("V_G__4E_00_00.glif")))
         {
             continue;
         }
-        let bf_glyph =
+        let mut bf_glyph =
             robocjk_glyph_to_babelfont_glyph(font, &glyph_dir, &default_master_id, path)?;
+
+        // Sort layers to match master order
+        sort_layers_by_master_order(&mut bf_glyph, font);
 
         font.glyphs.push(bf_glyph);
     }
@@ -139,6 +176,9 @@ fn robocjk_glyph_to_babelfont_glyph(
     })?;
     let mut bf_glyph = crate::Glyph::new(norad_glyph.name().as_str());
     bf_glyph.codepoints = norad_glyph.codepoints.iter().map(|x| x as u32).collect();
+    if !bf_glyph.codepoints.is_empty() {
+        bf_glyph.exported = true;
+    }
     let lib_json = serde_json::to_value(&norad_glyph.lib).unwrap_or_default();
     let mut default_layer = layer_basics_from_norad_glyph(
         default_master_id,
@@ -151,6 +191,7 @@ fn robocjk_glyph_to_babelfont_glyph(
 
     // Load variation glyph layers from robocjk.variationGlyphs
     let lib_json = serde_json::to_value(&norad_glyph.lib).unwrap_or_default();
+    bf_glyph.layers.push(default_layer);
     if let Some(vars) = lib_json
         .get("robocjk.variationGlyphs")
         .and_then(|v| v.as_array())
@@ -165,7 +206,6 @@ fn robocjk_glyph_to_babelfont_glyph(
             vars,
         );
     }
-    bf_glyph.layers.push(default_layer);
 
     Ok(bf_glyph)
 }
@@ -180,7 +220,13 @@ fn load_variation_glyphs(
     vars: &Vec<serde_json::Value>,
 ) {
     let file_name = path.file_name().map(|x| x.to_owned());
+    let font_level_axis_tags = font
+        .axes
+        .iter()
+        .map(|a| a.tag.to_string())
+        .collect::<Vec<String>>();
     for item in vars {
+        // println!("Processing variationGlyph item: {:?}", item);
         let layer_name = item
             .get("layerName")
             .and_then(|v| v.as_str())
@@ -198,7 +244,10 @@ fn load_variation_glyphs(
                 item.get("deepComponents"),
             );
             var_layer.id = Some(Uuid::new_v4().to_string());
-            var_layer.name = layer_name;
+            var_layer.name = match layer_name {
+                Some(name) if !name.is_empty() => Some(name),
+                _ => Some(source_name.to_string()),
+            };
 
             // Classify the location: glyph-level only vs. font-level axes
             if let Some(loc) = location_obj {
@@ -226,12 +275,23 @@ fn load_variation_glyphs(
                         // No master found: create free-floating layer with location
                         var_layer.master = LayerType::FreeFloating;
                         let mut design_location = DesignLocation::new();
+                        let mut scl = IndexMap::new();
                         for (axis_tag_str, value) in &location_map {
-                            if let Ok(tag) = tag_from_string(axis_tag_str) {
-                                design_location.insert(tag, DesignCoord::new(*value));
+                            // If this is a font-level axis, insert into .location
+                            if font_level_axis_tags.contains(axis_tag_str) {
+                                #[allow(clippy::unwrap_used)]
+                                // Already validated, we want to panic if this is wrong
+                                design_location.insert(
+                                    tag_from_string(axis_tag_str).unwrap(),
+                                    DesignCoord::new(*value),
+                                );
+                            } else {
+                                // Put it into the smart_component_location instead
+                                scl.insert(axis_tag_str.clone(), DesignCoord::new(*value));
                             }
                         }
                         var_layer.location = Some(design_location);
+                        var_layer.smart_component_location = scl;
                     }
                 }
             }

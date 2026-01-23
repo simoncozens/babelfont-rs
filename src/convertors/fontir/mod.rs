@@ -80,13 +80,11 @@ impl BabelfontIrSource {
 
     /// Compile the Babelfont Font to a font binary
     pub fn compile(font: Font, options: CompilationOptions) -> Result<Vec<u8>, BabelfontError> {
-        let font = if options.produce_varc_table {
-            let mut cloned = font.clone();
-            RewriteSmartAxes.apply(&mut cloned)?;
-            cloned
-        } else {
-            font
-        };
+        let mut font = font.clone();
+        if options.produce_varc_table {
+            RewriteSmartAxes.apply(&mut font)?;
+        }
+        // XXX Handle unexported glyphs here.
         let source = Self {
             font: Arc::new(font),
             options,
@@ -123,6 +121,7 @@ impl Source for BabelfontIrSource {
         self.font
             .glyphs
             .iter()
+            // .filter(|g| g.exported)
             .map(|glyph| {
                 self.create_work_for_one_glyph(glyph.name.clone().into())
                     .map(|w| -> Box<IrWork> { Box::new(w) })
