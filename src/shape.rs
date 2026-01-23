@@ -24,7 +24,12 @@ pub struct Component {
     /// A location for a variable component
     // We don't use a DesignLocation here because we want to allow axis names
     // rather than tags
-    #[serde(skip_serializing_if = "IndexMap::is_empty", default)]
+    #[serde(
+        skip_serializing_if = "IndexMap::is_empty",
+        default,
+        serialize_with = "crate::serde_helpers::string_design_location_to_map",
+        deserialize_with = "crate::serde_helpers::string_design_location_from_map"
+    )]
     #[typeshare(typescript(
         type = "Record<string, import('@simoncozens/fonttypes').DesignspaceCoordinate>"
     ))]
