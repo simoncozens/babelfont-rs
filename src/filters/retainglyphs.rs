@@ -29,13 +29,37 @@ impl FontFilter for RetainGlyphs {
     fn apply(&self, font: &mut crate::Font) -> Result<(), crate::BabelfontError> {
         log::info!("Retaining glyphs: {:?}", self.0);
         let immutable_font = font.clone();
-        let components_to_decompose: Vec<String> = font
-            .glyphs
-            .iter()
-            .filter(|g| !self.0.contains(&g.name))
-            .map(|g| g.name.to_string())
-            .collect();
-        DecomposeComponentReferences::new(Some(components_to_decompose)).apply(font)?;
+
+        // Find components referenced by retained glyphs that will be dropped
+        let mut components_to_decompose = std::collections::HashSet::new();
+        for glyph in font.glyphs.iter() {
+            if !self.0.contains(&glyph.name) {
+                continue; // Only look at retained glyphs
+            }
+            for layer in &glyph.layers {
+                for shape in &layer.shapes {
+                    if let crate::Shape::Component(comp) = shape {
+                        // If this component references a glyph being dropped, mark it for decomposition
+                        if !self.0.contains(&comp.reference) {
+                            components_to_decompose.insert(comp.reference.to_string());
+                        }
+                    }
+                }
+            }
+        }
+
+        // Only decompose if there are components to decompose
+        if !components_to_decompose.is_empty() {
+            log::info!(
+                "Decomposing {} component references",
+                components_to_decompose.len()
+            );
+            let decomposer = DecomposeComponentReferences::new(Some(
+                components_to_decompose.into_iter().collect::<Vec<_>>(),
+            ));
+            decomposer.apply(font)?;
+        }
+
         // Retain only the specified glyphs
         font.glyphs.retain(|g| self.0.contains(&g.name));
         for (_group, members) in font.first_kern_groups.iter_mut() {
