@@ -3,6 +3,26 @@ use indexmap::IndexMap;
 
 use crate::filters::FontFilter;
 
+#[derive(Hash, PartialEq, Eq)]
+struct AxisKey {
+    name: String,
+    min: Option<u64>,
+    default: Option<u64>,
+    max: Option<u64>,
+}
+
+impl AxisKey {
+    fn from_axis(axis: &crate::Axis) -> Self {
+        let name = axis.name();
+        AxisKey {
+            name,
+            min: axis.min.as_ref().map(|v| v.to_f64().to_bits()),
+            default: axis.default.as_ref().map(|v| v.to_f64().to_bits()),
+            max: axis.max.as_ref().map(|v| v.to_f64().to_bits()),
+        }
+    }
+}
+
 #[derive(Default)]
 /// A filter that converts internal axes to real OpenType axes for VARC table generation
 pub struct RewriteSmartAxes;
@@ -19,10 +39,11 @@ impl FontFilter for RewriteSmartAxes {
         // Gather all unique internal axes, change all the dummy tags to
         // real tags, add to our axes list
         let mut internal_axes = Vec::new();
-        let mut names_to_tags = IndexMap::new();
+        let mut names_to_tags: IndexMap<AxisKey, Tag> = IndexMap::new();
         for glyph in font.glyphs.iter_mut() {
             #[allow(clippy::unwrap_used)]
             for component_axis in glyph.component_axes.iter_mut() {
+                let axis_key = AxisKey::from_axis(component_axis);
                 let counter = internal_axes
                     .iter()
                     .position(|a| a == component_axis)
@@ -30,10 +51,7 @@ impl FontFilter for RewriteSmartAxes {
 
                 component_axis.tag =
                     Tag::new_checked(format!("V{:0>3}", counter).as_bytes()).unwrap();
-                names_to_tags.insert(
-                    component_axis.name.get_default().unwrap().clone(),
-                    component_axis.tag,
-                );
+                names_to_tags.insert(axis_key, component_axis.tag);
                 component_axis.hidden = true;
                 if !internal_axes.contains(component_axis) {
                     internal_axes.push(component_axis.clone());
@@ -107,9 +125,13 @@ impl FontFilter for RewriteSmartAxes {
                     layer.master = crate::LayerType::FreeFloating;
                     let mut location = layer.location.take().unwrap_or_default();
                     for (axis_name, value) in layer.smart_component_location.iter() {
-                        // println!("Axis name: {}={:?}", axis_name, value);
-                        if let Some(tag) = names_to_tags.get(axis_name) {
-                            location.insert(*tag, DesignCoord::new(value.to_f64()));
+                        if let Some(axis) =
+                            glyph.component_axes.iter().find(|a| a.name() == *axis_name)
+                        {
+                            let axis_key = AxisKey::from_axis(axis);
+                            if let Some(tag) = names_to_tags.get(&axis_key) {
+                                location.insert(*tag, DesignCoord::new(value.to_f64()));
+                            }
                         }
                     }
                     // Fill in any missing axes with defaults
