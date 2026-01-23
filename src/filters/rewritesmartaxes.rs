@@ -1,7 +1,9 @@
+use std::collections::HashMap;
+
 use fontdrasil::{coords::DesignCoord, types::Tag};
 use indexmap::IndexMap;
 
-use crate::filters::FontFilter;
+use crate::{filters::FontFilter, LayerType};
 
 #[derive(Hash, PartialEq, Eq)]
 struct AxisKey {
@@ -122,8 +124,19 @@ impl FontFilter for RewriteSmartAxes {
                 }
                 // Also, the "smart component location" is just the location now
                 if !layer.smart_component_location.is_empty() {
-                    layer.master = crate::LayerType::FreeFloating;
-                    let mut location = layer.location.take().unwrap_or_default();
+                    // inline "effective_location" implementation here because we have a &mut Font, sigh
+                    let master_ids = font
+                        .masters
+                        .iter()
+                        .map(|m| (m.id.clone(), m))
+                        .collect::<HashMap<_, _>>();
+                    let mut location = if let LayerType::DefaultForMaster(mid) = &layer.master {
+                        let master = master_ids.get(mid);
+                        master.map(|m| m.location.clone())
+                    } else {
+                        layer.location.take()
+                    }
+                    .unwrap_or_default();
                     for (axis_name, value) in layer.smart_component_location.iter() {
                         if let Some(axis) =
                             glyph.component_axes.iter().find(|a| a.name() == *axis_name)
@@ -134,7 +147,7 @@ impl FontFilter for RewriteSmartAxes {
                             }
                         }
                     }
-                    // Fill in any missing axes with defaults
+                    // Fill in any missing (non-font-level) axes with defaults
                     for axis in font.axes.iter() {
                         if !location.contains(axis.tag) {
                             let default_userspace = axis.default.unwrap_or_default();
