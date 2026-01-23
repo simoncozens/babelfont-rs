@@ -1,16 +1,21 @@
 use crate::{
     convertors::fontir::varc::insert_varc_table,
-    filters::{FontFilter as _, RewriteSmartAxes},
+    filters::{FontFilter as _, RetainGlyphs, RewriteSmartAxes},
     BabelfontError, Font,
 };
 use fontc::Options;
-use fontdrasil::{coords::NormalizedLocation, orchestration::Work, types::GlyphName};
+use fontdrasil::{
+    coords::{NormalizedCoord, NormalizedLocation},
+    orchestration::Work,
+    types::GlyphName,
+};
 use fontir::{
     error::Error,
     ir::KerningGroups,
     orchestration::{Context, IrWork, WorkId},
     source::Source,
 };
+use smol_str::SmolStr;
 use std::sync::Arc;
 
 mod color;
@@ -81,10 +86,41 @@ impl BabelfontIrSource {
     /// Compile the Babelfont Font to a font binary
     pub fn compile(font: Font, options: CompilationOptions) -> Result<Vec<u8>, BabelfontError> {
         let mut font = font.clone();
+        assert!(!font.masters.is_empty());
         if options.produce_varc_table {
+            // Set all variable components to exported
+            for glyph in font.glyphs.iter_mut() {
+                if glyph.is_smart_component() {
+                    glyph.exported = true;
+                }
+            }
             RewriteSmartAxes.apply(&mut font)?;
         }
-        // XXX Handle unexported glyphs here.
+        // Unexported glyphs - decompose and drop
+        let exported_glyphs: Vec<SmolStr> = font
+            .glyphs
+            .iter()
+            .filter(|g| g.exported)
+            .map(|g| g.name.clone())
+            .collect();
+        println!("Exported glyphs: {}", exported_glyphs.len());
+        RetainGlyphs::new(
+            font.glyphs
+                .iter()
+                .filter(|g| g.exported)
+                .map(|g| g.name.to_string())
+                .collect(),
+        )
+        .apply(&mut font)?;
+        assert!(
+            !font.masters.is_empty(),
+            "No masters remain after filtering"
+        );
+        // Make sure we have some exported glyphs
+        assert!(
+            font.glyphs.iter().any(|g| g.exported),
+            "No exported glyphs remain after filtering"
+        );
         let source = Self {
             font: Arc::new(font),
             options,
