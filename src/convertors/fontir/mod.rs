@@ -15,7 +15,6 @@ use fontir::{
     orchestration::{Context, IrWork, WorkId},
     source::Source,
 };
-use smol_str::SmolStr;
 use std::sync::Arc;
 
 mod color;
@@ -97,13 +96,6 @@ impl BabelfontIrSource {
             RewriteSmartAxes.apply(&mut font)?;
         }
         // Unexported glyphs - decompose and drop
-        let exported_glyphs: Vec<SmolStr> = font
-            .glyphs
-            .iter()
-            .filter(|g| g.exported)
-            .map(|g| g.name.clone())
-            .collect();
-        // println!("Exported glyphs: {}", exported_glyphs.len());
         RetainGlyphs::new(
             font.glyphs
                 .iter()

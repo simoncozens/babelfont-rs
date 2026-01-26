@@ -36,7 +36,7 @@ pub fn insert_varc_table(binary: &[u8], font: &Font) -> Result<Vec<u8>, Babelfon
 
     let master = font
         .default_master()
-        .ok_or_else(|| BabelfontError::NoDefaultMaster)?;
+        .ok_or(BabelfontError::NoDefaultMaster)?;
     let have_notdef = font
         .glyphs
         .iter()
@@ -269,7 +269,7 @@ fn compute_and_store_deltas(
     log::debug!(
         "Deltas by region for VARC {}: {:#?}",
         context,
-        deltas_by_region.iter().map(|(r, d)| d).collect::<Vec<_>>()
+        deltas_by_region.iter().map(|(_r, d)| d).collect::<Vec<_>>()
     );
     let mut deltas = vec![];
     for (region, delta_values) in deltas_by_region.iter() {

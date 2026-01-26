@@ -92,7 +92,7 @@ impl Work<Context, WorkId, Error> for KerningGroupWork {
                 master
                     .location
                     .to_normalized(&axes)
-                    .map_err(|e| fontir::error::Error::CoordinateConversionError(e))?,
+                    .map_err(fontir::error::Error::CoordinateConversionError)?,
             );
         }
 
@@ -169,7 +169,7 @@ fn kerning_at_location<'a>(
         master
             .location
             .to_normalized(&axes)
-            .map_or(false, |normalized| normalized == *location)
+            .is_ok_and(|normalized| normalized == *location)
     })?;
     Some(Cow::Owned(
         master

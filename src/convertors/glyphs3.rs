@@ -1,6 +1,5 @@
 use crate::{
     common::FormatSpecific,
-    filters::{DropSparseMasters, FontFilter as _},
     glyph::{self, glyphs::glyph_to_glyphs},
     i18ndictionary::I18NDictionary,
     names::Names,

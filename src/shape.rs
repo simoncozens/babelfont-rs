@@ -140,11 +140,16 @@ pub enum Shape {
 }
 
 impl Shape {
+    #[allow(dead_code)]
     pub(crate) fn is_smart_component(&self) -> bool {
         match self {
             Shape::Component(c) => !c.location.is_empty(),
             Shape::Path(_) => false,
         }
+    }
+
+    pub(crate) fn is_path(&self) -> bool {
+        matches!(self, Shape::Path(_))
     }
 
     /// Apply a DecomposedAffine transform to the shape

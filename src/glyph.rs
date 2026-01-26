@@ -154,7 +154,7 @@ pub(crate) mod glyphs {
 
     use super::*;
     use fontdrasil::{
-        coords::{Coord, DesignCoord, UserCoord},
+        coords::{DesignCoord, UserCoord},
         types::Tag,
     };
     use glyphslib::glyphs3::Glyph as G3Glyph;
