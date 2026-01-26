@@ -1,11 +1,11 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::{
-    common::decomposition::DecomposedAffine, Axis, BabelfontError, Component, Font, Glyph, Layer,
-    LayerType,
+    common::decomposition::DecomposedAffine, convertors::fontir::debug_location, Axis,
+    BabelfontError, Component, Font, Glyph, Layer, LayerType,
 };
 use fontdrasil::{
-    coords::{Location, NormalizedCoord, NormalizedSpace},
+    coords::{Location, NormalizedCoord, NormalizedLocation, NormalizedSpace},
     types::Tag,
     variations::{VariationModel, VariationRegion},
 };
@@ -20,7 +20,7 @@ use write_fonts::{
         },
         variations::mivs_builder::{MultiItemVariationStoreBuilder, SparseRegion},
     },
-    types::{F2Dot14, GlyphId, GlyphId16},
+    types::{F2Dot14, F4Dot12, F6Dot10, GlyphId, GlyphId16},
     FontBuilder,
 };
 
@@ -153,6 +153,11 @@ fn to_varcomp(
     axis_order: &[Tag],
     fontdrasil_axes: &fontdrasil::types::Axes,
 ) -> Result<VarComponent, BabelfontError> {
+    log::debug!(
+        "Building VarComponent for component {} in glyph {}",
+        component.reference,
+        glyph.name
+    );
     let glyph_id = glyph_ids.get(&component.reference).ok_or_else(|| {
         BabelfontError::General(format!(
             "Glyph ID not found for component glyph {} in glyph {}",
@@ -195,6 +200,12 @@ fn to_varcomp(
         storebuilder,
         fontdrasil_axes,
     )?;
+    let (transform, transform_var_index) = affine_to_transforms_and_deltas(
+        &component.transform,
+        &other_transforms,
+        fontdrasil_axes,
+        storebuilder,
+    )?;
     let component = VarComponent {
         reset_unspecified_axes: true,
         gid: GlyphId::new((*glyph_id).into()),
@@ -205,12 +216,8 @@ fn to_varcomp(
             Some(axis_values)
         },
         axis_values_var_index,
-        transform: DecomposedTransform {
-            translate_x: Some(component.transform.translation.0),
-            translate_y: Some(component.transform.translation.1),
-            ..Default::default()
-        },
-        transform_var_index: None,
+        transform,
+        transform_var_index,
     };
     Ok(component)
 }
@@ -244,26 +251,150 @@ fn derive_axis_values(
     axis_values
 }
 
-// fn affine_to_transforms_and_deltas(
-//     base_transform: &DecomposedAffine,
-//     other_transforms: &[(Location<NormalizedSpace>, DecomposedAffine)],
-//     fontdrasil_axes: &fontdrasil::types::Axes,
-//     storebuilder: &MultiItemVariationStoreBuilder,
-// ) -> (DecomposedTransform, VariationIndex) {
-//     let mut base_decomposed = DecomposedTransform::default();
-//     let mut all_locations: HashSet<Location<NormalizedSpace>> = HashSet::new();
-//     for (loc, _) in other_transforms.iter() {
-//         all_locations.insert(loc.clone());
-//     }
-//     let mut model = VariationModel::new(all_locations, fontdrasil_axes.axis_order());
-//     // If base.translate_x is not zero, or any other transforms has a non-zero
-//     // translate_x, then it's Some
-//     if base_transform.translation.0 != 0.0
-//         || other_transforms.iter().any(|(_, t)| t.translation.0 != 0.0)
-//     {
-//         base_decomposed.translate_x = Some(base_transform.translation.0);
-//     }
-// }
+fn compute_and_store_deltas(
+    all_locations: HashSet<Location<NormalizedSpace>>,
+    master_values: &HashMap<Location<NormalizedSpace>, Vec<i16>>,
+    fontdrasil_axes: &fontdrasil::types::Axes,
+    storebuilder: &mut MultiItemVariationStoreBuilder,
+    context: &str,
+) -> Result<Option<VarcVariationIndex>, BabelfontError> {
+    let model = VariationModel::new(all_locations, fontdrasil_axes.axis_order());
+    let master_values_f64: HashMap<Location<NormalizedSpace>, Vec<f64>> = master_values
+        .iter()
+        .map(|(loc, vals)| (loc.clone(), vals.iter().map(|&v| v as f64).collect()))
+        .collect();
+    let deltas_by_region = model.deltas(&master_values_f64).map_err(|e| {
+        BabelfontError::General(format!("Error computing VARC {}: {:#?}", context, e))
+    })?;
+    log::debug!(
+        "Deltas by region for VARC {}: {:#?}",
+        context,
+        deltas_by_region.iter().map(|(r, d)| d).collect::<Vec<_>>()
+    );
+    let mut deltas = vec![];
+    for (region, delta_values) in deltas_by_region.iter() {
+        let sparse_region = sparse_region_from_region(region, fontdrasil_axes);
+        deltas.push((
+            sparse_region,
+            delta_values.iter().map(|x| *x as i16).collect(),
+        ));
+    }
+    if deltas_by_region.is_empty() {
+        Ok(None)
+    } else {
+        let temporary_index = storebuilder.add_deltas(deltas).map_err(|e| {
+            BabelfontError::General(format!("Error storing VARC {}: {:#?}", context, e))
+        })?;
+        Ok(Some(VarcVariationIndex::PendingVariationIndex(
+            temporary_index,
+        )))
+    }
+}
+
+fn affine_to_transforms_and_deltas(
+    base_transform: &DecomposedAffine,
+    other_transforms: &[(Location<NormalizedSpace>, DecomposedAffine)],
+    fontdrasil_axes: &fontdrasil::types::Axes,
+    storebuilder: &mut MultiItemVariationStoreBuilder,
+) -> Result<(DecomposedTransform, Option<VarcVariationIndex>), BabelfontError> {
+    let mut base_decomposed = DecomposedTransform::default();
+    let mut all_locations: HashSet<Location<NormalizedSpace>> = HashSet::new();
+    for (loc, _) in other_transforms.iter() {
+        all_locations.insert(loc.clone());
+    }
+    let mut per_location_masters = other_transforms
+        .iter()
+        .map(|(loc, _t)| {
+            all_locations.insert(loc.clone());
+            (loc.clone(), vec![])
+        })
+        .collect::<HashMap<Location<NormalizedSpace>, Vec<i16>>>();
+    let mut default_masters = vec![];
+
+    // Macro to handle each transform component with its specific encoding
+    macro_rules! process_component {
+        ($base_field:ident, $affine_expr:expr, $default:expr, $encode:expr) => {
+            if $affine_expr(base_transform) != $default
+                || other_transforms
+                    .iter()
+                    .any(|(_, t)| $affine_expr(t) != $default)
+            {
+                log::debug!(
+                    "Processing transform component {} with base value {:?}",
+                    stringify!($base_field),
+                    $affine_expr(base_transform)
+                );
+                base_decomposed.$base_field = Some($affine_expr(base_transform));
+                default_masters.push($encode($affine_expr(base_transform)));
+                for (loc, t) in other_transforms.iter() {
+                    let entry =
+                        per_location_masters
+                            .get_mut(loc)
+                            .ok_or(BabelfontError::General(
+                                "Error finding location when building VARC transform deltas"
+                                    .to_string(),
+                            ))?;
+                    entry.push($encode($affine_expr(t)));
+                }
+            }
+        };
+    }
+
+    log::debug!("Base transform: {:#?}", base_transform);
+    // Process each transform component with its specific encoding
+    process_component!(
+        translate_x,
+        |t: &DecomposedAffine| t.translation.0,
+        0.0,
+        |v: f64| v as i16
+    );
+    process_component!(
+        translate_y,
+        |t: &DecomposedAffine| t.translation.1,
+        0.0,
+        |v: f64| v as i16
+    );
+    process_component!(
+        rotation,
+        |t: &DecomposedAffine| t.rotation,
+        0.0,
+        |v: f64| F4Dot12::from_f32(v as f32).to_bits()
+    );
+    process_component!(scale_x, |t: &DecomposedAffine| t.scale.0, 1.0, |v: f64| {
+        F6Dot10::from_f32(v as f32).to_bits()
+    });
+    process_component!(scale_y, |t: &DecomposedAffine| t.scale.1, 1.0, |v: f64| {
+        F6Dot10::from_f32(v as f32).to_bits()
+    });
+    process_component!(skew_x, |t: &DecomposedAffine| t.skew.0, 0.0, |v: f64| {
+        F4Dot12::from_f32(v as f32).to_bits()
+    });
+    process_component!(skew_y, |t: &DecomposedAffine| t.skew.1, 0.0, |v: f64| {
+        F4Dot12::from_f32(v as f32).to_bits()
+    });
+    for (location, vals) in per_location_masters.iter_mut() {
+        log::debug!(
+            "Location {}, transform masters: {:?}",
+            debug_location(location),
+            vals
+        );
+    }
+    // Insert the default location
+    per_location_masters.insert(NormalizedLocation::default(), default_masters);
+    all_locations.insert(NormalizedLocation::default());
+
+    // Now compute deltas for all our master values
+    let variation_index = compute_and_store_deltas(
+        all_locations,
+        &per_location_masters,
+        fontdrasil_axes,
+        storebuilder,
+        "transform deltas",
+    )?;
+    Ok((base_decomposed, variation_index))
+    // For debugging we have no transform deltas
+    // Ok((base_decomposed, None))
+}
 
 fn store_axis_value_deltas(
     base_axis_values: &BTreeMap<u16, f32>,
@@ -285,47 +416,27 @@ fn store_axis_value_deltas(
     // if all_locations.is_empty() {
     //     return Ok(None);
     // }
-    let model = VariationModel::new(all_locations, fontdrasil_axes.axis_order());
-    let mut master_values: HashMap<Location<NormalizedSpace>, Vec<f64>> = HashMap::new();
+    let mut master_values: HashMap<Location<NormalizedSpace>, Vec<i16>> = HashMap::new();
     for (axis_index, base_value) in base_axis_values.iter() {
         master_values
             .entry(base_loc.clone())
             .or_default()
-            .push(*base_value as f64);
+            .push(F2Dot14::from_f32(*base_value).to_bits());
         for (loc, other_axis_values) in other_locations_axis_values.iter() {
             let other_value = other_axis_values.get(axis_index).cloned().unwrap_or(0.0);
             master_values
                 .entry(loc.clone())
                 .or_default()
-                .push(other_value as f64);
+                .push(F2Dot14::from_f32(other_value).to_bits());
         }
     }
-    log::debug!("Master values: {:#?}", master_values);
-    let axis_values_deltas = model.deltas(&master_values).map_err(|e| {
-        BabelfontError::General(format!("Error computing VARC axis value deltas: {:#?}", e))
-    })?;
-    let mut deltas = vec![];
-    for (region, delta_values) in axis_values_deltas.iter() {
-        let sparse_region = sparse_region_from_region(region, fontdrasil_axes);
-        deltas.push((
-            sparse_region,
-            delta_values
-                .iter()
-                .map(|x| F2Dot14::from_f32(*x as f32).to_bits())
-                .collect(),
-        ));
-    }
-    // Sparsify the variation regions
-    if axis_values_deltas.is_empty() {
-        Ok(None)
-    } else {
-        let temporary_index = storebuilder.add_deltas(deltas).map_err(|e| {
-            BabelfontError::General(format!("Error storing VARC axis value deltas: {:#?}", e))
-        })?;
-        Ok(Some(VarcVariationIndex::PendingVariationIndex(
-            temporary_index,
-        )))
-    }
+    compute_and_store_deltas(
+        all_locations,
+        &master_values,
+        fontdrasil_axes,
+        storebuilder,
+        "axis value deltas",
+    )
 }
 
 fn sparse_region_from_region(
