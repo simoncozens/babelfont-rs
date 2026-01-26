@@ -94,6 +94,7 @@ checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
 [[package]]
 name = "ascii_plist_derive"
 version = "0.2.0"
+source = "git+https://github.com/simoncozens/fontc?branch=new-varc-writefonts#dd31a757cd9ad045844584efe5d6810f000b01fb"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -116,7 +117,7 @@ dependencies = [
  "env_logger",
  "fea-rs-ast",
  "fontc",
- "fontdrasil 0.4.0",
+ "fontdrasil 0.4.0 (git+https://github.com/simoncozens/fontc?branch=new-varc-writefonts)",
  "fontir",
  "glyphslib",
  "indexmap 2.13.0",
@@ -582,22 +583,6 @@ checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 [[package]]
 name = "fea-rs"
 version = "0.22.0"
-dependencies = [
- "ansi_term",
- "env_logger",
- "fontdrasil 0.4.0",
- "indexmap 2.13.0",
- "log",
- "ordered-float",
- "serde",
- "smol_str",
- "thiserror 2.0.18",
- "write-fonts 0.45.0",
-]
-
-[[package]]
-name = "fea-rs"
-version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c6acd5f994d5b0a5945942bd7db366873ab4304143b37c7e4008283475c87a1a"
 dependencies = [
@@ -610,6 +595,23 @@ dependencies = [
  "smol_str",
  "thiserror 2.0.18",
  "write-fonts 0.44.1",
+]
+
+[[package]]
+name = "fea-rs"
+version = "0.22.0"
+source = "git+https://github.com/simoncozens/fontc?branch=new-varc-writefonts#dd31a757cd9ad045844584efe5d6810f000b01fb"
+dependencies = [
+ "ansi_term",
+ "env_logger",
+ "fontdrasil 0.4.0 (git+https://github.com/simoncozens/fontc?branch=new-varc-writefonts)",
+ "indexmap 2.13.0",
+ "log",
+ "ordered-float",
+ "serde",
+ "smol_str",
+ "thiserror 2.0.18",
+ "write-fonts 0.45.0",
 ]
 
 [[package]]
@@ -652,6 +654,7 @@ dependencies = [
 [[package]]
 name = "font-types"
 version = "0.11.0"
+source = "git+https://github.com/googlefonts/fontations#fdda800ab449d4b29d81dbfe9d069038764cc6bd"
 dependencies = [
  "bytemuck",
  "serde",
@@ -660,11 +663,12 @@ dependencies = [
 [[package]]
 name = "fontbe"
 version = "0.5.0"
+source = "git+https://github.com/simoncozens/fontc?branch=new-varc-writefonts#dd31a757cd9ad045844584efe5d6810f000b01fb"
 dependencies = [
  "bincode",
  "chrono",
- "fea-rs 0.22.0",
- "fontdrasil 0.4.0",
+ "fea-rs 0.22.0 (git+https://github.com/simoncozens/fontc?branch=new-varc-writefonts)",
+ "fontdrasil 0.4.0 (git+https://github.com/simoncozens/fontc?branch=new-varc-writefonts)",
  "fontir",
  "icu_properties",
  "indexmap 2.13.0",
@@ -682,12 +686,13 @@ dependencies = [
 [[package]]
 name = "fontc"
 version = "0.6.0"
+source = "git+https://github.com/simoncozens/fontc?branch=new-varc-writefonts#dd31a757cd9ad045844584efe5d6810f000b01fb"
 dependencies = [
  "bitflags",
  "crossbeam-channel",
  "env_logger",
  "fontbe",
- "fontdrasil 0.4.0",
+ "fontdrasil 0.4.0 (git+https://github.com/simoncozens/fontc?branch=new-varc-writefonts)",
  "fontir",
  "fontra2fontir",
  "glyphs2fontir",
@@ -699,20 +704,6 @@ dependencies = [
  "thiserror 2.0.18",
  "ufo2fontir",
  "vergen-gitcl",
- "write-fonts 0.45.0",
-]
-
-[[package]]
-name = "fontdrasil"
-version = "0.4.0"
-dependencies = [
- "env_logger",
- "kurbo 0.13.0",
- "log",
- "ordered-float",
- "serde",
- "smol_str",
- "thiserror 2.0.18",
  "write-fonts 0.45.0",
 ]
 
@@ -733,13 +724,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "fontdrasil"
+version = "0.4.0"
+source = "git+https://github.com/simoncozens/fontc?branch=new-varc-writefonts#dd31a757cd9ad045844584efe5d6810f000b01fb"
+dependencies = [
+ "env_logger",
+ "kurbo 0.13.0",
+ "log",
+ "ordered-float",
+ "serde",
+ "smol_str",
+ "thiserror 2.0.18",
+ "write-fonts 0.45.0",
+]
+
+[[package]]
 name = "fontir"
 version = "0.5.0"
+source = "git+https://github.com/simoncozens/fontc?branch=new-varc-writefonts#dd31a757cd9ad045844584efe5d6810f000b01fb"
 dependencies = [
  "bitflags",
  "chrono",
  "env_logger",
- "fontdrasil 0.4.0",
+ "fontdrasil 0.4.0 (git+https://github.com/simoncozens/fontc?branch=new-varc-writefonts)",
  "indexmap 2.13.0",
  "kurbo 0.13.0",
  "log",
@@ -756,9 +763,10 @@ dependencies = [
 [[package]]
 name = "fontra2fontir"
 version = "0.4.0"
+source = "git+https://github.com/simoncozens/fontc?branch=new-varc-writefonts#dd31a757cd9ad045844584efe5d6810f000b01fb"
 dependencies = [
  "env_logger",
- "fontdrasil 0.4.0",
+ "fontdrasil 0.4.0 (git+https://github.com/simoncozens/fontc?branch=new-varc-writefonts)",
  "fontir",
  "indexmap 2.13.0",
  "kurbo 0.13.0",
@@ -834,11 +842,12 @@ checksum = "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280"
 [[package]]
 name = "glyphs-reader"
 version = "0.5.0"
+source = "git+https://github.com/simoncozens/fontc?branch=new-varc-writefonts#dd31a757cd9ad045844584efe5d6810f000b01fb"
 dependencies = [
  "ascii_plist_derive",
  "chrono",
  "env_logger",
- "fontdrasil 0.4.0",
+ "fontdrasil 0.4.0 (git+https://github.com/simoncozens/fontc?branch=new-varc-writefonts)",
  "icu_properties",
  "indexmap 2.13.0",
  "kurbo 0.13.0",
@@ -855,10 +864,11 @@ dependencies = [
 [[package]]
 name = "glyphs2fontir"
 version = "0.6.0"
+source = "git+https://github.com/simoncozens/fontc?branch=new-varc-writefonts#dd31a757cd9ad045844584efe5d6810f000b01fb"
 dependencies = [
  "chrono",
  "env_logger",
- "fontdrasil 0.4.0",
+ "fontdrasil 0.4.0 (git+https://github.com/simoncozens/fontc?branch=new-varc-writefonts)",
  "fontir",
  "glyphs-reader",
  "indexmap 2.13.0",
@@ -1471,6 +1481,7 @@ dependencies = [
 [[package]]
 name = "read-fonts"
 version = "0.37.0"
+source = "git+https://github.com/googlefonts/fontations#fdda800ab449d4b29d81dbfe9d069038764cc6bd"
 dependencies = [
  "bytemuck",
  "font-types 0.11.0",
@@ -1995,10 +2006,11 @@ dependencies = [
 [[package]]
 name = "ufo2fontir"
 version = "0.4.0"
+source = "git+https://github.com/simoncozens/fontc?branch=new-varc-writefonts#dd31a757cd9ad045844584efe5d6810f000b01fb"
 dependencies = [
  "chrono",
  "env_logger",
- "fontdrasil 0.4.0",
+ "fontdrasil 0.4.0 (git+https://github.com/simoncozens/fontc?branch=new-varc-writefonts)",
  "fontir",
  "indexmap 2.13.0",
  "kurbo 0.13.0",
@@ -2288,6 +2300,7 @@ dependencies = [
 [[package]]
 name = "write-fonts"
 version = "0.45.0"
+source = "git+https://github.com/googlefonts/fontations#fdda800ab449d4b29d81dbfe9d069038764cc6bd"
 dependencies = [
  "font-types 0.11.0",
  "indexmap 2.13.0",

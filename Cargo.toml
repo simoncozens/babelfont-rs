@@ -47,12 +47,12 @@ serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0.37"
 regex = "1.5.5"
 # Branch nonsense is temporary until fontc works with WASM better
-fontdrasil = { version = "0.4.0", path = "/Users/simon/others-repos/fontc/fontdrasil" }
-fontir = { version = "0.5.0", optional = true, path = "/Users/simon/others-repos/fontc/fontir" } # Must use version fondrasil uses
-fontc = { version = "0.6.0", optional = true, path = "/Users/simon/others-repos/fontc/fontc", default-features = false } # Must use version fondrasil uses
+fontdrasil = { version = "0.4.0", git = "https://github.com/simoncozens/fontc", branch = "new-varc-writefonts" }
+fontir = { version = "0.5.0", optional = true, git = "https://github.com/simoncozens/fontc", branch = "new-varc-writefonts" } # Must use version fondrasil uses
+fontc = { version = "0.6.0", optional = true, git = "https://github.com/simoncozens/fontc", branch = "new-varc-writefonts", default-features = false } # Must use version fondrasil uses
 write-fonts = { version = "0.45.0", features = [
     "read",
-], path = "/Users/simon/others-repos/fontations/write-fonts" } # Must use version fontdrasil uses
+], git = "https://github.com/googlefonts/fontations" } # Must use version fontdrasil uses
 smol_str = { version = "0.3.0", features = ["serde"] }
 kurbo = "0.13" # Must use same version as norad / fontir /etc.
 ordered-float = "5.1.0"
