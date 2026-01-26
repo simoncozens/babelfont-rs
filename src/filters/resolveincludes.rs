@@ -40,6 +40,30 @@ impl FontFilter for ResolveIncludes {
             ))
         }
     }
+
+    fn from_str(s: &str) -> Result<Self, crate::BabelfontError>
+    where
+        Self: Sized,
+    {
+        if s.is_empty() {
+            Ok(ResolveIncludes::new(None::<PathBuf>))
+        } else {
+            Ok(ResolveIncludes::new(Some(PathBuf::from(s))))
+        }
+    }
+
+    #[cfg(feature = "cli")]
+    fn arg() -> clap::Arg
+    where
+        Self: Sized,
+    {
+        clap::Arg::new("resolveincludes")
+            .long("resolve-includes")
+            .help("Resolve include() statements in feature files")
+            .value_name("BASE_PATH")
+            .action(clap::ArgAction::Append)
+            .required(false)
+    }
 }
 
 fn resolve_includes(

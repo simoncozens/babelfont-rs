@@ -50,4 +50,22 @@ impl FontFilter for GlyphsData {
         }
         Ok(())
     }
+
+    fn from_str(_s: &str) -> Result<Self, crate::BabelfontError>
+    where
+        Self: Sized,
+    {
+        Ok(GlyphsData)
+    }
+
+    #[cfg(feature = "cli")]
+    fn arg() -> clap::Arg
+    where
+        Self: Sized,
+    {
+        clap::Arg::new("glyphsdata")
+            .long("glyphs-data")
+            .help("Add Glyphs.app glyph metadata to the font")
+            .action(clap::ArgAction::SetTrue)
+    }
 }

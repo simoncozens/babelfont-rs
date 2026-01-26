@@ -69,4 +69,26 @@ impl FontFilter for DropAxis {
         // XXX Remove axis from variable scalars in features
         Ok(())
     }
+
+    fn from_str(s: &str) -> Result<Self, crate::BabelfontError>
+    where
+        Self: Sized,
+    {
+        use std::str::FromStr;
+        let tag = fontdrasil::types::Tag::from_str(s)
+            .map_err(|e| crate::BabelfontError::FilterError(format!("Invalid axis tag: {}", e)))?;
+        Ok(DropAxis::new(tag))
+    }
+
+    #[cfg(feature = "cli")]
+    fn arg() -> clap::Arg
+    where
+        Self: Sized,
+    {
+        clap::Arg::new("dropaxis")
+            .long("drop-axis")
+            .help("Drop the specified axis from the font")
+            .value_name("AXIS_TAG")
+            .action(clap::ArgAction::Append)
+    }
 }

@@ -165,4 +165,22 @@ impl FontFilter for RewriteSmartAxes {
 
         Ok(())
     }
+
+    fn from_str(_s: &str) -> Result<Self, crate::BabelfontError>
+    where
+        Self: Sized,
+    {
+        Ok(RewriteSmartAxes::new())
+    }
+
+    #[cfg(feature = "cli")]
+    fn arg() -> clap::Arg
+    where
+        Self: Sized,
+    {
+        clap::Arg::new("rewritesmartaxes")
+            .long("rewrite-smart-axes")
+            .help("Convert internal smart component axes to OpenType variation axes")
+            .action(clap::ArgAction::SetTrue)
+    }
 }

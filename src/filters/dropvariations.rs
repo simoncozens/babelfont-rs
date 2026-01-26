@@ -34,4 +34,22 @@ impl FontFilter for DropVariations {
         }
         Ok(())
     }
+
+    fn from_str(_s: &str) -> Result<Self, crate::BabelfontError>
+    where
+        Self: Sized,
+    {
+        Ok(DropVariations::new())
+    }
+
+    #[cfg(feature = "cli")]
+    fn arg() -> clap::Arg
+    where
+        Self: Sized,
+    {
+        clap::Arg::new("dropvariations")
+            .long("drop-variations")
+            .help("Drop all variation data, keeping only the default master")
+            .action(clap::ArgAction::SetTrue)
+    }
 }

@@ -24,4 +24,22 @@ impl FontFilter for DropGuides {
         }
         Ok(())
     }
+
+    fn from_str(_s: &str) -> Result<Self, crate::BabelfontError>
+    where
+        Self: Sized,
+    {
+        Ok(DropGuides::new())
+    }
+
+    #[cfg(feature = "cli")]
+    fn arg() -> clap::Arg
+    where
+        Self: Sized,
+    {
+        clap::Arg::new("dropguides")
+            .long("drop-guides")
+            .help("Drop all guides from the font")
+            .action(clap::ArgAction::SetTrue)
+    }
 }

@@ -17,4 +17,22 @@ impl FontFilter for DropInstances {
         font.instances.clear();
         Ok(())
     }
+
+    fn from_str(_s: &str) -> Result<Self, crate::BabelfontError>
+    where
+        Self: Sized,
+    {
+        Ok(DropInstances::new())
+    }
+
+    #[cfg(feature = "cli")]
+    fn arg() -> clap::Arg
+    where
+        Self: Sized,
+    {
+        clap::Arg::new("dropinstances")
+            .long("drop-instances")
+            .help("Drop all instances from the font")
+            .action(clap::ArgAction::SetTrue)
+    }
 }

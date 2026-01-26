@@ -1,35 +1,88 @@
-mod decomposecomponentreferences;
-mod dropaxis;
-mod dropfeatures;
-mod dropguides;
-mod dropinstances;
-mod dropkerning;
-mod dropsparsemasters;
-mod dropvariations;
-#[cfg(feature = "glyphs")]
-mod glyphsdata;
-mod resolveincludes;
-mod retainglyphs;
-mod rewritesmartaxes;
-mod scaleupem;
+/// Macro to declare filters with less boilerplate
+///
+/// Usage: `declare_filters! { TypeName(module_name) => "cli_name", ... }`
+macro_rules! declare_filters {
+    ($($(#[$meta:meta])* $type:ident($module:ident) => $name:literal),* $(,)?) => {
+        // Import modules
+        $(
+            $(#[$meta])*
+            mod $module;
+        )*
 
-pub use decomposecomponentreferences::DecomposeComponentReferences;
-pub use dropaxis::DropAxis;
-pub use dropfeatures::DropFeatures;
-pub use dropguides::DropGuides;
-pub use dropinstances::DropInstances;
-pub use dropkerning::DropKerning;
-pub use dropsparsemasters::DropSparseMasters;
-pub use dropvariations::DropVariations;
-#[cfg(feature = "glyphs")]
-pub use glyphsdata::GlyphsData;
-pub use resolveincludes::ResolveIncludes;
-pub use retainglyphs::RetainGlyphs;
-pub use rewritesmartaxes::RewriteSmartAxes;
-pub use scaleupem::ScaleUpem;
+        // Re-export types
+        $(
+            $(#[$meta])*
+            pub use $module::$type;
+        )*
+
+        // Generate filter_group function
+        #[cfg(feature = "cli")]
+        #[doc="Add filter arguments to a clap Command"]
+        pub fn filter_group(mut command: clap::Command) -> clap::Command {
+            command = command.next_help_heading("Font filters");
+            let mut ids = Vec::new();
+            $(
+                $(#[$meta])*
+                {
+                    let arg = $type::arg();
+                    ids.push(arg.get_id().clone());
+                    command = command.arg(arg);
+                }
+            )*
+            command.group(clap::ArgGroup::new("filters").args(ids).multiple(true))
+        }
+
+        // Generate cli_to_filter function
+        #[cfg(feature = "cli")]
+        #[doc="Convert a CLI filter name and argument to a FontFilter instance"]
+        pub fn cli_to_filter(name: &str, arg: &str) -> Result<Box<dyn FontFilter>, crate::BabelfontError> {
+            Ok(match name {
+                $(
+                    $(#[$meta])*
+                    $name => Box::new($type::from_str(arg)?),
+                )*
+                _ => {
+                    return Err(crate::BabelfontError::FilterError(format!(
+                        "Unknown filter: {}",
+                        name
+                    )))
+                }
+            })
+        }
+    };
+}
+
+// Declare all filters in one place
+declare_filters! {
+    DropKerning(dropkerning) => "dropkerning",
+    DropGuides(dropguides) => "dropguides",
+    DropFeatures(dropfeatures) => "dropfeatures",
+    DropInstances(dropinstances) => "dropinstances",
+    DropVariations(dropvariations) => "dropvariations",
+    DropAxis(dropaxis) => "dropaxis",
+    DropSparseMasters(dropsparsemasters) => "dropsparsemasters",
+    ResolveIncludes(resolveincludes) => "resolveincludes",
+    RetainGlyphs(retainglyphs) => "retainglyphs",
+    DecomposeComponentReferences(decomposecomponentreferences) => "decomposecomponentreferences",
+    RewriteSmartAxes(rewritesmartaxes) => "rewritesmartaxes",
+    ScaleUpem(scaleupem) => "scaleupem",
+    #[cfg(feature = "glyphs")]
+    GlyphsData(glyphsdata) => "glyphsdata",
+}
 
 /// A trait for font filters that can be applied to a font
 pub trait FontFilter {
     /// Apply the filter to the given font
     fn apply(&self, font: &mut crate::Font) -> Result<(), crate::BabelfontError>;
+
+    /// Parse a FontFilter from a string argument
+    fn from_str(s: &str) -> Result<Self, crate::BabelfontError>
+    where
+        Self: Sized;
+
+    #[cfg(feature = "cli")]
+    /// Get the clap argument for this filter
+    fn arg() -> clap::Arg
+    where
+        Self: Sized;
 }

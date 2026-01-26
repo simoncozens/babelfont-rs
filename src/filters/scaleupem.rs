@@ -65,4 +65,26 @@ impl FontFilter for ScaleUpem {
         font.upm = self.0;
         Ok(())
     }
+
+    fn from_str(s: &str) -> Result<Self, crate::BabelfontError>
+    where
+        Self: Sized,
+    {
+        let new_upem: u16 = s.parse().map_err(|_| {
+            crate::BabelfontError::FilterError(format!("Invalid UPEM value: {}", s))
+        })?;
+        Ok(ScaleUpem::new(new_upem))
+    }
+
+    #[cfg(feature = "cli")]
+    fn arg() -> clap::Arg
+    where
+        Self: Sized,
+    {
+        clap::Arg::new("scaleupem")
+            .long("scaleupem")
+            .help("Scale the font's units per em to the specified value")
+            .value_name("UPEM")
+            .action(clap::ArgAction::Append)
+    }
 }

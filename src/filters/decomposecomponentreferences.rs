@@ -377,6 +377,31 @@ impl FontFilter for DecomposeComponentReferences {
 
         Ok(())
     }
+
+    fn from_str(s: &str) -> Result<Self, crate::BabelfontError>
+    where
+        Self: Sized,
+    {
+        if s.is_empty() {
+            Ok(DecomposeComponentReferences::all())
+        } else {
+            let glyphs: IndexSet<SmolStr> = s.split(',').map(|g| SmolStr::new(g.trim())).collect();
+            Ok(DecomposeComponentReferences::new(Some(glyphs)))
+        }
+    }
+
+    #[cfg(feature = "cli")]
+    fn arg() -> clap::Arg
+    where
+        Self: Sized,
+    {
+        clap::Arg::new("decomposecomponents")
+            .long("decompose-components")
+            .help("Decompose component references (optionally list specific glyphs to decompose)")
+            .value_name("GLYPHS")
+            .action(clap::ArgAction::Append)
+            .required(false)
+    }
 }
 
 fn decompose_smart_component_with_glyph(

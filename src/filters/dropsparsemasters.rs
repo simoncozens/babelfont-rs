@@ -55,4 +55,22 @@ impl FontFilter for DropSparseMasters {
             .retain(|m| !sparse_master_ids_and_locations.contains_key(&m.id));
         Ok(())
     }
+
+    fn from_str(_s: &str) -> Result<Self, crate::BabelfontError>
+    where
+        Self: Sized,
+    {
+        Ok(DropSparseMasters::new())
+    }
+
+    #[cfg(feature = "cli")]
+    fn arg() -> clap::Arg
+    where
+        Self: Sized,
+    {
+        clap::Arg::new("dropsparsemasters")
+            .long("drop-sparse-masters")
+            .help("Drop all sparse masters, converting their layers to associated layers")
+            .action(clap::ArgAction::SetTrue)
+    }
 }

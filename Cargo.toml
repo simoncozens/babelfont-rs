@@ -20,7 +20,16 @@ uuid = { version = "1.11.0", features = ["v4", "serde"] }
 uuid = { version = "1.11.0", features = ["v4", "js", "serde"] }
 
 [features]
-default = ["glyphs", "ufo", "fontlab", "fontra", "fontir", "rayon", "types", "robocjk"]
+default = [
+    "glyphs",
+    "ufo",
+    "fontlab",
+    "fontra",
+    "fontir",
+    "rayon",
+    "types",
+    "robocjk",
+]
 vfb = ["dep:vfbreader"]
 glyphs = ["dep:glyphslib"]
 ufo = ["dep:norad"]

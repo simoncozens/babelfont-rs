@@ -105,6 +105,26 @@ impl FontFilter for RetainGlyphs {
 
         Ok(())
     }
+
+    fn from_str(s: &str) -> Result<Self, crate::BabelfontError>
+    where
+        Self: Sized,
+    {
+        let glyph_names: Vec<String> = s.split(',').map(|g| g.trim().to_string()).collect();
+        Ok(RetainGlyphs::new(glyph_names))
+    }
+
+    #[cfg(feature = "cli")]
+    fn arg() -> clap::Arg
+    where
+        Self: Sized,
+    {
+        clap::Arg::new("retainglyphs")
+            .long("retain-glyphs")
+            .help("Retain only the specified glyphs (comma-separated list)")
+            .value_name("GLYPHS")
+            .action(clap::ArgAction::Append)
+    }
 }
 
 // Feature subsetting code goes here!

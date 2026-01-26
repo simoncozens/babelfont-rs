@@ -19,4 +19,22 @@ impl FontFilter for DropKerning {
         }
         Ok(())
     }
+
+    fn from_str(_s: &str) -> Result<Self, crate::BabelfontError>
+    where
+        Self: Sized,
+    {
+        Ok(DropKerning::new())
+    }
+
+    #[cfg(feature = "cli")]
+    fn arg() -> clap::Arg
+    where
+        Self: Sized,
+    {
+        clap::Arg::new("dropkerning")
+            .long("drop-kerning")
+            .help("Drop all kerning data from the font")
+            .action(clap::ArgAction::SetTrue)
+    }
 }
