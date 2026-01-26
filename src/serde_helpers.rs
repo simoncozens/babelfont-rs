@@ -117,6 +117,10 @@ pub(crate) fn is_one_one(scale: &(f64, f64)) -> bool {
     *scale == (1.0, 1.0)
 }
 
+pub(crate) fn one_one() -> (f64, f64) {
+    (1.0, 1.0)
+}
+
 pub(crate) fn serialize_nodes<S>(
     nodes: &Vec<crate::common::Node>,
     serializer: S,

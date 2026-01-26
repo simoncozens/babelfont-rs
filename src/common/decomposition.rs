@@ -21,7 +21,10 @@ pub struct DecomposedAffine {
     #[typeshare(typescript(type = "[number, number]"))]
     #[typeshare(python(type = "(float, float)"))]
     pub translation: (f64, f64),
-    #[serde(default, skip_serializing_if = "crate::serde_helpers::is_one_one")]
+    #[serde(
+        default = "crate::serde_helpers::one_one",
+        skip_serializing_if = "crate::serde_helpers::is_one_one"
+    )]
     #[typeshare(typescript(type = "[number, number]"))]
     #[typeshare(python(type = "(float, float)"))]
     pub scale: (f64, f64),
