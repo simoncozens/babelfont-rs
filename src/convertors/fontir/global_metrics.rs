@@ -53,7 +53,6 @@ impl Work<Context, WorkId, Error> for GlobalMetricWork {
 
         for master in self.0.masters.iter() {
             let pos = master.location.to_normalized(&axes)?;
-
             // glyphsLib <https://github.com/googlefonts/glyphsLib/blob/1cb4fc5ae2/Lib/glyphsLib/classes.py#L1590-L1601>
             let cap_height = master
                 .metrics
@@ -192,9 +191,21 @@ impl Work<Context, WorkId, Error> for GlobalMetricWork {
             );
         }
 
-        context
-            .global_metrics
-            .set(metrics.build(&static_metadata.axes)?);
+        let global_metrics = metrics.build(&static_metadata.axes)?;
+        // Ensure that one of the masters has that location
+        assert!(
+            self.0
+                .masters
+                .iter()
+                .any(|m| m.location.to_normalized(&axes).ok().as_ref()
+                    == Some(static_metadata.default_location())),
+            "No master at default location {:?}",
+            static_metadata.default_location()
+        );
+        global_metrics.at(static_metadata.default_location());
+
+        context.global_metrics.set(global_metrics);
+        // Check we have a default location; this'll panic if we don't
         Ok(())
     }
 }
