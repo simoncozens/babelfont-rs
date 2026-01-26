@@ -103,7 +103,7 @@ impl BabelfontIrSource {
             .filter(|g| g.exported)
             .map(|g| g.name.clone())
             .collect();
-        println!("Exported glyphs: {}", exported_glyphs.len());
+        // println!("Exported glyphs: {}", exported_glyphs.len());
         RetainGlyphs::new(
             font.glyphs
                 .iter()

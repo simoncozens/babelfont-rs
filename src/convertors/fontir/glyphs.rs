@@ -1,4 +1,7 @@
-use crate::{convertors::fontir::CompilationOptions, Component, Font, Layer, NodeType, Shape};
+use crate::{
+    convertors::fontir::{debug_location, CompilationOptions},
+    Component, Font, Layer, NodeType, Shape,
+};
 use fontdrasil::{
     coords::{Location, NormalizedCoord, NormalizedLocation},
     orchestration::{Access, AccessBuilder, Work},
@@ -82,7 +85,28 @@ impl Work<Context, WorkId, Error> for GlyphIrWork {
 
         let mut ir_anchors = AnchorBuilder::new(self.glyph_name.clone());
         let layers: Vec<&Layer> = glyph.layers.iter().collect();
+        // println!(
+        //     "Processing glyph '{}' with {} layers",
+        //     self.glyph_name,
+        //     layers.len()
+        // );
 
+        // println!(
+        //     "Glyph:{}\nAxes:\n {}",
+        //     self.glyph_name,
+        //     axes.clone()
+        //         .into_inner()
+        //         .iter()
+        //         .map(|a| format!(
+        //             "{} {}<-{}->{}\n",
+        //             a.tag,
+        //             a.min.to_f64(),
+        //             a.default.to_f64(),
+        //             a.max.to_f64()
+        //         ))
+        //         .collect::<Vec<_>>()
+        //         .join("")
+        // );
         // Glyphs have layers that match up with masters, and masters have locations
         let mut axis_positions: HashMap<Tag, HashSet<NormalizedCoord>> = HashMap::new();
         for layer in layers.iter() {
@@ -101,9 +125,20 @@ impl Work<Context, WorkId, Error> for GlyphIrWork {
                 Location::new()
             };
             let location = design_location.to_normalized(axes)?;
+            // println!(
+            //     "Layer {} has normalized location {:?}",
+            //     layer.debug_name(),
+            //     debug_location(&location)
+            // );
+
             if self.options.skip_outlines && !location.is_default() {
                 continue;
             }
+            // log::debug!(
+            //     "Processing layer {} at location {}",
+            //     layer.debug_name(),
+            //     debug_location(&location)
+            // );
 
             let (location, instance) = process_layer(glyph, &location, layer, &self.options)?;
 
@@ -126,15 +161,38 @@ impl Work<Context, WorkId, Error> for GlyphIrWork {
         }
         // Let's do our own sanity check for default locations
         let locations = ir_glyph.sources.keys().cloned().collect::<Vec<_>>();
-        if !locations.iter().any(|loc| loc.is_default()) {
+        let default_locations = locations
+            .iter()
+            .filter(|loc| loc.is_default())
+            .collect::<Vec<_>>();
+        if default_locations.is_empty() {
             log::error!(
-                "Glyph '{}' has no layer at default location: locations found: {:?}",
+                "Glyph '{}' has no layer at default location: locations found: {}",
                 self.glyph_name,
                 locations
+                    .iter()
+                    .map(debug_location)
+                    .collect::<Vec<_>>()
+                    .join(", ")
             );
             return Err(Error::BadGlyph(BadGlyph::new(
                 &self.glyph_name,
                 BadGlyphKind::NoDefaultLocation,
+            )));
+        }
+        if default_locations.len() > 1 {
+            log::error!(
+                "Glyph '{}' has multiple layers at default location: locations found: {}",
+                self.glyph_name,
+                locations
+                    .iter()
+                    .map(debug_location)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
+            return Err(Error::BadGlyph(BadGlyph::new(
+                &self.glyph_name,
+                BadGlyphKind::MultipleDefaultLocations,
             )));
         }
 
