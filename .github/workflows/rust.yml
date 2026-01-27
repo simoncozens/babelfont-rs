@@ -27,9 +27,11 @@ jobs:
         name: Set up Rust for caching
       - name: Build
         run: cargo build
+      - name: Check out notocjk for testing
+        run: git clone https://github.com/notofonts/noto-cjk-varco.git --depth 1
       - name: Run tests
         run: |
-          cargo test --verbose --workspace 
+          cargo test --verbose --workspace
 
   formatting:
     runs-on: ubuntu-latest
@@ -66,8 +68,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - if: contains(github.ref, 'refs/tags/v')
-        run:
-          python3 scripts/check_versions.py
+        run: python3 scripts/check_versions.py
         env:
           CRATE_PATTERN: ${{ env.CRATE_PATTERN }}
       - if: contains(github.ref, 'refs/tags/v')
@@ -77,4 +78,3 @@ jobs:
           if ! gh release view ${{ github.ref_name }}; then
           git show -s --format=%B ${{ github.ref_name }} | tail -n +4 | gh release create ${{ github.ref_name }} -t ${{ github.ref_name }} -F -
           fi
-
