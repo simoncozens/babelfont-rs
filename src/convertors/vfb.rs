@@ -319,14 +319,14 @@ fn load_glyph(font: &mut Font, items: Vec<GlyphEntry>) -> Result<(), BabelfontEr
                                             reason: "Not enough coordinates for component"
                                                 .to_string(),
                                         }
-                                    })? as f64,
+                                    })?,
                                     *component.y_scale.get(index).ok_or_else(|| {
                                         BabelfontError::GlyphNotInterpolatable {
                                             glyph: glyph.name.clone().into(),
                                             reason: "Not enough coordinates for component"
                                                 .to_string(),
                                         }
-                                    })? as f64,
+                                    })?,
                                 ),
                                 ..Default::default()
                             },
