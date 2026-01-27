@@ -108,7 +108,7 @@ fn main() {
     // appear in the command line. Clap stores --foo 1 --bar 2 --foo 3 as
     // "foo": ["1", "3"], "bar": ["2"], losing the original order, but we can regain that order
     // by looking at the raw occurrences of the "filters" arg group.
-    let filter_group = args.get_raw("filters").unwrap();
+    let filter_group = args.get_raw("filters").unwrap_or_default();
     let mut counter = HashMap::new();
     let mut filters: Vec<Box<dyn FontFilter>> = vec![];
 
