@@ -68,6 +68,7 @@ declare_filters! {
     ScaleUpem(scaleupem) => "scaleupem",
     #[cfg(feature = "glyphs")]
     GlyphsData(glyphsdata) => "glyphsdata",
+    DropIncompatiblePaths(dropincompatiblepaths) => "dropincompatiblepaths",
 }
 
 /// A trait for font filters that can be applied to a font

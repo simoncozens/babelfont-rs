@@ -1,6 +1,6 @@
 use crate::{
     convertors::fontir::varc::insert_varc_table,
-    filters::{FontFilter as _, RetainGlyphs, RewriteSmartAxes},
+    filters::{DropIncompatiblePaths, FontFilter as _, RetainGlyphs, RewriteSmartAxes},
     BabelfontError, Font,
 };
 use fontc::Options;
@@ -40,6 +40,8 @@ pub struct CompilationOptions {
     pub dont_use_production_names: bool,
     /// Produce VARC table (defaults to true)
     pub produce_varc_table: bool,
+    /// Drop incompatible paths from layers
+    pub drop_incompatible_paths: bool,
 }
 
 impl Default for CompilationOptions {
@@ -51,6 +53,7 @@ impl Default for CompilationOptions {
             skip_outlines: false,
             dont_use_production_names: false,
             produce_varc_table: true,
+            drop_incompatible_paths: false,
         }
     }
 }
@@ -86,6 +89,10 @@ impl BabelfontIrSource {
     pub fn compile(font: Font, options: CompilationOptions) -> Result<Vec<u8>, BabelfontError> {
         let mut font = font.clone();
         assert!(!font.masters.is_empty());
+        if options.drop_incompatible_paths {
+            DropIncompatiblePaths.apply(&mut font)?;
+        }
+
         if options.produce_varc_table {
             // Set all variable components to exported
             for glyph in font.glyphs.iter_mut() {
