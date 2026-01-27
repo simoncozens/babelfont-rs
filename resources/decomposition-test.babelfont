@@ -1,0 +1,2185 @@
+{
+    "upm": 1000,
+    "version": [
+        1,
+        0
+    ],
+    "masters": [
+    {
+        "name":
+        {
+            "dflt": "Thin"
+        },
+        "id": "c52203bb",
+        "location":
+        {},
+        "metrics":
+        {
+            "Ascender": 800,
+            "ascender zone": 16,
+            "baseline zone": -16,
+            "CapHeight": 750,
+            "cap height zone": 16,
+            "Descender": -250,
+            "descender zone": -16,
+            "XHeight": 500,
+            "x-height zone": 16
+        },
+        "kerning":
+        {},
+        "custom_ot_values":
+        {}
+    }],
+    "glyphs": [
+    {
+        "name": "T_2099D_2FF0",
+        "category": null,
+        "layers": [
+        {
+            "width": 1000.0,
+            "id": "c52203bb",
+            "master":
+            {
+                "type": "DefaultForMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "reference": "VG_65E5_00",
+                "transform":
+                {
+                    "translation": [
+                        100.0,
+                        369.0
+                    ],
+                    "scale": [
+                        1.0,
+                        1.0
+                    ],
+                    "rotation": 0.0,
+                    "skew": [
+                        0.0,
+                        0.0
+                    ],
+                    "order": "Glyphs"
+                },
+                "location":
+                {
+                    "H_weight": 0.0,
+                    "L_S_bottom_length": 0.0,
+                    "M_H_moveV": 1.0,
+                    "M_H_weight": 0.0,
+                    "R_S_bottom_length": 0.0,
+                    "height": 333.0,
+                    "weight": 30.0,
+                    "width": 393.0
+                }
+            },
+            {
+                "reference": "VG_4E00_00",
+                "transform":
+                {
+                    "translation": [
+                        50.0,
+                        -264.0
+                    ],
+                    "scale": [
+                        1.0,
+                        1.0
+                    ],
+                    "rotation": 0.0,
+                    "skew": [
+                        0.0,
+                        0.0
+                    ],
+                    "order": "Glyphs"
+                },
+                "location":
+                {
+                    "weight": 29.0,
+                    "width": 478.0
+                }
+            },
+            {
+                "reference": "VG_4E00_00",
+                "transform":
+                {
+                    "translation": [
+                        61.0,
+                        298.0
+                    ],
+                    "scale": [
+                        1.0,
+                        1.0
+                    ],
+                    "rotation": 0.0,
+                    "skew": [
+                        0.0,
+                        0.0
+                    ],
+                    "order": "Glyphs"
+                },
+                "location":
+                {
+                    "weight": 30.0,
+                    "width": 460.0
+                }
+            },
+            {
+                "reference": "VG_4E28_00",
+                "transform":
+                {
+                    "translation": [
+                        -223.0,
+                        -612.0
+                    ],
+                    "scale": [
+                        1.0,
+                        1.0
+                    ],
+                    "rotation": 0.0,
+                    "skew": [
+                        0.0,
+                        0.0
+                    ],
+                    "order": "Glyphs"
+                },
+                "location":
+                {
+                    "height": 338.0,
+                    "weight": 29.0
+                }
+            },
+            {
+                "reference": "VG_4E28_00",
+                "transform":
+                {
+                    "translation": [
+                        -223.0,
+                        -49.0
+                    ],
+                    "scale": [
+                        1.0,
+                        1.0
+                    ],
+                    "rotation": 0.0,
+                    "skew": [
+                        0.0,
+                        0.0
+                    ],
+                    "order": "Glyphs"
+                },
+                "location":
+                {
+                    "height": 268.0,
+                    "weight": 29.0
+                }
+            }],
+            "smart_component_location":
+            {
+                "width": 478.0
+            }
+        }],
+        "exported": false,
+        "component_axes": [
+        {
+            "name":
+            {
+                "dflt": "width"
+            },
+            "tag": "VARC",
+            "min": 331.0,
+            "max": 478.0,
+            "default": 478.0
+        }]
+    },
+    {
+        "name": "VG_4E00_00",
+        "category": null,
+        "layers": [
+        {
+            "width": 1000.0,
+            "id": "c52203bb",
+            "master":
+            {
+                "type": "DefaultForMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "nodes": "0 380 l 1000 380 l 1000 390 l 0 390 l",
+                "closed": true
+            }],
+            "smart_component_location":
+            {
+                "weight": 10.0,
+                "width": 1000.0
+            }
+        },
+        {
+            "width": 1000.0,
+            "name": "weight=200",
+            "id": "09351959-d530-44df-aaae-c2d88634d4e6",
+            "master":
+            {
+                "type": "AssociatedWithMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "nodes": "0 380 l 1000 380 l 1000 580 l 0 580 l",
+                "closed": true
+            }],
+            "smart_component_location":
+            {
+                "weight": 200.0,
+                "width": 1000.0
+            }
+        },
+        {
+            "width": 1000.0,
+            "name": "width=10",
+            "id": "86448280-77d6-4a28-82f2-ffaac585566a",
+            "master":
+            {
+                "type": "AssociatedWithMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "nodes": "0 380 l 10 380 l 10 390 l 0 390 l",
+                "closed": true
+            }],
+            "smart_component_location":
+            {
+                "width": 10.0,
+                "weight": 10.0
+            }
+        }],
+        "exported": false,
+        "component_axes": [
+        {
+            "name":
+            {
+                "dflt": "weight"
+            },
+            "tag": "VARC",
+            "min": -100.0,
+            "max": 200.0,
+            "default": 10.0
+        },
+        {
+            "name":
+            {
+                "dflt": "width"
+            },
+            "tag": "VARC",
+            "min": 10.0,
+            "max": 1000.0,
+            "default": 1000.0
+        }]
+    },
+    {
+        "name": "VG_4E28_00",
+        "category": null,
+        "layers": [
+        {
+            "width": 1000.0,
+            "id": "c52203bb",
+            "master":
+            {
+                "type": "DefaultForMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "nodes": "500 -120 l 510 -120 l 510 880 l 500 880 l",
+                "closed": true
+            }],
+            "smart_component_location":
+            {
+                "weight": 10.0,
+                "height": 1000.0,
+                "T_slant": 0.0
+            }
+        },
+        {
+            "width": 1000.0,
+            "name": "weight=200",
+            "id": "ad982a04-cbec-4881-a7de-ef9cb7950fd7",
+            "master":
+            {
+                "type": "AssociatedWithMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "nodes": "500 -120 l 700 -120 l 700 880 l 500 880 l",
+                "closed": true
+            }],
+            "smart_component_location":
+            {
+                "weight": 200.0,
+                "height": 1000.0,
+                "T_slant": 0.0
+            }
+        },
+        {
+            "width": 1000.0,
+            "name": "height=10",
+            "id": "c2c46c89-d3d5-4c31-82c1-489800867189",
+            "master":
+            {
+                "type": "AssociatedWithMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "nodes": "500 870 l 510 870 l 510 880 l 500 880 l",
+                "closed": true
+            }],
+            "smart_component_location":
+            {
+                "height": 10.0,
+                "weight": 10.0,
+                "T_slant": 0.0
+            }
+        },
+        {
+            "width": 1000.0,
+            "name": "height=2000",
+            "id": "ccfca6cd-980a-4e59-b991-389d603a5a5e",
+            "master":
+            {
+                "type": "AssociatedWithMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "nodes": "500 -1120 l 510 -1120 l 510 880 l 500 880 l",
+                "closed": true
+            }],
+            "smart_component_location":
+            {
+                "height": 2000.0,
+                "weight": 10.0,
+                "T_slant": 0.0
+            }
+        },
+        {
+            "width": 1000.0,
+            "name": "T_slant=100",
+            "id": "85d7df0d-ade9-4b00-93f3-3ab0522c8328",
+            "master":
+            {
+                "type": "AssociatedWithMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "nodes": "500 -120 l 510 -120 l 510 980 l 500 880 l",
+                "closed": true
+            }],
+            "smart_component_location":
+            {
+                "T_slant": 100.0,
+                "weight": 10.0,
+                "height": 1000.0
+            }
+        }],
+        "exported": false,
+        "component_axes": [
+        {
+            "name":
+            {
+                "dflt": "weight"
+            },
+            "tag": "VARC",
+            "min": -100.0,
+            "max": 200.0,
+            "default": 10.0
+        },
+        {
+            "name":
+            {
+                "dflt": "height"
+            },
+            "tag": "VARC",
+            "min": 10.0,
+            "max": 2000.0,
+            "default": 1000.0
+        },
+        {
+            "name":
+            {
+                "dflt": "T_slant"
+            },
+            "tag": "VARC",
+            "min": 0.0,
+            "max": 100.0,
+            "default": 0.0
+        }]
+    },
+    {
+        "name": "VG_53E3_00",
+        "category": null,
+        "layers": [
+        {
+            "width": 1000.0,
+            "id": "c52203bb",
+            "master":
+            {
+                "type": "DefaultForMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "nodes": "0 -120 l 30 -120 l 30 850 l 970 850 l 970 -120 l 1000 -120 l 1000 880 l 0 880 l",
+                "closed": true
+            },
+            {
+                "nodes": "10 -120 l 999 -120 l 999 -90 l 10 -90 l",
+                "closed": true
+            }],
+            "smart_component_location":
+            {
+                "weight": 30.0,
+                "T_H_weight": 0.0,
+                "B_H_weight": 0.0,
+                "L_S_weight": 0.0,
+                "R_S_weight": 0.0,
+                "height": 1000.0,
+                "width": 1000.0,
+                "L_S_bottom_length": 0.0,
+                "R_S_bottom_length": 0.0,
+                "B_H_moveV": 0.0,
+                "B_H_length": 0.0
+            }
+        },
+        {
+            "width": 1000.0,
+            "name": "weight=160",
+            "id": "1528f396-229f-454b-8757-d32dd59e6c91",
+            "master":
+            {
+                "type": "AssociatedWithMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "nodes": "0 -120 l 160 -120 l 160 720 l 840 720 l 840 -120 l 1000 -120 l 1000 880 l 0 880 l",
+                "closed": true
+            },
+            {
+                "nodes": "10 -120 l 999 -120 l 999 40 l 10 40 l",
+                "closed": true
+            }],
+            "smart_component_location":
+            {
+                "weight": 160.0,
+                "T_H_weight": 0.0,
+                "B_H_weight": 0.0,
+                "L_S_weight": 0.0,
+                "R_S_weight": 0.0,
+                "height": 1000.0,
+                "width": 1000.0,
+                "L_S_bottom_length": 0.0,
+                "R_S_bottom_length": 0.0,
+                "B_H_moveV": 0.0,
+                "B_H_length": 0.0
+            }
+        },
+        {
+            "width": 1000.0,
+            "name": "T_H_weight=100",
+            "id": "bd1c88ae-e9e3-47e7-9459-aafb0e835fc7",
+            "master":
+            {
+                "type": "AssociatedWithMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "nodes": "0 -120 l 30 -120 l 30 750 l 970 750 l 970 -120 l 1000 -120 l 1000 880 l 0 880 l",
+                "closed": true
+            },
+            {
+                "nodes": "10 -120 l 999 -120 l 999 -90 l 10 -90 l",
+                "closed": true
+            }],
+            "smart_component_location":
+            {
+                "T_H_weight": 100.0,
+                "weight": 30.0,
+                "B_H_weight": 0.0,
+                "L_S_weight": 0.0,
+                "R_S_weight": 0.0,
+                "height": 1000.0,
+                "width": 1000.0,
+                "L_S_bottom_length": 0.0,
+                "R_S_bottom_length": 0.0,
+                "B_H_moveV": 0.0,
+                "B_H_length": 0.0
+            }
+        },
+        {
+            "width": 1000.0,
+            "name": "T_H_weight=-100",
+            "id": "9955ed79-6e03-45db-a79a-3304b5c0c252",
+            "master":
+            {
+                "type": "AssociatedWithMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "nodes": "0 -120 l 30 -120 l 30 950 l 970 950 l 970 -120 l 1000 -120 l 1000 880 l 0 880 l",
+                "closed": true
+            },
+            {
+                "nodes": "10 -120 l 999 -120 l 999 -90 l 10 -90 l",
+                "closed": true
+            }],
+            "smart_component_location":
+            {
+                "T_H_weight": -100.0,
+                "weight": 30.0,
+                "B_H_weight": 0.0,
+                "L_S_weight": 0.0,
+                "R_S_weight": 0.0,
+                "height": 1000.0,
+                "width": 1000.0,
+                "L_S_bottom_length": 0.0,
+                "R_S_bottom_length": 0.0,
+                "B_H_moveV": 0.0,
+                "B_H_length": 0.0
+            }
+        },
+        {
+            "width": 1000.0,
+            "name": "B_H_weight=100",
+            "id": "30fd4890-11a3-48e9-8533-a6bb19e0fe4c",
+            "master":
+            {
+                "type": "AssociatedWithMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "nodes": "0 -120 l 30 -120 l 30 850 l 970 850 l 970 -120 l 1000 -120 l 1000 880 l 0 880 l",
+                "closed": true
+            },
+            {
+                "nodes": "10 -120 l 999 -120 l 999 10 l 10 10 l",
+                "closed": true
+            }],
+            "smart_component_location":
+            {
+                "B_H_weight": 100.0,
+                "weight": 30.0,
+                "T_H_weight": 0.0,
+                "L_S_weight": 0.0,
+                "R_S_weight": 0.0,
+                "height": 1000.0,
+                "width": 1000.0,
+                "L_S_bottom_length": 0.0,
+                "R_S_bottom_length": 0.0,
+                "B_H_moveV": 0.0,
+                "B_H_length": 0.0
+            }
+        },
+        {
+            "width": 1000.0,
+            "name": "B_H_weight=-100",
+            "id": "a2346ac2-9e7a-46c6-8fb4-085f4530b922",
+            "master":
+            {
+                "type": "AssociatedWithMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "nodes": "0 -120 l 30 -120 l 30 850 l 970 850 l 970 -120 l 1000 -120 l 1000 880 l 0 880 l",
+                "closed": true
+            },
+            {
+                "nodes": "10 -120 l 999 -120 l 999 -190 l 10 -190 l",
+                "closed": true
+            }],
+            "smart_component_location":
+            {
+                "B_H_weight": -100.0,
+                "weight": 30.0,
+                "T_H_weight": 0.0,
+                "L_S_weight": 0.0,
+                "R_S_weight": 0.0,
+                "height": 1000.0,
+                "width": 1000.0,
+                "L_S_bottom_length": 0.0,
+                "R_S_bottom_length": 0.0,
+                "B_H_moveV": 0.0,
+                "B_H_length": 0.0
+            }
+        },
+        {
+            "width": 1000.0,
+            "name": "L_S_weight=100",
+            "id": "30ad664f-8b5e-4672-9b18-df8570cd536b",
+            "master":
+            {
+                "type": "AssociatedWithMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "nodes": "0 -120 l 130 -120 l 130 850 l 970 850 l 970 -120 l 1000 -120 l 1000 880 l 0 880 l",
+                "closed": true
+            },
+            {
+                "nodes": "10 -120 l 999 -120 l 999 -90 l 10 -90 l",
+                "closed": true
+            }],
+            "smart_component_location":
+            {
+                "L_S_weight": 100.0,
+                "weight": 30.0,
+                "T_H_weight": 0.0,
+                "B_H_weight": 0.0,
+                "R_S_weight": 0.0,
+                "height": 1000.0,
+                "width": 1000.0,
+                "L_S_bottom_length": 0.0,
+                "R_S_bottom_length": 0.0,
+                "B_H_moveV": 0.0,
+                "B_H_length": 0.0
+            }
+        },
+        {
+            "width": 1000.0,
+            "name": "L_S_weight=-100",
+            "id": "0bdd5743-7ee5-4ffd-a72b-0af5764773d0",
+            "master":
+            {
+                "type": "AssociatedWithMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "nodes": "0 -120 l -70 -120 l -70 850 l 970 850 l 970 -120 l 1000 -120 l 1000 880 l 0 880 l",
+                "closed": true
+            },
+            {
+                "nodes": "10 -120 l 999 -120 l 999 -90 l 10 -90 l",
+                "closed": true
+            }],
+            "smart_component_location":
+            {
+                "L_S_weight": -100.0,
+                "weight": 30.0,
+                "T_H_weight": 0.0,
+                "B_H_weight": 0.0,
+                "R_S_weight": 0.0,
+                "height": 1000.0,
+                "width": 1000.0,
+                "L_S_bottom_length": 0.0,
+                "R_S_bottom_length": 0.0,
+                "B_H_moveV": 0.0,
+                "B_H_length": 0.0
+            }
+        },
+        {
+            "width": 1000.0,
+            "name": "R_S_weight=100",
+            "id": "add8cdda-47a2-4227-bcd7-a1f8cab3a202",
+            "master":
+            {
+                "type": "AssociatedWithMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "nodes": "0 -120 l 30 -120 l 30 850 l 870 850 l 870 -120 l 1000 -120 l 1000 880 l 0 880 l",
+                "closed": true
+            },
+            {
+                "nodes": "10 -120 l 999 -120 l 999 -90 l 10 -90 l",
+                "closed": true
+            }],
+            "smart_component_location":
+            {
+                "R_S_weight": 100.0,
+                "weight": 30.0,
+                "T_H_weight": 0.0,
+                "B_H_weight": 0.0,
+                "L_S_weight": 0.0,
+                "height": 1000.0,
+                "width": 1000.0,
+                "L_S_bottom_length": 0.0,
+                "R_S_bottom_length": 0.0,
+                "B_H_moveV": 0.0,
+                "B_H_length": 0.0
+            }
+        },
+        {
+            "width": 1000.0,
+            "name": "R_S_weight=-100",
+            "id": "ffa96ecc-6ae9-4d40-878f-b917d556fc7e",
+            "master":
+            {
+                "type": "AssociatedWithMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "nodes": "0 -120 l 30 -120 l 30 850 l 1070 850 l 1070 -120 l 1000 -120 l 1000 880 l 0 880 l",
+                "closed": true
+            },
+            {
+                "nodes": "10 -120 l 999 -120 l 999 -90 l 10 -90 l",
+                "closed": true
+            }],
+            "smart_component_location":
+            {
+                "R_S_weight": -100.0,
+                "weight": 30.0,
+                "T_H_weight": 0.0,
+                "B_H_weight": 0.0,
+                "L_S_weight": 0.0,
+                "height": 1000.0,
+                "width": 1000.0,
+                "L_S_bottom_length": 0.0,
+                "R_S_bottom_length": 0.0,
+                "B_H_moveV": 0.0,
+                "B_H_length": 0.0
+            }
+        },
+        {
+            "width": 1000.0,
+            "name": "height=60",
+            "id": "5c18fa4b-8562-4045-be87-29943223dc64",
+            "master":
+            {
+                "type": "AssociatedWithMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "nodes": "0 820 l 30 820 l 30 850 l 970 850 l 970 820 l 1000 820 l 1000 880 l 0 880 l",
+                "closed": true
+            },
+            {
+                "nodes": "10 820 l 999 820 l 999 850 l 10 850 l",
+                "closed": true
+            }],
+            "smart_component_location":
+            {
+                "height": 60.0,
+                "weight": 30.0,
+                "T_H_weight": 0.0,
+                "B_H_weight": 0.0,
+                "L_S_weight": 0.0,
+                "R_S_weight": 0.0,
+                "width": 1000.0,
+                "L_S_bottom_length": 0.0,
+                "R_S_bottom_length": 0.0,
+                "B_H_moveV": 0.0,
+                "B_H_length": 0.0
+            }
+        },
+        {
+            "width": 1000.0,
+            "name": "width=60",
+            "id": "f53a6d7e-d2c7-4d5e-8358-2ac7d1341645",
+            "master":
+            {
+                "type": "AssociatedWithMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "nodes": "0 -120 l 30 -120 l 30 850 l 30 850 l 30 -120 l 60 -120 l 60 880 l 0 880 l",
+                "closed": true
+            },
+            {
+                "nodes": "10 -120 l 59 -120 l 59 -90 l 10 -90 l",
+                "closed": true
+            }],
+            "smart_component_location":
+            {
+                "width": 60.0,
+                "weight": 30.0,
+                "T_H_weight": 0.0,
+                "B_H_weight": 0.0,
+                "L_S_weight": 0.0,
+                "R_S_weight": 0.0,
+                "height": 1000.0,
+                "L_S_bottom_length": 0.0,
+                "R_S_bottom_length": 0.0,
+                "B_H_moveV": 0.0,
+                "B_H_length": 0.0
+            }
+        },
+        {
+            "width": 1000.0,
+            "name": "height=60,width=60",
+            "id": "a856c0f0-a0eb-476b-920d-ee9ea59e8104",
+            "master":
+            {
+                "type": "AssociatedWithMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "nodes": "0 820 l 30 820 l 30 850 l 30 850 l 30 820 l 60 820 l 60 880 l 0 880 l",
+                "closed": true
+            },
+            {
+                "nodes": "10 820 l 59 820 l 59 850 l 10 850 l",
+                "closed": true
+            }],
+            "smart_component_location":
+            {
+                "width": 60.0,
+                "height": 60.0,
+                "weight": 30.0,
+                "T_H_weight": 0.0,
+                "B_H_weight": 0.0,
+                "L_S_weight": 0.0,
+                "R_S_weight": 0.0,
+                "L_S_bottom_length": 0.0,
+                "R_S_bottom_length": 0.0,
+                "B_H_moveV": 0.0,
+                "B_H_length": 0.0
+            }
+        },
+        {
+            "width": 1000.0,
+            "name": "L_S_bottom_length=200",
+            "id": "097d7818-88b5-4f8b-890f-a2ae79814a3c",
+            "master":
+            {
+                "type": "AssociatedWithMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "nodes": "0 -320 l 30 -320 l 30 850 l 970 850 l 970 -120 l 1000 -120 l 1000 880 l 0 880 l",
+                "closed": true
+            },
+            {
+                "nodes": "10 -120 l 999 -120 l 999 -90 l 10 -90 l",
+                "closed": true
+            }],
+            "smart_component_location":
+            {
+                "L_S_bottom_length": 200.0,
+                "weight": 30.0,
+                "T_H_weight": 0.0,
+                "B_H_weight": 0.0,
+                "L_S_weight": 0.0,
+                "R_S_weight": 0.0,
+                "height": 1000.0,
+                "width": 1000.0,
+                "R_S_bottom_length": 0.0,
+                "B_H_moveV": 0.0,
+                "B_H_length": 0.0
+            }
+        },
+        {
+            "width": 1000.0,
+            "name": "R_S_bottom_length=200",
+            "id": "79dcf3f8-28e9-4ac3-851d-7b23f6dc0d90",
+            "master":
+            {
+                "type": "AssociatedWithMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "nodes": "0 -120 l 30 -120 l 30 850 l 970 850 l 970 -320 l 1000 -320 l 1000 880 l 0 880 l",
+                "closed": true
+            },
+            {
+                "nodes": "10 -120 l 999 -120 l 999 -90 l 10 -90 l",
+                "closed": true
+            }],
+            "smart_component_location":
+            {
+                "R_S_bottom_length": 200.0,
+                "weight": 30.0,
+                "T_H_weight": 0.0,
+                "B_H_weight": 0.0,
+                "L_S_weight": 0.0,
+                "R_S_weight": 0.0,
+                "height": 1000.0,
+                "width": 1000.0,
+                "L_S_bottom_length": 0.0,
+                "B_H_moveV": 0.0,
+                "B_H_length": 0.0
+            }
+        },
+        {
+            "width": 1000.0,
+            "name": "B_H_moveV=300",
+            "id": "53662c36-f65a-446a-a5b9-af30ca25fc6b",
+            "master":
+            {
+                "type": "AssociatedWithMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "nodes": "0 -120 l 30 -120 l 30 850 l 970 850 l 970 -120 l 1000 -120 l 1000 880 l 0 880 l",
+                "closed": true
+            },
+            {
+                "nodes": "10 180 l 999 180 l 999 210 l 10 210 l",
+                "closed": true
+            }],
+            "smart_component_location":
+            {
+                "B_H_moveV": 300.0,
+                "weight": 30.0,
+                "T_H_weight": 0.0,
+                "B_H_weight": 0.0,
+                "L_S_weight": 0.0,
+                "R_S_weight": 0.0,
+                "height": 1000.0,
+                "width": 1000.0,
+                "L_S_bottom_length": 0.0,
+                "R_S_bottom_length": 0.0,
+                "B_H_length": 0.0
+            }
+        },
+        {
+            "width": 1000.0,
+            "name": "B_H_moveV=-300",
+            "id": "cc1ba9d3-2bb0-44fd-8858-9ebb49e15496",
+            "master":
+            {
+                "type": "AssociatedWithMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "nodes": "0 -120 l 30 -120 l 30 850 l 970 850 l 970 -120 l 1000 -120 l 1000 880 l 0 880 l",
+                "closed": true
+            },
+            {
+                "nodes": "10 -420 l 999 -420 l 999 -390 l 10 -390 l",
+                "closed": true
+            }],
+            "smart_component_location":
+            {
+                "B_H_moveV": -300.0,
+                "weight": 30.0,
+                "T_H_weight": 0.0,
+                "B_H_weight": 0.0,
+                "L_S_weight": 0.0,
+                "R_S_weight": 0.0,
+                "height": 1000.0,
+                "width": 1000.0,
+                "L_S_bottom_length": 0.0,
+                "R_S_bottom_length": 0.0,
+                "B_H_length": 0.0
+            }
+        },
+        {
+            "width": 1000.0,
+            "name": "B_H_length=-500",
+            "id": "e3dcd7fd-85b8-4a41-8e24-e2a38a621cd2",
+            "master":
+            {
+                "type": "AssociatedWithMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "nodes": "0 -120 l 30 -120 l 30 850 l 970 850 l 970 -120 l 1000 -120 l 1000 880 l 0 880 l",
+                "closed": true
+            },
+            {
+                "nodes": "260 -120 l 740 -120 l 740 -90 l 260 -90 l",
+                "closed": true
+            }],
+            "smart_component_location":
+            {
+                "B_H_length": -500.0,
+                "weight": 30.0,
+                "T_H_weight": 0.0,
+                "B_H_weight": 0.0,
+                "L_S_weight": 0.0,
+                "R_S_weight": 0.0,
+                "height": 1000.0,
+                "width": 1000.0,
+                "L_S_bottom_length": 0.0,
+                "R_S_bottom_length": 0.0,
+                "B_H_moveV": 0.0
+            }
+        }],
+        "exported": false,
+        "component_axes": [
+        {
+            "name":
+            {
+                "dflt": "weight"
+            },
+            "tag": "VARC",
+            "min": 30.0,
+            "max": 160.0,
+            "default": 30.0
+        },
+        {
+            "name":
+            {
+                "dflt": "T_H_weight"
+            },
+            "tag": "VARC",
+            "min": -100.0,
+            "max": 100.0,
+            "default": 0.0
+        },
+        {
+            "name":
+            {
+                "dflt": "B_H_weight"
+            },
+            "tag": "VARC",
+            "min": -100.0,
+            "max": 100.0,
+            "default": 0.0
+        },
+        {
+            "name":
+            {
+                "dflt": "L_S_weight"
+            },
+            "tag": "VARC",
+            "min": -100.0,
+            "max": 100.0,
+            "default": 0.0
+        },
+        {
+            "name":
+            {
+                "dflt": "R_S_weight"
+            },
+            "tag": "VARC",
+            "min": -100.0,
+            "max": 100.0,
+            "default": 0.0
+        },
+        {
+            "name":
+            {
+                "dflt": "height"
+            },
+            "tag": "VARC",
+            "min": 60.0,
+            "max": 1000.0,
+            "default": 1000.0
+        },
+        {
+            "name":
+            {
+                "dflt": "width"
+            },
+            "tag": "VARC",
+            "min": 60.0,
+            "max": 1000.0,
+            "default": 1000.0
+        },
+        {
+            "name":
+            {
+                "dflt": "L_S_bottom_length"
+            },
+            "tag": "VARC",
+            "min": 0.0,
+            "max": 200.0,
+            "default": 0.0
+        },
+        {
+            "name":
+            {
+                "dflt": "R_S_bottom_length"
+            },
+            "tag": "VARC",
+            "min": 0.0,
+            "max": 200.0,
+            "default": 0.0
+        },
+        {
+            "name":
+            {
+                "dflt": "B_H_moveV"
+            },
+            "tag": "VARC",
+            "min": -300.0,
+            "max": 300.0,
+            "default": 0.0
+        },
+        {
+            "name":
+            {
+                "dflt": "B_H_length"
+            },
+            "tag": "VARC",
+            "min": -500.0,
+            "max": 0.0,
+            "default": 0.0
+        }]
+    },
+    {
+        "name": "VG_65E5_00",
+        "category": null,
+        "layers": [
+        {
+            "width": 1000.0,
+            "id": "c52203bb",
+            "master":
+            {
+                "type": "DefaultForMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "reference": "VG_53E3_00",
+                "location":
+                {
+                    "B_H_moveV": 0.0,
+                    "B_H_weight": -10.0,
+                    "L_S_bottom_length": 0.0,
+                    "L_S_weight": -10.0,
+                    "R_S_bottom_length": 0.0,
+                    "R_S_weight": -10.0,
+                    "T_H_weight": -10.0,
+                    "height": 1000.0,
+                    "weight": 30.0,
+                    "width": 1000.0
+                }
+            },
+            {
+                "reference": "VG_4E00_00",
+                "transform":
+                {
+                    "translation": [
+                        0.0,
+                        -10.0
+                    ],
+                    "scale": [
+                        1.0,
+                        1.0
+                    ],
+                    "rotation": 0.0,
+                    "skew": [
+                        0.0,
+                        0.0
+                    ],
+                    "order": "Glyphs"
+                },
+                "location":
+                {
+                    "weight": 20.0,
+                    "width": 1000.0
+                }
+            }],
+            "smart_component_location":
+            {
+                "weight": 20.0,
+                "width": 1000.0,
+                "height": 1000.0,
+                "H_weight": 0.0,
+                "M_H_weight": 0.0,
+                "M_H_moveV": 0.0,
+                "L_S_bottom_length": 0.0,
+                "R_S_bottom_length": 0.0,
+                "M_H_right_length": 0.0,
+                "L_S_weight": 0.0
+            }
+        },
+        {
+            "width": 1000.0,
+            "name": "weight=160",
+            "id": "a5a9ebd5-d400-4915-a67b-1853b1bdc389",
+            "master":
+            {
+                "type": "AssociatedWithMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "reference": "VG_53E3_00",
+                "location":
+                {
+                    "B_H_moveV": 0.0,
+                    "B_H_weight": 0.0,
+                    "L_S_bottom_length": 0.0,
+                    "L_S_weight": 0.0,
+                    "R_S_bottom_length": 0.0,
+                    "R_S_weight": 0.0,
+                    "T_H_weight": 0.0,
+                    "height": 1000.0,
+                    "weight": 160.0,
+                    "width": 1000.0
+                }
+            },
+            {
+                "reference": "VG_4E00_00",
+                "transform":
+                {
+                    "translation": [
+                        0.0,
+                        -80.0
+                    ],
+                    "scale": [
+                        1.0,
+                        1.0
+                    ],
+                    "rotation": 0.0,
+                    "skew": [
+                        0.0,
+                        0.0
+                    ],
+                    "order": "Glyphs"
+                },
+                "location":
+                {
+                    "weight": 160.0,
+                    "width": 1000.0
+                }
+            }],
+            "smart_component_location":
+            {
+                "weight": 160.0,
+                "width": 1000.0,
+                "height": 1000.0,
+                "H_weight": 0.0,
+                "M_H_weight": 0.0,
+                "M_H_moveV": 0.0,
+                "L_S_bottom_length": 0.0,
+                "R_S_bottom_length": 0.0,
+                "M_H_right_length": 0.0,
+                "L_S_weight": 0.0
+            }
+        },
+        {
+            "width": 1000.0,
+            "name": "width=60",
+            "id": "5af52ee3-b508-4bc9-ab84-fbc6af402aff",
+            "master":
+            {
+                "type": "AssociatedWithMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "reference": "VG_53E3_00",
+                "location":
+                {
+                    "B_H_moveV": 0.0,
+                    "B_H_weight": -10.0,
+                    "L_S_bottom_length": 0.0,
+                    "L_S_weight": -10.0,
+                    "R_S_bottom_length": 0.0,
+                    "R_S_weight": -10.0,
+                    "T_H_weight": -10.0,
+                    "height": 1000.0,
+                    "weight": 30.0,
+                    "width": 60.0
+                }
+            },
+            {
+                "reference": "VG_4E00_00",
+                "transform":
+                {
+                    "translation": [
+                        0.0,
+                        -10.0
+                    ],
+                    "scale": [
+                        1.0,
+                        1.0
+                    ],
+                    "rotation": 0.0,
+                    "skew": [
+                        0.0,
+                        0.0
+                    ],
+                    "order": "Glyphs"
+                },
+                "location":
+                {
+                    "weight": 20.0,
+                    "width": 60.0
+                }
+            }],
+            "smart_component_location":
+            {
+                "width": 60.0,
+                "weight": 20.0,
+                "height": 1000.0,
+                "H_weight": 0.0,
+                "M_H_weight": 0.0,
+                "M_H_moveV": 0.0,
+                "L_S_bottom_length": 0.0,
+                "R_S_bottom_length": 0.0,
+                "M_H_right_length": 0.0,
+                "L_S_weight": 0.0
+            }
+        },
+        {
+            "width": 1000.0,
+            "name": "height=60",
+            "id": "00513fa7-2583-4504-bd60-638a1c3ed20b",
+            "master":
+            {
+                "type": "AssociatedWithMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "reference": "VG_53E3_00",
+                "transform":
+                {
+                    "translation": [
+                        0.0,
+                        -940.0
+                    ],
+                    "scale": [
+                        1.0,
+                        1.0
+                    ],
+                    "rotation": 0.0,
+                    "skew": [
+                        0.0,
+                        0.0
+                    ],
+                    "order": "Glyphs"
+                },
+                "location":
+                {
+                    "B_H_moveV": 0.0,
+                    "B_H_weight": -10.0,
+                    "L_S_bottom_length": 0.0,
+                    "L_S_weight": -10.0,
+                    "R_S_bottom_length": 0.0,
+                    "R_S_weight": -10.0,
+                    "T_H_weight": -10.0,
+                    "height": 60.0,
+                    "weight": 30.0,
+                    "width": 1000.0
+                }
+            },
+            {
+                "reference": "VG_4E00_00",
+                "transform":
+                {
+                    "translation": [
+                        0.0,
+                        -480.0
+                    ],
+                    "scale": [
+                        1.0,
+                        1.0
+                    ],
+                    "rotation": 0.0,
+                    "skew": [
+                        0.0,
+                        0.0
+                    ],
+                    "order": "Glyphs"
+                },
+                "location":
+                {
+                    "weight": 20.0,
+                    "width": 1000.0
+                }
+            }],
+            "smart_component_location":
+            {
+                "height": 60.0,
+                "weight": 20.0,
+                "width": 1000.0,
+                "H_weight": 0.0,
+                "M_H_weight": 0.0,
+                "M_H_moveV": 0.0,
+                "L_S_bottom_length": 0.0,
+                "R_S_bottom_length": 0.0,
+                "M_H_right_length": 0.0,
+                "L_S_weight": 0.0
+            }
+        },
+        {
+            "width": 1000.0,
+            "name": "H_weight=-90",
+            "id": "8f45802c-7ffe-4f0c-9acc-95450116e0a3",
+            "master":
+            {
+                "type": "AssociatedWithMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "reference": "VG_53E3_00",
+                "location":
+                {
+                    "B_H_moveV": 0.0,
+                    "B_H_weight": -100.0,
+                    "L_S_bottom_length": 0.0,
+                    "L_S_weight": -10.0,
+                    "R_S_bottom_length": 0.0,
+                    "R_S_weight": -10.0,
+                    "T_H_weight": -100.0,
+                    "height": 1000.0,
+                    "weight": 30.0,
+                    "width": 1000.0
+                }
+            },
+            {
+                "reference": "VG_4E00_00",
+                "transform":
+                {
+                    "translation": [
+                        0.0,
+                        35.0
+                    ],
+                    "scale": [
+                        1.0,
+                        1.0
+                    ],
+                    "rotation": 0.0,
+                    "skew": [
+                        0.0,
+                        0.0
+                    ],
+                    "order": "Glyphs"
+                },
+                "location":
+                {
+                    "weight": -70.0,
+                    "width": 1000.0
+                }
+            }],
+            "smart_component_location":
+            {
+                "H_weight": -90.0,
+                "weight": 20.0,
+                "width": 1000.0,
+                "height": 1000.0,
+                "M_H_weight": 0.0,
+                "M_H_moveV": 0.0,
+                "L_S_bottom_length": 0.0,
+                "R_S_bottom_length": 0.0,
+                "M_H_right_length": 0.0,
+                "L_S_weight": 0.0
+            }
+        },
+        {
+            "width": 1000.0,
+            "name": "M_H_weight=-50",
+            "id": "fe086325-91ac-460d-867c-c36af9c26707",
+            "master":
+            {
+                "type": "AssociatedWithMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "reference": "VG_53E3_00",
+                "location":
+                {
+                    "B_H_moveV": 0.0,
+                    "B_H_weight": -10.0,
+                    "L_S_bottom_length": 0.0,
+                    "L_S_weight": -10.0,
+                    "R_S_bottom_length": 0.0,
+                    "R_S_weight": -10.0,
+                    "T_H_weight": -10.0,
+                    "height": 1000.0,
+                    "weight": 30.0,
+                    "width": 1000.0
+                }
+            },
+            {
+                "reference": "VG_4E00_00",
+                "transform":
+                {
+                    "translation": [
+                        0.0,
+                        15.0
+                    ],
+                    "scale": [
+                        1.0,
+                        1.0
+                    ],
+                    "rotation": 0.0,
+                    "skew": [
+                        0.0,
+                        0.0
+                    ],
+                    "order": "Glyphs"
+                },
+                "location":
+                {
+                    "weight": -30.0,
+                    "width": 1000.0
+                }
+            }],
+            "smart_component_location":
+            {
+                "M_H_weight": -50.0,
+                "weight": 20.0,
+                "width": 1000.0,
+                "height": 1000.0,
+                "H_weight": 0.0,
+                "M_H_moveV": 0.0,
+                "L_S_bottom_length": 0.0,
+                "R_S_bottom_length": 0.0,
+                "M_H_right_length": 0.0,
+                "L_S_weight": 0.0
+            }
+        },
+        {
+            "width": 1000.0,
+            "name": "M_H_moveV=-100",
+            "id": "2dab43cb-9be2-416b-a25a-cee57b18bdad",
+            "master":
+            {
+                "type": "AssociatedWithMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "reference": "VG_53E3_00",
+                "location":
+                {
+                    "B_H_moveV": 0.0,
+                    "B_H_weight": -10.0,
+                    "L_S_bottom_length": 0.0,
+                    "L_S_weight": -10.0,
+                    "R_S_bottom_length": 0.0,
+                    "R_S_weight": -10.0,
+                    "T_H_weight": -10.0,
+                    "height": 1000.0,
+                    "weight": 30.0,
+                    "width": 1000.0
+                }
+            },
+            {
+                "reference": "VG_4E00_00",
+                "transform":
+                {
+                    "translation": [
+                        0.0,
+                        -110.0
+                    ],
+                    "scale": [
+                        1.0,
+                        1.0
+                    ],
+                    "rotation": 0.0,
+                    "skew": [
+                        0.0,
+                        0.0
+                    ],
+                    "order": "Glyphs"
+                },
+                "location":
+                {
+                    "weight": 20.0,
+                    "width": 1000.0
+                }
+            }],
+            "smart_component_location":
+            {
+                "M_H_moveV": -100.0,
+                "weight": 20.0,
+                "width": 1000.0,
+                "height": 1000.0,
+                "H_weight": 0.0,
+                "M_H_weight": 0.0,
+                "L_S_bottom_length": 0.0,
+                "R_S_bottom_length": 0.0,
+                "M_H_right_length": 0.0,
+                "L_S_weight": 0.0
+            }
+        },
+        {
+            "width": 1000.0,
+            "name": "M_H_moveV=100",
+            "id": "22f41419-f6cd-4db4-8e3f-8b31dab3c0f6",
+            "master":
+            {
+                "type": "AssociatedWithMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "reference": "VG_53E3_00",
+                "location":
+                {
+                    "B_H_moveV": 0.0,
+                    "B_H_weight": -10.0,
+                    "L_S_bottom_length": 0.0,
+                    "L_S_weight": -10.0,
+                    "R_S_bottom_length": 0.0,
+                    "R_S_weight": -10.0,
+                    "T_H_weight": -10.0,
+                    "height": 1000.0,
+                    "weight": 30.0,
+                    "width": 1000.0
+                }
+            },
+            {
+                "reference": "VG_4E00_00",
+                "transform":
+                {
+                    "translation": [
+                        0.0,
+                        90.0
+                    ],
+                    "scale": [
+                        1.0,
+                        1.0
+                    ],
+                    "rotation": 0.0,
+                    "skew": [
+                        0.0,
+                        0.0
+                    ],
+                    "order": "Glyphs"
+                },
+                "location":
+                {
+                    "weight": 20.0,
+                    "width": 1000.0
+                }
+            }],
+            "smart_component_location":
+            {
+                "M_H_moveV": 100.0,
+                "weight": 20.0,
+                "width": 1000.0,
+                "height": 1000.0,
+                "H_weight": 0.0,
+                "M_H_weight": 0.0,
+                "L_S_bottom_length": 0.0,
+                "R_S_bottom_length": 0.0,
+                "M_H_right_length": 0.0,
+                "L_S_weight": 0.0
+            }
+        },
+        {
+            "width": 1000.0,
+            "name": "L_S_bottom_length=200",
+            "id": "0a6d6594-9f62-4c4b-88b9-4f9e48dff140",
+            "master":
+            {
+                "type": "AssociatedWithMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "reference": "VG_53E3_00",
+                "location":
+                {
+                    "B_H_moveV": 0.0,
+                    "B_H_weight": -10.0,
+                    "L_S_bottom_length": 200.0,
+                    "L_S_weight": -10.0,
+                    "R_S_bottom_length": 0.0,
+                    "R_S_weight": -10.0,
+                    "T_H_weight": -10.0,
+                    "height": 1000.0,
+                    "weight": 30.0,
+                    "width": 1000.0
+                }
+            },
+            {
+                "reference": "VG_4E00_00",
+                "transform":
+                {
+                    "translation": [
+                        0.0,
+                        -10.0
+                    ],
+                    "scale": [
+                        1.0,
+                        1.0
+                    ],
+                    "rotation": 0.0,
+                    "skew": [
+                        0.0,
+                        0.0
+                    ],
+                    "order": "Glyphs"
+                },
+                "location":
+                {
+                    "weight": 20.0,
+                    "width": 1000.0
+                }
+            }],
+            "smart_component_location":
+            {
+                "L_S_bottom_length": 200.0,
+                "weight": 20.0,
+                "width": 1000.0,
+                "height": 1000.0,
+                "H_weight": 0.0,
+                "M_H_weight": 0.0,
+                "M_H_moveV": 0.0,
+                "R_S_bottom_length": 0.0,
+                "M_H_right_length": 0.0,
+                "L_S_weight": 0.0
+            }
+        },
+        {
+            "width": 1000.0,
+            "name": "R_S_bottom_length=200",
+            "id": "2a744edd-6d37-4869-916c-c8e95b8a8f5f",
+            "master":
+            {
+                "type": "AssociatedWithMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "reference": "VG_53E3_00",
+                "location":
+                {
+                    "B_H_moveV": 0.0,
+                    "B_H_weight": -10.0,
+                    "L_S_bottom_length": 0.0,
+                    "L_S_weight": -10.0,
+                    "R_S_bottom_length": 200.0,
+                    "R_S_weight": -10.0,
+                    "T_H_weight": -10.0,
+                    "height": 1000.0,
+                    "weight": 30.0,
+                    "width": 1000.0
+                }
+            },
+            {
+                "reference": "VG_4E00_00",
+                "transform":
+                {
+                    "translation": [
+                        0.0,
+                        -10.0
+                    ],
+                    "scale": [
+                        1.0,
+                        1.0
+                    ],
+                    "rotation": 0.0,
+                    "skew": [
+                        0.0,
+                        0.0
+                    ],
+                    "order": "Glyphs"
+                },
+                "location":
+                {
+                    "weight": 20.0,
+                    "width": 1000.0
+                }
+            }],
+            "smart_component_location":
+            {
+                "R_S_bottom_length": 200.0,
+                "weight": 20.0,
+                "width": 1000.0,
+                "height": 1000.0,
+                "H_weight": 0.0,
+                "M_H_weight": 0.0,
+                "M_H_moveV": 0.0,
+                "L_S_bottom_length": 0.0,
+                "M_H_right_length": 0.0,
+                "L_S_weight": 0.0
+            }
+        },
+        {
+            "width": 1000.0,
+            "name": "H_weight=50",
+            "id": "ef28b0d9-d497-4a24-a764-52f6c810dc8e",
+            "master":
+            {
+                "type": "AssociatedWithMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "reference": "VG_53E3_00",
+                "location":
+                {
+                    "B_H_moveV": 0.0,
+                    "B_H_weight": 40.0,
+                    "L_S_bottom_length": 0.0,
+                    "L_S_weight": -10.0,
+                    "R_S_bottom_length": 0.0,
+                    "R_S_weight": -10.0,
+                    "T_H_weight": 40.0,
+                    "height": 1000.0,
+                    "weight": 30.0,
+                    "width": 1000.0
+                }
+            },
+            {
+                "reference": "VG_4E00_00",
+                "transform":
+                {
+                    "translation": [
+                        0.0,
+                        -35.0
+                    ],
+                    "scale": [
+                        1.0,
+                        1.0
+                    ],
+                    "rotation": 0.0,
+                    "skew": [
+                        0.0,
+                        0.0
+                    ],
+                    "order": "Glyphs"
+                },
+                "location":
+                {
+                    "weight": 70.0,
+                    "width": 1000.0
+                }
+            }],
+            "smart_component_location":
+            {
+                "H_weight": 50.0,
+                "weight": 20.0,
+                "width": 1000.0,
+                "height": 1000.0,
+                "M_H_weight": 0.0,
+                "M_H_moveV": 0.0,
+                "L_S_bottom_length": 0.0,
+                "R_S_bottom_length": 0.0,
+                "M_H_right_length": 0.0,
+                "L_S_weight": 0.0
+            }
+        },
+        {
+            "width": 1000.0,
+            "name": "M_H_right_length=-200",
+            "id": "d4838142-49b9-43e9-a1e6-06b12f776a55",
+            "master":
+            {
+                "type": "AssociatedWithMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "reference": "VG_53E3_00",
+                "location":
+                {
+                    "B_H_moveV": 0.0,
+                    "B_H_weight": -10.0,
+                    "L_S_bottom_length": 0.0,
+                    "L_S_weight": -10.0,
+                    "R_S_bottom_length": 0.0,
+                    "R_S_weight": -10.0,
+                    "T_H_weight": -10.0,
+                    "height": 1000.0,
+                    "weight": 30.0,
+                    "width": 1000.0
+                }
+            },
+            {
+                "reference": "VG_4E00_00",
+                "transform":
+                {
+                    "translation": [
+                        0.0,
+                        -10.0
+                    ],
+                    "scale": [
+                        1.0,
+                        1.0
+                    ],
+                    "rotation": 0.0,
+                    "skew": [
+                        0.0,
+                        0.0
+                    ],
+                    "order": "Glyphs"
+                },
+                "location":
+                {
+                    "weight": 20.0,
+                    "width": 800.0
+                }
+            }],
+            "smart_component_location":
+            {
+                "M_H_right_length": -200.0,
+                "weight": 20.0,
+                "width": 1000.0,
+                "height": 1000.0,
+                "H_weight": 0.0,
+                "M_H_weight": 0.0,
+                "M_H_moveV": 0.0,
+                "L_S_bottom_length": 0.0,
+                "R_S_bottom_length": 0.0,
+                "L_S_weight": 0.0
+            }
+        },
+        {
+            "width": 1000.0,
+            "name": "L_S_weight=100",
+            "id": "b312dc67-d7ed-4a69-a930-dbe0e91619f5",
+            "master":
+            {
+                "type": "AssociatedWithMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "reference": "VG_53E3_00",
+                "location":
+                {
+                    "B_H_moveV": 0.0,
+                    "B_H_weight": -10.0,
+                    "L_S_bottom_length": 0.0,
+                    "L_S_weight": 90.0,
+                    "R_S_bottom_length": 0.0,
+                    "R_S_weight": -10.0,
+                    "T_H_weight": -10.0,
+                    "height": 1000.0,
+                    "weight": 30.0,
+                    "width": 1000.0
+                }
+            },
+            {
+                "reference": "VG_4E00_00",
+                "transform":
+                {
+                    "translation": [
+                        0.0,
+                        -10.0
+                    ],
+                    "scale": [
+                        1.0,
+                        1.0
+                    ],
+                    "rotation": 0.0,
+                    "skew": [
+                        0.0,
+                        0.0
+                    ],
+                    "order": "Glyphs"
+                },
+                "location":
+                {
+                    "weight": 20.0,
+                    "width": 1000.0
+                }
+            }],
+            "smart_component_location":
+            {
+                "L_S_weight": 100.0,
+                "weight": 20.0,
+                "width": 1000.0,
+                "height": 1000.0,
+                "H_weight": 0.0,
+                "M_H_weight": 0.0,
+                "M_H_moveV": 0.0,
+                "L_S_bottom_length": 0.0,
+                "R_S_bottom_length": 0.0,
+                "M_H_right_length": 0.0
+            }
+        },
+        {
+            "width": 1000.0,
+            "name": "L_S_weight=-100",
+            "id": "b3f8d77d-5952-4219-a96d-b2d112c58958",
+            "master":
+            {
+                "type": "AssociatedWithMaster",
+                "master": "c52203bb"
+            },
+            "shapes": [
+            {
+                "reference": "VG_53E3_00",
+                "location":
+                {
+                    "B_H_moveV": 0.0,
+                    "B_H_weight": -10.0,
+                    "L_S_bottom_length": 0.0,
+                    "L_S_weight": -100.0,
+                    "R_S_bottom_length": 0.0,
+                    "R_S_weight": -10.0,
+                    "T_H_weight": -10.0,
+                    "height": 1000.0,
+                    "weight": 30.0,
+                    "width": 1000.0
+                }
+            },
+            {
+                "reference": "VG_4E00_00",
+                "transform":
+                {
+                    "translation": [
+                        0.0,
+                        -10.0
+                    ],
+                    "scale": [
+                        1.0,
+                        1.0
+                    ],
+                    "rotation": 0.0,
+                    "skew": [
+                        0.0,
+                        0.0
+                    ],
+                    "order": "Glyphs"
+                },
+                "location":
+                {
+                    "weight": 20.0,
+                    "width": 1000.0
+                }
+            }],
+            "smart_component_location":
+            {
+                "L_S_weight": -100.0,
+                "weight": 20.0,
+                "width": 1000.0,
+                "height": 1000.0,
+                "H_weight": 0.0,
+                "M_H_weight": 0.0,
+                "M_H_moveV": 0.0,
+                "L_S_bottom_length": 0.0,
+                "R_S_bottom_length": 0.0,
+                "M_H_right_length": 0.0
+            }
+        }],
+        "exported": false,
+        "component_axes": [
+        {
+            "name":
+            {
+                "dflt": "weight"
+            },
+            "tag": "VARC",
+            "min": 20.0,
+            "max": 160.0,
+            "default": 20.0
+        },
+        {
+            "name":
+            {
+                "dflt": "width"
+            },
+            "tag": "VARC",
+            "min": 60.0,
+            "max": 1000.0,
+            "default": 1000.0
+        },
+        {
+            "name":
+            {
+                "dflt": "height"
+            },
+            "tag": "VARC",
+            "min": 60.0,
+            "max": 1000.0,
+            "default": 1000.0
+        },
+        {
+            "name":
+            {
+                "dflt": "H_weight"
+            },
+            "tag": "VARC",
+            "min": -90.0,
+            "max": 50.0,
+            "default": 0.0
+        },
+        {
+            "name":
+            {
+                "dflt": "M_H_weight"
+            },
+            "tag": "VARC",
+            "min": -50.0,
+            "max": 0.0,
+            "default": 0.0
+        },
+        {
+            "name":
+            {
+                "dflt": "M_H_moveV"
+            },
+            "tag": "VARC",
+            "min": -100.0,
+            "max": 100.0,
+            "default": 0.0
+        },
+        {
+            "name":
+            {
+                "dflt": "L_S_bottom_length"
+            },
+            "tag": "VARC",
+            "min": 0.0,
+            "max": 200.0,
+            "default": 0.0
+        },
+        {
+            "name":
+            {
+                "dflt": "R_S_bottom_length"
+            },
+            "tag": "VARC",
+            "min": 0.0,
+            "max": 200.0,
+            "default": 0.0
+        },
+        {
+            "name":
+            {
+                "dflt": "M_H_right_length"
+            },
+            "tag": "VARC",
+            "min": -200.0,
+            "max": 0.0,
+            "default": 0.0
+        },
+        {
+            "name":
+            {
+                "dflt": "L_S_weight"
+            },
+            "tag": "VARC",
+            "min": -100.0,
+            "max": 100.0,
+            "default": 0.0
+        }]
+    }],
+    "date": "2026-01-22T16:34:48.796422Z",
+    "names":
+    {},
+    "custom_ot_values":
+    {},
+    "features":
+    {
+        "classes":
+        {},
+        "prefixes":
+        {
+            "anonymous":
+            {
+                "code": ""
+            }
+        },
+        "features": []
+    },
+    "source": "noto-cjk-varco/notosanscjksc.rcjk"
+}
