@@ -2,8 +2,10 @@ use babelfont::{Font, Glyph, LayerType};
 use fontdrasil::types::Axes;
 use indexmap::IndexSet;
 
-use crate::designspace::{convert_between_designspaces, fontdrasil_axes, within_bounds, Strategy};
-use crate::error::FontmergeError;
+use crate::{
+    designspace::{Strategy, convert_between_designspaces, fontdrasil_axes, within_bounds},
+    error::FontmergeError,
+};
 
 pub(crate) fn merge_glyph(
     font1: &mut Font,
@@ -136,13 +138,14 @@ pub(crate) fn merge_glyph(
             font2_axes,
             &font1_axes,
             true,
-        );
+        )?;
 
         // Make double double sure there isn't a font master at this location already in font1
+        let user_loc_in_font1 = loc_in_font1.to_user(&font1_axes)?;
         if font1
             .masters
             .iter()
-            .any(|m| m.location.to_user(&font1_axes) == loc_in_font1.to_user(&font1_axes))
+            .any(|m| m.location.to_user(&font1_axes).unwrap_or_default() == user_loc_in_font1)
         {
             log::debug!(
                 "Not adding remaining layer at location {:?} to glyph '{}' because a master already exists there",

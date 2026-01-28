@@ -33,4 +33,12 @@ pub enum FontmergeError {
     /// No glyphs selected for merging
     #[error("No glyphs selected for merging from donor font")]
     NoGlyphsSelected,
+
+    #[error("Delta error: {0}")]
+    /// An error occurred while processing a delta
+    Delta(#[from] fontdrasil::variations::DeltaError),
+
+    #[error("Axis conversion error: {0}")]
+    /// An error occurred while converting axes
+    AxisConversion(#[from] fontdrasil::error::Error),
 }

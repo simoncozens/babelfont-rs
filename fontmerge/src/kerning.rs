@@ -8,7 +8,7 @@ use fontdrasil::{
 use indexmap::IndexMap;
 
 use crate::{
-    designspace::{fontdrasil_axes, Strategy},
+    designspace::{Strategy, fontdrasil_axes},
     error::FontmergeError,
     glyphset::GlyphsetFilter,
 };
@@ -70,7 +70,7 @@ fn get_kerning_table_for_master(
             #[allow(clippy::unwrap_used)] // We did this several times already by this point
             let axes = fontdrasil_axes(&font.axes).unwrap();
             log::debug!("Interpolating kerning at location {:?}", location);
-            let target_location = location.to_normalized(&axes);
+            let target_location = location.to_normalized(&axes)?;
             let non_sparse_masters = font
                 .masters
                 .iter()
@@ -80,7 +80,7 @@ fn get_kerning_table_for_master(
             let locations_in_order = non_sparse_masters
                 .iter()
                 .map(|m| m.location.to_normalized(&axes))
-                .collect::<Vec<Location<NormalizedSpace>>>();
+                .collect::<Result<Vec<Location<NormalizedSpace>>, _>>()?;
             let locations: HashSet<Location<NormalizedSpace>> =
                 locations_in_order.iter().cloned().collect();
             let model = VariationModel::new(locations, axes.axis_order());
@@ -95,7 +95,7 @@ fn get_kerning_table_for_master(
                     HashMap::new();
                 for master in non_sparse_masters.iter() {
                     if let Some(&value) = master.kerning.get(&key) {
-                        let loc = master.location.to_normalized(&axes);
+                        let loc = master.location.to_normalized(&axes)?;
                         kerns_positions.entry(loc).or_default().push(value as f64);
                     }
                     let kern_deltas = model.deltas(&kerns_positions)?;
