@@ -23,6 +23,17 @@ impl FormatSpecific {
         self.0.contains_key(key)
     }
 
+    /// Remove a key-value pair and return the value if it existed
+    #[allow(deprecated)]
+    pub fn remove(&mut self, key: &str) -> Option<Value> {
+        self.0.remove(key)
+    }
+
+    /// Get an entry for the given key
+    pub fn entry(&mut self, key: String) -> indexmap::map::Entry<'_, String, Value> {
+        self.0.entry(key)
+    }
+
     /// Get a string value by key, or an empty string if not found
     pub(crate) fn get_string(&self, key: &str) -> String {
         self.0
