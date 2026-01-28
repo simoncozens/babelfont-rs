@@ -24,6 +24,7 @@ default = [
     "glyphs",
     "ufo",
     "fontlab",
+    "fontforge",
     "fontra",
     "fontir",
     "rayon",
@@ -36,6 +37,7 @@ ufo = ["dep:norad"]
 fontra = []
 robocjk = []
 fontlab = []
+fontforge = []
 fontir = ["dep:fontir", "dep:fontc"]
 cli = [
     "dep:env_logger",

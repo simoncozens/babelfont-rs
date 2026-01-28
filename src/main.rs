@@ -21,6 +21,8 @@ static SUPPORTED_EXTENSIONS: std::sync::LazyLock<Vec<&'static str>> =
             "vfb",
             #[cfg(feature = "robocjk")]
             "rcjk",
+            #[cfg(feature = "fontforge")]
+            "sfd",
         ]
     });
 

@@ -5,6 +5,9 @@ pub mod fontir;
 #[cfg(feature = "ufo")]
 /// Designspace/UFO convertor
 pub mod designspace;
+#[cfg(feature = "fontforge")]
+/// Fontforge convertor
+pub mod fontforge;
 #[cfg(feature = "fontlab")]
 /// Fontlab convertor
 pub mod fontlab;
