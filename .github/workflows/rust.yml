@@ -28,7 +28,7 @@ jobs:
       - name: Build
         run: cargo build
       - name: Check out notocjk for testing
-        run: git clone https://github.com/notofonts/noto-cjk-varco.git --depth 1
+        run: cd babelfont ; git clone https://github.com/notofonts/noto-cjk-varco.git --depth 1
       - name: Run tests
         run: |
           cargo test --verbose --workspace
