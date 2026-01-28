@@ -1,7 +1,6 @@
 use babelfont::load;
 use clap::Parser;
-use fontmerge::fontmerge;
-use fontmerge::Args;
+use fontmerge::{Args, fontmerge};
 
 use std::path::PathBuf;
 
@@ -27,7 +26,10 @@ fn main() {
         match output_ext {
             "glyphs" | "glyphspackage" | "babelfont" | "ttf" | "otf" => {}
             _ => {
-                log::error!("Output file extension '{}' is not supported. Please use .glyphs, .glyphspackage, .babelfont, .ttf or .otf", output_ext);
+                log::error!(
+                    "Output file extension '{}' is not supported. Please use .glyphs, .glyphspackage, .babelfont, .ttf or .otf",
+                    output_ext
+                );
                 return;
             }
         }

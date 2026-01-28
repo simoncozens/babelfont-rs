@@ -141,7 +141,7 @@ pub struct Fixups {
 }
 
 /// Parse a single codepoint from a string
-fn parse_codepoint(input: &str) -> Result<char, FontmergeError> {
+fn parse_codepoint(input: &str) -> Result<char, String> {
     if input.len() == 1 {
         // Single character
         #[allow(clippy::unwrap_used)] // We know input has at least one char
@@ -149,15 +149,14 @@ fn parse_codepoint(input: &str) -> Result<char, FontmergeError> {
     }
 
     let input = input.trim_start_matches("U+").trim_start_matches("u+");
-    let cp = u32::from_str_radix(input, 16)
-        .map_err(|_| FontmergeError::Parse(format!("Invalid codepoint: {}", input)))?;
+    let cp = u32::from_str_radix(input, 16).map_err(|_| format!("Invalid codepoint: {}", input))?;
 
-    char::from_u32(cp)
-        .ok_or_else(|| FontmergeError::Parse(format!("Invalid Unicode codepoint: U+{:04X}", cp)))
+    char::from_u32(cp).ok_or_else(|| format!("Invalid Unicode codepoint: U+{:04X}", cp))
 }
 
 /// Parse codepoints from strings
-pub fn parse_codepoints(input: &str) -> Result<CodepointArgs, FontmergeError> {
+// We just use a String error here to keep clap happy
+pub fn parse_codepoints(input: &str) -> Result<CodepointArgs, String> {
     let mut result = Vec::new();
 
     for item in input.split(",") {
@@ -165,10 +164,7 @@ pub fn parse_codepoints(input: &str) -> Result<CodepointArgs, FontmergeError> {
             // Parse range
             let parts: Vec<&str> = item.split('-').collect();
             if parts.len() != 2 {
-                return Err(FontmergeError::Parse(format!(
-                    "Invalid codepoint range: {}",
-                    item
-                )));
+                return Err(format!("Invalid codepoint range: {}", item));
             }
             #[allow(clippy::indexing_slicing)] // We have already checked length
             let start = parse_codepoint(parts[0])?;
@@ -179,10 +175,10 @@ pub fn parse_codepoints(input: &str) -> Result<CodepointArgs, FontmergeError> {
             let end_u32 = end as u32;
 
             if start_u32 > end_u32 {
-                return Err(FontmergeError::Parse(format!(
+                return Err(format!(
                     "Invalid codepoint range: {} > {}",
                     start_u32, end_u32
-                )));
+                ));
             }
 
             for cp in start_u32..=end_u32 {
@@ -253,7 +249,7 @@ impl GlyphSelection {
                 if line.is_empty() || line.starts_with('#') {
                     continue;
                 }
-                let cp_args = parse_codepoints(line)?;
+                let cp_args = parse_codepoints(line).map_err(FontmergeError::Parse)?;
                 codepoints.extend(cp_args.0);
             }
         }

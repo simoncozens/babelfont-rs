@@ -225,7 +225,8 @@ impl SfdParser {
                     }
                 }
                 "ContextPos2" | "ContextSub2" | "ChainPos2" | "ChainSub2" | "ReverseChain2" => {
-                    let (_section, next_i) = self.get_section(&data, i, "EndFPST", value.as_deref());
+                    let (_section, next_i) =
+                        self.get_section(&data, i, "EndFPST", value.as_deref());
                     // println!(
                     //     "{}: captured {} lines (end marker EndFPST)",
                     //     key,

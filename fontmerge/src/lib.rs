@@ -1,6 +1,8 @@
 use babelfont::filters::{DropFeatures, FontFilter as _, ResolveIncludes, RetainGlyphs};
-use fea_rs_ast::fea_rs::{self, GlyphMap};
-use fea_rs_ast::AsFea as _;
+use fea_rs_ast::{
+    AsFea as _,
+    fea_rs::{self, GlyphMap},
+};
 use indexmap::IndexSet;
 use indicatif::ProgressIterator;
 mod args;
@@ -11,12 +13,15 @@ mod kerning;
 mod layout;
 mod merge;
 
-pub use crate::args::Args;
-pub use crate::args::{ExistingGlyphHandling, LayoutHandling};
-use crate::designspace::{add_needed_masters, fontdrasil_axes, map_designspaces, sanity_check};
-pub use crate::glyphset::GlyphsetFilter;
-use crate::kerning::merge_kerning;
-use crate::merge::merge_glyph;
+pub use crate::{
+    args::{Args, ExistingGlyphHandling, LayoutHandling},
+    glyphset::GlyphsetFilter,
+};
+use crate::{
+    designspace::{add_needed_masters, fontdrasil_axes, map_designspaces, sanity_check},
+    kerning::merge_kerning,
+    merge::merge_glyph,
+};
 use babelfont::SmolStr;
 
 use std::path::PathBuf;

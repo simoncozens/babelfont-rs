@@ -1,12 +1,13 @@
 use babelfont::SmolStr;
+use fea_rs::{
+    Kind,
+    parse::ParseTree,
+    typed::{AstNode as _, GlyphOrClass, Gsub1, Gsub2, Gsub3},
+};
 use fea_rs_ast::fea_rs;
-use fea_rs::Kind;
-use fea_rs::parse::ParseTree;
-use fea_rs::typed::{AstNode as _, GlyphOrClass, Gsub1, Gsub2, Gsub3};
 use indexmap::IndexSet;
 
-use crate::layout::visitor::LayoutVisitor;
-use crate::layout::{find_first_glyph_or_class, glyph_names};
+use crate::layout::{find_first_glyph_or_class, glyph_names, visitor::LayoutVisitor};
 
 pub(crate) struct LayoutClosureVisitor<'a> {
     parse_tree: &'a ParseTree,

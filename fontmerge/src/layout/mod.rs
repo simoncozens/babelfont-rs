@@ -4,12 +4,14 @@ use std::{
 };
 
 use babelfont::SmolStr;
-use fea_rs_ast::fea_rs;
-use fea_rs_ast::fea_rs::{
-    compile::NopVariationInfo,
-    parse::{FileSystemResolver, SourceResolver},
-    typed::{AstNode, GlyphOrClass},
-    GlyphMap, Kind, ParseTree,
+use fea_rs_ast::{
+    fea_rs,
+    fea_rs::{
+        GlyphMap, Kind, ParseTree,
+        compile::NopVariationInfo,
+        parse::{FileSystemResolver, SourceResolver},
+        typed::{AstNode, GlyphOrClass},
+    },
 };
 use itertools::Either;
 

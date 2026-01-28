@@ -1,15 +1,16 @@
-use fea_rs_ast::fea_rs;
-use fea_rs_ast::fea_rs::parse::ParseTree;
+use fea_rs_ast::{fea_rs, fea_rs::parse::ParseTree};
 use indexmap::IndexSet;
 
 use crate::layout::visitor::LayoutVisitor;
 
+#[allow(dead_code)]
 pub(crate) struct LookupGathererVisitor<'a> {
     parse_tree: &'a ParseTree,
     pub lookup_names: IndexSet<String>,
 }
 
 impl<'a> LookupGathererVisitor<'a> {
+    #[allow(dead_code)]
     pub fn new(parse_tree: &'a ParseTree) -> Self {
         Self {
             parse_tree,
