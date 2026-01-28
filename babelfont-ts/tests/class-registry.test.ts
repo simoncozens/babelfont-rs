@@ -3,6 +3,11 @@ import { ReviverFunc } from "../src/underlying";
 import * as fs from "fs";
 import * as path from "path";
 
+const RADIO_CANADA_FONT_PATH = path.join(
+  __dirname,
+  "../../babelfont/resources/RadioCanadaDisplay.babelfont",
+);
+
 describe("Class Registry - User Extensions", () => {
   it("should allow users to extend classes with custom implementations", () => {
     // User creates their own versions of classes with custom methods
@@ -25,11 +30,7 @@ describe("Class Registry - User Extensions", () => {
     };
 
     // Load font with custom registry
-    const babelfontPath = path.join(
-      __dirname,
-      "../../resources/RadioCanadaDisplay.babelfont",
-    );
-    const fileContents = fs.readFileSync(babelfontPath, "utf8");
+    const fileContents = fs.readFileSync(RADIO_CANADA_FONT_PATH, "utf8");
     const rawFont = JSON.parse(fileContents, ReviverFunc);
     const font = new Font(rawFont, customRegistry);
 
@@ -60,11 +61,7 @@ describe("Class Registry - User Extensions", () => {
   });
 
   it("should use default classes when no registry is provided", () => {
-    const babelfontPath = path.join(
-      __dirname,
-      "../../resources/RadioCanadaDisplay.babelfont",
-    );
-    const fileContents = fs.readFileSync(babelfontPath, "utf8");
+    const fileContents = fs.readFileSync(RADIO_CANADA_FONT_PATH, "utf8");
     const rawFont = JSON.parse(fileContents, ReviverFunc);
     const font = new Font(rawFont); // No custom registry
 
@@ -87,11 +84,7 @@ describe("Class Registry - User Extensions", () => {
       // Node not specified - will use default
     };
 
-    const babelfontPath = path.join(
-      __dirname,
-      "../../resources/RadioCanadaDisplay.babelfont",
-    );
-    const fileContents = fs.readFileSync(babelfontPath, "utf8");
+    const fileContents = fs.readFileSync(RADIO_CANADA_FONT_PATH, "utf8");
     const rawFont = JSON.parse(fileContents, ReviverFunc);
     const font = new Font(rawFont, customRegistry);
 

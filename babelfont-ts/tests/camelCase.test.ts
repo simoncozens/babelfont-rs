@@ -3,13 +3,14 @@ import { ReviverFunc } from "../src/underlying";
 import * as fs from "fs";
 import * as path from "path";
 
+const RADIO_CANADA_FONT_PATH = path.join(
+  __dirname,
+  "../../babelfont/resources/RadioCanadaDisplay.babelfont",
+);
+
 describe("CamelCase Property Access", () => {
   it("should allow camelCase access to snake_case properties", () => {
-    const babelfontPath = path.join(
-      __dirname,
-      "../../resources/RadioCanadaDisplay.babelfont",
-    );
-    const fileContents = fs.readFileSync(babelfontPath, "utf8");
+    const fileContents = fs.readFileSync(RADIO_CANADA_FONT_PATH, "utf8");
     const rawFont = JSON.parse(fileContents, ReviverFunc);
     const font = new Font(rawFont);
 
@@ -36,11 +37,7 @@ describe("CamelCase Property Access", () => {
   });
 
   it("should work with methods on proxied objects", () => {
-    const babelfontPath = path.join(
-      __dirname,
-      "../../resources/RadioCanadaDisplay.babelfont",
-    );
-    const fileContents = fs.readFileSync(babelfontPath, "utf8");
+    const fileContents = fs.readFileSync(RADIO_CANADA_FONT_PATH, "utf8");
     const rawFont = JSON.parse(fileContents, ReviverFunc);
     const font = new Font(rawFont);
 
