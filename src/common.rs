@@ -57,10 +57,10 @@ impl Position {
 #[derive(Debug, Copy, Clone, Default, Serialize, Deserialize)]
 #[typeshare]
 pub struct Color {
-    r: i32,
-    g: i32,
-    b: i32,
-    a: i32,
+    pub r: i32,
+    pub g: i32,
+    pub b: i32,
+    pub a: i32,
 }
 
 #[cfg(feature = "ufo")]
