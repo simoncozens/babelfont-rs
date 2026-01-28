@@ -226,11 +226,11 @@ impl SfdParser {
                 }
                 "ContextPos2" | "ContextSub2" | "ChainPos2" | "ChainSub2" | "ReverseChain2" => {
                     let (section, next_i) = self.get_section(&data, i, "EndFPST", value.as_deref());
-                    println!(
-                        "{}: captured {} lines (end marker EndFPST)",
-                        key,
-                        section.len()
-                    );
+                    // println!(
+                    //     "{}: captured {} lines (end marker EndFPST)",
+                    //     key,
+                    //     section.len()
+                    // );
                     // Self::print_section(&key, &section);
                     i = next_i;
                 }
@@ -268,7 +268,7 @@ impl SfdParser {
                         }
                     } else {
                         // These keys will receive real parsing later; for now we just log.
-                        println!("{key}: {}", value.unwrap_or_default());
+                        // println!("{key}: {}", value.unwrap_or_default());
                     }
                 }
                 "EndSplineFont" => {
