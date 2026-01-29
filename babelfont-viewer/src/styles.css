@@ -1,6 +1,10 @@
 /* Basic panel layout styles are inline in index.html; add canvas sizing */
 #layersPanel .panel-body { height: 100%; }
-#axesTable { width: 100%; border-collapse: collapse; }
-#axesTable tr { text-align: left; }
-#axesTable tr:nth-child(odd) { background-color: #f9f9f9; }
-#axesTable tr:nth-child(even) { background-color: #ffffff; }
+table { width: 100%; }
+table tr { text-align: left; }
+table tr:nth-child(odd) { background-color: #dcdcdc91; }
+table tr:nth-child(even) { background-color: #ffffff; }
+#mastersList table { width: inherit; }
+#mastersList li { margin-bottom: 12px; }
+#mastersList table { margin: 12px; }
+table  td { padding: 5px; }

@@ -16,8 +16,8 @@ let canvasPanY: number = 0;
 function stringifyLocation(loc: any): string {
   if (!loc) return "";
   return Object.entries(loc)
-    .map(([k, v]) => `<code>${k}</code>=${v}`)
-    .join(" | ");
+    .map(([k, v]) => `<code>${k}</code>=<code>${v}</code>`)
+    .join(", ");
 }
 
 function setStatus(text: string) {
@@ -259,17 +259,27 @@ function drawCurrentLayer() {
     ctx.stroke();
   }
 
-  ctx.strokeStyle = "#fff";
+  if ($("#showHelpers").is(":checked")) {
+    ctx.strokeStyle = "#fff";
+    ctx.fillStyle = "#ffffff5d";
+  } else {
+    ctx.strokeStyle = "#eee";
+    ctx.fillStyle = "#eee";
+  }
 
   // Draw main paths
+  let allPaths = "";
   for (const p of paths) {
     const svg = p.toSvgPathString();
     if (!svg) continue;
-    const path2d = new Path2D(svg);
-    ctx.stroke(path2d);
+    allPaths += svg + " ";
   }
+  const path2d = new Path2D(allPaths);
+  ctx.stroke(path2d);
+  ctx.fill(path2d);
 
   // Draw helpers: control points and lines
+  if (!$("#showHelpers").is(":checked")) return;
   ctx.strokeStyle = "#07f";
   ctx.fillStyle = "transparent";
   const rOn = 8 / s;
@@ -358,12 +368,37 @@ function renderMetadata() {
     }
     content.append(table);
   } else if (tab === "masters") {
-    const pre = $("<pre>");
-    pre.text(JSON.stringify(currentFont.masters || [], null, 2));
-    content.append(pre);
+    renderMasters(content);
   } else if (tab === "axes") {
     renderAxes(content, currentFont);
   }
+}
+
+function renderMasters(content: JQuery<HTMLElement>) {
+  if (!currentFont) return;
+  const list = $("<ul id='mastersList'>");
+  for (const master of currentFont.masters || []) {
+    let masterName = master.name.dflt || "Unnamed Master";
+    let location = stringifyLocation(master.location);
+    const li = $("<li>");
+    li.html(
+      `<strong>${masterName}</strong> (ID: <code>${master.id}</code>)<br/>${location}`,
+    );
+    let metrics = $("<table>");
+    for (const [key, value] of Object.entries(master.metrics || {})) {
+      const tr = $("<tr>");
+      const th = $("<td>");
+      th.text(titleCase(key.replace("_", " ")) || "");
+      const td = $("<td>");
+      td.text(String(value));
+      tr.append(th);
+      tr.append(td);
+      metrics.append(tr);
+    }
+    li.append(metrics);
+    list.append(li);
+  }
+  content.append(list);
 }
 
 function renderAxes(container: JQuery<HTMLElement>, currentFont: Font) {
@@ -407,6 +442,7 @@ function main() {
   wireLayerTabs();
   wireDividers();
   wireFileDragDrop();
+  $("#showHelpers").on("change", drawCurrentLayer);
 }
 
 function wireCanvasZoom() {
