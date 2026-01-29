@@ -74,9 +74,8 @@ pub fn fontmerge(
             .apply(&mut font2)
             .expect("Failed to resolve includes");
     }
-    sanity_check_features(&font2);
-    // This performs the layout subsetting
 
+    // This performs the layout subsetting
     RetainGlyphs::new(
         glyphset_filter
             .incoming_glyphset
@@ -86,6 +85,8 @@ pub fn fontmerge(
     )
     .apply(&mut font2)
     .expect("Failed to retain selected glyphs in font 2");
+
+    sanity_check_features(&font2);
 
     let final_glyphset = glyphset_filter.final_glyphset();
 
