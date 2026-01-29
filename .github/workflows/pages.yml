@@ -12,6 +12,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Build babelfont-ts
+        run: |
+          cd babelfont-ts
+          npm install
+          npm run build
       - name: Build web site
         run: |
           cd babelfont-viewer
