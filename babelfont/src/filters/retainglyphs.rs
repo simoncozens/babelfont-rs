@@ -28,20 +28,30 @@ impl RetainGlyphs {
 impl FontFilter for RetainGlyphs {
     fn apply(&self, font: &mut crate::Font) -> Result<(), crate::BabelfontError> {
         log::info!("Retaining glyphs: {:?}", self.0);
-        let immutable_font = font.clone();
-
+        let original_glyphs: Vec<SmolStr> = font.glyphs.iter().map(|g| g.name.clone()).collect();
         // Find components referenced by retained glyphs that will be dropped
-        let mut components_to_decompose = std::collections::HashSet::new();
+        let mut components_to_decompose = HashSet::new();
         for glyph in font.glyphs.iter() {
             if !self.0.contains(&glyph.name) {
                 continue; // Only look at retained glyphs
             }
             for layer in &glyph.layers {
+                if layer.is_background {
+                    continue;
+                }
                 for shape in &layer.shapes {
                     if let crate::Shape::Component(comp) = shape {
                         // If this component references a glyph being dropped, mark it for decomposition
-                        if !self.0.contains(&comp.reference) {
-                            components_to_decompose.insert(comp.reference.to_string());
+                        let reference = comp.reference.as_str();
+                        if !self.0.contains(&comp.reference)
+                            && !components_to_decompose.contains(reference)
+                        {
+                            components_to_decompose.insert(reference);
+                            log::debug!(
+                                "Decomposing component {} used by glyph {}",
+                                comp.reference,
+                                glyph.name
+                            );
                         }
                     }
                 }
@@ -54,6 +64,7 @@ impl FontFilter for RetainGlyphs {
                 "Decomposing {} component references",
                 components_to_decompose.len()
             );
+            log::debug!("Components to decompose: {:?}", components_to_decompose);
             let decomposer = DecomposeComponentReferences::new(Some(
                 components_to_decompose.into_iter().collect::<Vec<_>>(),
             ));
@@ -93,15 +104,11 @@ impl FontFilter for RetainGlyphs {
             })
         });
         // Filter features!
-        let old_glyphs: Vec<SmolStr> = immutable_font
-            .glyphs
-            .iter()
-            .map(|g| g.name.clone())
-            .collect();
+
         let new_glyphs: Vec<SmolStr> = font.glyphs.iter().map(|g| g.name.clone()).collect();
-        let old_glyphs: Vec<&str> = old_glyphs.iter().map(|s| s.as_str()).collect();
+        let original_glyphs: Vec<&str> = original_glyphs.iter().map(|s| s.as_str()).collect();
         let new_glyphs: Vec<&str> = new_glyphs.iter().map(|s| s.as_str()).collect();
-        feature_subset(font, &old_glyphs, &new_glyphs)?;
+        feature_subset(font, &original_glyphs, &new_glyphs)?;
 
         Ok(())
     }
