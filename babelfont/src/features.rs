@@ -137,6 +137,10 @@ mod glyphs {
                     "com.schriftgestalt.Glyphs.disabled".into(),
                     serde_json::Value::Bool(true),
                 );
+                code.code = "#".to_string() + &code.code.replace("\n", "\n#");
+                if code.code.ends_with("\n#") {
+                    code.code.truncate(code.code.len() - 2);
+                }
             }
             if let Some(notes) = &val.notes {
                 code.format_specific.insert(
@@ -159,6 +163,10 @@ mod glyphs {
                     "com.schriftgestalt.Glyphs.disabled".into(),
                     serde_json::Value::Bool(true),
                 );
+                code.code = "#".to_string() + &code.code.replace("\n", "\n#");
+                if code.code.ends_with("\n#") {
+                    code.code.truncate(code.code.len() - 2);
+                }
             }
             if let Some(notes) = &val.notes {
                 code.format_specific.insert(
