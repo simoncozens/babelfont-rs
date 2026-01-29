@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Babelfont Viewer</title>
+  <style>
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    #app { display: grid; grid-template-rows: auto 1fr auto 1fr; height: 100vh; gap: 0; }
+    .top { display: grid; grid-template-columns: 0.3fr auto 1fr; gap: 0; padding: 8px; min-height: 0; }
+    .panel { border: 1px solid #ddd; border-radius: 6px; overflow: hidden; display: flex; flex-direction: column; }
+    .panel-header { background: #f7f7f8; padding: 8px 10px; font-weight: 600; border-bottom: 1px solid #e6e6e6; }
+    .panel-body { padding: 8px; flex: 1; overflow: auto; min-height: 0; }
+    #bottom { padding: 8px; }
+    .tabs { display: flex; gap: 4px; border-bottom: 1px solid #e6e6e6; }
+    .tab { padding: 6px 10px; cursor: pointer; border: 1px solid #e6e6e6; border-bottom: none; border-radius: 6px 6px 0 0; background: #fafafa; }
+    .tab.active { background: white; font-weight: 600; }
+    .tab-content { padding: 8px; }
+    #glyphList { list-style: none; margin: 0; padding: 0; }
+    #glyphList li { padding: 4px 6px; cursor: pointer; border-radius: 4px; }
+    #glyphList li:hover { background: #f0f0f0; }
+    #layerCanvas { width: 100%; height: 100%; background: #fff; border: 1px solid #e6e6e6; }
+    #toolbar { display: flex; gap: 8px; align-items: center; padding: 8px; border-bottom: 1px solid #e6e6e6; background: #f9f9fb; }
+    #fileInput { padding: 4px; }
+    .divider-v { width: 8px; cursor: col-resize; background: linear-gradient(to right, transparent 3px, #ddd 3px, #ddd 5px, transparent 5px); }
+    .divider-h { height: 8px; cursor: row-resize; background: linear-gradient(to bottom, transparent 3px, #ddd 3px, #ddd 5px, transparent 5px); }
+    .divider-v:hover, .divider-h:hover { background-color: #bbb; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="toolbar">
+      <input type="file" id="fileInput" accept=".json,.babelfont" />
+      <span id="status">Load a .babelfont JSON to begin</span>
+    </div>
+    <div class="top">
+      <div class="panel" id="glyphsPanel">
+        <div class="panel-header">Glyphs</div>
+        <div class="panel-body">
+          <ul id="glyphList"></ul>
+        </div>
+      </div>
+      <div class="divider-v" id="dividerVertical"></div>
+      <div class="panel" id="layersPanel">
+        <div class="panel-header">Layers</div>
+        <div class="panel-body" style="display:flex;flex-direction:column;gap:8px;">
+          <select id="layerSelect"></select>
+          <div class="tabs" style="margin: 0;">
+            <div class="tab active" data-layer-tab="render">Render</div>
+            <div class="tab" data-layer-tab="json">JSON</div>
+          </div>
+          <div id="selectedLayer">
+            <table id="layerLocationInfo"></table>
+            <canvas id="layerCanvas"></canvas>
+          </div>
+          <pre id="layerJSON" style="display:none;margin:0;padding:8px;background:#f5f5f5;border:1px solid #ddd;border-radius:4px;font-size:11px;overflow:auto;max-height:300px;"></pre>
+        </div>
+      </div>
+    </div>
+    <div class="divider-h" id="dividerHorizontal"></div>
+    <div class="panel" id="bottom">
+      <div class="panel-header">Metadata</div>
+      <div class="panel-body">
+        <div class="tabs">
+          <div class="tab active" data-tab="names">Names</div>
+          <div class="tab" data-tab="masters">Masters</div>
+          <div class="tab" data-tab="axes">Axes</div>
+        </div>
+        <div class="tab-content" id="tabContent"></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
