@@ -176,9 +176,10 @@ fn robocjk_glyph_to_babelfont_glyph(
     })?;
     let mut bf_glyph = crate::Glyph::new(norad_glyph.name().as_str());
     bf_glyph.codepoints = norad_glyph.codepoints.iter().map(|x| x as u32).collect();
-    if !bf_glyph.codepoints.is_empty() {
-        bf_glyph.exported = true;
-    }
+    // Just export everything for now.
+    // if !bf_glyph.codepoints.is_empty() {
+    bf_glyph.exported = true;
+    // }
     let lib_json = serde_json::to_value(&norad_glyph.lib).unwrap_or_default();
     let mut default_layer = layer_basics_from_norad_glyph(
         default_master_id,
