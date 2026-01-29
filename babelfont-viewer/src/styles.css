@@ -1,0 +1,6 @@
+/* Basic panel layout styles are inline in index.html; add canvas sizing */
+#layersPanel .panel-body { height: 100%; }
+#axesTable { width: 100%; border-collapse: collapse; }
+#axesTable tr { text-align: left; }
+#axesTable tr:nth-child(odd) { background-color: #f9f9f9; }
+#axesTable tr:nth-child(even) { background-color: #ffffff; }
