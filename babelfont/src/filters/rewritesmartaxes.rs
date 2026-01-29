@@ -5,23 +5,12 @@ use indexmap::IndexMap;
 
 use crate::{filters::FontFilter, LayerType};
 
-#[derive(Hash, PartialEq, Eq)]
-struct AxisKey {
-    name: String,
-    min: Option<u64>,
-    default: Option<u64>,
-    max: Option<u64>,
-}
-
-impl AxisKey {
-    fn from_axis(axis: &crate::Axis) -> Self {
-        let name = axis.name();
-        AxisKey {
-            name,
-            min: axis.min.as_ref().map(|v| v.to_f64().to_bits()),
-            default: axis.default.as_ref().map(|v| v.to_f64().to_bits()),
-            max: axis.max.as_ref().map(|v| v.to_f64().to_bits()),
-        }
+/// Normalize a smart component axis value from its original range to 0-1.
+fn normalize_axis_value(value: f64, min: f64, max: f64) -> f64 {
+    if max == min {
+        0.0 // Avoid division by zero
+    } else {
+        (value - min) / (max - min)
     }
 }
 
@@ -38,32 +27,94 @@ impl RewriteSmartAxes {
 
 impl FontFilter for RewriteSmartAxes {
     fn apply(&self, font: &mut crate::Font) -> Result<(), crate::BabelfontError> {
+        // First pass: collect original axis bounds for normalization
+        // Map from (glyph_name, axis_name) -> (min, max)
+        let mut axis_bounds: HashMap<(String, String), (f64, f64)> = HashMap::new();
+        for glyph in font.glyphs.iter() {
+            for component_axis in glyph.component_axes.iter() {
+                if let (Some(min), Some(max)) = (component_axis.min, component_axis.max) {
+                    axis_bounds.insert(
+                        (glyph.name.to_string(), component_axis.name()),
+                        (min.to_f64(), max.to_f64()),
+                    );
+                }
+            }
+        }
+
         // Gather all unique internal axes, change all the dummy tags to
         // real tags, add to our axes list
         let mut internal_axes = Vec::new();
-        let mut names_to_tags: IndexMap<AxisKey, Tag> = IndexMap::new();
+        let mut names_to_tags: IndexMap<String, Tag> = IndexMap::new();
         for glyph in font.glyphs.iter_mut() {
             #[allow(clippy::unwrap_used)]
             for component_axis in glyph.component_axes.iter_mut() {
-                let axis_key = AxisKey::from_axis(component_axis);
+                // Normalize the axis range to 0-1
+                if let (Some(min), Some(max)) = (component_axis.min, component_axis.max) {
+                    let min_f64 = min.to_f64();
+                    let max_f64 = max.to_f64();
+                    component_axis.min = Some(fontdrasil::coords::UserCoord::new(0.0));
+                    component_axis.max = Some(fontdrasil::coords::UserCoord::new(1.0));
+                    // Normalize the default to the 0-1 range
+                    if let Some(default) = component_axis.default {
+                        let normalized_default =
+                            normalize_axis_value(default.to_f64(), min_f64, max_f64);
+                        component_axis.default =
+                            Some(fontdrasil::coords::UserCoord::new(normalized_default));
+                    }
+                }
+                component_axis.map = None; // Clear any mapping since we're changing coordinate space
+
+                let axis_name = component_axis.name();
                 let counter = internal_axes
                     .iter()
-                    .position(|a| a == component_axis)
+                    .position(|a: &crate::Axis| a.name() == axis_name)
                     .unwrap_or(internal_axes.len());
 
                 component_axis.tag =
                     Tag::new_checked(format!("V{:0>3}", counter).as_bytes()).unwrap();
-                names_to_tags.insert(axis_key, component_axis.tag);
+                names_to_tags.insert(axis_name.clone(), component_axis.tag);
                 component_axis.hidden = true;
-                if !internal_axes.contains(component_axis) {
+                if !internal_axes
+                    .iter()
+                    .any(|a: &crate::Axis| a.name() == axis_name)
+                {
                     internal_axes.push(component_axis.clone());
                 }
-                if !font.axes.contains(component_axis) {
+                if !font.axes.iter().any(|a| a.name() == axis_name) {
                     font.axes.push(component_axis.clone());
                 }
             }
         }
-        // Now rewrite all the layers to use the tags
+
+        // Normalize all component.location values in layers
+        for glyph in font.glyphs.iter_mut() {
+            for layer in glyph.layers.iter_mut() {
+                for shape in layer.shapes.iter_mut() {
+                    if let crate::Shape::Component(component) = shape {
+                        let ref_glyph_name = component.reference.to_string();
+                        let mut new_location = IndexMap::new();
+                        for (axis_name, value) in component.location.iter() {
+                            if let Some((min, max)) =
+                                axis_bounds.get(&(ref_glyph_name.clone(), axis_name.clone()))
+                            {
+                                let normalized_value =
+                                    normalize_axis_value(value.to_f64(), *min, *max);
+                                new_location.insert(
+                                    axis_name.clone(),
+                                    fontdrasil::coords::DesignCoord::new(normalized_value),
+                                );
+                            } else {
+                                // No bounds found, keep original value
+                                new_location.insert(axis_name.clone(), *value);
+                            }
+                        }
+                        component.location = new_location;
+                    }
+                }
+            }
+        }
+
+        // Now rewrite all the layers to use the tags and normalize smart_component_location
         for glyph in font.glyphs.iter_mut() {
             for layer in glyph.layers.iter_mut() {
                 if layer.smart_component_location.is_empty() {
@@ -71,7 +122,19 @@ impl FontFilter for RewriteSmartAxes {
                 }
                 let mut new_location = IndexMap::new();
                 for (axis_name, value) in layer.smart_component_location.iter() {
-                    new_location.insert(axis_name.to_string(), *value);
+                    // Normalize the value based on original axis bounds
+                    if let Some((min, max)) =
+                        axis_bounds.get(&(glyph.name.to_string(), axis_name.clone()))
+                    {
+                        let normalized_value = normalize_axis_value(value.to_f64(), *min, *max);
+                        new_location.insert(
+                            axis_name.clone(),
+                            fontdrasil::coords::DesignCoord::new(normalized_value),
+                        );
+                    } else {
+                        // No bounds found, keep original value
+                        new_location.insert(axis_name.to_string(), *value);
+                    }
                 }
                 layer.smart_component_location = new_location;
                 log::trace!(
@@ -138,13 +201,8 @@ impl FontFilter for RewriteSmartAxes {
                     }
                     .unwrap_or_default();
                     for (axis_name, value) in layer.smart_component_location.iter() {
-                        if let Some(axis) =
-                            glyph.component_axes.iter().find(|a| a.name() == *axis_name)
-                        {
-                            let axis_key = AxisKey::from_axis(axis);
-                            if let Some(tag) = names_to_tags.get(&axis_key) {
-                                location.insert(*tag, DesignCoord::new(value.to_f64()));
-                            }
+                        if let Some(tag) = names_to_tags.get(axis_name) {
+                            location.insert(*tag, DesignCoord::new(value.to_f64()));
                         }
                     }
                     // Fill in any missing (non-font-level) axes with defaults
