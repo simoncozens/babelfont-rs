@@ -10,6 +10,8 @@ let currentLayerIndex: number | null = null;
 let canvasZoom: number = 1;
 let cachedCanvasWidth: number = 0;
 let cachedCanvasHeight: number = 0;
+let canvasPanX: number = 0;
+let canvasPanY: number = 0;
 
 function stringifyLocation(loc: any): string {
   if (!loc) return "";
@@ -77,6 +79,8 @@ function renderLayerSelect() {
     const t = e.target as HTMLSelectElement;
     currentLayerIndex = parseInt(t.value, 10);
     canvasZoom = 1;
+    canvasPanX = 0;
+    canvasPanY = 0;
     updateLayerLocationInfo();
     updateLayerJSON();
     drawCurrentLayer();
@@ -216,8 +220,8 @@ function drawCurrentLayer() {
   const centerY = logicalHeight / 2;
   const glyphCenterX = minX + w / 2;
   const glyphCenterY = minY + h / 2;
-  const tx = centerX - glyphCenterX * s;
-  const ty = centerY + glyphCenterY * s; // account for Y flip
+  const tx = centerX - glyphCenterX * s + canvasPanX;
+  const ty = centerY + glyphCenterY * s + canvasPanY; // account for Y flip
 
   // Set transform: scale and flip Y
   ctx.setTransform(s, 0, 0, -s, tx, ty);
@@ -407,11 +411,50 @@ function main() {
 
 function wireCanvasZoom() {
   const canvas = $("#layerCanvas")[0] as HTMLCanvasElement;
+  const zoomSpeed = 1 / 20;
+  const panSpeed = 2;
   canvas.addEventListener("wheel", (e: WheelEvent) => {
     e.preventDefault();
-    const zoomDelta = e.deltaY > 0 ? 0.9 : 1.1;
+    const zoomDelta = e.deltaY > 0 ? 1 - zoomSpeed : 1 + zoomSpeed;
     canvasZoom = Math.max(0.25, Math.min(4, canvasZoom * zoomDelta));
     drawCurrentLayer();
+  });
+
+  // Pan on drag
+  let isPanning = false;
+  let panStartX = 0;
+  let panStartY = 0;
+  let panStartPanX = 0;
+  let panStartPanY = 0;
+
+  canvas.addEventListener("mousedown", (e: MouseEvent) => {
+    // Only pan on middle mouse button or right click, or left click without modifier
+    // For simplicity, let's use left click
+    isPanning = true;
+    panStartX = e.clientX;
+    panStartY = e.clientY;
+    panStartPanX = canvasPanX;
+    panStartPanY = canvasPanY;
+  });
+
+  document.addEventListener("mousemove", (e: MouseEvent) => {
+    if (!isPanning) return;
+    const deltaX = e.clientX - panStartX;
+    const deltaY = e.clientY - panStartY;
+    canvasPanX = (panStartPanX + deltaX) * panSpeed;
+    canvasPanY = (panStartPanY + deltaY) * panSpeed;
+    drawCurrentLayer();
+  });
+
+  document.addEventListener("mouseup", () => {
+    isPanning = false;
+  });
+
+  // Prevent text selection while panning
+  canvas.addEventListener("selectstart", (e: Event) => {
+    if (isPanning) {
+      e.preventDefault();
+    }
   });
 }
 
