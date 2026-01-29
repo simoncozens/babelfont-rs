@@ -289,18 +289,22 @@ function drawCurrentLayer() {
   for (const p of paths) {
     const nodes = p.nodes || [];
     if (nodes.length === 0) continue;
+    let isFirstOncurve = true;
     for (let i = 0; i < nodes.length; i++) {
       const n = nodes[i];
       const type = n.nodetype;
       if (type === "OffCurve") {
         // draw small off-curve dot
-        drawCircle(ctx, n.x, n.y, rOff);
+        drawCircle(ctx, n.x, n.y, rOff, isFirstOncurve);
+        isFirstOncurve = false;
       } else if (type === "Line") {
         // square at line node
-        drawSquare(ctx, n.x, n.y, sq);
+        drawSquare(ctx, n.x, n.y, sq, isFirstOncurve);
+        isFirstOncurve = false;
       } else if (type === "Curve") {
         // circle at curve endpoint
-        drawCircle(ctx, n.x, n.y, rOn);
+        drawCircle(ctx, n.x, n.y, rOn, isFirstOncurve);
+        isFirstOncurve = false;
         const prevNode = nodes[i - 1 >= 0 ? i - 1 : 0];
         if (prevNode && prevNode.nodetype === NodeType.OffCurve) {
           // lines connecting this node to second CP
@@ -327,8 +331,9 @@ function drawCircle(
   x: number,
   y: number,
   r: number,
+  isFirstOncurve: boolean,
 ) {
-  ctx.fillStyle = "blue";
+  ctx.fillStyle = isFirstOncurve ? "#55f" : "blue";
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.fill();
@@ -340,8 +345,9 @@ function drawSquare(
   x: number,
   y: number,
   size: number,
+  isFirstOncurve: boolean,
 ) {
-  ctx.fillStyle = "blue";
+  ctx.fillStyle = isFirstOncurve ? "#55f" : "blue";
   ctx.beginPath();
   ctx.rect(x - size / 2, y - size / 2, size, size);
   ctx.fill();

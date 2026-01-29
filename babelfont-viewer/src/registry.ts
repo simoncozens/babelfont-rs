@@ -32,6 +32,16 @@ export class MyPath extends Path {
     const nodes = this.nodes || [];
     if (nodes.length === 0) return "";
     const parts: string[] = [];
+    // reshuffle nodes array so first node is not off-curve
+    let safety = 0;
+    while (nodes.length > 0 && nodes[0].nodetype === "OffCurve") {
+      nodes.push(nodes.shift()!);
+      safety += 1;
+      if (safety > nodes.length) {
+        // all nodes are off-curve?
+        return "";
+      }
+    }
     const first = nodes[0];
     parts.push(`M ${first.x} ${first.y}`);
     const offcurves: Array<[number, number]> = [];
