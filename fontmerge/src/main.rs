@@ -10,9 +10,21 @@ fn main() {
         .filter_level(args.verbosity.into())
         .init();
     log::debug!("Loading font 1");
-    let mut font1 = load(&args.font_1).expect("Failed to load font 1");
+    let mut font1 = match load(&args.font_1) {
+        Ok(f) => f,
+        Err(e) => {
+            log::error!("Failed to load font 1 ({}): {}", args.font_1, e);
+            std::process::exit(1);
+        }
+    };
     log::debug!("Loading font 2");
-    let font2 = load(&args.font_2).expect("Failed to load font 2");
+    let font2 = match load(&args.font_2) {
+        Ok(f) => f,
+        Err(e) => {
+            log::error!("Failed to load font 2 ({}): {}", args.font_2, e);
+            std::process::exit(1);
+        }
+    };
 
     // Check the output file is supported
     // File name should end with `.glyphs`, `.glyphspackage`, `.babelfont` or `.ttf`.
