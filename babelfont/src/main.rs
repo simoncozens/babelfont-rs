@@ -61,6 +61,12 @@ fn main() {
                 .long("drop-outlines")
                 .help("Drop outlines when compiling to TTF")
                 .action(clap::ArgAction::SetTrue),
+        )
+        .arg(
+            clap::Arg::new("novarc")
+                .long("no-varc-table")
+                .help("Do not produce VARC table when compiling to TTF")
+                .action(clap::ArgAction::SetTrue),
         );
 
     // Extend with the font filter arguments
@@ -137,6 +143,9 @@ fn main() {
         }
         if args.get_flag("dropoutlines") && compiling {
             compilation_options.skip_outlines = true;
+        }
+        if args.get_flag("novarc") && compiling {
+            compilation_options.produce_varc_table = false;
         }
     }
 

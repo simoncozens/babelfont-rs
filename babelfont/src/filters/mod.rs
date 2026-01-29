@@ -63,7 +63,7 @@ declare_filters! {
     DropSparseMasters(dropsparsemasters) => "dropsparsemasters",
     ResolveIncludes(resolveincludes) => "resolveincludes",
     RetainGlyphs(retainglyphs) => "retainglyphs",
-    DecomposeComponentReferences(decomposecomponentreferences) => "decomposecomponentreferences",
+    DecomposeComponentReferences(decomposecomponentreferences) => "decomposecomponents",
     RewriteSmartAxes(rewritesmartaxes) => "rewritesmartaxes",
     ScaleUpem(scaleupem) => "scaleupem",
     #[cfg(feature = "glyphs")]

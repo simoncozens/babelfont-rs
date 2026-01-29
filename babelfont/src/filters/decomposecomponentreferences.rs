@@ -325,6 +325,7 @@ fn visit_glyph(
 
 impl FontFilter for DecomposeComponentReferences {
     fn apply(&self, font: &mut crate::Font) -> Result<(), crate::BabelfontError> {
+        log::info!("Decomposing component references");
         let fontdrasil_axes = font
             .axes
             .iter()
@@ -368,6 +369,7 @@ impl FontFilter for DecomposeComponentReferences {
                 &mut sorted_glyphs,
             );
         }
+        log::info!("Decomposing {} glyphs", sorted_glyphs.len());
 
         // Process glyphs in dependency order, fully decomposing each before moving to the next
         for glyph_to_decompose in sorted_glyphs {
@@ -400,6 +402,7 @@ impl FontFilter for DecomposeComponentReferences {
             .help("Decompose component references (optionally list specific glyphs to decompose)")
             .value_name("GLYPHS")
             .action(clap::ArgAction::Append)
+            .default_missing_value("")
             .required(false)
     }
 }
