@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use fontdrasil::{coords::DesignCoord, types::Tag};
 use indexmap::IndexMap;
@@ -24,16 +24,21 @@ fn normalize_axis_value(
     default: f64,
     max: f64,
 ) -> Result<f64, crate::BabelfontError> {
-    // Create a temporary axis to use its normalization logic
-    let temp_axis = crate::Axis {
-        min: Some(fontdrasil::coords::UserCoord::new(min)),
-        default: Some(fontdrasil::coords::UserCoord::new(default)),
-        max: Some(fontdrasil::coords::UserCoord::new(max)),
-        ..Default::default()
+    // It turns out RoboCJK smart axes sometimes have defaults not at endpoints!
+    // So we have to do a piecewise normalization, mapping [min, default] to [0, 0.5]
+    // and [default, max] to [0.5, 1.0]
+    let normalized = if (value - default).abs() < f64::EPSILON {
+        0.5
+    } else if value <= default {
+        if (default - min).abs() < f64::EPSILON {
+            0.0
+        } else {
+            0.5 * (value - min) / (default - min)
+        }
+    } else {
+        0.5 + 0.5 * (value - default) / (max - default)
     };
-    let normalized =
-        temp_axis.normalize_userspace_value(fontdrasil::coords::UserCoord::new(value))?;
-    Ok(normalized.to_f64())
+    Ok(normalized)
 }
 
 /// Create a normalized version of an axis with range 0-1
@@ -41,25 +46,8 @@ fn normalize_axis(axis: &crate::Axis) -> Result<crate::Axis, crate::BabelfontErr
     let mut normalized = axis.clone();
     normalized.min = Some(fontdrasil::coords::UserCoord::new(0.0));
     normalized.max = Some(fontdrasil::coords::UserCoord::new(1.0));
-
-    // Normalize the default value to the 0-1 range
-    if let (Some(orig_min), Some(orig_default), Some(orig_max)) = (axis.min, axis.default, axis.max)
-    {
-        let normalized_default = normalize_axis_value(
-            orig_default.to_f64(),
-            orig_min.to_f64(),
-            orig_default.to_f64(),
-            orig_max.to_f64(),
-        )?;
-        normalized.default = Some(fontdrasil::coords::UserCoord::new(normalized_default));
-    } else {
-        // If bounds are not specified, use 0.5 as default
-        normalized.default = Some(fontdrasil::coords::UserCoord::new(0.5));
-    }
-
-    // Clear the map since we're changing the coordinate space
+    normalized.default = Some(fontdrasil::coords::UserCoord::new(0.5));
     normalized.map = None;
-
     Ok(normalized)
 }
 
@@ -164,6 +152,7 @@ impl FontFilter for RewriteSmartAxes {
                 }
             }
         }
+
         // Normalize all component.location values in layers
         for glyph in font.glyphs.iter_mut() {
             for layer in glyph.layers.iter_mut() {
@@ -202,7 +191,7 @@ impl FontFilter for RewriteSmartAxes {
                 for (axis_name, value) in layer.smart_component_location.iter() {
                     // Normalize the value based on original axis bounds
                     if let Some((min, default, max)) =
-                        axis_bounds.get(&(glyph.name.to_string(), axis_name.clone()))
+                        axis_bounds.get(&(glyph.name.to_string(), axis_name.to_string()))
                     {
                         let normalized_value =
                             normalize_axis_value(value.to_f64(), *min, *default, *max)?;
@@ -216,12 +205,6 @@ impl FontFilter for RewriteSmartAxes {
                     }
                 }
                 layer.smart_component_location = new_location;
-                log::trace!(
-                    "New smart_component_location for {}, {}: {:?}",
-                    glyph.name,
-                    layer.debug_name(),
-                    layer.smart_component_location
-                );
             }
         }
         // Masters need to have default values for the new locations
@@ -250,6 +233,18 @@ impl FontFilter for RewriteSmartAxes {
                 }
             }
         }
+        // For each glyph, track which V axes it actually uses
+        let mut glyph_axis_tags: HashMap<String, HashSet<Tag>> = HashMap::new();
+        for glyph in font.glyphs.iter() {
+            let mut used_tags = HashSet::new();
+            for axis in glyph.component_axes.iter() {
+                used_tags.insert(axis.tag);
+            }
+            if !used_tags.is_empty() {
+                glyph_axis_tags.insert(glyph.name.to_string(), used_tags);
+            }
+        }
+
         // And so layers with their own locations
         for glyph in font.glyphs.iter_mut() {
             for layer in glyph.layers.iter_mut() {
@@ -287,20 +282,35 @@ impl FontFilter for RewriteSmartAxes {
                             if let Some(tag) = names_to_tags.get(&axis_key) {
                                 location.insert(*tag, DesignCoord::new(value.to_f64()));
                             }
+                        } else {
+                            log::warn!(
+                                "Component axis {} not found in glyph {}!",
+                                axis_name,
+                                glyph.name
+                            );
                         }
                     }
-                    // Fill in any missing (non-font-level) axes with defaults
+                    log::debug!(
+                        "RewriteSmartAxes: After adding smart component values for {}: {:?}",
+                        layer.debug_name(),
+                        location
+                    );
+                    // Fill in any missing axes with defaults
                     for axis in font.axes.iter() {
                         if !location.contains(axis.tag) {
-                            let default_userspace = axis.default.unwrap_or_default();
                             let default_designspace =
-                                axis.userspace_to_designspace(default_userspace)?;
+                                axis.userspace_to_designspace(axis.default.unwrap_or_default())?;
                             location.insert(axis.tag, default_designspace);
                         }
                     }
                     layer.location = Some(location);
                     layer.smart_component_location.clear();
-                    // println!("New location: {:?}", layer.location);
+                    log::debug!(
+                        "New location for glyph {} layer {:?}: {:?}",
+                        glyph.name,
+                        layer.id,
+                        layer.location
+                    );
                 }
             }
         }
@@ -324,5 +334,150 @@ impl FontFilter for RewriteSmartAxes {
             .long("rewrite-smart-axes")
             .help("Convert internal smart component axes to OpenType variation axes")
             .action(clap::ArgAction::SetTrue)
+    }
+}
+
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_grantha_unique_locations() {
+        let path = "resources/NotoSansGrantha-SmartComponent.glyphs";
+        let mut font = crate::load(path).expect("Failed to load babelfont");
+
+        println!("\nBefore RewriteSmartAxes:");
+        if let Some(glyph) = font.glyphs.get("_part.iMatra") {
+            for (i, layer) in glyph.layers.iter().enumerate() {
+                println!(
+                    "  Layer {} ({}): location={:?}, smart_component_location={:?}",
+                    i,
+                    layer.id.as_deref().unwrap_or("?"),
+                    layer.location,
+                    layer.smart_component_location
+                );
+            }
+        }
+
+        RewriteSmartAxes
+            .apply(&mut font)
+            .expect("Failed to apply filter");
+
+        println!("\nAfter RewriteSmartAxes:");
+        if let Some(glyph) = font.glyphs.get("_part.iMatra") {
+            for (i, layer) in glyph.layers.iter().enumerate() {
+                println!(
+                    "  Layer {} ({}): location={:?}, smart_component_location={:?}",
+                    i,
+                    layer.id.as_deref().unwrap_or("?"),
+                    layer.location,
+                    layer.smart_component_location
+                );
+            }
+        }
+
+        println!("\nFont axes:");
+        for axis in &font.axes {
+            println!(
+                "  {} ({}): {:?} <- {:?} -> {:?}",
+                axis.name(),
+                axis.tag,
+                axis.min,
+                axis.default,
+                axis.max
+            );
+        }
+
+        let glyph = font.glyphs.get("_part.iMatra").expect("Missing glyph");
+        assert_no_duplicate_locations(glyph);
+    }
+
+    fn assert_no_duplicate_locations(glyph: &crate::Glyph) {
+        let mut locations = HashMap::new();
+        for layer in glyph.layers.iter() {
+            if let Some(loc) = &layer.location {
+                if let Some(layerid) = locations.get(loc) {
+                    panic!(
+                        "Layer {:?} contains duplicate location {:?}, also provided by {:?}",
+                        layer.id, loc, layerid
+                    );
+                }
+                locations.insert(loc.clone(), layer.id.clone());
+            }
+        }
+    }
+
+    fn assert_has_one_default_location(
+        glyph: &crate::Glyph,
+        default_location: &fontdrasil::coords::Location<fontdrasil::coords::DesignSpace>,
+    ) {
+        let mut found = false;
+        for layer in glyph.layers.iter() {
+            if let Some(loc) = &layer.location {
+                if loc == default_location {
+                    if found {
+                        panic!(
+                            "Glyph {} has multiple layers with default location {:?}",
+                            glyph.name, default_location
+                        );
+                    }
+                    found = true;
+                }
+            }
+        }
+        if !found {
+            panic!(
+                "Glyph {} has no layer with default location {:?}; instead, it has layers at: {:?}",
+                glyph.name,
+                default_location,
+                glyph
+                    .layers
+                    .iter()
+                    .filter_map(|layer| layer.location.as_ref())
+                    .collect::<Vec<_>>()
+            );
+        }
+    }
+
+    #[test]
+    fn test_robocjk_unique_locations() {
+        let path = "resources/notosanscjk.babelfont";
+        let mut font = crate::load(path).expect("Failed to load babelfont");
+        RewriteSmartAxes
+            .apply(&mut font)
+            .expect("Failed to apply filter");
+        let default_location = font
+            .default_location()
+            .expect("There was no default location");
+        // T_2FF0_4E14 has a width axis (which becomes V000), min/default = 539, max=675
+        // and a B_H_left_length axis (which becomes V003), range -100/0/+100
+        // The first two layers have smart_component_location "width": 539.0, "B_H_left_length": 0.0
+        // and are default for the two masters, layer 1 is the default location for the font.
+        let glyph = font.glyphs.get("T_2FF0_4E14").expect("Missing glyph");
+        let default_loc = glyph.layers[1].location.as_ref().unwrap();
+        // We want to ensure the width location is *default* (0.5), not min (0.0)
+        assert_eq!(
+            default_loc
+                .get(Tag::new_checked(b"V000").unwrap())
+                .unwrap()
+                .to_f64(),
+            0.5
+        );
+
+        for glyph in font.glyphs.iter() {
+            if !glyph.is_smart_component() {
+                continue;
+            }
+            assert_no_duplicate_locations(glyph);
+            assert_has_one_default_location(glyph, &default_location);
+        }
+        // Let's check the new axes make sense
+        for axis in &font.axes {
+            if axis.tag.to_string().starts_with("V") {
+                assert_eq!(axis.min.unwrap().to_f64(), 0.0);
+                assert_eq!(axis.max.unwrap().to_f64(), 1.0);
+            }
+        }
     }
 }

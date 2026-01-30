@@ -1,0 +1,230 @@
+{
+category = Letter;
+color = 6;
+glyphname = "zhedieresis-cy";
+kernLeft = "zhe-cy";
+kernRight = "zhe-cy";
+layers = (
+{
+background = {
+anchors = (
+{
+name = bottom;
+pos = (345,0);
+},
+{
+name = top;
+pos = (344,709);
+}
+);
+shapes = (
+{
+ref = "zhe-cy";
+},
+{
+alignment = -1;
+pos = (57,0);
+ref = dieresis;
+}
+);
+};
+layerId = "AB666A95-3AF9-4DE8-B258-097FFCFE8A59";
+shapes = (
+{
+ref = "zhe-cy";
+},
+{
+alignment = -1;
+pos = (335,0);
+ref = dieresiscomb;
+}
+);
+width = 670;
+},
+{
+background = {
+anchors = (
+{
+name = bottom;
+pos = (380,0);
+},
+{
+name = top;
+pos = (380,730);
+}
+);
+shapes = (
+{
+ref = "zhe-cy";
+},
+{
+alignment = -1;
+pos = (90,0);
+ref = dieresis;
+}
+);
+};
+layerId = "9FF96064-8718-4A86-A5C8-73C592101F67";
+shapes = (
+{
+ref = "zhe-cy";
+},
+{
+alignment = -1;
+pos = (365,0);
+ref = dieresiscomb;
+}
+);
+width = 730;
+},
+{
+background = {
+anchors = (
+{
+name = bottom;
+pos = (472,0);
+},
+{
+name = top;
+pos = (471,767);
+}
+);
+shapes = (
+{
+ref = "zhe-cy";
+},
+{
+alignment = -1;
+pos = (161,0);
+ref = dieresis;
+}
+);
+};
+layerId = "0A718E2F-231D-484E-9433-16A5230D2CE8";
+shapes = (
+{
+ref = "zhe-cy";
+},
+{
+alignment = -1;
+pos = (441,0);
+ref = dieresiscomb;
+}
+);
+width = 879;
+},
+{
+background = {
+anchors = (
+{
+name = bottom;
+pos = (222,0);
+},
+{
+name = top;
+pos = (222,696);
+}
+);
+shapes = (
+{
+ref = "zhe-cy";
+},
+{
+alignment = -1;
+pos = (-42,0);
+ref = dieresis;
+}
+);
+};
+layerId = "029FEF0C-5FA4-4A3E-AC23-838A1147A554";
+shapes = (
+{
+ref = "zhe-cy";
+},
+{
+alignment = -1;
+pos = (232,0);
+ref = dieresiscomb;
+}
+);
+width = 464;
+},
+{
+background = {
+anchors = (
+{
+name = bottom;
+pos = (274,0);
+},
+{
+name = top;
+pos = (274,718);
+}
+);
+shapes = (
+{
+ref = "zhe-cy";
+},
+{
+alignment = -1;
+pos = (12,0);
+ref = dieresis;
+}
+);
+};
+layerId = "36F3C8CB-53EE-4548-BFDE-2C03212BACAA";
+shapes = (
+{
+ref = "zhe-cy";
+},
+{
+alignment = -1;
+pos = (268,0);
+ref = dieresiscomb;
+}
+);
+width = 538;
+},
+{
+background = {
+anchors = (
+{
+name = bottom;
+pos = (373,0);
+},
+{
+name = top;
+pos = (373,767);
+}
+);
+shapes = (
+{
+ref = "zhe-cy";
+},
+{
+alignment = -1;
+pos = (143,0);
+ref = dieresis;
+}
+);
+};
+layerId = "98E204A9-1C79-49C7-AB3E-40A925F56409";
+shapes = (
+{
+ref = "zhe-cy";
+},
+{
+alignment = -1;
+pos = (355,0);
+ref = dieresiscomb;
+}
+);
+width = 709;
+}
+);
+metricLeft = "zhe-cy";
+metricRight = "zhe-cy";
+script = cyrillic;
+subCategory = Lowercase;
+unicode = 1245;
+}

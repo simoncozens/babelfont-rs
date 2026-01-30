@@ -62,3 +62,82 @@ fn test_load_babelfont() -> Result<(), BabelfontError> {
 
     Ok(())
 }
+
+#[test]
+fn test_convert_to_ttf_radiocanada() {
+    let path = "resources/RadioCanadaDisplay.babelfont";
+    let font = load(path).expect("Failed to load babelfont");
+
+    use babelfont::convertors::fontir::CompilationOptions;
+    use write_fonts::read::TableProvider;
+    let bytes = babelfont::convertors::fontir::BabelfontIrSource::compile(
+        font.clone(),
+        CompilationOptions::default(),
+    )
+    .expect("Failed to compile to TTF");
+    // Check we have a fvar table
+    use write_fonts::read::FontRef;
+    let font_ref = FontRef::new(&bytes).expect("Failed to read font bytes");
+    assert!(font_ref.fvar().is_ok());
+    // Check we have no VARC table (even though we asked for one)
+    assert!(font_ref.varc().is_err());
+}
+
+#[test]
+fn test_convert_to_ttf_grantha() {
+    let path = "resources/NotoSansGrantha-SmartComponent.glyphs";
+    let font = load(path).expect("Failed to load babelfont");
+
+    use babelfont::convertors::fontir::CompilationOptions;
+    use write_fonts::read::TableProvider;
+    let bytes = babelfont::convertors::fontir::BabelfontIrSource::compile(
+        font.clone(),
+        CompilationOptions::default(),
+    )
+    .expect("Failed to compile to TTF");
+    // Check we have a fvar table
+    use write_fonts::read::FontRef;
+    let font_ref = FontRef::new(&bytes).expect("Failed to read font bytes");
+    assert!(font_ref.fvar().is_ok());
+    // Check we have a VARC table
+    assert!(font_ref.varc().is_ok());
+
+    // Now do it again with varc turned off
+    // XXX
+}
+
+#[test]
+fn test_convert_to_ttf_static() {
+    let path = "resources/NotoSans-LightItalic.ufo";
+    let font = load(path).expect("Failed to load babelfont");
+
+    use babelfont::convertors::fontir::CompilationOptions;
+    use write_fonts::read::TableProvider;
+    let bytes = babelfont::convertors::fontir::BabelfontIrSource::compile(
+        font.clone(),
+        CompilationOptions::default(),
+    )
+    .expect("Failed to compile to TTF");
+    // Check we have no fvar table
+    use write_fonts::read::FontRef;
+    let font_ref = FontRef::new(&bytes).expect("Failed to read font bytes");
+    assert!(font_ref.fvar().is_err());
+}
+
+#[test]
+fn test_convert_to_ttf_static2() {
+    let path = "resources/NotoSansLimbu.glyphs";
+    let font = load(path).expect("Failed to load babelfont");
+
+    use babelfont::convertors::fontir::CompilationOptions;
+    use write_fonts::read::TableProvider;
+    let bytes = babelfont::convertors::fontir::BabelfontIrSource::compile(
+        font.clone(),
+        CompilationOptions::default(),
+    )
+    .expect("Failed to compile to TTF");
+    // Check we have no fvar table
+    use write_fonts::read::FontRef;
+    let font_ref = FontRef::new(&bytes).expect("Failed to read font bytes");
+    assert!(font_ref.fvar().is_err());
+}

@@ -124,27 +124,30 @@ impl Work<Context, WorkId, Error> for GlyphIrWork {
                 }
                 Location::new()
             };
+            // log::debug!(
+            //     "Glyph {} layer {}: location {:?} , design_location = {:?}",
+            //     self.glyph_name,
+            //     layer.debug_name(),
+            //     layer.location,
+            //     design_location
+            // );
             let location = design_location.to_normalized(axes)?;
-            // println!(
-            //     "Layer {} has normalized location {:?}",
+            // log::debug!(
+            //     "Glyph {} layer {}: normalized_location = {}",
+            //     self.glyph_name,
             //     layer.debug_name(),
             //     debug_location(&location)
             // );
-
             if self.options.skip_outlines && !location.is_default() {
                 continue;
             }
-            // log::debug!(
-            //     "Processing layer {} at location {}",
-            //     layer.debug_name(),
-            //     debug_location(&location)
-            // );
 
             let (location, instance) = process_layer(glyph, &location, layer, &self.options)?;
 
             for (tag, coord) in location.iter() {
                 axis_positions.entry(*tag).or_default().insert(*coord);
             }
+            // This will panic if location is already present
             ir_glyph.try_add_source(&location, instance)?;
 
             // we only care about anchors from exportable glyphs
@@ -160,7 +163,8 @@ impl Work<Context, WorkId, Error> for GlyphIrWork {
             }
         }
         // Let's do our own sanity check for default locations
-        let locations = ir_glyph.sources.keys().cloned().collect::<Vec<_>>();
+        let locations: Vec<Location<fontdrasil::coords::NormalizedSpace>> =
+            ir_glyph.sources.keys().cloned().collect::<Vec<_>>();
         let default_locations = locations
             .iter()
             .filter(|loc| loc.is_default())

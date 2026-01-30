@@ -261,3 +261,40 @@ impl GlyphsetFilter {
             .collect()
     }
 }
+
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[cfg(test)]
+mod tests {
+    use crate::args::GlyphSelection;
+
+    use super::*;
+
+    #[test]
+    fn test_glyphset() {
+        let gs: GlyphSelection = GlyphSelection {
+            glyphs: vec![],
+            glyphs_file: None,
+            codepoints: None,
+            codepoints_file: Some("../babelfont/resources/codepoints.txt".to_string()),
+            exclude_glyphs: vec![],
+            exclude_glyphs_file: None,
+        };
+        let mut font1 = babelfont::load("../babelfont/resources/NotoSansLimbu.glyphs").unwrap();
+        let font2 = babelfont::load("../babelfont/resources/NotoSans.glyphspackage").unwrap();
+        let filter = GlyphsetFilter::new(
+            gs.get_include_glyphs()
+                .expect("Failed to get include glyphs"),
+            vec![],
+            gs.get_codepoints().expect("Failed to get codepoints"),
+            &mut font1,
+            &font2,
+            ExistingGlyphHandling::Skip,
+        );
+
+        let final_glyphs = filter.final_glyphset();
+        assert!(final_glyphs.contains(&"a".into()));
+        assert!(final_glyphs.contains(&"uni1904".into()));
+        assert!(!final_glyphs.contains(&"softsign-cy".into()));
+        assert!(!final_glyphs.contains(&"softsign-cy.loclBGR".into()));
+    }
+}
