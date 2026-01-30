@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use fontdrasil::{coords::DesignCoord, types::Tag};
 use indexmap::IndexMap;
+use smol_str::SmolStr;
 
 use crate::{filters::FontFilter, LayerType};
 
@@ -10,14 +11,13 @@ fn normalize_axis_value(value: f64, min: f64, default: f64, max: f64) -> f64 {
     // It turns out RoboCJK smart axes sometimes have defaults not at endpoints!
     // So we have to do a piecewise normalization, mapping [min, default] to [-1, 0]
     // and [default, max] to [0, 1.0]
-    let normalized = if (value - default).abs() < f64::EPSILON {
+    if (value - default).abs() < f64::EPSILON {
         0.0
     } else if value <= default {
         (value - default) / (default - min)
     } else {
         (value - default) / (max - default)
-    };
-    normalized
+    }
 }
 
 /// Create a normalized version of an axis with range -1 to 1
@@ -100,19 +100,35 @@ impl FontFilter for RewriteSmartAxes {
         // real tags, add to our axes list
         let mut internal_axes = Vec::new();
         let mut names_to_tags: IndexMap<String, Tag> = IndexMap::new();
+        // First pass: sort component axes for each glyph alphabetically
         for glyph in font.glyphs.iter_mut() {
-            #[allow(clippy::unwrap_used)]
+            glyph.component_axes.sort_by_key(|a| a.name());
+
+            // Normalize axes
             for component_axis in glyph.component_axes.iter_mut() {
-                // Normalize the axis to 0-1 range
                 let normalized_axis = normalize_axis(component_axis)?;
                 *component_axis = normalized_axis;
+            }
+        }
 
+        let mut name_to_index_for_glyph: HashMap<SmolStr, HashMap<String, usize>> = HashMap::new();
+
+        for glyph in font.glyphs.iter_mut() {
+            #[allow(clippy::unwrap_used, clippy::unused_enumerate_index)]
+            for (_index, component_axis) in glyph.component_axes.iter_mut().enumerate() {
                 let axis_key = component_axis.name();
+
                 let counter = internal_axes
                     .iter()
                     .position(|a: &crate::Axis| a.name() == axis_key)
                     .unwrap_or(internal_axes.len());
 
+                // For now we put the counter in. Ideally we should be able to put
+                // the index in, but it's not working and I'm not sure why not.
+                name_to_index_for_glyph
+                    .entry(glyph.name.clone())
+                    .or_default()
+                    .insert(axis_key.clone(), counter);
                 component_axis.tag =
                     Tag::new_checked(format!("V{:0>3}", counter).as_bytes()).unwrap();
                 names_to_tags.insert(axis_key, component_axis.tag);
@@ -161,7 +177,7 @@ impl FontFilter for RewriteSmartAxes {
                 for (axis_name, value) in layer.smart_component_location.iter() {
                     convert_axis(
                         &axis_bounds,
-                        &glyph.name.to_string(),
+                        glyph.name.as_ref(),
                         &mut new_location,
                         axis_name,
                         value,
@@ -237,14 +253,15 @@ impl FontFilter for RewriteSmartAxes {
                         layer.location.take()
                     }
                     .unwrap_or_default();
+                    #[allow(clippy::unwrap_used)]
                     for (axis_name, value) in layer.smart_component_location.iter() {
-                        if let Some(axis) =
-                            glyph.component_axes.iter().find(|a| a.name() == *axis_name)
-                        {
-                            let axis_key = axis.name();
-                            if let Some(tag) = names_to_tags.get(&axis_key) {
-                                location.insert(*tag, DesignCoord::new(value.to_f64()));
-                            }
+                        let index = name_to_index_for_glyph
+                            .get(&glyph.name)
+                            .and_then(|m| m.get(axis_name));
+                        if let Some(index) = index {
+                            let tag =
+                                Tag::new_checked(format!("V{:0>3}", index).as_bytes()).unwrap();
+                            location.insert(tag, DesignCoord::new(value.to_f64()));
                         } else {
                             log::warn!(
                                 "Component axis {} not found in glyph {}!",
@@ -302,21 +319,22 @@ impl FontFilter for RewriteSmartAxes {
 
 fn convert_axis(
     axis_bounds: &HashMap<(String, String), (f64, f64, f64)>,
-    ref_glyph_name: &String,
+    ref_glyph_name: &str,
     new_location: &mut IndexMap<String, fontdrasil::coords::Coord<fontdrasil::coords::DesignSpace>>,
-    axis_name: &String,
+    axis_name: &str,
     value: &fontdrasil::coords::Coord<fontdrasil::coords::DesignSpace>,
 ) {
-    if let Some((min, default, max)) = axis_bounds.get(&(ref_glyph_name.clone(), axis_name.clone()))
+    if let Some((min, default, max)) =
+        axis_bounds.get(&(ref_glyph_name.to_string(), axis_name.to_string()))
     {
         let normalized_value = normalize_axis_value(value.to_f64(), *min, *default, *max);
         new_location.insert(
-            axis_name.clone(),
+            axis_name.to_string(),
             fontdrasil::coords::DesignCoord::new(normalized_value),
         );
     } else {
         // No bounds found, keep original value
-        new_location.insert(axis_name.clone(), *value);
+        new_location.insert(axis_name.to_string(), *value);
     }
 }
 
