@@ -387,6 +387,11 @@ mod tests {
 
         let glyph = font.glyphs.get("_part.iMatra").expect("Missing glyph");
         assert_no_duplicate_locations(glyph);
+        // This will fail until we write fixup_axis_definitions
+        // assert_has_one_default_location(
+        //     glyph,
+        //     &font.default_location().expect("No default location"),
+        // );
     }
 
     fn assert_no_duplicate_locations(glyph: &crate::Glyph) {
@@ -471,6 +476,7 @@ mod tests {
         }
         // Let's check the new axes make sense
         for axis in &font.axes {
+            assert!(axis.tag != Tag::new(b"VARC"));
             if axis.tag.to_string().starts_with("V") {
                 assert_eq!(axis.min.unwrap().to_f64(), -1.0);
                 assert_eq!(axis.max.unwrap().to_f64(), 1.0);

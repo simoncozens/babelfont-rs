@@ -158,6 +158,7 @@ pub(crate) mod glyphs {
         types::Tag,
     };
     use glyphslib::glyphs3::Glyph as G3Glyph;
+    use indexmap::IndexMap;
 
     pub(crate) fn from_glyphs(val: &G3Glyph, axes_order: &[Tag]) -> Result<Glyph, BabelfontError> {
         let mut format_specific = FormatSpecific::default();
@@ -199,7 +200,7 @@ pub(crate) mod glyphs {
         };
         copy_user_data(&mut format_specific, &val.user_data);
         let mut layers = vec![];
-        let component_axes: Vec<Axis> = val
+        let mut component_axes: Vec<Axis> = val
             .smart_component_settings
             .iter()
             .map(|x| x.into())
@@ -222,6 +223,18 @@ pub(crate) mod glyphs {
                 layers.push(bf_layer);
             }
         }
+        let sc_locations = layers
+            .iter()
+            .filter_map(|l| {
+                if l.is_background {
+                    None
+                } else {
+                    Some(&l.smart_component_location)
+                }
+            })
+            .collect::<Vec<_>>();
+        fixup_axis_definitions(&mut component_axes, &sc_locations);
+
         Ok(Glyph {
             name: SmolStr::from(&val.name),
             production_name: val.production.as_ref().map(SmolStr::from),
@@ -239,6 +252,17 @@ pub(crate) mod glyphs {
             component_axes,
             format_specific,
         })
+    }
+
+    fn fixup_axis_definitions(
+        _component_axes: &mut [Axis],
+        _sc_locations: &[&IndexMap<String, DesignCoord>],
+    ) {
+        // It's not immediately obvious in Glyphs files what the default for the
+        // glyph-specific axis should be; sometimes it's the minimum and sometimes
+        // it's the maximum value. We look at the layer .smart_component_location
+        // and see if we can deduce a default master, then rewrite the defaults of
+        // the axes accordingly. Unfortunately I don't actually know how to do that.
     }
 
     fn glyph_specific_axes(component_axes: &[Axis]) -> Vec<(String, DesignCoord, DesignCoord)> {
@@ -350,6 +374,8 @@ pub(crate) mod glyphs {
             Axis {
                 name: crate::I18NDictionary::from(&val.name),
                 tag: Tag::new(b"VARC"), // placeholder
+                // We assume that the default is the minimum value.
+                // THIS MAY NOT BE TRUE. We correct it later.
                 default: Some(UserCoord::new(val.bottom_value as f64)),
                 min: Some(UserCoord::new(val.bottom_value as f64)),
                 max: Some(UserCoord::new(val.top_value as f64)),
