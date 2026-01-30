@@ -25,28 +25,24 @@ fn normalize_axis_value(
     max: f64,
 ) -> Result<f64, crate::BabelfontError> {
     // It turns out RoboCJK smart axes sometimes have defaults not at endpoints!
-    // So we have to do a piecewise normalization, mapping [min, default] to [0, 0.5]
-    // and [default, max] to [0.5, 1.0]
+    // So we have to do a piecewise normalization, mapping [min, default] to [-1, 0]
+    // and [default, max] to [0, 1.0]
     let normalized = if (value - default).abs() < f64::EPSILON {
-        0.5
+        0.0
     } else if value <= default {
-        if (default - min).abs() < f64::EPSILON {
-            0.0
-        } else {
-            0.5 * (value - min) / (default - min)
-        }
+        (value - default) / (default - min)
     } else {
-        0.5 + 0.5 * (value - default) / (max - default)
+        (value - default) / (max - default)
     };
     Ok(normalized)
 }
 
-/// Create a normalized version of an axis with range 0-1
+/// Create a normalized version of an axis with range -1 to 1
 fn normalize_axis(axis: &crate::Axis) -> Result<crate::Axis, crate::BabelfontError> {
     let mut normalized = axis.clone();
-    normalized.min = Some(fontdrasil::coords::UserCoord::new(0.0));
+    normalized.min = Some(fontdrasil::coords::UserCoord::new(-1.0));
     normalized.max = Some(fontdrasil::coords::UserCoord::new(1.0));
-    normalized.default = Some(fontdrasil::coords::UserCoord::new(0.5));
+    normalized.default = Some(fontdrasil::coords::UserCoord::new(0.0));
     normalized.map = None;
     Ok(normalized)
 }
@@ -459,10 +455,11 @@ mod tests {
         // We want to ensure the width location is *default* (0.5), not min (0.0)
         assert_eq!(
             default_loc
+                // Of course this test will fail if the axes get renamed...
                 .get(Tag::new_checked(b"V000").unwrap())
                 .unwrap()
                 .to_f64(),
-            0.5
+            0.0
         );
 
         for glyph in font.glyphs.iter() {
@@ -475,7 +472,7 @@ mod tests {
         // Let's check the new axes make sense
         for axis in &font.axes {
             if axis.tag.to_string().starts_with("V") {
-                assert_eq!(axis.min.unwrap().to_f64(), 0.0);
+                assert_eq!(axis.min.unwrap().to_f64(), -1.0);
                 assert_eq!(axis.max.unwrap().to_f64(), 1.0);
             }
         }
