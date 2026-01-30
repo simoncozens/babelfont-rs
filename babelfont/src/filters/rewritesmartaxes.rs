@@ -76,6 +76,41 @@ impl RewriteSmartAxes {
 
 impl FontFilter for RewriteSmartAxes {
     fn apply(&self, font: &mut crate::Font) -> Result<(), crate::BabelfontError> {
+        // We are preparing to export smart components as VARC. Let's ensure that
+        // all transitively used components of exported glyphs are themselves set to export.
+        let mut to_check = font
+            .glyphs
+            .iter()
+            .filter(|g| g.exported)
+            .map(|g| g.name.clone())
+            .collect::<Vec<_>>();
+        let mut checked = IndexMap::new();
+        while let Some(glyph_name) = to_check.pop() {
+            if checked.contains_key(&glyph_name) {
+                continue;
+            }
+            checked.insert(glyph_name.clone(), ());
+            if let Some(glyph) = font.glyphs.get(&glyph_name) {
+                for layer in glyph.layers.iter() {
+                    for shape in layer.shapes.iter() {
+                        if let crate::Shape::Component(component) = shape {
+                            if let Some(ref_glyph) = font.glyphs.get(&component.reference) {
+                                if !checked.contains_key(&ref_glyph.name) {
+                                    to_check.push(ref_glyph.name.clone());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // Now mark all checked glyphs as exported
+        for glyphname in checked.keys() {
+            if let Some(glyph) = font.glyphs.get_mut(glyphname) {
+                glyph.exported = true;
+            }
+        }
+
         // First pass: collect original axis bounds for normalization
         // Map from (glyph_name, axis_name) -> (min, default, max)
         let mut axis_bounds: HashMap<(String, String), (f64, f64, f64)> = HashMap::new();
@@ -140,12 +175,8 @@ impl FontFilter for RewriteSmartAxes {
                             if let Some((min, default, max)) =
                                 axis_bounds.get(&(ref_glyph_name.clone(), axis_name.clone()))
                             {
-                                let normalized_value = normalize_axis_value(
-                                    value.to_f64(),
-                                    *min,
-                                    *default,
-                                    *max,
-                                )?;
+                                let normalized_value =
+                                    normalize_axis_value(value.to_f64(), *min, *default, *max)?;
                                 new_location.insert(
                                     axis_name.clone(),
                                     fontdrasil::coords::DesignCoord::new(normalized_value),

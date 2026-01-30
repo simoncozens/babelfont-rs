@@ -94,12 +94,6 @@ impl BabelfontIrSource {
         }
 
         if options.produce_varc_table {
-            // Set all variable components to exported
-            for glyph in font.glyphs.iter_mut() {
-                if glyph.is_smart_component() {
-                    glyph.exported = true;
-                }
-            }
             RewriteSmartAxes.apply(&mut font)?;
         }
         // Unexported glyphs - decompose and drop

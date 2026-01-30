@@ -25,6 +25,19 @@ use write_fonts::{
 };
 
 pub fn insert_varc_table(binary: &[u8], font: &Font) -> Result<Vec<u8>, BabelfontError> {
+    // If there are no smart composites, go home
+    let mut has_smart_composite = false;
+    for glyph in font.glyphs.iter() {
+        has_smart_composite |= glyph.layers.iter().any(|layer| layer.is_smart_composite());
+        if has_smart_composite {
+            break;
+        }
+    }
+    if !has_smart_composite {
+        log::info!("No smart composites found, skipping VARC table generation");
+        return Ok(binary.to_vec());
+    }
+
     let mut builder = FontBuilder::new();
     let mut storebuilder = MultiItemVariationStoreBuilder::new();
     let existing_font = FontRef::new(binary)?;
