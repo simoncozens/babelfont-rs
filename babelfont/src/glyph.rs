@@ -279,6 +279,14 @@ pub(crate) mod glyphs {
             g3_layers.push(g3_layer);
         }
 
+        let subcategory = val.format_specific.get_optionstring("subcategory");
+        let category = match subcategory {
+            Some(s) if s != "Nonspacing" && val.category == GlyphCategory::Base => {
+                &GlyphCategory::Mark
+            }
+            _ => &val.category,
+        };
+
         G3Glyph {
             name: val.name.to_string(),
             production: val.production_name.as_ref().map(|p| p.to_string()),
@@ -286,7 +294,7 @@ pub(crate) mod glyphs {
             layers: g3_layers,
             export: val.exported,
             case: val.format_specific.get_string("case"),
-            category: (&val.category).into(),
+            category: category.into(),
             direction: val.direction.as_ref().map(|d| match d {
                 Direction::LeftToRight => "LTR".to_string(),
                 Direction::RightToLeft => "RTL".to_string(),

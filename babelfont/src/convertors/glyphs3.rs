@@ -1131,7 +1131,7 @@ fn save_master(master: &Master, axes: &[Axis], metrics: &[crate::MetricType]) ->
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used)]
-    use crate::Shape;
+    use crate::{GlyphCategory, Shape};
     use fontdrasil::coords::Location;
     use pretty_assertions::assert_eq;
     use rstest::rstest;
@@ -1340,5 +1340,26 @@ mod tests {
             smart.location.get("Width").unwrap(),
             &DesignCoord::new(520.0)
         );
+    }
+
+    #[test]
+    fn test_load_marks() {
+        let font = load("resources/NotoSansLimbu.glyphs".into()).unwrap();
+        /*
+        category = Mark;
+        glyphname = uni1938;
+        subCategory = Spacing;
+        */
+        let uni1938 = font.glyphs.get("uni1938").unwrap();
+        assert_eq!(uni1938.category, GlyphCategory::Base);
+        // When we send it back to Glyphs, it should get Mark/Spacing again
+        let glyphs_glyph = glyph_to_glyphs(
+            uni1938,
+            &font.axes.iter().map(|a| a.tag).collect::<Vec<_>>(),
+            None,
+            None,
+        );
+        assert_eq!(glyphs_glyph.category, Some("Mark".to_string()));
+        assert_eq!(glyphs_glyph.subcategory, Some("Spacing".to_string()));
     }
 }
