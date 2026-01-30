@@ -294,18 +294,20 @@ impl Layer {
         &self,
         font: &Font,
     ) -> Option<Location<fontdrasil::coords::DesignSpace>> {
+        if let Some(loc) = &self.location {
+            return Some(loc.clone());
+        }
         let master_ids = font
             .masters
             .iter()
             .map(|m| (m.id.clone(), m))
             .collect::<HashMap<_, _>>();
-        let maybe_location = if let LayerType::DefaultForMaster(mid) = &self.master {
+        if let LayerType::DefaultForMaster(mid) = &self.master {
             let master = master_ids.get(mid);
-            master.map(|m| &m.location)
+            master.map(|m| m.location.clone())
         } else {
-            self.location.as_ref()
-        };
-        maybe_location.cloned()
+            None
+        }
     }
 }
 
