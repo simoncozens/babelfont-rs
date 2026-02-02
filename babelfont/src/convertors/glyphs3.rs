@@ -466,7 +466,9 @@ fn load_properties(
                     }
                 }
             }
-            glyphs3::Property::Junk(_plist) => unreachable!(),
+            glyphs3::Property::Junk(plist) => {
+                log::warn!("Ignoring junk property in Glyphs3 font: {:?}", plist);
+            }
         }
     }
 }
