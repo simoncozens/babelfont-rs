@@ -255,6 +255,11 @@ impl<'a> SubsetVisitor<'a> {
             }
         }
 
+        // If there's nothing left in either glyphs or statement, drop the whole thing
+        if statement.glyphs.is_empty() || statement.replacement.is_empty() {
+            return Some(DELETION_COMMENT.clone());
+        }
+
         None
     }
     fn subset_multiple_subst(
