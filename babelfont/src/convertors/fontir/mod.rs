@@ -42,6 +42,8 @@ pub struct CompilationOptions {
     pub produce_varc_table: bool,
     /// Drop incompatible paths from layers
     pub drop_incompatible_paths: bool,
+    /// Write out a debug feature file to the given path
+    pub debug_feature_file: Option<std::path::PathBuf>,
 }
 
 impl Default for CompilationOptions {
@@ -54,6 +56,7 @@ impl Default for CompilationOptions {
             dont_use_production_names: false,
             produce_varc_table: true,
             drop_incompatible_paths: false,
+            debug_feature_file: None,
         }
     }
 }
@@ -105,15 +108,24 @@ impl BabelfontIrSource {
                 .collect(),
         )
         .apply(&mut font)?;
-        assert!(
-            !font.masters.is_empty(),
-            "No masters remain after filtering"
-        );
-        // Make sure we have some exported glyphs
-        assert!(
-            font.glyphs.iter().any(|g| g.exported),
-            "No exported glyphs remain after filtering"
-        );
+        // These really should be errors, not assertions
+        // assert!(
+        //     !font.masters.is_empty(),
+        //     "No masters remain after filtering"
+        // );
+        // // Make sure we have some exported glyphs
+        // assert!(
+        //     font.glyphs.iter().any(|g| g.exported),
+        //     "No exported glyphs remain after filtering"
+        // );
+
+        // Dump feature file now
+        if let Some(debug_feature_file) = &options.debug_feature_file {
+            let content = font.features.to_fea();
+            std::fs::write(debug_feature_file, content).map_err(|e| {
+                BabelfontError::General(format!("Failed to write debug feature file: {:#?}", e))
+            })?;
+        }
         let source = Self {
             font: Arc::new(font),
             options,

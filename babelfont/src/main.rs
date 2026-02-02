@@ -67,6 +67,12 @@ fn main() {
                 .long("no-varc-table")
                 .help("Do not produce VARC table when compiling to TTF")
                 .action(clap::ArgAction::SetTrue),
+        )
+        .arg(
+            clap::Arg::new("debugfeaturefile")
+                .long("debug-feature-file")
+                .help("Write out a debug feature file to the given path when compiling to TTF")
+                .value_name("FILE"),
         );
 
     // Extend with the font filter arguments
@@ -146,6 +152,11 @@ fn main() {
         }
         if args.get_flag("novarc") && compiling {
             compilation_options.produce_varc_table = false;
+        }
+        if let Some(debug_feature_file) = args.get_one::<String>("debugfeaturefile") {
+            if compiling {
+                compilation_options.debug_feature_file = Some(PathBuf::from(debug_feature_file));
+            }
         }
     }
 
