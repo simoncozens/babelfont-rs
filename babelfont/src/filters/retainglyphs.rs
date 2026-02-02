@@ -3,7 +3,10 @@ use fea_rs_ast::{
     Statement, SubOrPos,
 };
 use smol_str::SmolStr;
-use std::{collections::HashSet, sync::LazyLock};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::LazyLock,
+};
 
 use crate::{
     filters::{DecomposeComponentReferences, FontFilter},
@@ -163,6 +166,7 @@ struct SubsetVisitor<'a> {
     dropped_lookups: HashSet<SmolStr>,
     dropped_features: HashSet<String>,
     empty_classes: HashSet<String>,
+    original_class_definitions: HashMap<SmolStr, Vec<SmolStr>>,
 }
 impl<'a> SubsetVisitor<'a> {
     fn new(glyphs: HashSet<&'a str>) -> Self {
@@ -171,24 +175,86 @@ impl<'a> SubsetVisitor<'a> {
             dropped_lookups: HashSet::new(),
             dropped_features: HashSet::new(),
             empty_classes: HashSet::new(),
+            original_class_definitions: HashMap::new(),
         }
     }
+
+    fn expand_glyph_container(&self, gc: &GlyphContainer) -> Vec<SmolStr> {
+        // Expand original glyphs recursively
+        let mut todo = vec![gc.clone()];
+        let mut original_glyphs = vec![];
+        while let Some(container) = todo.pop() {
+            match container {
+                GlyphContainer::GlyphName(glyph_name) => {
+                    original_glyphs.push(glyph_name.name.clone());
+                }
+                GlyphContainer::GlyphClassName(class_name) => {
+                    if let Some(definition) = self.original_class_definitions.get(&class_name) {
+                        for glyph in definition.iter().rev() {
+                            todo.push(GlyphContainer::GlyphName(GlyphName::new(glyph)));
+                        }
+                    }
+                }
+                GlyphContainer::GlyphClass(glyph_class) => {
+                    for gc in glyph_class.glyphs.iter().rev() {
+                        todo.push(gc.clone());
+                    }
+                }
+                GlyphContainer::GlyphNameOrRange(name) => {
+                    // I'm just going to treat it as a glyph name for now
+                    original_glyphs.push(name.clone());
+                }
+                GlyphContainer::GlyphRange(range) => {
+                    for glyph in range.glyphset() {
+                        original_glyphs.push(glyph);
+                    }
+                }
+            }
+        }
+        original_glyphs
+    }
+
     fn subset_single_subst(
         &self,
         statement: &mut fea_rs_ast::SingleSubstStatement,
     ) -> Option<Statement> {
-        for vec_container in [
-            statement.glyphs.iter_mut(),
-            statement.replacement.iter_mut(),
-            statement.prefix.iter_mut(),
-            statement.suffix.iter_mut(),
-        ] {
+        for vec_container in [statement.prefix.iter_mut(), statement.suffix.iter_mut()] {
             for container in vec_container {
                 if !self.filter_container(container) {
                     return Some(DELETION_COMMENT.clone());
                 }
             }
         }
+        // We have to go pairwise over glyph->replacement,
+        // looking into class definitions as we do so.
+        let mapping_from: Vec<SmolStr> = statement
+            .glyphs
+            .iter()
+            .flat_map(|gc| self.expand_glyph_container(gc))
+            .collect::<Vec<_>>();
+        let mapping_to: Vec<SmolStr> = statement
+            .replacement
+            .iter()
+            .flat_map(|gc| self.expand_glyph_container(gc))
+            .collect::<Vec<_>>();
+        let mapping = mapping_from.into_iter().zip(mapping_to);
+        // Empty the existing mapping
+        statement.glyphs.clear();
+        statement.replacement.clear();
+
+        for (glyph, replacement) in mapping {
+            if self.glyphs.contains(glyph.as_str()) && self.glyphs.contains(replacement.as_str()) {
+                statement
+                    .glyphs
+                    .push(GlyphContainer::GlyphName(GlyphName::new(glyph.as_str())));
+                statement
+                    .replacement
+                    .push(GlyphContainer::GlyphName(GlyphName::new(
+                        replacement.as_str(),
+                    )));
+            }
+        }
+
         None
     }
     fn subset_multiple_subst(
@@ -403,6 +469,17 @@ impl<'a> SubsetVisitor<'a> {
         &mut self,
         statement: &mut fea_rs_ast::GlyphClassDefinition,
     ) -> Option<Statement> {
+        // Store the original class definition
+        let name = statement.name.clone();
+        let original_glyphs = statement
+            .glyphs
+            .glyphs
+            .iter()
+            .flat_map(|gc| self.expand_glyph_container(gc))
+            .collect();
+        self.original_class_definitions
+            .insert(name.into(), original_glyphs);
+
         statement
             .glyphs
             .glyphs
@@ -764,5 +841,26 @@ mod tests {
         let retained = visitor.filter_container(&mut container);
         assert!(retained);
         assert_eq!(container.as_fea(""), "[a b]");
+    }
+
+    #[test]
+    fn test_multiple_subst_with_classes() {
+        let mut font = Font::new();
+        font.glyphs.push(Glyph::new("a"));
+        font.glyphs.push(Glyph::new("b"));
+        font.glyphs.push(Glyph::new("c"));
+        font.glyphs.push(Glyph::new("d"));
+        font.features = Features::from_fea(
+            "@before = [a b]; @after = [c d]; feature foo { sub @before by @after; } foo;\n",
+        );
+        // Now subset to a and c only
+        let old_glyphs = vec!["a", "b", "c", "d"];
+        let new_glyphs = vec!["a", "c"];
+        feature_subset(&mut font, &old_glyphs, &new_glyphs).expect("Feature subsetting failed");
+        let fea = font.features.to_fea();
+        assert_eq!(
+            fea,
+            "@before = [a]; @after = [c]; feature foo {\nsub a by c;\n} foo;\n\n"
+        );
     }
 }
