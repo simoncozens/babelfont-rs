@@ -801,7 +801,7 @@ impl LayoutVisitor for SubsetVisitor<'_> {
             Statement::FeatureBlock(feature_block) => self.subset_feature_block(feature_block),
             Statement::LookupBlock(lookup_block) => self.subset_lookup_block(lookup_block),
             Statement::NestedBlock(nested_block) => self.subset_nested_block(nested_block),
-            Statement::ValueRecordDefinition(_) => todo!(),
+            Statement::ValueRecordDefinition(_) => None,
             Statement::ConditionSet(_) => None,
             Statement::VariationBlock(_) => None,
         } {
