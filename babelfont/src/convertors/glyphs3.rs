@@ -464,6 +464,9 @@ fn load_properties(
                     glyphs3::LocalizedPropertyKey::StyleNames => {
                         names.typographic_subfamily = value;
                     }
+                    glyphs3::LocalizedPropertyKey::PostscriptFullNames => {
+                        names.postscript_name = value
+                    }
                 }
             }
             glyphs3::Property::Junk(plist) => {
