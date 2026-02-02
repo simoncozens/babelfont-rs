@@ -188,11 +188,19 @@ impl<'a> SubsetVisitor<'a> {
                 GlyphContainer::GlyphName(glyph_name) => {
                     original_glyphs.push(glyph_name.name.clone());
                 }
-                GlyphContainer::GlyphClassName(class_name) => {
+                GlyphContainer::GlyphClassName(mut class_name) => {
+                    if class_name.starts_with("@") {
+                        class_name = class_name[1..].into();
+                    }
                     if let Some(definition) = self.original_class_definitions.get(&class_name) {
                         for glyph in definition.iter().rev() {
                             todo.push(GlyphContainer::GlyphName(GlyphName::new(glyph)));
                         }
+                    } else {
+                        log::warn!(
+                            "Warning: no definition found for glyph class {}",
+                            class_name
+                        );
                     }
                 }
                 GlyphContainer::GlyphClass(glyph_class) => {
@@ -241,26 +249,45 @@ impl<'a> SubsetVisitor<'a> {
         // Empty the existing mapping
         statement.glyphs.clear();
         statement.replacement.clear();
+        let mut new_from = vec![];
+        let mut new_to = vec![];
 
         for (glyph, replacement) in mapping {
             if self.glyphs.contains(glyph.as_str()) && self.glyphs.contains(replacement.as_str()) {
-                statement
-                    .glyphs
-                    .push(GlyphContainer::GlyphName(GlyphName::new(glyph.as_str())));
-                statement
-                    .replacement
-                    .push(GlyphContainer::GlyphName(GlyphName::new(
-                        replacement.as_str(),
-                    )));
+                new_from.push(GlyphContainer::GlyphName(GlyphName::new(glyph.as_str())));
+                new_to.push(GlyphContainer::GlyphName(GlyphName::new(
+                    replacement.as_str(),
+                )));
             }
         }
-
-        // If there's nothing left in either glyphs or statement, drop the whole thing
-        if statement.glyphs.is_empty() || statement.replacement.is_empty() {
-            return Some(DELETION_COMMENT.clone());
+        match new_from.len() {
+            0 => Some(DELETION_COMMENT.clone()),
+            1 => Some(Statement::SingleSubst(fea_rs_ast::SingleSubstStatement {
+                prefix: statement.prefix.clone(),
+                suffix: statement.suffix.clone(),
+                glyphs: new_from,
+                replacement: new_to,
+                location: statement.location.clone(),
+                force_chain: statement.force_chain,
+            })),
+            _ => {
+                // Put them into classes
+                Some(Statement::SingleSubst(fea_rs_ast::SingleSubstStatement {
+                    prefix: statement.prefix.clone(),
+                    suffix: statement.suffix.clone(),
+                    glyphs: vec![GlyphContainer::GlyphClass(GlyphClass::new(
+                        new_from,
+                        statement.location.clone(),
+                    ))],
+                    replacement: vec![GlyphContainer::GlyphClass(GlyphClass::new(
+                        new_to,
+                        statement.location.clone(),
+                    ))],
+                    location: statement.location.clone(),
+                    force_chain: statement.force_chain,
+                }))
+            }
         }
-
-        None
     }
     fn subset_multiple_subst(
         &self,
@@ -476,6 +503,7 @@ impl<'a> SubsetVisitor<'a> {
     ) -> Option<Statement> {
         // Store the original class definition
         let name = statement.name.clone();
+
         let original_glyphs = statement
             .glyphs
             .glyphs
@@ -819,12 +847,17 @@ mod tests {
     use crate::{Font, Glyph};
     use pretty_assertions::assert_eq;
 
+    fn dummy_font_with_glyphs(glyph_names: Vec<&str>) -> Font {
+        let mut font = Font::new();
+        for name in glyph_names {
+            font.glyphs.push(Glyph::new(name));
+        }
+        font
+    }
+
     #[test]
     fn test_subset_single_subst() {
-        let mut font = Font::new();
-        font.glyphs.push(Glyph::new("a"));
-        font.glyphs.push(Glyph::new("b"));
-        font.glyphs.push(Glyph::new("c"));
+        let mut font = dummy_font_with_glyphs(vec!["a", "b", "c"]);
         font.features = Features::from_fea(
             "feature foo { sub a by c; sub b by c; } foo;\nfeature bar { sub b by a; } bar;\n",
         );
@@ -850,11 +883,7 @@ mod tests {
 
     #[test]
     fn test_multiple_subst_with_classes() {
-        let mut font = Font::new();
-        font.glyphs.push(Glyph::new("a"));
-        font.glyphs.push(Glyph::new("b"));
-        font.glyphs.push(Glyph::new("c"));
-        font.glyphs.push(Glyph::new("d"));
+        let mut font = dummy_font_with_glyphs(vec!["a", "b", "c", "d"]);
         font.features = Features::from_fea(
             "@before = [a b]; @after = [c d]; feature foo { sub @before by @after; } foo;\n",
         );
@@ -865,7 +894,28 @@ mod tests {
         let fea = font.features.to_fea();
         assert_eq!(
             fea,
-            "@before = [a]; @after = [c]; feature foo {\nsub a by c;\n} foo;\n\n"
+            "@before = [a];\n@after = [c];\nfeature foo {\nsub a by c;\n} foo;\n\n"
         );
+    }
+
+    #[test]
+    fn test_multiple_subset_retains_classes() {
+        let all_glyphs = vec![
+            "heh-ar.isol",
+            "heh-ar.fina",
+            "hamzaabove-ar",
+            "heh-ar.isol.1",
+            "heh-ar.fina.1",
+        ];
+        let mut font = dummy_font_with_glyphs(all_glyphs.clone());
+        let feature_code = "feature foo {
+sub [heh-ar.isol heh-ar.fina]' hamzaabove-ar by [heh-ar.isol.1 heh-ar.fina.1];
+} foo;\n";
+        font.features = Features::from_fea(feature_code);
+        // keep them all, just rewrite
+        feature_subset(&mut font, &all_glyphs, &all_glyphs).expect("Feature subsetting failed");
+        // Should be same
+        let fea = font.features.to_fea();
+        assert_eq!(fea.trim_end(), feature_code.trim_end());
     }
 }
