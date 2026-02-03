@@ -69,6 +69,7 @@ declare_filters! {
     #[cfg(feature = "glyphs")]
     GlyphsData(glyphsdata) => "glyphsdata",
     DropIncompatiblePaths(dropincompatiblepaths) => "dropincompatiblepaths",
+    GlyphsNumberValue(glyphsnumbervalue) => "glyphsnumbervalue",
 }
 
 /// A trait for font filters that can be applied to a font
