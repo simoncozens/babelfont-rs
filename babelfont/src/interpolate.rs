@@ -31,18 +31,19 @@ pub(crate) fn interpolate_layer(
         })?
         .1;
     for (i, shape) in first_layer.shapes.iter().enumerate() {
-        let all_shapes =
-            layers_locations
-                .iter()
-                .map(|(_, layer)| {
-                    layer.shapes.get(i).cloned().ok_or_else(|| {
-                        BabelfontError::GlyphNotInterpolatable {
-                            glyph: glyphname.to_string(),
-                            reason: format!("Layer missing shape index {}", i),
-                        }
+        let all_shapes = layers_locations
+            .iter()
+            .map(|(_, layer)| {
+                layer
+                    .shapes
+                    .get(i)
+                    .cloned()
+                    .ok_or_else(|| BabelfontError::GlyphNotInterpolatable {
+                        glyph: glyphname.to_string(),
+                        reason: format!("Layer {} missing shape index {}", layer.debug_name(), i),
                     })
-                })
-                .collect::<Result<Vec<crate::shape::Shape>, BabelfontError>>()?;
+            })
+            .collect::<Result<Vec<crate::shape::Shape>, BabelfontError>>()?;
         // Ensure all shapes are the same enum variants
         if !all_shapes
             .iter()
