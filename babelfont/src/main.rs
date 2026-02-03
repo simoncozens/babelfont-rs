@@ -185,7 +185,11 @@ fn main() {
                 input,
                 compilation_options,
             )
-            .expect("Failed to compile font");
+            .map_err(|e| {
+                println!("Failed to compile font: {}", e);
+                std::process::exit(1);
+            })
+            .unwrap();
             let after_compile = std::time::Instant::now();
             std::fs::write(&output_name, bytes).expect("Failed to write output font");
             let after_safe = std::time::Instant::now();
