@@ -38,7 +38,7 @@ fontra = []
 robocjk = []
 fontlab = []
 fontforge = []
-fontir = ["dep:fontir", "dep:fontc"]
+fontir = ["dep:fontir", "dep:fontc", "dep:fontbe"]
 cli = [
     "dep:env_logger",
     "dep:clap",
@@ -59,6 +59,7 @@ thiserror = { workspace = true }
 regex = { workspace = true }
 fontdrasil = { workspace = true }
 fontir = { workspace = true, optional = true }
+fontbe = { workspace = true, optional = true }
 fontc = { workspace = true, optional = true }
 write-fonts = { workspace = true }
 kurbo = { workspace = true }

@@ -131,12 +131,21 @@ impl BabelfontIrSource {
             options,
         };
         let binary = fontc::generate_font(Box::new(source.clone()), Options::default())
-            .map_err(|e| BabelfontError::General(format!("Font generation error: {:#?}", e)))?;
+            .map_err(improve_ir_error)?;
         if source.options.produce_varc_table {
             insert_varc_table(&binary, &source.font)
         } else {
             Ok(binary)
         }
+    }
+}
+
+fn improve_ir_error(e: fontc::Error) -> BabelfontError {
+    match e {
+        fontc::Error::Backend(fontbe::error::Error::FeaCompileError(x)) => {
+            BabelfontError::General(x.display_verbose().to_string())
+        }
+        other => BabelfontError::General(format!("Font generation error: {:#?}", other)),
     }
 }
 

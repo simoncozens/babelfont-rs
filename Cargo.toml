@@ -8,12 +8,13 @@ env_logger = "0.10"
 # Branch nonsense is temporary until fontc works with WASM better
 fontdrasil = { version = "0.4.0", git = "https://github.com/simoncozens/fontc", branch = "new-varc-writefonts" }
 fontir = { version = "0.5.0", git = "https://github.com/simoncozens/fontc", branch = "new-varc-writefonts" } # Must use version fondrasil uses
+fontbe = { version = "0.5.0", git = "https://github.com/simoncozens/fontc", branch = "new-varc-writefonts", default-features = false } # Must use version fondrasil uses
 fontc = { version = "0.6.0", git = "https://github.com/simoncozens/fontc", branch = "new-varc-writefonts", default-features = false } # Must use version fondrasil uses
 write-fonts = { version = "0.45.0", features = [
     "read",
 ], git = "https://github.com/googlefonts/fontations" } # Must use version fontdrasil uses
 kurbo = "0.13" # Must use same version as norad / fontir /etc.
-fea-rs-ast = { version = "0.1.1" }
+fea-rs-ast = { version = "0.1.2" }
 regex = "1.12.2"
 thiserror = "2.0.17"
 indexmap = { version = "2.12.0", features = ["serde"] }
