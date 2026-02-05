@@ -152,6 +152,7 @@ mod i18ndictionary;
 mod instance;
 mod interpolate;
 mod layer;
+mod layout;
 mod master;
 mod metrics;
 mod names;
@@ -170,6 +171,7 @@ pub use crate::{
     i18ndictionary::I18NDictionary,
     instance::Instance,
     layer::{Layer, LayerType},
+    layout::closure::close_layout,
     master::Master,
     metrics::MetricType,
     names::Names,

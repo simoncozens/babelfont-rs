@@ -1,9 +1,5 @@
-use crate::{
-    args::ExistingGlyphHandling,
-    error::FontmergeError,
-    layout::{closure::LayoutClosureVisitor, visitor::LayoutVisitor},
-};
-use babelfont::{Font, SmolStr};
+use crate::{args::ExistingGlyphHandling, error::FontmergeError};
+use babelfont::{close_layout, Font, SmolStr};
 use indexmap::{IndexMap, IndexSet};
 
 pub struct GlyphsetFilter {
@@ -225,33 +221,6 @@ impl GlyphsetFilter {
                 .position(|name| name == g)
                 .unwrap_or(usize::MAX)
         });
-    }
-
-    pub(crate) fn perform_layout_closure(
-        &mut self,
-        features: &babelfont::Features,
-        glyph_names: &[&SmolStr],
-        project_root: impl Into<std::path::PathBuf>,
-    ) -> Result<(), FontmergeError> {
-        let parse_tree =
-            crate::layout::get_parse_tree(&features.to_fea(), glyph_names, project_root)?;
-        let mut count = self.incoming_glyphset.len();
-        let mut rounds = 0;
-        loop {
-            let mut visitor =
-                LayoutClosureVisitor::new(&parse_tree, self.incoming_glyphset.clone());
-            visitor.visit();
-            self.incoming_glyphset = visitor.glyphset.clone();
-            rounds += 1;
-            if self.incoming_glyphset.len() == count {
-                break;
-            }
-            if rounds > 10 {
-                return Err(FontmergeError::LayoutClosureError);
-            }
-            count = self.incoming_glyphset.len();
-        }
-        Ok(())
     }
 
     pub(crate) fn final_glyphset(&self) -> Vec<SmolStr> {

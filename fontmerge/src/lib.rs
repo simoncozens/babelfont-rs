@@ -1,7 +1,10 @@
-use babelfont::filters::{DropFeatures, FontFilter as _, ResolveIncludes, RetainGlyphs};
+use babelfont::{
+    close_layout,
+    filters::{DropFeatures, FontFilter as _, ResolveIncludes, RetainGlyphs},
+};
 use fea_rs_ast::{
-    AsFea as _,
     fea_rs::{self, GlyphMap},
+    AsFea as _,
 };
 use indexmap::IndexSet;
 use indicatif::ProgressIterator;
@@ -45,15 +48,10 @@ pub fn fontmerge(
         .as_ref()
         .and_then(|p| p.parent())
         .unwrap_or(std::path::Path::new("."));
-    let font2_root = font2
-        .source
-        .as_ref()
-        .and_then(|p| p.parent())
-        .unwrap_or(std::path::Path::new("."));
     if layout_handling == LayoutHandling::Closure {
-        glyphset_filter
-            .perform_layout_closure(&font2.features, &font2_glyphnames, font2_root)
+        let closed_glyphset = close_layout(&font2, font2_glyphnames.into_iter().cloned().collect())
             .expect("Failed to perform layout closure");
+        glyphset_filter.incoming_glyphset = closed_glyphset.iter().cloned().collect();
     }
 
     if glyphset_filter.incoming_glyphset.is_empty() {
