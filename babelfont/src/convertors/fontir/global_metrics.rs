@@ -1,7 +1,7 @@
 use crate::{Font, MetricType};
 use fontdrasil::orchestration::{Access, Work};
 use fontir::{
-    error::Error,
+    error::{BadSourceKind, Error},
     ir::{GlobalMetric, GlobalMetricsBuilder},
     orchestration::{Context, WorkId},
 };
@@ -49,7 +49,12 @@ impl Work<Context, WorkId, Error> for GlobalMetricWork {
 
         let static_metadata = context.static_metadata.get();
         let mut metrics = GlobalMetricsBuilder::new();
-        let axes = self.0.fontdrasil_axes()?;
+        let axes = self.0.fontdrasil_axes().map_err(|e| {
+            Error::BadSource(fontir::error::BadSource::new(
+                self.0.source.clone().unwrap_or("unknown source".into()),
+                BadSourceKind::Custom(format!("Error converting axes for global metrics: {e}")),
+            ))
+        })?;
 
         for master in self.0.masters.iter() {
             let pos = master.location.to_normalized(&axes)?;

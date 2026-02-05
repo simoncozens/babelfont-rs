@@ -10,7 +10,7 @@ use fontdrasil::{
     types::GlyphName,
 };
 use fontir::{
-    error::Error,
+    error::{BadSourceKind, Error},
     ir::{GlyphOrder, KernGroup, KernSide, KerningGroups, KerningInstance},
     orchestration::{Context, WorkId},
 };
@@ -70,7 +70,12 @@ impl Work<Context, WorkId, Error> for KerningGroupWork {
     fn exec(&self, context: &Context) -> Result<(), fontir::error::Error> {
         log::trace!("Generate IR for kerning groups");
         let font = &self.0;
-        let axes = font.fontdrasil_axes()?;
+        let axes = font.fontdrasil_axes().map_err(|e| {
+            Error::BadSource(fontir::error::BadSource::new(
+                self.0.source.clone().unwrap_or("unknown source".into()),
+                BadSourceKind::Custom(format!("Error converting axes for kerning: {e}")),
+            ))
+        })?;
 
         let mut groups = KerningGroups::default();
 

@@ -4,7 +4,7 @@ use super::BabelfontIrSource;
 use crate::{Font, MetricType};
 use fontdrasil::{orchestration::Work, types::GlyphName};
 use fontir::{
-    error::Error,
+    error::{BadSourceKind, Error},
     ir::{
         GdefCategories, GlyphOrder, NameBuilder, NameKey, NamedInstance, PostscriptNames,
         StaticMetadata,
@@ -126,7 +126,16 @@ impl Work<Context, WorkId, Error> for StaticMetadataWork {
                 .map(|s| s.as_str())
                 .unwrap_or("<nameless family>")
         );
-        let axes = font.fontdrasil_axes()?;
+        let axes = font.fontdrasil_axes().map_err(|e| {
+            Error::BadSource(fontir::error::BadSource::new(
+                self.0
+                    .font
+                    .source
+                    .clone()
+                    .unwrap_or("unknown source".into()),
+                BadSourceKind::Custom(format!("Error converting axes for static metadata: {e}")),
+            ))
+        })?;
         let named_instances = font
             .instances
             .iter()
