@@ -66,6 +66,7 @@ declare_filters! {
     DecomposeComponentReferences(decomposecomponentreferences) => "decomposecomponents",
     RewriteSmartAxes(rewritesmartaxes) => "rewritesmartaxes",
     ScaleUpem(scaleupem) => "scaleupem",
+    SubsetLayout(subsetlayout) => "subsetlayout",
     #[cfg(feature = "glyphs")]
     GlyphsData(glyphsdata) => "glyphsdata",
     DropIncompatiblePaths(dropincompatiblepaths) => "dropincompatiblepaths",
