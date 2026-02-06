@@ -1,5 +1,5 @@
-use crate::{args::ExistingGlyphHandling, error::FontmergeError};
-use babelfont::{close_layout, Font, SmolStr};
+use crate::args::ExistingGlyphHandling;
+use babelfont::{Font, SmolStr};
 use indexmap::{IndexMap, IndexSet};
 
 pub struct GlyphsetFilter {
