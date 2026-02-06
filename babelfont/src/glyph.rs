@@ -49,7 +49,6 @@ impl DerefMut for GlyphList {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
-#[serde(untagged)]
 #[typeshare]
 /// The category of a glyph
 pub enum GlyphCategory {
