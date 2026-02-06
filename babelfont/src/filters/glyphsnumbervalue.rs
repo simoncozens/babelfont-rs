@@ -159,9 +159,7 @@ impl GlyphsNumberValueVisitor {
         &mut self,
         vrd: &mut fea_rs_ast::ValueRecordDefinition,
     ) -> bool {
-        println!("Visiting VRD: {:?}", vrd);
         self.convert_value_record(&mut vrd.value);
-        println!("Converted VRD: {:?}", vrd);
 
         true
     }
