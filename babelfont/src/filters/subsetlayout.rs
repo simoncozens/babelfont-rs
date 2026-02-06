@@ -56,7 +56,7 @@ impl FontFilter for SubsetLayout {
     fn arg() -> clap::Arg {
         clap::Arg::new("subsetlayout")
             .long("subset-layout")
-            .takes_value(true)
+            .value_name("GLYPHS")
             .help("Subset layout features to only include specified glyphs (comma-separated list)")
     }
 }
