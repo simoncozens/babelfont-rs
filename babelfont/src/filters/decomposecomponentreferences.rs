@@ -504,12 +504,7 @@ fn decompose_smart_component_with_glyph(
         .layers
         .iter()
         .enumerate()
-        .filter(|(_, layer)| {
-            !layer.is_background
-                && (!layer.smart_component_location.is_empty()
-                    || layer.location.is_some()
-                    || matches!(layer.master, crate::LayerType::DefaultForMaster(_)))
-        })
+        .filter(|(_, layer)| layer.should_interpolate())
         .map(|(layer_idx, layer)| {
             let mut loc = Location::new();
             // XXX There's a fit_to_axes method that might be relevant here?

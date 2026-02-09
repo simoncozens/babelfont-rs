@@ -20,10 +20,7 @@ impl FontFilter for DropIncompatiblePaths {
             let effective_layers: Vec<&Layer> = glyph
                 .layers
                 .iter()
-                .filter(|layer| {
-                    matches!(layer.master, crate::LayerType::DefaultForMaster(_))
-                        || layer.location.is_some()
-                })
+                .filter(|layer| layer.should_interpolate())
                 .collect();
             if effective_layers.len() < 2 {
                 continue;
@@ -121,5 +118,32 @@ impl FontFilter for DropIncompatiblePaths {
             .long("drop-incompatible-paths")
             .help("Remove incompatible paths from the font's layers")
             .action(clap::ArgAction::SetTrue)
+    }
+}
+
+#[allow(clippy::unwrap_used)]
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_fustat() {
+        let mut font = crate::load("resources/Fustat.glyphs").unwrap();
+        let filter = DropIncompatiblePaths::new();
+        filter.apply(&mut font).unwrap();
+        // Check that "e" has paths
+        let e_glyph = font.glyphs.iter().find(|g| g.name == "e").unwrap();
+        assert!(e_glyph
+            .layers
+            .iter()
+            .filter(|l| l.should_interpolate())
+            .all(|layer| layer.paths().count() > 0));
+        // Check that "a" has paths
+        let a_glyph = font.glyphs.iter().find(|g| g.name == "a").unwrap();
+        assert!(a_glyph
+            .layers
+            .iter()
+            .filter(|l| l.should_interpolate())
+            .all(|layer| layer.paths().count() > 0));
     }
 }

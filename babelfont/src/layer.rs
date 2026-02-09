@@ -309,6 +309,13 @@ impl Layer {
             None
         }
     }
+
+    pub(crate) fn should_interpolate(&self) -> bool {
+        !self.is_background
+            && (!self.smart_component_location.is_empty()
+                || self.location.is_some()
+                || matches!(self.master, crate::LayerType::DefaultForMaster(_)))
+    }
 }
 
 // kurbo pen protocol support?
