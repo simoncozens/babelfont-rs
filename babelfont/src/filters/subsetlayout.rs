@@ -259,19 +259,69 @@ impl<'a> SubsetVisitor<'a> {
         &self,
         statement: &mut fea_rs_ast::ReverseChainSingleSubstStatement,
     ) -> Option<Statement> {
-        for vec_container in [
-            statement.glyphs.iter_mut(),
-            statement.prefix.iter_mut(),
-            statement.suffix.iter_mut(),
-            statement.replacements.iter_mut(),
-        ] {
+        for vec_container in [statement.prefix.iter_mut(), statement.suffix.iter_mut()] {
             for container in vec_container {
                 if !self.filter_container(container) {
                     return Some(DELETION_COMMENT.clone());
                 }
             }
         }
-        None
+        // XXX Code copied from single subst above
+        let mapping_from: Vec<SmolStr> = statement
+            .glyphs
+            .iter()
+            .flat_map(|gc| self.expand_glyph_container(gc))
+            .collect::<Vec<_>>();
+        let mapping_to: Vec<SmolStr> = statement
+            .replacements
+            .iter()
+            .flat_map(|gc| self.expand_glyph_container(gc))
+            .collect::<Vec<_>>();
+        let mapping = mapping_from.into_iter().zip(mapping_to);
+        // Empty the existing mapping
+        statement.glyphs.clear();
+        statement.replacements.clear();
+        let mut new_from = vec![];
+        let mut new_to = vec![];
+
+        for (glyph, replacement) in mapping {
+            if self.glyphs.contains(glyph.as_str()) && self.glyphs.contains(replacement.as_str()) {
+                new_from.push(GlyphContainer::GlyphName(GlyphName::new(glyph.as_str())));
+                new_to.push(GlyphContainer::GlyphName(GlyphName::new(
+                    replacement.as_str(),
+                )));
+            }
+        }
+        match new_from.len() {
+            0 => Some(DELETION_COMMENT.clone()),
+            1 => Some(Statement::ReverseChainSubst(
+                fea_rs_ast::ReverseChainSingleSubstStatement {
+                    prefix: statement.prefix.clone(),
+                    suffix: statement.suffix.clone(),
+                    glyphs: new_from,
+                    replacements: new_to,
+                    location: statement.location.clone(),
+                },
+            )),
+            _ => {
+                // Put them into classes
+                Some(Statement::ReverseChainSubst(
+                    fea_rs_ast::ReverseChainSingleSubstStatement {
+                        prefix: statement.prefix.clone(),
+                        suffix: statement.suffix.clone(),
+                        glyphs: vec![GlyphContainer::GlyphClass(GlyphClass::new(
+                            new_from,
+                            statement.location.clone(),
+                        ))],
+                        replacements: vec![GlyphContainer::GlyphClass(GlyphClass::new(
+                            new_to,
+                            statement.location.clone(),
+                        ))],
+                        location: statement.location.clone(),
+                    },
+                ))
+            }
+        }
     }
     fn subset_single_pos(
         &self,
@@ -745,7 +795,7 @@ impl LayoutVisitor for SubsetVisitor<'_> {
     }
 }
 
-#[allow(clippy::expect_used)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -825,5 +875,33 @@ sub [heh-ar.isol heh-ar.fina]' hamzaabove-ar by [heh-ar.isol.1 heh-ar.fina.1];
         // Should be same
         let fea = font.features.to_fea();
         assert_eq!(fea.trim_end(), feature_code.trim_end());
+    }
+    use crate::{
+        close_layout,
+        convertors::fontir::{BabelfontIrSource, CompilationOptions},
+    };
+
+    #[test]
+    fn test_fustat_subset() {
+        let mut font = crate::load("resources/Fustat.glyphs").unwrap();
+        let subset = [
+            "fathatan-ar",
+            "alef-ar.short.fina",
+            "dotbelow-ar",
+            "behDotless-ar.medi",
+            "fatha-ar",
+            "hah-ar.init",
+            "reh-ar.fina",
+            "meem-ar.init",
+        ];
+        // Perform layout closure
+        let new_glyphset =
+            close_layout(&font, subset.iter().map(|s| (*s).into()).collect()).unwrap();
+        // Now subset to that glyphset
+        SubsetLayout::new(new_glyphset.into_iter().collect())
+            .apply(&mut font)
+            .expect("Feature subsetting failed");
+        // Just check that the resulting fea compiles
+        BabelfontIrSource::compile(font, CompilationOptions::default()).unwrap();
     }
 }
