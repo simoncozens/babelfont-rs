@@ -10,7 +10,7 @@ use fontc::Options;
 use fontdrasil::{
     coords::{NormalizedCoord, NormalizedLocation},
     orchestration::Work,
-    types::GlyphName,
+    types::{Axes, GlyphName},
 };
 use fontir::{
     error::Error,
@@ -166,7 +166,7 @@ impl Source for BabelfontIrSource {
 
     fn create_global_metric_work(&self) -> Result<Box<IrWork>, Error> {
         if self.options.skip_metrics {
-            return Ok(Box::new(DummyWork(WorkId::GlobalMetrics)));
+            return Ok(Box::new(DummyWork((WorkId::GlobalMetrics, self.font.upm))));
         }
         Ok(Box::new(global_metrics::GlobalMetricWork(
             self.font.clone(),
@@ -187,7 +187,7 @@ impl Source for BabelfontIrSource {
 
     fn create_feature_ir_work(&self) -> Result<Box<IrWork>, Error> {
         if self.options.skip_features {
-            return Ok(Box::new(DummyWork(WorkId::Features)));
+            return Ok(Box::new(DummyWork((WorkId::Features, self.font.upm))));
         }
         Ok(Box::new(features::FeatureWork {
             font: self.font.clone(),
@@ -196,7 +196,7 @@ impl Source for BabelfontIrSource {
 
     fn create_kerning_group_ir_work(&self) -> Result<Box<IrWork>, Error> {
         if self.options.skip_kerning {
-            return Ok(Box::new(DummyWork(WorkId::KerningGroups)));
+            return Ok(Box::new(DummyWork((WorkId::KerningGroups, self.font.upm))));
         }
 
         Ok(Box::new(kerning::KerningGroupWork(self.font.clone())))
@@ -207,7 +207,10 @@ impl Source for BabelfontIrSource {
         at: NormalizedLocation,
     ) -> Result<Box<IrWork>, Error> {
         if self.options.skip_kerning {
-            return Ok(Box::new(DummyWork(WorkId::KernInstance(at.clone()))));
+            return Ok(Box::new(DummyWork((
+                WorkId::KernInstance(at.clone()),
+                self.font.upm,
+            ))));
         }
         Ok(Box::new(kerning::KerningInstanceWork {
             font: self.font.clone(),
@@ -231,16 +234,27 @@ impl Source for BabelfontIrSource {
 }
 
 #[derive(Debug)]
-struct DummyWork(WorkId);
+struct DummyWork((WorkId, u16));
 impl Work<Context, WorkId, Error> for DummyWork {
     fn id(&self) -> WorkId {
-        self.0.clone()
+        self.0 .0.clone()
     }
 
     fn exec(&self, context: &Context) -> Result<(), Error> {
-        match &self.0 {
+        match &self.0 .0 {
             WorkId::StaticMetadata => todo!(),
-            WorkId::GlobalMetrics => todo!(),
+            WorkId::GlobalMetrics => {
+                let mut builder = fontir::ir::GlobalMetricsBuilder::new();
+                builder.populate_defaults(
+                    &NormalizedLocation::default(),
+                    self.0 .1,
+                    Some(456.0),
+                    Some(1000.0),
+                    Some(-500.0),
+                    None,
+                );
+                context.global_metrics.set(builder.build(&Axes::default())?)
+            }
             WorkId::Glyph(_glyph_name) => todo!(),
             WorkId::PreliminaryGlyphOrder => todo!(),
             WorkId::GlyphOrder => todo!(),
@@ -265,4 +279,27 @@ pub(crate) fn debug_location(loc: &NormalizedLocation) -> String {
     let mut loc2 = loc.clone();
     loc2.retain(|_tag, coord| *coord != NormalizedCoord::new(0.0));
     format!("{:?}", loc2)
+}
+
+#[allow(clippy::unwrap_used)]
+#[cfg(test)]
+mod tests {
+    use crate::convertors::fontir::{BabelfontIrSource, CompilationOptions};
+
+    #[test]
+    fn test_fustat_skipmetrics() {
+        let font = crate::load("resources/Fustat.glyphs").unwrap();
+        let options = CompilationOptions {
+            skip_kerning: false,
+            skip_features: false,
+            skip_metrics: true,
+            skip_outlines: false,
+            dont_use_production_names: false,
+            produce_varc_table: false,
+            drop_incompatible_paths: false,
+            debug_feature_file: None,
+        };
+        let result = BabelfontIrSource::compile(font, options);
+        assert!(result.is_ok());
+    }
 }
