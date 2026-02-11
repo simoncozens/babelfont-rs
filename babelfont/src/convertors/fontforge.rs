@@ -39,6 +39,7 @@ struct SfdParser {
     gpos_lookups: GTable,
     feature_names: IndexMap<SmolStr, Vec<(u32, String)>>, // feature tag -> feature name
     sanitized_lookup_names: HashMap<String, usize>, // track sanitized names for de-duplication
+    content: Option<String>, // Optional pre-loaded content for load_str()
 }
 
 #[derive(Debug, Clone, Default)]
@@ -82,11 +83,32 @@ impl SfdParser {
             gpos_lookups: GTable(IndexMap::new()),
             feature_names: IndexMap::new(),
             sanitized_lookup_names: HashMap::new(),
+            content: None,
+        }
+    }
+
+    fn new_from_str(content: String) -> Self {
+        Self {
+            path: PathBuf::from("<string>"),
+            font: Font::new(),
+            layer_defs: Vec::new(),
+            kern_classes: IndexMap::new(),
+            kern_pairs: IndexMap::new(),
+            gsub_lookups: GTable(IndexMap::new()),
+            gpos_lookups: GTable(IndexMap::new()),
+            feature_names: IndexMap::new(),
+            sanitized_lookup_names: HashMap::new(),
+            content: Some(content),
         }
     }
 
     /// Read the SFD file or SFDir `font.props` into a vector of lines.
     fn read_data(&self) -> Result<Vec<String>, BabelfontError> {
+        // If content was pre-loaded (from load_str), use that
+        if let Some(content) = &self.content {
+            return Ok(content.lines().map(|l| l.to_string()).collect());
+        }
+
         if self.path.is_dir() {
             let props = self.path.join("font.props");
             if !props.is_file() {
@@ -1835,6 +1857,16 @@ impl SfdParser {
 /// Load a FontForge SFD font or SFDir from a file path
 pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
     let mut parser = SfdParser::new(path);
+    parser.parse()?;
+    parser.resolve_component_references()?;
+    parser.process_kerning()?;
+    parser.insert_gtables();
+    Ok(parser.font)
+}
+
+/// Load a FontForge SFD font from a string
+pub fn load_str(content: &str) -> Result<Font, BabelfontError> {
+    let mut parser = SfdParser::new_from_str(content.to_string());
     parser.parse()?;
     parser.resolve_component_references()?;
     parser.process_kerning()?;
