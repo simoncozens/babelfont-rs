@@ -71,6 +71,7 @@ declare_filters! {
     GlyphsData(glyphsdata) => "glyphsdata",
     DropIncompatiblePaths(dropincompatiblepaths) => "dropincompatiblepaths",
     GlyphsNumberValue(glyphsnumbervalue) => "glyphsnumbervalue",
+    RenameGlyphs(renameglyphs) => "renameglyphs",
 }
 
 /// A trait for font filters that can be applied to a font
