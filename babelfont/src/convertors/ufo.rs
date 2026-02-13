@@ -8,7 +8,13 @@ use fontdrasil::{coords::Location, types::Tag};
 use indexmap::IndexMap;
 use paste::paste;
 use smol_str::{SmolStr, ToSmolStr};
-use std::{collections::HashSet, fs, str::FromStr, time::SystemTime};
+use std::{
+    collections::{HashMap, HashSet},
+    fs,
+    path::{Path as FsPath, PathBuf},
+    str::FromStr,
+    time::SystemTime,
+};
 
 /// Key for storing norad lib data in FormatSpecific
 pub const KEY_LIB: &str = "norad.lib";
@@ -57,9 +63,32 @@ pub(crate) fn stat(path: &std::path::Path) -> Option<DateTime<chrono::Local>> {
 
 /// Load a UFO font from a file path
 pub fn load<T: AsRef<std::path::Path>>(path: T) -> Result<Font, BabelfontError> {
-    let mut font = Font::new();
     let created_time: Option<DateTime<Utc>> = stat(path.as_ref()).map(DateTime::<Utc>::from);
     let ufo = norad::Font::load(&path)?;
+    font_from_norad(path.as_ref(), created_time, ufo)
+}
+
+/// Load a UFO font from in-memory entries keyed by relative path.
+///
+/// `path` is the virtual UFO root path (for example `MyFont.ufo` or `sources/MyFont.ufo`).
+pub fn load_entries(path: PathBuf, entries: &HashMap<String, String>) -> Result<Font, BabelfontError> {
+    let ufo = load_norad_from_entries(&path, entries)?;
+    font_from_norad(&path, None, ufo)
+}
+
+pub(crate) fn load_norad_from_entries(
+    path: &FsPath,
+    entries: &HashMap<String, String>,
+) -> Result<norad::Font, BabelfontError> {
+    norad::Font::load_entries(path, entries).map_err(Into::into)
+}
+
+fn font_from_norad(
+    path: &FsPath,
+    created_time: Option<DateTime<Utc>>,
+    ufo: norad::Font,
+) -> Result<Font, BabelfontError> {
+    let mut font = Font::new();
     font.format_specific = stash_lib(Some(&ufo.lib));
     load_glyphs(&mut font, &ufo);
     let info = &ufo.font_info;
@@ -88,7 +117,7 @@ pub fn load<T: AsRef<std::path::Path>>(path: T) -> Result<Font, BabelfontError> 
     }
     font.features = Features::from_fea(&ufo.features);
     font.features.include_paths.push(
-        path.as_ref()
+        path
             .parent()
             .unwrap_or_else(|| std::path::Path::new("."))
             .to_path_buf(),
@@ -939,5 +968,94 @@ mod tests {
         assert_eq!(backagain.data, once_more.data);
         assert_eq!(backagain.images, once_more.images);
         assert_eq!(backagain.font_info, once_more.font_info);
+    }
+
+    #[test]
+    fn test_load_entries_ufo() {
+        let mut entries = HashMap::new();
+        entries.insert(
+            "metainfo.plist".to_string(),
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict><key>creator</key><string>org.test</string><key>formatVersion</key><integer>3</integer></dict></plist>"#
+                .to_string(),
+        );
+        entries.insert(
+            "fontinfo.plist".to_string(),
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict><key>familyName</key><string>TestFamily</string><key>styleName</key><string>Regular</string></dict></plist>"#
+                .to_string(),
+        );
+        entries.insert(
+            "layercontents.plist".to_string(),
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><array><array><string>public.default</string><string>glyphs</string></array></array></plist>"#
+                .to_string(),
+        );
+        entries.insert(
+            "glyphs/contents.plist".to_string(),
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict><key>A</key><string>A_.glif</string></dict></plist>"#
+                .to_string(),
+        );
+        entries.insert(
+            "glyphs/A_.glif".to_string(),
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<glyph name="A" format="2">
+  <advance width="600"/>
+</glyph>"#
+                .to_string(),
+        );
+
+        let font = load_entries(PathBuf::from("Test.ufo"), &entries).unwrap();
+        assert_eq!(font.glyphs.len(), 1);
+        assert_eq!(font.glyphs[0].name, "A");
+    }
+
+    #[test]
+    fn test_load_entries_ufo_negative_os2_win_descent() {
+        let mut entries = HashMap::new();
+        entries.insert(
+            "metainfo.plist".to_string(),
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict><key>creator</key><string>org.test</string><key>formatVersion</key><integer>3</integer></dict></plist>"#
+                .to_string(),
+        );
+        entries.insert(
+            "fontinfo.plist".to_string(),
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict><key>familyName</key><string>TestFamily</string><key>styleName</key><string>Regular</string><key>openTypeOS2WinDescent</key><integer>-279</integer></dict></plist>"#
+                .to_string(),
+        );
+        entries.insert(
+            "layercontents.plist".to_string(),
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><array><array><string>public.default</string><string>glyphs</string></array></array></plist>"#
+                .to_string(),
+        );
+        entries.insert(
+            "glyphs/contents.plist".to_string(),
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict><key>A</key><string>A_.glif</string></dict></plist>"#
+                .to_string(),
+        );
+        entries.insert(
+            "glyphs/A_.glif".to_string(),
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<glyph name="A" format="2">
+  <advance width="600"/>
+</glyph>"#
+                .to_string(),
+        );
+
+        let ufo = load_norad_from_entries(std::path::Path::new("Test.ufo"), &entries).unwrap();
+        assert_eq!(ufo.font_info.open_type_os2_win_descent, Some(279));
     }
 }
