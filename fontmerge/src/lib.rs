@@ -13,7 +13,7 @@ mod designspace;
 mod error;
 mod glyphset;
 mod kerning;
-mod layout;
+// mod layout;
 mod merge;
 
 pub use crate::{
