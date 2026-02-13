@@ -39,7 +39,7 @@ struct SfdParser {
     gpos_lookups: GTable,
     feature_names: IndexMap<SmolStr, Vec<(u32, String)>>, // feature tag -> feature name
     sanitized_lookup_names: HashMap<String, usize>, // track sanitized names for de-duplication
-    content: Option<String>, // Optional pre-loaded content for load_str()
+    content: Option<String>,                        // Optional pre-loaded content for load_str()
 }
 
 #[derive(Debug, Clone, Default)]
@@ -847,9 +847,31 @@ impl SfdParser {
         }
         let mut layer = Layer::new(width);
         layer.id = Some(master_id.to_string());
-        layer.master = LayerType::DefaultForMaster(master_id.to_string());
         layer.name = def.and_then(|d| d.name.clone());
-        if layer_idx == 0 {
+
+        // In SFD, index 1 / "Fore" is the primary drawable layer.
+        // Non-foreground layers should not be treated as default master layers,
+        // otherwise interpolation may combine incompatible structures.
+        let is_foreground = layer_idx == 1
+            || layer
+                .name
+                .as_deref()
+                .map(|n| n.eq_ignore_ascii_case("Fore"))
+                .unwrap_or(false);
+
+        layer.master = if is_foreground {
+            LayerType::DefaultForMaster(master_id.to_string())
+        } else {
+            LayerType::AssociatedWithMaster(master_id.to_string())
+        };
+
+        if layer_idx == 0
+            || layer
+                .name
+                .as_deref()
+                .map(|n| n.eq_ignore_ascii_case("Back"))
+                .unwrap_or(false)
+        {
             layer.is_background = true;
         }
         let pos = glyph.layers.len();
