@@ -22,23 +22,29 @@ export class DecomposedAffine {
 
   toAffineMatrix(): Matrix {
     const angle = this.rotation;
-    const [skewX, skewY] = this.skew;
-    const [scaleX, scaleY] = this.scale;
+    const [skewX, skewY] = this.skew || [0, 0];
+    const [scaleX, scaleY] = this.scale || [1, 1];
     if (this.order == "Glyphs") {
       // Glyphs order: translate, rotate, skew, scale
       return compose(
-        translate(this.translation[0], this.translation[1]),
-        rotate(angle),
+        translate(
+          this.translation ? this.translation[0] : 0,
+          this.translation ? this.translation[1] : 0,
+        ),
+        rotate(angle || 0),
         skew(skewX, skewY),
         scale(scaleX, scaleY),
       );
     } else {
       // Default order: translate, scale, skew, rotate
       return compose(
-        translate(this.translation[0], this.translation[1]),
+        translate(
+          this.translation ? this.translation[0] : 0,
+          this.translation ? this.translation[1] : 0,
+        ),
         scale(scaleX, scaleY),
         skew(skewX, skewY),
-        rotate(angle),
+        rotate(angle || 0),
       );
     }
   }
