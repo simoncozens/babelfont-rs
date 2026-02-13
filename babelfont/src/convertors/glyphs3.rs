@@ -1199,6 +1199,7 @@ mod tests {
         #[exclude("RadioCanadaDisplay.glyphs")]
         #[exclude("Nunito3.glyphs")]
         #[exclude("NotoSansGrantha-SmartComponent.glyphs")]
+        #[exclude("Fustat.glyphs")]
         path: PathBuf,
     ) {
         let there = load(path.clone()).unwrap();

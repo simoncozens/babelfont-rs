@@ -33,7 +33,7 @@
     "glyphs": [
     {
         "name": "T_2099D_2FF0",
-        "category": null,
+        "category": "Unknown",
         "layers": [
         {
             "width": 1000.0,
@@ -195,7 +195,7 @@
     },
     {
         "name": "VG_4E00_00",
-        "category": null,
+        "category": "Unknown",
         "layers": [
         {
             "width": 1000.0,
@@ -281,7 +281,7 @@
     },
     {
         "name": "VG_4E28_00",
-        "category": null,
+        "category": "Unknown",
         "layers": [
         {
             "width": 1000.0,
@@ -422,7 +422,7 @@
     },
     {
         "name": "VG_53E3_00",
-        "category": null,
+        "category": "Unknown",
         "layers": [
         {
             "width": 1000.0,
@@ -1132,7 +1132,7 @@
     },
     {
         "name": "VG_65E5_00",
-        "category": null,
+        "category": "Unknown",
         "layers": [
         {
             "width": 1000.0,
