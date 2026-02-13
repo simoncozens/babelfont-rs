@@ -7,10 +7,10 @@ use babelfont::SmolStr;
 use fea_rs_ast::{
     fea_rs,
     fea_rs::{
+        GlyphMap, Kind, ParseTree,
         compile::NopVariationInfo,
         parse::{FileSystemResolver, SourceResolver},
         typed::{AstNode, GlyphOrClass},
-        GlyphMap, Kind, ParseTree,
     },
 };
 use itertools::Either;

@@ -39,7 +39,7 @@ struct SfdParser {
     gpos_lookups: GTable,
     feature_names: IndexMap<SmolStr, Vec<(u32, String)>>, // feature tag -> feature name
     sanitized_lookup_names: HashMap<String, usize>, // track sanitized names for de-duplication
-    content: Option<String>, // Optional pre-loaded content for load_str()
+    content: Option<String>,                        // Optional pre-loaded content for load_str()
 }
 
 #[derive(Debug, Clone, Default)]
