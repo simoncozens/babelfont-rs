@@ -287,15 +287,11 @@ impl Font {
 
         let mut layers: Vec<(DesignLocation, &Layer)> = vec![];
         for layer in &glyph.layers {
-            if let Some(master) = self
-                .masters
-                .iter()
-                .find(|m| Some(&m.id) == layer.id.as_ref())
-            {
-                layers.push((master.location.clone(), layer));
-            } else if let Some(loc) = &layer.location {
-                // Intermediate layer
-                layers.push((loc.clone(), layer));
+            if !layer.should_interpolate() {
+                continue;
+            }
+            if let Some(loc) = layer.effective_location(self) {
+                layers.push((loc, layer));
             }
         }
         // Put default master first, if we can find it
