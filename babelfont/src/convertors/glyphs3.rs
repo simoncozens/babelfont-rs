@@ -141,6 +141,16 @@ pub fn load_str(s: &str, path: PathBuf) -> Result<Font, BabelfontError> {
     _load(&glyphs_font, path)
 }
 
+/// Load a Glyphs package from an in-memory tree of relative file entries.
+pub fn load_package_entries(
+    path: PathBuf,
+    entries: &HashMap<String, String>,
+) -> Result<Font, BabelfontError> {
+    let glyphs_font = glyphslib::Font::load_package_entries(entries)
+        .map_err(|x| BabelfontError::PlistParse(x.to_string()))?;
+    _load(&glyphs_font, path)
+}
+
 fn _load(glyphs_font: &glyphslib::Font, path: PathBuf) -> Result<Font, BabelfontError> {
     let mut font = Font::new();
     let glyphs_font = glyphs_font
