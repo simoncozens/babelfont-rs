@@ -24,6 +24,7 @@ export type CamelCaseKeys<T> = {
  */
 export type WithCamelCase<T> = {
   [K in keyof T]: T[K];
-} & {
-  [K in keyof T as K extends string ? SnakeToCamelCase<K> : K]: T[K];
-};
+} &
+  {
+    [K in keyof T as K extends string ? SnakeToCamelCase<K> : K]: T[K];
+  };

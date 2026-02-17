@@ -13,7 +13,8 @@ import { getClassConstructor } from "./registry";
 import { DecomposedAffine } from "./decomposedAffine";
 
 export interface Component
-  extends WithCamelCase<IComponent>, WithParent<Layer> {
+  extends WithCamelCase<IComponent>,
+    WithParent<Layer> {
   transform: DecomposedAffine;
 }
 export class Component {
@@ -23,7 +24,7 @@ export class Component {
     if (data.transform) {
       const DecomposedAffineClass = getClassConstructor(
         "DecomposedAffine",
-        DecomposedAffine,
+        DecomposedAffine
       );
       this.transform = new DecomposedAffineClass(data.transform);
     }
@@ -95,15 +96,17 @@ export class Path {
     ensureParentAccessors(this);
     if (data.nodes) {
       const NodeClass = getClassConstructor("Node", Node);
-      data.nodes = Path.parseNodes(data.nodes as unknown as string).map((n) => {
-        const nObject = new NodeClass(n);
-        return nObject as Node;
-      });
+      data.nodes = Path.parseNodes((data.nodes as unknown) as string).map(
+        (n) => {
+          const nObject = new NodeClass(n);
+          return nObject as Node;
+        }
+      );
     }
     Object.assign(this, data);
     const proxied = createCaseConvertingProxy(this, Path.prototype) as Path;
     proxied.nodes?.forEach((n) =>
-      setParent(n as unknown as WithParent<Path>, proxied),
+      setParent((n as unknown) as WithParent<Path>, proxied)
     );
     return proxied;
   }
@@ -153,7 +156,7 @@ export class Path {
           y: parseFloat(tokens[i + 1]!),
           nodetype,
           smooth,
-        }),
+        })
       );
     }
     return nodesArray;
@@ -185,10 +188,10 @@ export class Path {
       })
       .join(" ");
     const { nodes, __parent, ...rest } = this as Path;
-    return {
+    return ({
       ...rest,
       nodes: nodesStr,
-    } as unknown as IPath;
+    } as unknown) as IPath;
   }
 }
 

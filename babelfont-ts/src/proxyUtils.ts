@@ -23,7 +23,7 @@ function snakeToCamel(str: string): string {
  */
 export function createCaseConvertingProxy<T extends object>(
   target: T,
-  prototype: any,
+  prototype: any
 ): T {
   return new Proxy(target, {
     get(obj: any, prop: string | symbol) {

@@ -56,21 +56,21 @@ export class Font {
       const proxied = createCaseConvertingProxy(this, Font.prototype) as Font;
 
       proxied.axes?.forEach((axis) =>
-        setParent(axis as unknown as WithParent<Font>, proxied),
+        setParent((axis as unknown) as WithParent<Font>, proxied)
       );
       proxied.instances?.forEach((inst) =>
-        setParent(inst as unknown as WithParent<Font>, proxied),
+        setParent((inst as unknown) as WithParent<Font>, proxied)
       );
       proxied.glyphs?.forEach((glyph) =>
-        setParent(glyph as unknown as WithParent<Font>, proxied),
+        setParent((glyph as unknown) as WithParent<Font>, proxied)
       );
       proxied.masters?.forEach((master) =>
-        setParent(master as unknown as WithParent<Font>, proxied),
+        setParent((master as unknown) as WithParent<Font>, proxied)
       );
       if (proxied.names)
-        setParent(proxied.names as unknown as WithParent<Font>, proxied);
+        setParent((proxied.names as unknown) as WithParent<Font>, proxied);
       if (proxied.features)
-        setParent(proxied.features as unknown as WithParent<Font>, proxied);
+        setParent((proxied.features as unknown) as WithParent<Font>, proxied);
 
       return proxied;
     });

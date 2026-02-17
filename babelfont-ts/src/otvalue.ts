@@ -5,7 +5,8 @@ import type { Master } from "./master";
 import { WithParent, ensureParentAccessors } from "./parent";
 
 export interface CustomOTValues
-  extends WithCamelCase<ICustomOTValues>, WithParent<Master> {}
+  extends WithCamelCase<ICustomOTValues>,
+    WithParent<Master> {}
 export class CustomOTValues {
   constructor(data: ICustomOTValues) {
     Object.assign(this, data);
