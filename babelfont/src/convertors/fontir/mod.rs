@@ -1,5 +1,6 @@
 use crate::{
     convertors::fontir::varc::insert_varc_table,
+    error::FeatureError,
     filters::{
         DropIncompatiblePaths, FontFilter as _, GlyphsData, GlyphsNumberValue, RetainGlyphs,
         RewriteSmartAxes,
@@ -149,7 +150,24 @@ impl BabelfontIrSource {
 fn improve_ir_error(e: fontc::Error) -> BabelfontError {
     match e {
         fontc::Error::Backend(fontbe::error::Error::FeaCompileError(x)) => {
-            BabelfontError::General(x.display_verbose().to_string())
+            if let Some(diags) = x.diagnostics() {
+                BabelfontError::FeatureParsing(
+                    diags
+                        .diagnostics()
+                        .iter()
+                        .map(|d| FeatureError {
+                            message: d.message.text.clone(),
+                            span: d.span(),
+                            is_error: d.is_error(),
+                        })
+                        .collect(),
+                )
+            } else {
+                BabelfontError::General(format!(
+                    "Feature compilation error: {}",
+                    x.display_verbose()
+                ))
+            }
         }
         other => BabelfontError::General(format!("Font generation error: {:#?}", other)),
     }

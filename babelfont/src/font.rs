@@ -228,10 +228,9 @@ impl Font {
     pub fn save<T: Into<std::path::PathBuf>>(&self, path: T) -> Result<(), BabelfontError> {
         let path = path.into();
         if path.extension().and_then(|x| x.to_str()) == Some("babelfont") {
-            let file = std::fs::File::create(&path).map_err(BabelfontError::IO)?;
+            let file = std::fs::File::create(&path)?;
             let mut buffer = std::io::BufWriter::new(file);
-            serde_json::to_writer_pretty(&mut buffer, &self)
-                .map_err(BabelfontError::JsonSerialize)?;
+            serde_json::to_writer_pretty(&mut buffer, &self)?;
             return Ok(());
         }
 

@@ -34,8 +34,7 @@ impl FontFilter for SubsetLayout {
             .collect::<Vec<_>>();
         let features = font.features.to_fea();
         let mut feature_file: FeatureFile =
-            FeatureFile::new_from_fea(&features, Some(&old_glyphs), font.source.clone())
-                .map_err(|e| crate::BabelfontError::FilterError(e.to_string()))?;
+            FeatureFile::new_from_fea(&features, Some(&old_glyphs), font.source.clone())?;
         let glyph_set: HashSet<&str> = new_glyphs.iter().copied().collect();
         let mut visitor = SubsetVisitor::new(glyph_set);
         visitor.visit(&mut feature_file).map_err(|e| {
