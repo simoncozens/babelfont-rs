@@ -14,7 +14,7 @@ use crate::{
 };
 /// VFB convertor
 pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
-    let vfb: Vfb = read_vfb(&path).map_err(|e| BabelfontError::VfbLoad(e.into()))?;
+    let vfb: Vfb = read_vfb(&path).map_err(|e| BabelfontError::VfbLoad(e.to_string()))?;
 
     // Convert Vfb to Babelfont Font
     let mut font = Font::new();
