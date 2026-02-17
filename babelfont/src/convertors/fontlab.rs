@@ -392,12 +392,16 @@ struct FontlabFontWrapper {
 
 /// Load a Fontlab VFJ font from a file path
 pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
-    let mut axes_short_name_to_tag: HashMap<String, _> = HashMap::new();
-    log::debug!("Reading to string");
     let s = fs::read_to_string(&path)?;
+    load_str(&s)
+}
+
+/// Load a Fontlab VFJ font from string contents
+pub fn load_str(contents: &str) -> Result<Font, BabelfontError> {
+    let mut axes_short_name_to_tag: HashMap<String, _> = HashMap::new();
     log::debug!("Parsing to internal structs");
     let mut font = Font::new();
-    let p: FontlabFontWrapper = serde_json::from_str(&s)
+    let p: FontlabFontWrapper = serde_json::from_str(contents)
         .map_err(|e| BabelfontError::General(format!("Couldn't parse VFJ: {:}", e)))?;
     let fontlab = p.font;
     // log::debug!("{:#?}", fontlab);
