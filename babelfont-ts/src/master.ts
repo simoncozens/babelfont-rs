@@ -15,17 +15,17 @@ export class Master {
       const GuideClass = getClassConstructor("Guide", Guide);
       data.guides = data.guides.map((g) => {
         const guide = new GuideClass(g);
-        setParent((guide as unknown) as WithParent<Master>, this);
+        setParent(guide as unknown as WithParent<Master>, this);
         return guide;
       });
     }
     if (data.custom_ot_values) {
       const CustomOTValuesClass = getClassConstructor(
         "CustomOTValues",
-        CustomOTValues
+        CustomOTValues,
       );
       data.custom_ot_values = new CustomOTValuesClass(data.custom_ot_values);
-      setParent((data.custom_ot_values as unknown) as WithParent<Master>, this);
+      setParent(data.custom_ot_values as unknown as WithParent<Master>, this);
     }
     Object.assign(this, data);
     return createCaseConvertingProxy(this, Master.prototype);

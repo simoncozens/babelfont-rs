@@ -5,7 +5,7 @@ import * as path from "path";
 
 const RADIO_CANADA_FONT_PATH = path.join(
   __dirname,
-  "../../babelfont/resources/RadioCanadaDisplay.babelfont"
+  "../../babelfont/resources/RadioCanadaDisplay.babelfont",
 );
 
 describe("Class Registry - User Extensions", () => {

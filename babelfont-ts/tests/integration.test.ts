@@ -14,7 +14,7 @@ import { designspaceToUserspace, Axis as FTAxis } from "@simoncozens/fonttypes";
 
 const RADIO_CANADA_FONT_PATH = path.join(
   __dirname,
-  "../../babelfont/resources/RadioCanadaDisplay.babelfont"
+  "../../babelfont/resources/RadioCanadaDisplay.babelfont",
 );
 
 describe("Babelfont-TS", () => {
@@ -40,7 +40,7 @@ describe("Babelfont-TS", () => {
     const wghtLoc = firstMaster!.location!;
     let wghtLocUserspace = designspaceToUserspace(
       wghtLoc,
-      (font.axes! as unknown) as FTAxis[]
+      font.axes! as unknown as FTAxis[],
     );
     expect(wghtLocUserspace["wght"]).toBe(400);
 
@@ -107,7 +107,7 @@ describe("Babelfont-TS", () => {
           .map(([key, val]) => [
             key,
             key == "nodes" ? stripPrecision(val as string) : normalize(val),
-          ])
+          ]),
       );
     };
 

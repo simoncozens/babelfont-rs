@@ -24,7 +24,7 @@ export class Layer {
       data.shapes = data.shapes.map((s) =>
         isComponent(s)
           ? (new ComponentClass(s) as Component)
-          : (new PathClass(s as IPath) as Path)
+          : (new PathClass(s as IPath) as Path),
       );
     }
     if (data.anchors) {
@@ -34,13 +34,13 @@ export class Layer {
     Object.assign(this, data);
     const proxied = createCaseConvertingProxy(this, Layer.prototype) as Layer;
     proxied.guides?.forEach((guide) =>
-      setParent((guide as unknown) as WithParent<Layer>, proxied)
+      setParent(guide as unknown as WithParent<Layer>, proxied),
     );
     proxied.shapes?.forEach((shape) =>
-      setParent((shape as unknown) as WithParent<Layer>, proxied)
+      setParent(shape as unknown as WithParent<Layer>, proxied),
     );
     proxied.anchors?.forEach((anchor) =>
-      setParent((anchor as unknown) as WithParent<Layer>, proxied)
+      setParent(anchor as unknown as WithParent<Layer>, proxied),
     );
     return proxied;
   }

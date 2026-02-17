@@ -6,8 +6,7 @@ import type { Master } from "./master";
 import { WithParent, ensureParentAccessors } from "./parent";
 
 export interface Guide
-  extends WithCamelCase<IGuide>,
-    WithParent<Layer | Master> {}
+  extends WithCamelCase<IGuide>, WithParent<Layer | Master> {}
 export class Guide {
   constructor(data: IGuide) {
     Object.assign(this, data);

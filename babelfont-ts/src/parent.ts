@@ -34,7 +34,7 @@ export function ensureParentAccessors<TParent>(obj: WithParent<TParent>): void {
  */
 export function setParent<TParent>(
   obj: WithParent<TParent>,
-  parent: TParent | undefined
+  parent: TParent | undefined,
 ): void {
   ensureParentAccessors(obj);
   obj.parent = parent;

@@ -33,7 +33,7 @@ export interface Axis {
   map?: Array<
     [
       import("@simoncozens/fonttypes").UserspaceCoordinate,
-      import("@simoncozens/fonttypes").DesignspaceCoordinate
+      import("@simoncozens/fonttypes").DesignspaceCoordinate,
     ]
   > | null;
   /** Whether the axis is hidden in the font's user interface */
@@ -154,7 +154,7 @@ export interface CustomOTValues {
     number,
     number,
     number,
-    number
+    number,
   ];
   /** Unicode range bits 0-31; see OpenType spec for bit meanings */
   os2_unicode_range1?: number;
