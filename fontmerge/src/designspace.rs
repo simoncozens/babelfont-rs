@@ -1,6 +1,6 @@
 use std::{collections::HashSet, fmt::Display};
 
-use babelfont::{BabelfontError, Font};
+use babelfont::{BabelfontError, DesignCoord, Font, Tag};
 use fontdrasil::coords::{DesignSpace, Location};
 use itertools::Itertools;
 
@@ -159,7 +159,7 @@ pub(crate) fn map_designspaces(
         // What would it be in font2's designspace?
         let (loc2, clamped) = convert_between_designspaces(&master.location, &ds1, &ds2, true)?;
         log::trace!(
-            "Looking for a match for font1 master '{}' at location {:?}",
+            "Looking for a match for font1 master '{}' at location {:?} in font2's designspace",
             master.name.get_default().unwrap_or(&master.id),
             loc2
         );
@@ -199,6 +199,7 @@ pub(crate) fn map_designspaces(
 pub(crate) fn add_needed_masters(
     font1: &mut babelfont::Font,
     font2: &mut babelfont::Font,
+    process_avar_mapping: bool,
 ) -> Result<(), FontmergeError> {
     let ds1 = fontdrasil_axes(&font1.axes)?;
     let ds2 = fontdrasil_axes(&font2.axes)?;
@@ -210,7 +211,7 @@ pub(crate) fn add_needed_masters(
 
     // If there are axis mappings in font2 that don't exist in font1 we need to
     // make intermediate masters for them in font2! This may get messy.
-    let mut intermediate_mappings = vec![];
+    let mut intermediate_mappings: Vec<(Tag, &DesignCoord)> = vec![];
     for f2_axis in font2.axes.iter() {
         let Some(f1_axis) = font1.axes.iter().find(|a| a.tag == f2_axis.tag) else {
             continue;
@@ -219,7 +220,7 @@ pub(crate) fn add_needed_masters(
             continue;
         };
         for (user, design) in f2_map.iter() {
-            if f1_axis.userspace_to_designspace(*user)? != *design {
+            if f1_axis.userspace_to_designspace(*user)? != *design && process_avar_mapping {
                 // If the problem is at the min or max, ignore it, we're mapping those already
                 #[allow(clippy::unwrap_used)]
                 // We know these are Some() because we converted to fontdrasil previously

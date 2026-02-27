@@ -1,6 +1,6 @@
 use babelfont::load;
 use clap::Parser;
-use fontmerge::{Args, fontmerge};
+use fontmerge::{fontmerge, Args};
 
 use std::path::PathBuf;
 
@@ -62,7 +62,13 @@ fn main() {
         args.existing_handling,
     );
 
-    match fontmerge(font1, font2, glyphset_filter, args.layout_handling) {
+    match fontmerge(
+        font1,
+        font2,
+        glyphset_filter,
+        args.layout_handling,
+        !args.fixups.skip_avar_masters,
+    ) {
         Ok(result) => {
             log::info!("Saving merged font to {}", args.output);
 

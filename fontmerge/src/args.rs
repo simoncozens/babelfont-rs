@@ -138,6 +138,10 @@ pub struct Fixups {
     /// Merge anchors if both fonts contain a dotted circle glyph
     #[arg(long, default_value = "true", action = clap::ArgAction::Set)]
     pub dotted_circle: bool,
+
+    /// Don't add in additional masters to maintain differences between avar mappings
+    #[arg(long, default_value = "false", action = clap::ArgAction::Set)]
+    pub skip_avar_masters: bool,
 }
 
 /// Parse a single codepoint from a string

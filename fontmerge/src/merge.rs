@@ -3,7 +3,7 @@ use fontdrasil::types::Axes;
 use indexmap::IndexSet;
 
 use crate::{
-    designspace::{Strategy, convert_between_designspaces, fontdrasil_axes, within_bounds},
+    designspace::{convert_between_designspaces, fontdrasil_axes, within_bounds, Strategy},
     error::FontmergeError,
 };
 
@@ -12,6 +12,7 @@ pub(crate) fn merge_glyph(
     font1_nonsparse_master_ids: &[String],
     font2_glyph: &Glyph,
     font2_axes: &Axes,
+    font2: &Font,
     strategies: &[Strategy],
 ) -> Result<(), FontmergeError> {
     let font1_axes = fontdrasil_axes(&font1.axes)?;
@@ -70,12 +71,22 @@ pub(crate) fn merge_glyph(
                     None
                 }
             }
-            Strategy::InterpolateOrIntermediate {
-                location: _,
-                clamped: _,
-            } => {
-                // I'm just going to leave it sparse, dammit.
-                continue;
+            Strategy::InterpolateOrIntermediate { location, clamped } => {
+                log::info!(
+                    "Interpolating glyph '{}' at location {:?}",
+                    glyph.name,
+                    location
+                );
+                Some(
+                    font2
+                        .interpolate_glyph(&glyph.name, &location)
+                        .map_err(|e| {
+                            FontmergeError::Interpolation(format!(
+                                "Failed to interpolate glyph '{}' at location {:?}: {}",
+                                glyph.name, location, e
+                            ))
+                        })?,
+                )
             }
             Strategy::Failed(reason) => {
                 log::warn!(

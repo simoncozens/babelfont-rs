@@ -3,8 +3,8 @@ use babelfont::{
     filters::{DropFeatures, FontFilter as _, ResolveIncludes, RetainGlyphs},
 };
 use fea_rs_ast::{
-    AsFea as _,
     fea_rs::{self, GlyphMap},
+    AsFea as _,
 };
 use indexmap::IndexSet;
 use indicatif::ProgressIterator;
@@ -34,6 +34,7 @@ pub fn fontmerge(
     font2: babelfont::Font,
     mut glyphset_filter: glyphset::GlyphsetFilter,
     layout_handling: LayoutHandling,
+    process_avar_mapping: bool,
 ) -> Result<babelfont::Font, error::FontmergeError> {
     glyphset_filter.check_for_presence(&font2);
     let existing_handling = glyphset_filter.existing_glyph_handling;
@@ -177,7 +178,7 @@ pub fn fontmerge(
     glyphset_filter.sort_glyphset(&mut font2);
     glyphset_filter.de_encode(&mut font1, &mut font2);
 
-    add_needed_masters(&mut font1, &mut font2)
+    add_needed_masters(&mut font1, &mut font2, process_avar_mapping)
         .expect("Failed to add needed masters from font2 to font1");
 
     // Compute the list of master IDs here first because checking if a master is sparse or not is
@@ -222,8 +223,15 @@ pub fn fontmerge(
         }
         set_layer_locations(glyph, &mut font2);
         if let Some(g) = font2.glyphs.get(glyph) {
-            merge_glyph(&mut font1, &f1_nonsparse_master_ids, g, &f2_axes, &mapping)
-                .expect("Failed to merge glyph");
+            merge_glyph(
+                &mut font1,
+                &f1_nonsparse_master_ids,
+                g,
+                &f2_axes,
+                &font2,
+                &mapping,
+            )
+            .expect("Failed to merge glyph");
         }
     }
     assert!(
