@@ -74,7 +74,7 @@ pub struct GlyphSelection {
     #[arg(short = 'G', long)]
     pub glyphs_file: Option<String>,
 
-    /// Unicode codepoints to add from donor font
+    /// Unicode codepoints to add from donor font (comma separated, hexadecimal, U+ prefix allowed, ranges with hyphen allowed)
     #[arg(short = 'u', long, value_parser = crate::args::parse_codepoints)]
     pub codepoints: Option<CodepointArgs>,
 
