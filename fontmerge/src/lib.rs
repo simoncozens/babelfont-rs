@@ -3,8 +3,8 @@ use babelfont::{
     filters::{DropFeatures, FontFilter as _, ResolveIncludes, RetainGlyphs},
 };
 use fea_rs_ast::{
-    fea_rs::{self, GlyphMap},
     AsFea as _,
+    fea_rs::{self, GlyphMap},
 };
 use indexmap::IndexSet;
 use indicatif::ProgressIterator;

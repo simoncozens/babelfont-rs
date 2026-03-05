@@ -71,7 +71,10 @@ pub(crate) fn merge_glyph(
                     None
                 }
             }
-            Strategy::InterpolateOrIntermediate { location, clamped } => {
+            Strategy::InterpolateOrIntermediate {
+                location,
+                clamped: _,
+            } => {
                 log::info!(
                     "Interpolating glyph '{}' at location {:?}",
                     glyph.name,
@@ -79,7 +82,7 @@ pub(crate) fn merge_glyph(
                 );
                 Some(
                     font2
-                        .interpolate_glyph(&glyph.name, &location)
+                        .interpolate_glyph(&glyph.name, location)
                         .map_err(|e| {
                             FontmergeError::Interpolation(format!(
                                 "Failed to interpolate glyph '{}' at location {:?}: {}",
