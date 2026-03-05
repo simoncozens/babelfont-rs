@@ -38,8 +38,12 @@ fn name_id_to_i18n(fontref: &skrifa::FontRef, name_id: StringId) -> crate::I18ND
     let mut dict = crate::I18NDictionary::new();
     for name in names {
         if let Some(lang) = name.language() {
-            let lang = lang.to_string();
-            dict.insert(lang, name.to_string());
+            let lang = if lang == "en-US" {
+                crate::i18ndictionary::DFLT
+            } else {
+                lang
+            };
+            dict.insert(lang.to_string(), name.to_string());
         }
     }
     dict
