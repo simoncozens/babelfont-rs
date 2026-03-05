@@ -218,6 +218,8 @@ pub fn load(filename: impl Into<PathBuf>) -> Result<Font, BabelfontError> {
         Some(ext) if ext == "glyphs" || ext == "glyphspackage" => {
             crate::convertors::glyphs3::load(pb)
         }
+        #[cfg(feature = "ttf")]
+        Some(ext) if ext == "ttf" => crate::convertors::ttf::load(pb),
         _ => Err(BabelfontError::UnknownFileType { path: pb }),
     }?;
     font.source = Some(pb_clone);

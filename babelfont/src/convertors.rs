@@ -20,6 +20,9 @@ pub mod glyphs3;
 #[cfg(feature = "robocjk")]
 /// RoboCJK convertor
 pub mod robocjk;
+#[cfg(feature = "ttf")]
+/// TTF convertor
+pub mod ttf;
 #[cfg(feature = "ufo")]
 /// Bare UFO convertor
 pub mod ufo;

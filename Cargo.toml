@@ -13,7 +13,9 @@ fontc = { version = "0.6.0", git = "https://github.com/simoncozens/fontc", branc
 write-fonts = { version = "0.45.0", features = [
     "read",
 ], git = "https://github.com/googlefonts/fontations" } # Must use version fontdrasil uses
-kurbo = "0.13" # Must use same version as norad / fontir /etc.
+skrifa = { version = "0.40.0", git = "https://github.com/googlefonts/fontations" } # Must use version fontdrasil uses
+
+kurbo = "0.13"                                          # Must use same version as norad / fontir /etc.
 fea-rs-ast = { version = "0.1.2" }
 regex = "1.12.2"
 thiserror = "2.0.17"

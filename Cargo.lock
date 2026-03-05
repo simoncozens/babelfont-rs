@@ -136,6 +136,7 @@ dependencies = [
  "serde_json",
  "serde_json_path_to_error",
  "similar",
+ "skrifa",
  "smol_str",
  "thiserror",
  "typeshare",
@@ -687,7 +688,7 @@ dependencies = [
 [[package]]
 name = "font-types"
 version = "0.11.0"
-source = "git+https://github.com/googlefonts/fontations#4d690b5c34873261e8547af7c510c1c270772f1f"
+source = "git+https://github.com/googlefonts/fontations#cdd93511e64486d4a228b8e1531df7daf9429271"
 dependencies = [
  "bytemuck",
  "serde",
@@ -1573,7 +1574,7 @@ dependencies = [
 [[package]]
 name = "read-fonts"
 version = "0.37.0"
-source = "git+https://github.com/googlefonts/fontations#4d690b5c34873261e8547af7c510c1c270772f1f"
+source = "git+https://github.com/googlefonts/fontations#cdd93511e64486d4a228b8e1531df7daf9429271"
 dependencies = [
  "bytemuck",
  "font-types 0.11.0",
@@ -1890,6 +1891,15 @@ name = "siphasher"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b2aa850e253778c88a04c3d7323b043aeda9d3e30d5971937c1855769763678e"
+
+[[package]]
+name = "skrifa"
+version = "0.40.0"
+source = "git+https://github.com/googlefonts/fontations#cdd93511e64486d4a228b8e1531df7daf9429271"
+dependencies = [
+ "bytemuck",
+ "read-fonts 0.37.0",
+]
 
 [[package]]
 name = "slab"
@@ -2412,7 +2422,7 @@ dependencies = [
 [[package]]
 name = "write-fonts"
 version = "0.45.0"
-source = "git+https://github.com/googlefonts/fontations#4d690b5c34873261e8547af7c510c1c270772f1f"
+source = "git+https://github.com/googlefonts/fontations#cdd93511e64486d4a228b8e1531df7daf9429271"
 dependencies = [
  "font-types 0.11.0",
  "indexmap 2.13.0",

@@ -302,6 +302,30 @@ impl OutlinePen for PathBuilder {
     }
 }
 
+// Darn it
+#[cfg(feature = "ttf")]
+impl skrifa::outline::OutlinePen for PathBuilder {
+    fn move_to(&mut self, x: f32, y: f32) {
+        <Self as OutlinePen>::move_to(self, x, y);
+    }
+
+    fn line_to(&mut self, x: f32, y: f32) {
+        <Self as OutlinePen>::line_to(self, x, y);
+    }
+
+    fn quad_to(&mut self, cx0: f32, cy0: f32, x: f32, y: f32) {
+        <Self as OutlinePen>::quad_to(self, cx0, cy0, x, y);
+    }
+
+    fn curve_to(&mut self, cx0: f32, cy0: f32, cx1: f32, cy1: f32, x: f32, y: f32) {
+        <Self as OutlinePen>::curve_to(self, cx0, cy0, cx1, cy1, x, y);
+    }
+
+    fn close(&mut self) {
+        <Self as OutlinePen>::close(self);
+    }
+}
+
 #[cfg(feature = "glyphs")]
 mod glyphs {
     use fontdrasil::coords::DesignCoord;
