@@ -301,6 +301,18 @@ function drawCurrentLayer() {
         // square at line node
         drawSquare(ctx, n.x, n.y, sq, isFirstOncurve);
         isFirstOncurve = false;
+      } else if (type === "QCurve") {
+        // circle at QCurve node
+        drawCircle(ctx, n.x, n.y, rOn, isFirstOncurve);
+        isFirstOncurve = false;
+        const prevNode = nodes[i - 1 >= 0 ? i - 1 : 0];
+        if (prevNode && prevNode.nodetype === NodeType.OffCurve) {
+          // line connecting this node to control point
+          ctx.beginPath();
+          ctx.moveTo(n.x, n.y);
+          ctx.lineTo(prevNode.x, prevNode.y);
+          ctx.stroke();
+        }
       } else if (type === "Curve") {
         // circle at curve endpoint
         drawCircle(ctx, n.x, n.y, rOn, isFirstOncurve);

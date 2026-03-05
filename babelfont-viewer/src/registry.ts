@@ -53,6 +53,16 @@ export class MyPath extends Path {
       } else if (t === "Line") {
         parts.push(`L ${n.x} ${n.y}`);
         offcurves.length = 0;
+      } else if (t === "QCurve") {
+        const c =
+          offcurves.length >= 1 ? offcurves[offcurves.length - 1] : undefined;
+        if (c) {
+          parts.push(`Q ${c[0]} ${c[1]} ${n.x} ${n.y}`);
+        } else {
+          // Fallback if control point missing: treat as line
+          parts.push(`L ${n.x} ${n.y}`);
+        }
+        offcurves.length = 0;
       } else if (t === "Curve") {
         const c1 =
           offcurves.length >= 2 ? offcurves[offcurves.length - 2] : undefined;
