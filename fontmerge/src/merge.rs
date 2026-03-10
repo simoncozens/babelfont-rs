@@ -3,7 +3,7 @@ use fontdrasil::types::Axes;
 use indexmap::IndexSet;
 
 use crate::{
-    designspace::{convert_between_designspaces, fontdrasil_axes, within_bounds, Strategy},
+    designspace::{Strategy, convert_between_designspaces, fontdrasil_axes, within_bounds},
     error::FontmergeError,
 };
 
