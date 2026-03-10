@@ -243,10 +243,12 @@ impl FontFilter for GlyphsBracketLayers {
                         box_map
                             .iter()
                             .map(|(tag, range)| {
+                                let min = range.min.to_f64().round() as i16;
+                                let max = range.max.to_f64().round() as i16;
                                 (
                                     tag.to_string(),
-                                    range.min.to_f64() as f32,
-                                    range.max.to_f64() as f32,
+                                    f32::from(min),
+                                    f32::from(max),
                                 )
                             })
                             .collect::<Vec<_>>()
