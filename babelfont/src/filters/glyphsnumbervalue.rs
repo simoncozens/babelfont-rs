@@ -42,6 +42,14 @@ impl FontFilter for GlyphsNumberValue {
         });
         if let Some(names) = number_names {
             let axes = font.fontdrasil_axes()?;
+            let axis_defaults: IndexMap<SmolStr, i16> = font
+                .axes
+                .iter()
+                .filter_map(|axis| {
+                    axis.default
+                        .map(|default| (SmolStr::new(axis.tag.to_string()), default.to_f64() as i16))
+                })
+                .collect();
             let mut variables: HashMap<String, fea_rs_ast::Metric> = HashMap::new();
             for (index, name) in names.iter().enumerate() {
                 let mut location_values: Vec<(IndexMap<SmolStr, i16>, i16)> = vec![];
@@ -68,7 +76,10 @@ impl FontFilter for GlyphsNumberValue {
                 let var_metric = fea_rs_ast::Metric::Variable(location_values);
                 variables.insert(name.clone(), var_metric);
             }
-            let mut visitor = GlyphsNumberValueVisitor(variables);
+            let mut visitor = GlyphsNumberValueVisitor {
+                variables,
+                axis_defaults,
+            };
             visitor.visit(&mut feature_file).map_err(|e| {
                 crate::BabelfontError::FilterError(format!(
                     "Error during feature replacement: {}",
@@ -101,7 +112,10 @@ impl FontFilter for GlyphsNumberValue {
     }
 }
 
-struct GlyphsNumberValueVisitor(HashMap<String, fea_rs_ast::Metric>);
+struct GlyphsNumberValueVisitor {
+    variables: HashMap<String, fea_rs_ast::Metric>,
+    axis_defaults: IndexMap<SmolStr, i16>,
+}
 
 impl LayoutVisitor for GlyphsNumberValueVisitor {
     fn visit_statement(&mut self, statement: &mut fea_rs_ast::Statement) -> bool {
@@ -121,11 +135,54 @@ impl LayoutVisitor for GlyphsNumberValueVisitor {
 }
 
 impl GlyphsNumberValueVisitor {
+    fn variable_value_at_default(&self, variations: &[(IndexMap<SmolStr, i16>, i16)]) -> i16 {
+        if variations.is_empty() {
+            return 0;
+        }
+        if self.axis_defaults.is_empty() {
+            return variations[0].1;
+        }
+
+        let mut best_score: Option<i64> = None;
+        let mut best_value = variations[0].1;
+
+        for (location, value) in variations {
+            let mut score: i64 = 0;
+            for (tag, default_value) in self.axis_defaults.iter() {
+                let here = location.get(tag).copied().unwrap_or(*default_value);
+                score += (i64::from(here) - i64::from(*default_value)).abs();
+            }
+            for (tag, here) in location.iter() {
+                if !self.axis_defaults.contains_key(tag) {
+                    score += i64::from(*here).abs();
+                }
+            }
+
+            if best_score.is_none_or(|current| score < current) {
+                best_score = Some(score);
+                best_value = *value;
+            }
+        }
+
+        best_value
+    }
+
+    fn normalize_parser_incompatible_value_record(&self, vr: &mut fea_rs_ast::ValueRecord) {
+        // fea-rs currently rejects value records whose first slot is a variable
+        // metric (`<(wght=...) ...>`), even though variable metrics are accepted
+        // elsewhere. When number value replacement lands in x_placement, collapse
+        // to default-location scalar as a compatibility workaround.
+        if let Some(fea_rs_ast::Metric::Variable(variations)) = &vr.x_placement {
+            let scalar = self.variable_value_at_default(variations);
+            vr.x_placement = Some(fea_rs_ast::Metric::Scalar(scalar));
+        }
+    }
+
     fn convert_metric(&self, metric: &mut fea_rs_ast::Metric) {
         if let fea_rs_ast::Metric::GlyphsAppNumber(n) = metric {
             // remove the dollar sign if present
             let n = n.trim_start_matches('$');
-            if let Some(var_metric) = self.0.get(n) {
+            if let Some(var_metric) = self.variables.get(n) {
                 *metric = var_metric.clone();
             }
         }
@@ -142,6 +199,7 @@ impl GlyphsNumberValueVisitor {
         self.convert_option_metric(&mut vr.y_advance);
         self.convert_option_metric(&mut vr.x_placement);
         self.convert_option_metric(&mut vr.y_placement);
+        self.normalize_parser_incompatible_value_record(vr);
     }
 
     fn convert_anchor(&mut self, anchor: &mut fea_rs_ast::Anchor) {
