@@ -254,24 +254,23 @@ impl FontFilter for GlyphsBracketLayers {
                     .collect(),
                 0..0,
             );
-            let substitution = SingleSubstStatement::new(
-                substs
-                    .keys()
-                    .map(|x| GlyphContainer::GlyphName(GlyphName::new(x.as_str())))
-                    .collect(),
-                substs
-                    .values()
-                    .map(|x| GlyphContainer::GlyphName(GlyphName::new(x.as_str())))
-                    .collect(),
-                vec![],
-                vec![],
-                0..0,
-                false,
-            );
+            let substitutions = substs
+                .iter()
+                .map(|(from, to)| {
+                    Statement::SingleSubst(SingleSubstStatement::new(
+                        vec![GlyphContainer::GlyphName(GlyphName::new(from.as_str()))],
+                        vec![GlyphContainer::GlyphName(GlyphName::new(to.as_str()))],
+                        vec![],
+                        vec![],
+                        0..0,
+                        false,
+                    ))
+                })
+                .collect::<Vec<_>>();
             let feature_var = VariationBlock::new(
                 variation_feature.into(),
                 name,
-                vec![Statement::SingleSubst(substitution)],
+                substitutions,
                 false,
                 0..0,
             );
