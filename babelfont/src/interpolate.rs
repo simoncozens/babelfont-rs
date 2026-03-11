@@ -4,7 +4,7 @@ use crate::{common::decomposition::DecomposedAffine, BabelfontError, Layer, Path
 use fontdrasil::{
     coords::{DesignSpace, Location, NormalizedSpace},
     types::Axes,
-    variations::VariationModel,
+    variations::{RoundingBehaviour, VariationModel},
 };
 
 pub(crate) fn interpolate_layer(
@@ -197,7 +197,8 @@ impl Shape {
                         });
                     }
                 }
-                let deltas = model.deltas(&position_lists)?;
+                let deltas =
+                    model.deltas_with_rounding(&position_lists, RoundingBehaviour::None)?;
                 let interpolated_params = model.interpolate_from_deltas(target_location, &deltas);
                 let new_component = crate::shape::Component {
                     reference: c.reference.clone(),
