@@ -829,12 +829,17 @@ fn interpret_axis_mappings(font: &mut Font) -> Result<(), BabelfontError> {
             }
         }
         if c_pairs.is_empty() {
-            if instance.name.get_default() == Some(&"Regular".to_string()) {
-                c_pairs.push(("Weight", 400.0));
-                c_pairs.push(("Width", 100.0));
-            } else if instance.name.get_default() == Some(&"Bold".to_string()) {
-                c_pairs.push(("Weight", 700.0));
-                c_pairs.push(("Width", 100.0));
+            let instance_name = instance.name.get_default();
+            match instance_name.map(|s| s.as_str()) {
+                Some("Regular") | Some("Italic") => {
+                    c_pairs.push(("Weight", 400.0));
+                    c_pairs.push(("Width", 100.0));
+                }
+                Some("Bold") | Some("Bold Italic") => {
+                    c_pairs.push(("Weight", 700.0));
+                    c_pairs.push(("Width", 100.0));
+                }
+                _ => {}
             }
         }
 
@@ -1208,6 +1213,7 @@ mod tests {
         // Glyphs sometimes stores a singular property as a localized property
         // with only one entry, and vice versa.
         #[exclude("RadioCanadaDisplay.glyphs")]
+        #[exclude("RadioCanadaDisplay-Italic.glyphs")]
         #[exclude("Nunito3.glyphs")]
         #[exclude("NotoSansGrantha-SmartComponent.glyphs")]
         #[exclude("Fustat.glyphs")]
@@ -1378,5 +1384,16 @@ mod tests {
         );
         assert_eq!(glyphs_glyph.category, Some("Mark".to_string()));
         assert_eq!(glyphs_glyph.subcategory, Some("Spacing".to_string()));
+    }
+
+    #[test]
+    fn all_the_axes() {
+        let font = load("resources/RadioCanadaDisplay-Italic.glyphs".into()).unwrap();
+        assert_eq!(font.axes[0].tag, Tag::new(b"wght"));
+        assert_eq!(
+            font.masters[0].location,
+            DesignLocation::from(vec![(Tag::new(b"wght"), DesignCoord::new(400.0))])
+        );
+        assert_eq!(font.axes[0].min, Some(UserCoord::new(400.0)));
     }
 }
