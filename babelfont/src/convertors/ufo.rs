@@ -8,7 +8,12 @@ use fontdrasil::{coords::Location, types::Tag};
 use indexmap::IndexMap;
 use paste::paste;
 use smol_str::{SmolStr, ToSmolStr};
-use std::{collections::HashSet, fs, str::FromStr, time::SystemTime};
+use std::{
+    collections::{BTreeMap, HashSet},
+    fs,
+    str::FromStr,
+    time::SystemTime,
+};
 
 /// Key for storing norad lib data in FormatSpecific
 pub const KEY_LIB: &str = "norad.lib";
@@ -25,6 +30,11 @@ pub const KEY_STYLE_MAP_FAMILY_NAME: &str = "ufo.styleMapFamilyName";
 pub const KEY_STYLE_MAP_STYLE_NAME: &str = "ufo.styleMapStyleName";
 /// Key for storing style name in FormatSpecific
 pub const KEY_STYLE_NAME: &str = "ufo.styleName";
+
+/// Key for storing identifier in FormatSpecific
+pub const KEY_IDENTIFIER: &str = "ufo.identifier";
+/// Key for storing original guide type in FormatSpecific, used to roundtrip horizontal and vertical guides which UFO can either represent as such, or as angled guides with specific angles. Values are "horizontal" or "vertical".
+pub const KEY_ORIGINAL_GUIDE: &str = "ufo.originalGuide";
 
 pub(crate) fn stash_lib(lib: Option<&norad::Plist>) -> crate::common::FormatSpecific {
     let mut fs = crate::common::FormatSpecific::default();
@@ -86,6 +96,17 @@ pub fn load<T: AsRef<std::path::Path>>(path: T) -> Result<Font, BabelfontError> 
             }
         }
     }
+    // Store groups which are not kerning groups into our private key
+    let non_kerning_groups = ufo
+        .groups
+        .iter()
+        .filter(|(k, _v)| !k.starts_with("public.kern"))
+        .collect::<BTreeMap<_, _>>();
+    font.format_specific.insert(
+        KEY_GROUPS.into(),
+        serde_json::to_value(&non_kerning_groups).unwrap_or_default(),
+    );
+
     font.features = Features::from_fea(&ufo.features);
     font.features.include_paths.push(
         path.as_ref()
@@ -138,6 +159,23 @@ pub fn as_norad(font: &Font) -> Result<norad::Font, BabelfontError> {
         &font.first_kern_groups,
         &font.second_kern_groups,
     )?;
+    // Insert non-kerning groups into ufo.groups
+    for (group_name, glyphs) in font
+        .format_specific
+        .get(KEY_GROUPS)
+        .and_then(|x| x.as_object())
+        .unwrap_or(&serde_json::Map::new())
+    {
+        let norad_group_name = norad::Name::new(group_name.as_str())?;
+        if let Some(glyphs) = glyphs.as_array() {
+            let norad_glyph_names: Vec<norad::Name> = glyphs
+                .iter()
+                .flat_map(|g| g.as_str())
+                .map(norad::Name::new)
+                .collect::<Result<_, _>>()?;
+            ufo.groups.insert(norad_group_name, norad_glyph_names);
+        }
+    }
 
     ufo.features = font.features.to_fea();
     Ok(ufo)
@@ -902,11 +940,14 @@ fn add_uvs_sequences(font: &mut Font, ufo: &norad::Font) {
 mod tests {
     #![allow(clippy::unwrap_used)]
 
+    use std::path::PathBuf;
+
     use super::*;
     use pretty_assertions::assert_eq;
+    use rstest::rstest;
 
     #[test]
-    fn test_roundtrip() {
+    fn test_roundtrip_1() {
         let there = crate::load("resources/NotoSans-LightItalic.ufo").unwrap();
         assert!(there.masters.len() == 1);
         let backagain = as_norad(&there).unwrap();
@@ -931,6 +972,36 @@ mod tests {
                 1 << 0 | 1 << 1 | 1 << 2 | 1 << 3 | 1 << 4 | 1 << 13 | 1 << 30
             )
         );
+
+        assert_eq!(backagain.lib, once_more.lib);
+        assert_eq!(backagain.groups, once_more.groups);
+        assert_eq!(backagain.kerning, once_more.kerning);
+        assert_eq!(backagain.features.trim(), once_more.features.trim());
+        assert_eq!(backagain.data, once_more.data);
+        assert_eq!(backagain.images, once_more.images);
+        assert_eq!(backagain.font_info, once_more.font_info);
+    }
+
+    #[rstest]
+    fn test_roundtrip_2(#[files("resources/*.ufo/lib.plist")] path: PathBuf) {
+        // rstest won't let us match on *.ufo as they're directories.
+        let parent = path.parent().unwrap();
+        let there = crate::load(parent).unwrap();
+        assert!(there.masters.len() == 1);
+        let backagain = as_norad(&there).unwrap();
+        let once_more = norad::Font::load(parent).unwrap();
+        assert_eq!(there.glyphs.len(), backagain.default_layer().len());
+        assert_eq!(
+            backagain.default_layer().len(),
+            once_more.default_layer().len()
+        );
+        let backagain_layer = backagain.default_layer();
+        let once_more_layer = once_more.default_layer();
+        for name in there.glyphs.iter().map(|x| x.name.as_str()) {
+            let g1 = backagain_layer.get_glyph(name).unwrap();
+            let g2 = once_more_layer.get_glyph(name).unwrap();
+            assert_eq!(g1, g2, "Glyph {} differs", name);
+        }
 
         assert_eq!(backagain.lib, once_more.lib);
         assert_eq!(backagain.groups, once_more.groups);

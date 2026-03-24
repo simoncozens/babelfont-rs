@@ -32,7 +32,10 @@ impl Guide {
 
 #[cfg(feature = "ufo")]
 mod ufo {
-    use crate::{convertors::ufo::KEY_LIB, BabelfontError};
+    use crate::{
+        convertors::ufo::{KEY_IDENTIFIER, KEY_LIB, KEY_ORIGINAL_GUIDE},
+        BabelfontError,
+    };
 
     use super::*;
     impl From<&norad::Guideline> for Guide {
@@ -40,27 +43,51 @@ mod ufo {
             let mut out = Guide::new();
             out.name = g.name.as_ref().map(|x| x.to_string());
             out.color = g.color.as_ref().map(|x| x.into());
+            if let Some(lib) = g.lib() {
+                out.format_specific.insert(
+                    KEY_LIB.to_string(),
+                    serde_json::to_value(lib).unwrap_or_default(),
+                );
+            }
+            if let Some(identifier) = g.identifier() {
+                out.format_specific.insert(
+                    KEY_IDENTIFIER.to_string(),
+                    serde_json::to_value(identifier).unwrap_or_default(),
+                );
+            }
             match g.line {
                 norad::Line::Angle { x, y, degrees } => {
                     out.pos = Position {
                         x: x as f32,
                         y: y as f32,
                         angle: degrees as f32,
-                    }
+                    };
+                    out.format_specific.insert(
+                        KEY_ORIGINAL_GUIDE.to_string(),
+                        serde_json::to_value("angled").unwrap_or_default(),
+                    );
                 }
                 norad::Line::Horizontal(y) => {
                     out.pos = Position {
                         x: 0.0,
                         y: y as f32,
                         angle: 0.0,
-                    }
+                    };
+                    out.format_specific.insert(
+                        KEY_ORIGINAL_GUIDE.to_string(),
+                        serde_json::to_value("horizontal").unwrap_or_default(),
+                    );
                 }
                 norad::Line::Vertical(x) => {
                     out.pos = Position {
                         y: 0.0,
                         x: x as f32,
                         angle: 90.0,
-                    }
+                    };
+                    out.format_specific.insert(
+                        KEY_ORIGINAL_GUIDE.to_string(),
+                        serde_json::to_value("vertical").unwrap_or_default(),
+                    );
                 }
             };
             out
@@ -72,16 +99,32 @@ mod ufo {
         fn try_from(g: &Guide) -> Result<Self, BabelfontError> {
             let name = g.name.as_ref().map(|x| norad::Name::new(x)).transpose()?;
             let color = g.color.as_ref().map(|x| x.try_into()).transpose()?;
-            let line = match (g.pos.x, g.pos.y, g.pos.angle) {
-                (_, y, 0.0) => norad::Line::Horizontal(y as f64),
-                (x, _, 90.0) => norad::Line::Vertical(x as f64),
-                (x, y, angle) => norad::Line::Angle {
+            let was_angled = g
+                .format_specific
+                .get(KEY_ORIGINAL_GUIDE)
+                .and_then(|x| serde_json::from_value(x.clone()).ok())
+                .and_then(|s: String| match s.as_str() {
+                    "horizontal" => Some("horizontal"),
+                    "vertical" => Some("vertical"),
+                    "angled" => Some("angled"),
+                    _ => None,
+                })
+                == Some("angled");
+            let line = match (g.pos.x, g.pos.y, g.pos.angle, was_angled) {
+                (_, y, 0.0, false) => norad::Line::Horizontal(y as f64),
+                (x, _, 90.0, false) => norad::Line::Vertical(x as f64),
+                (x, y, angle, _) => norad::Line::Angle {
                     x: x as f64,
                     y: y as f64,
                     degrees: angle as f64,
                 },
             };
-            let mut guide = norad::Guideline::new(line, name, color, None);
+            let identifier = g
+                .format_specific
+                .get(KEY_IDENTIFIER)
+                .and_then(|x| serde_json::from_value(x.clone()).ok());
+            let mut guide = norad::Guideline::new(line, name, color, identifier);
+
             if let Some(lib) = g
                 .format_specific
                 .get(KEY_LIB)
