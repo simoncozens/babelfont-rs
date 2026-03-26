@@ -1,0 +1,174 @@
+use crate::UncompileContext;
+use fea_rs_ast::{ChainedContextStatement, GlyphContainer, SubOrPos};
+use skrifa::raw::{
+    ReadError,
+    tables::{gsub::ChainedSequenceContext, layout::SequenceContext},
+};
+
+impl<'a> UncompileContext<'a> {
+    pub(crate) fn uncompile_sequence_context<T: SubOrPos>(
+        &self,
+        sequence: SequenceContext,
+        sub_or_pos: T,
+    ) -> Result<Vec<ChainedContextStatement<T>>, ReadError> {
+        let mut statements = vec![];
+        match sequence {
+            SequenceContext::Format1(seq_f1) => {
+                let first_glyphs = seq_f1
+                    .coverage()?
+                    .iter()
+                    .map(|g| GlyphContainer::GlyphName(self.get_name(g)))
+                    .collect::<Vec<GlyphContainer>>();
+                for (first_glyph, ruleset) in first_glyphs.iter().zip(seq_f1.seq_rule_sets().iter())
+                {
+                    if let Some(ruleset) = ruleset.transpose()? {
+                        for rule in ruleset.seq_rules().iter().flatten() {
+                            let mut input: Vec<_> = rule
+                                .input_sequence()
+                                .iter()
+                                .map(|g| GlyphContainer::GlyphName(self.get_name(g.get())))
+                                .collect();
+                            input.insert(0, first_glyph.clone());
+                            let mut lookups = vec![vec![]; input.len()];
+                            for lookup_record in rule.seq_lookup_records() {
+                                if let Some(lu) =
+                                    lookups.get_mut(lookup_record.sequence_index() as usize)
+                                {
+                                    lu.push(
+                                        self.get_lookup_name(lookup_record.lookup_list_index()),
+                                    );
+                                }
+                            }
+                            let statement = ChainedContextStatement::new(
+                                input,
+                                vec![],
+                                vec![],
+                                lookups,
+                                0..0,
+                                sub_or_pos,
+                            );
+                            statements.push(statement);
+                        }
+                    }
+                }
+            }
+            SequenceContext::Format2(table_ref) => {
+                unimplemented!("SequenceContext Format 2 is not supported yet");
+            }
+            SequenceContext::Format3(table_ref) => {
+                let input: Vec<GlyphContainer> = table_ref
+                    .coverages()
+                    .iter()
+                    .flatten()
+                    .map(|coverage| self.resolve_coverage_to_class(&coverage))
+                    .collect();
+                let mut lookups = vec![vec![]; input.len()];
+                for lookup_record in table_ref.seq_lookup_records() {
+                    if let Some(lu) = lookups.get_mut(lookup_record.sequence_index() as usize) {
+                        lu.push(self.get_lookup_name(lookup_record.lookup_list_index()));
+                    }
+                }
+                let statement =
+                    ChainedContextStatement::new(input, vec![], vec![], lookups, 0..0, sub_or_pos);
+                statements.push(statement);
+            }
+        }
+        Ok(statements)
+    }
+    pub fn uncompile_chain_sequence_context<T: SubOrPos>(
+        &self,
+        chainsequence: ChainedSequenceContext,
+        sub_or_pos: T,
+    ) -> Result<Vec<ChainedContextStatement<T>>, ReadError> {
+        let mut statements = vec![];
+        match chainsequence {
+            ChainedSequenceContext::Format1(seq_f1) => {
+                let first_glyphs = seq_f1
+                    .coverage()?
+                    .iter()
+                    .map(|g| GlyphContainer::GlyphName(self.get_name(g)))
+                    .collect::<Vec<GlyphContainer>>();
+                for (first_glyph, ruleset) in first_glyphs
+                    .iter()
+                    .zip(seq_f1.chained_seq_rule_sets().iter())
+                {
+                    if let Some(ruleset) = ruleset.transpose()? {
+                        for rule in ruleset.chained_seq_rules().iter().flatten() {
+                            let mut input: Vec<_> = rule
+                                .input_sequence()
+                                .iter()
+                                .map(|g| GlyphContainer::GlyphName(self.get_name(g.get())))
+                                .collect();
+                            input.insert(0, first_glyph.clone());
+                            let prefix = rule
+                                .backtrack_sequence()
+                                .iter()
+                                .rev()
+                                .map(|g| GlyphContainer::GlyphName(self.get_name(g.get())))
+                                .collect::<Vec<GlyphContainer>>();
+                            let suffix = rule
+                                .lookahead_sequence()
+                                .iter()
+                                .map(|g| GlyphContainer::GlyphName(self.get_name(g.get())))
+                                .collect::<Vec<GlyphContainer>>();
+                            let mut lookups = vec![vec![]; input.len()];
+                            for lookup_record in rule.seq_lookup_records() {
+                                if let Some(lu) =
+                                    lookups.get_mut(lookup_record.sequence_index() as usize)
+                                {
+                                    lu.push(
+                                        self.get_lookup_name(lookup_record.lookup_list_index()),
+                                    );
+                                }
+                            }
+                            let statement = ChainedContextStatement::new(
+                                input,
+                                prefix,
+                                suffix,
+                                lookups,
+                                0..0,
+                                sub_or_pos,
+                            );
+                            statements.push(statement);
+                        }
+                    }
+                }
+            }
+            ChainedSequenceContext::Format2(table_ref) => {
+                unimplemented!("ChainedSequenceContext Format 2 is not supported yet")
+            }
+            ChainedSequenceContext::Format3(table_ref) => {
+                let input: Vec<GlyphContainer> = table_ref
+                    .input_coverages()
+                    .iter()
+                    .flatten()
+                    .map(|coverage| self.resolve_coverage_to_class(&coverage))
+                    .collect();
+                let mut pre: Vec<GlyphContainer> = table_ref
+                    .backtrack_coverages()
+                    .iter()
+                    .flatten()
+                    .map(|coverage| self.resolve_coverage_to_class(&coverage))
+                    .collect();
+                pre.reverse();
+                let post: Vec<GlyphContainer> = table_ref
+                    .lookahead_coverages()
+                    .iter()
+                    .flatten()
+                    .map(|coverage| self.resolve_coverage_to_class(&coverage))
+                    .collect();
+
+                let mut lookups = vec![vec![]; input.len()];
+                for lookup_record in table_ref.seq_lookup_records() {
+                    if let Some(lu) = lookups.get_mut(lookup_record.sequence_index() as usize) {
+                        lu.push(self.get_lookup_name(lookup_record.lookup_list_index()));
+                    }
+                }
+                let statement =
+                    ChainedContextStatement::new(input, pre, post, lookups, 0..0, sub_or_pos);
+                statements.push(statement);
+            }
+        }
+        Ok(statements)
+    }
+}

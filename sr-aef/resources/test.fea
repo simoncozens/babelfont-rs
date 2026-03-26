@@ -1,0 +1,18 @@
+lookup gsub1 { 
+    sub a by b;
+} gsub1;
+lookup gsub2 { 
+    sub a by b c;
+} gsub2;
+lookup gsub3 { 
+    sub a from [b c];
+} gsub3;
+lookup gsub4 { 
+    sub b c by a;
+} gsub4;
+lookup gsub5 {
+    sub [a one]' lookup gsub1 b' [c two]' lookup gsub2;
+} gsub5;
+lookup gsub6_f1 {
+    sub one two three a' lookup gsub1 b' c' lookup gsub2 x y z;
+} gsub6_f1;

@@ -1,0 +1,11 @@
+[package]
+name = "sr-aef"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+fea-rs-ast.workspace = true
+indexmap.workspace = true
+skrifa.workspace = true
+smol_str = "0.3.6"
+
