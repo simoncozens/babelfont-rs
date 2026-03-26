@@ -112,6 +112,23 @@ impl Axis {
     /// Get the bounds (min, default, max) of this axis, if all are defined
     pub fn bounds(&self) -> Option<(UserCoord, UserCoord, UserCoord)> {
         if self.min.is_none() || self.default.is_none() || self.max.is_none() {
+            // If we have a list of values, use that as min/max
+            if !self.values.is_empty() {
+                let min = self
+                    .values
+                    .iter()
+                    .cloned()
+                    .min_by(|a, b| a.partial_cmp(b).unwrap());
+                let max = self
+                    .values
+                    .iter()
+                    .cloned()
+                    .max_by(|a, b| a.partial_cmp(b).unwrap());
+                if let (Some(min), Some(max)) = (min, max) {
+                    let default = self.default.unwrap_or(min);
+                    return Some((min, default, max));
+                }
+            }
             return None;
         }
         #[allow(clippy::unwrap_used)] // We just checked that!
@@ -271,6 +288,9 @@ mod ufo {
             ax.min = dsax.minimum.map(|x| x as f64).map(UserCoord::new);
             ax.max = dsax.maximum.map(|x| x as f64).map(UserCoord::new);
             ax.default = Some(UserCoord::new(dsax.default as f64));
+            if let Some(values) = &dsax.values {
+                ax.values = values.iter().map(|x| UserCoord::new(*x as f64)).collect();
+            }
             if let Some(map) = &dsax.map {
                 ax.map = Some(
                     map.iter()
