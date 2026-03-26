@@ -186,15 +186,13 @@ pub fn as_norad(font: &Font, master_ix: usize) -> Result<norad::Font, BabelfontE
         .filter(|g| !g.exported)
         .map(|g| g.name.to_string())
         .collect::<Vec<String>>();
-    // XXX Skipped doing this for now because it doesn't maintain order.
-
-    // if !skipped_glyphs.is_empty() || lib.contains_key(KEY_SKIP_EXPORT) {
-    //     // Update it
-    //     lib.insert(
-    //         KEY_SKIP_EXPORT.into(),
-    //         serde_json::to_value(&skipped_glyphs)?,
-    //     );
-    // }
+    if !skipped_glyphs.is_empty() || lib.contains_key(KEY_SKIP_EXPORT) {
+        // Update it
+        lib.insert(
+            KEY_SKIP_EXPORT.into(),
+            serde_json::to_value(&skipped_glyphs)?,
+        );
+    }
     // categories
     let categories = font
         .glyphs
@@ -1104,7 +1102,7 @@ pub(crate) mod tests {
             .collect();
         assert_eq!(skipped1, skipped2, "skipExportGlyphs differs");
         assert_eq!(ufo1.kerning, ufo2.kerning);
-        if (!do_metadata) {
+        if !do_metadata {
             return;
         }
         // Compare the glyph order, ignoring skipped glyphs since they don't have to be in the same order

@@ -411,7 +411,7 @@ pub(crate) fn to_norad_instance(
 fn to_source(
     font: &Font,
     master: &Master,
-    filename: &String,
+    filename: &str,
     axis_tag_name_map: &HashMap<Tag, String>,
     axis_order: &[&str],
 ) -> norad::designspace::Source {
@@ -451,7 +451,7 @@ fn to_source(
             .map(|s| s.to_string()),
         name: master.name.get_default().map(|x| x.to_string()),
         // We know we have one
-        filename: filename.clone(),
+        filename: filename.to_string(),
         location,
         layer: None, // XXX
     }

@@ -13,8 +13,9 @@ use skrifa::{
 };
 use write_fonts::types::F2Dot14;
 
-use crate::{BabelfontError, Font, FormatSpecific, Glyph, Instance, Layer};
-use crate::{MetricType, PathBuilder};
+use crate::{
+    BabelfontError, Font, FormatSpecific, Glyph, Instance, Layer, MetricType, PathBuilder,
+};
 
 /// Load a TTF font from a file path
 pub fn load<T: AsRef<std::path::Path>>(path: T) -> Result<Font, BabelfontError> {

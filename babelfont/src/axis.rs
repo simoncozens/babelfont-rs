@@ -113,6 +113,7 @@ impl Axis {
     pub fn bounds(&self) -> Option<(UserCoord, UserCoord, UserCoord)> {
         if self.min.is_none() || self.default.is_none() || self.max.is_none() {
             // If we have a list of values, use that as min/max
+            #[allow(clippy::unwrap_used)] // If any value is NaN, user deserves what they get
             if !self.values.is_empty() {
                 let min = self
                     .values

@@ -149,6 +149,7 @@ pub enum BabelfontError {
     /// Feature parsing error
     #[error("Feature parsing error: {0:#?}")]
     FeatureParsing(Vec<FeatureError>),
+    /// Multiple masters are not supported when saving a UFO font
     #[cfg(feature = "ufo")]
     #[error("Multiple masters are not supported when saving a UFO font")]
     MultipleMastersNotSupported,
