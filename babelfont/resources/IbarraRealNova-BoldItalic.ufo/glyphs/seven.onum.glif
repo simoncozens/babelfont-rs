@@ -1,7 +1,6 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <glyph name="seven.onum" format="2">
   <advance width="520"/>
-  <unicode hex="F64A"/>
   <outline>
     <contour>
       <point x="60" y="-257" type="curve" smooth="yes"/>

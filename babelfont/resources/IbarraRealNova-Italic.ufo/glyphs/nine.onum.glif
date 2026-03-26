@@ -1,7 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <glyph name="nine.onum" format="2">
-  <advance width="508"/>
-  <unicode hex="F64C"/>
   <outline>
     <contour>
       <point x="336" y="434" type="curve" smooth="yes"/>
