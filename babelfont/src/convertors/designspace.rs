@@ -1,8 +1,8 @@
 use crate::{
-    convertors::ufo::{load_kerning, stash_lib},
+    convertors::ufo::{as_norad, load_kerning, stash_lib, KEY_LIB},
     glyph::GlyphList,
     names::Names,
-    Instance, Layer,
+    I18NDictionary, Instance, Layer,
 };
 use fontdrasil::coords::{DesignCoord, DesignLocation};
 use norad::{
@@ -20,6 +20,8 @@ use uuid::Uuid;
 pub const FORMAT_KEY: &str = "norad.designspace.format";
 /// Key to store the master filename in the instance's format_specific
 pub const FILENAME_KEY: &str = "norad.designspace.filename";
+/// Key to store the master style name in the master's format_specific
+pub const STYLENAME_KEY: &str = "norad.designspace.style";
 
 use crate::{
     convertors::ufo::{load_master_info, norad_glyph_to_babelfont_layer},
@@ -67,6 +69,12 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
             g.layers.append(l);
         }
     }
+    // Stash DS format
+    #[allow(clippy::unwrap_used)] // It's a number
+    font.format_specific.insert(
+        FORMAT_KEY.to_string(),
+        serde_json::Value::Number(serde_json::Number::from_f64(ds.format as f64).unwrap()),
+    );
     Ok(font)
 }
 
@@ -164,6 +172,18 @@ fn load_master(
         uuid,
         location,
     );
+    // Stash master style name
+    if let Some(stylename) = &source.stylename {
+        master.format_specific.insert(
+            STYLENAME_KEY.to_string(),
+            serde_json::Value::String(stylename.into()),
+        );
+    }
+    master.format_specific.insert(
+        FILENAME_KEY.to_string(),
+        serde_json::Value::String(source.filename.clone()),
+    );
+
     let relative_path_to_master = if let Some(r) = relative {
         r.join(source.filename.clone())
     } else {
@@ -192,6 +212,26 @@ fn load_master(
             // because we have promoted sparse masters to their own babelfont master.
             our_layer.master = crate::LayerType::DefaultForMaster(master.id.to_string());
             glyph_layer_list.push(our_layer);
+            if required_layer.is_none() {
+                // i.e. the default layer
+                // Check for a background layer for this glyph. Load it as a separate layer, and tie it to the layer we just pushed
+                // Unwrap is safe because we're going to unwrap something we just pushed to the array
+                #[allow(clippy::unwrap_used)]
+                if let Some(background_glyph) = source_font
+                    .layers
+                    .get("public.background")
+                    .and_then(|l| l.get_glyph(g.name.as_str()))
+                {
+                    let mut background_layer =
+                        norad_glyph_to_babelfont_layer(background_glyph, ufo_layer, &master.id);
+                    background_layer.master = crate::LayerType::FreeFloating;
+                    background_layer.id = Some(Uuid::new_v4().to_string());
+                    background_layer.is_background = true;
+                    glyph_layer_list.last_mut().unwrap().background_layer_id =
+                        background_layer.id.clone();
+                    glyph_layer_list.push(background_layer);
+                }
+            }
         }
         bf_layer_list.push(glyph_layer_list)
     }
@@ -259,20 +299,28 @@ pub fn save_designspace(font: &Font, path: &PathBuf) -> Result<(), BabelfontErro
                     font.names
                         .family_name
                         .get_default()
-                        .unwrap_or(&"Unnamed font".to_string()),
+                        .unwrap_or(&"Unnamed font".to_string())
+                        .replace(" ", ""),
                     m.name
                         .get_default()
                         .map(|x| x.as_str())
                         .unwrap_or(m.id.as_str())
+                        .replace(" ", "")
                 ))
         })
         .collect();
+    let axis_order = font
+        .axes
+        .iter()
+        .flat_map(|ax| ax.name.get_default())
+        .map(|x| x.as_str())
+        .collect::<Vec<_>>();
     let ds = DesignSpaceDocument {
         format: font
             .format_specific
             .get(FORMAT_KEY)
             .and_then(|v| v.as_f64())
-            .unwrap_or(3.0) as f32,
+            .unwrap_or(5.0) as f32,
         axes: font.axes.iter().map(|x| x.into()).collect(),
         rules: Rules {
             processing: RuleProcessing::First,
@@ -281,39 +329,201 @@ pub fn save_designspace(font: &Font, path: &PathBuf) -> Result<(), BabelfontErro
         sources: font
             .masters
             .iter()
-            .zip(master_filenames)
-            .map(|(m, f)| to_source(m, f, &axis_tag_name_map))
+            .zip(master_filenames.iter())
+            .map(|(m, f)| to_source(font, m, f, &axis_tag_name_map, &axis_order))
             .collect(),
-        instances: font.instances.iter().map(|i| i.into()).collect(),
+        instances: font
+            .instances
+            .iter()
+            .map(|i| to_norad_instance(i, &axis_tag_name_map, &axis_order))
+            .collect(),
         lib: Plist::new(),
     };
+    // Now save all the UFOs
+    for (ix, master_filename) in master_filenames.iter().enumerate() {
+        let relative_path = path
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new("."))
+            .join(master_filename);
+        let ufo = as_norad(font, ix)?;
+        ufo.save(&relative_path)?;
+    }
     Ok(ds.save(path)?)
 }
 
-fn to_source(
-    master: &Master,
-    filename: String,
+pub(crate) fn to_norad_instance(
+    instance: &Instance,
     axis_tag_name_map: &HashMap<Tag, String>,
+    axis_order: &[&str],
+) -> norad::designspace::Instance {
+    let name_to_option_string = |x: &I18NDictionary| x.get_default().map(|y| y.to_string());
+    let mut location: Vec<_> = instance
+        .location
+        .iter()
+        .map(|(tag, coord)| norad::designspace::Dimension {
+            name: axis_tag_name_map
+                .get(tag)
+                .cloned()
+                .unwrap_or_else(|| tag.to_string()),
+            xvalue: Some(coord.to_f64() as f32),
+            uservalue: None,
+            yvalue: None,
+        })
+        .collect();
+    // Sort them based on the font's axis order
+    location.sort_by(|a, b| {
+        axis_order
+            .iter()
+            .position(|x| x == &a.name)
+            .unwrap_or(usize::MAX)
+            .cmp(
+                &axis_order
+                    .iter()
+                    .position(|x| x == &b.name)
+                    .unwrap_or(usize::MAX),
+            )
+    });
+    norad::designspace::Instance {
+        familyname: name_to_option_string(&instance.custom_names.family_name),
+        stylename: name_to_option_string(&instance.custom_names.preferred_subfamily_name),
+        name: name_to_option_string(&instance.name),
+        filename: instance
+            .format_specific
+            .get(FILENAME_KEY)
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
+        postscriptfontname: name_to_option_string(&instance.custom_names.postscript_name),
+        stylemapfamilyname: name_to_option_string(&instance.custom_names.typographic_family),
+        stylemapstylename: name_to_option_string(&instance.custom_names.typographic_subfamily),
+        location,
+        lib: serde_json::from_value(
+            instance
+                .format_specific
+                .get(KEY_LIB)
+                .cloned()
+                .unwrap_or_default(),
+        )
+        .ok()
+        .unwrap_or_default(),
+    }
+}
+
+fn to_source(
+    font: &Font,
+    master: &Master,
+    filename: &String,
+    axis_tag_name_map: &HashMap<Tag, String>,
+    axis_order: &[&str],
 ) -> norad::designspace::Source {
+    let mut location: Vec<_> = master
+        .location
+        .iter()
+        .map(|(tag, coord)| norad::designspace::Dimension {
+            name: axis_tag_name_map
+                .get(tag)
+                .cloned()
+                .unwrap_or_else(|| tag.to_string()),
+            xvalue: Some(coord.to_f64() as f32),
+            uservalue: None,
+            yvalue: None,
+        })
+        .collect();
+    // Sort them based on the font's axis order
+    location.sort_by(|a, b| {
+        axis_order
+            .iter()
+            .position(|x| x == &a.name)
+            .unwrap_or(usize::MAX)
+            .cmp(
+                &axis_order
+                    .iter()
+                    .position(|x| x == &b.name)
+                    .unwrap_or(usize::MAX),
+            )
+    });
+
     norad::designspace::Source {
-        familyname: None, // Maybe we want custom names for masters?
-        stylename: None,  // ???
+        familyname: font.names.family_name.get_default().map(|x| x.to_string()),
+        stylename: master
+            .format_specific
+            .get(STYLENAME_KEY)
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
         name: master.name.get_default().map(|x| x.to_string()),
         // We know we have one
-        filename,
-        location: master
-            .location
-            .iter()
-            .map(|(tag, coord)| norad::designspace::Dimension {
-                name: axis_tag_name_map
-                    .get(tag)
-                    .cloned()
-                    .unwrap_or_else(|| tag.to_string()),
-                uservalue: Some(coord.to_f64() as f32),
-                xvalue: None,
-                yvalue: None,
-            })
-            .collect(),
+        filename: filename.clone(),
+        location,
         layer: None, // XXX
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used)]
+
+    use std::path::PathBuf;
+
+    use crate::filters::{FontFilter, RetainGlyphs};
+
+    use super::*;
+    use pretty_assertions::assert_eq;
+    use rstest::rstest;
+
+    #[rstest]
+    fn test_roundtrip(#[files("resources/*.designspace")] path: PathBuf) {
+        let there = crate::load(&path).unwrap();
+        let tempdir = tempfile::tempdir().unwrap();
+        let temp_path = tempdir.path().join("temp.designspace");
+        save_designspace(&there, &temp_path).unwrap();
+        println!("Saved to temp path: {:?}", temp_path);
+
+        // Perform a norad load on both designspace files and check for equivalence
+        let relative = path.parent();
+        let ds1 = norad::designspace::DesignSpaceDocument::load(&path).unwrap();
+        let ds2 = norad::designspace::DesignSpaceDocument::load(&temp_path).unwrap();
+        assert_eq!(ds1, ds2);
+        let index_of_default = there.default_master_index().unwrap();
+
+        // Now check each UFO in turn.
+        for (ix, source) in ds1.sources.iter().enumerate() {
+            use crate::convertors::ufo::tests::ufo_semantic_test;
+
+            let relative_path_to_master = if let Some(r) = relative {
+                r.join(source.filename.clone())
+            } else {
+                source.filename.clone().into()
+            };
+            let font1 = norad::Font::load(relative_path_to_master).unwrap();
+
+            let source2 = ds2
+                .sources
+                .iter()
+                .find(|s| s.filename == source.filename)
+                .unwrap();
+            let relative_path_to_master2 = tempdir.path().join(source2.filename.clone());
+            println!(
+                "Testing master: {}, loading from {:?}",
+                source.filename,
+                relative_path_to_master2.display()
+            );
+            let font2 = norad::Font::load(relative_path_to_master2).unwrap();
+            ufo_semantic_test(&font1, &font2, ix == index_of_default);
+        }
+    }
+
+    #[test]
+    fn test_background() {
+        let mut font = crate::load("resources/IbarraRealNova.designspace").unwrap();
+        let glyph = font.glyphs.iter().find(|g| g.name == "A").unwrap();
+        // Each layer in the glyph should have a background layer, and they should be linked
+        assert_eq!(glyph.layers.len(), 2 * font.masters.len());
+        // Slim the font just to the A glyph for simplicity
+        RetainGlyphs::new(vec!["A".to_string()])
+            .apply(&mut font)
+            .unwrap();
+        // Convert master 1 to UFO
+        let ufo = as_norad(&font, 0).unwrap();
+        // Check it has two layers
+        assert_eq!(ufo.layers.len(), 2);
     }
 }

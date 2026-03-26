@@ -59,6 +59,11 @@ pub enum BabelfontError {
     /// Error in UFO color
     UfoColor(String),
 
+    #[cfg(feature = "ufo")]
+    #[error("Error saving UFO: {0}")]
+    /// Error saving UFO
+    UfoSave(String),
+
     #[cfg(feature = "vfb")]
     #[error("Error loading VFB: {0}")]
     /// Error loading VFB
@@ -144,6 +149,9 @@ pub enum BabelfontError {
     /// Feature parsing error
     #[error("Feature parsing error: {0:#?}")]
     FeatureParsing(Vec<FeatureError>),
+    #[cfg(feature = "ufo")]
+    #[error("Multiple masters are not supported when saving a UFO font")]
+    MultipleMastersNotSupported,
 }
 
 #[derive(Debug, Serialize)]
@@ -225,6 +233,13 @@ impl From<norad::error::DesignSpaceSaveError> for BabelfontError {
             }
             _ => todo!(),
         }
+    }
+}
+
+#[cfg(feature = "ufo")]
+impl From<norad::error::FontWriteError> for BabelfontError {
+    fn from(e: norad::error::FontWriteError) -> Self {
+        BabelfontError::UfoSave(e.to_string())
     }
 }
 

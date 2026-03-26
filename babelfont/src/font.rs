@@ -265,8 +265,11 @@ impl Font {
         }
         #[cfg(feature = "ufo")]
         {
+            if path.extension().and_then(|x| x.to_str()) == Some("ufo") {
+                return crate::convertors::ufo::save_ufo(self, &path);
+            }
             if path.extension().and_then(|x| x.to_str()) == Some("designspace") {
-                crate::convertors::designspace::save_designspace(self, &path)?;
+                return crate::convertors::designspace::save_designspace(self, &path);
             }
         }
 

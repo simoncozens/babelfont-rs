@@ -135,10 +135,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 | Format | Extension | Read | Write | Feature Flag |
 |--------|-----------|------|-------|--------------|
-| UFO | `.ufo` | ✓ | ✗ | `ufo` |
+| UFO | `.ufo` | ✓ | ✓ | `ufo` |
 | DesignSpace | `.designspace` | ✓ | ✓ | `ufo` |
 | Glyphs 2/3 | `.glyphs` | ✓ | ✓ | `glyphs` |
-| Glyphs Package | `.glyphspackage` | ✓ | ✗ | `glyphs` |
+| Glyphs Package | `.glyphspackage` | ✓ | ✓ | `glyphs` |
 | FontLab VFJ | `.vfj` | ✓ | ✗ | `fontlab` |
 | Babelfont JSON | `.babelfont` | ✓ | ✓ | (always) |
 | TrueType | `.ttf` | ✗ | ✓ | `fontir` |

@@ -9,11 +9,12 @@ use indexmap::IndexMap;
 use paste::paste;
 use smol_str::{SmolStr, ToSmolStr};
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     fs,
     str::FromStr,
     time::SystemTime,
 };
+use uuid::Uuid;
 
 /// Key for storing norad lib data in FormatSpecific
 pub const KEY_LIB: &str = "norad.lib";
@@ -23,6 +24,7 @@ pub const KEY_GROUPS: &str = "norad.groups";
 const KEY_CATEGORIES: &str = "public.openTypeCategories";
 const KEY_PSNAMES: &str = "public.postscriptNames";
 const KEY_SKIP_EXPORT: &str = "public.skipExportGlyphs";
+const KEY_GLYPHORDER: &str = "public.glyphOrder";
 // Format-specific names
 /// Key for storing style map family name in FormatSpecific
 pub const KEY_STYLE_MAP_FAMILY_NAME: &str = "ufo.styleMapFamilyName";
@@ -96,6 +98,32 @@ pub fn load<T: AsRef<std::path::Path>>(path: T) -> Result<Font, BabelfontError> 
             }
         }
     }
+    // Tie background layers to their associated layers
+    // For now we assume that the background layer is named "public.background" and
+    // associated with the default layer for the master.
+    for glyph in font.glyphs.iter_mut() {
+        // Find any background layers
+        if let Some(background_layer_id) = glyph
+            .layers
+            .iter()
+            .find(|l| {
+                l.is_background
+                    && l.master == LayerType::FreeFloating
+                    && l.name.as_deref() == Some("public.background")
+            })
+            .and_then(|ix| ix.id.clone())
+        {
+            // Set default layer's background_layer_id to this layer's ID
+            if let Some(default_layer) = glyph
+                .layers
+                .iter_mut()
+                .find(|l| l.master == LayerType::DefaultForMaster(master.id.clone()))
+            {
+                default_layer.background_layer_id = Some(background_layer_id);
+            }
+        }
+    }
+
     // Store groups which are not kerning groups into our private key
     let non_kerning_groups = ufo
         .groups
@@ -121,39 +149,113 @@ pub fn load<T: AsRef<std::path::Path>>(path: T) -> Result<Font, BabelfontError> 
     Ok(font)
 }
 
+pub(crate) fn save_ufo<T: AsRef<std::path::Path>>(
+    font: &Font,
+    path: T,
+) -> Result<(), BabelfontError> {
+    // We can't save more than one master
+    if font.masters.len() > 1 {
+        return Err(BabelfontError::MultipleMastersNotSupported);
+    }
+    let ufo = as_norad(font, 0)?;
+    ufo.save(path).map_err(|e| e.into())
+}
+
 /// Convert a Babelfont Font to a norad UFO font
 ///
 /// This is currently unfinished and may not preserve all data.
-pub fn as_norad(font: &Font) -> Result<norad::Font, BabelfontError> {
+pub fn as_norad(font: &Font, master_ix: usize) -> Result<norad::Font, BabelfontError> {
     let mut ufo = norad::Font::new();
     // Move some things into lib key before serializing it:
-    // exports
-    // categories
-    ufo.lib = font
+    let mut lib = font
         .format_specific
         .get(KEY_LIB)
-        .and_then(|x| serde_json::from_value::<norad::Plist>(x.clone()).ok())
-        .unwrap_or_default();
-    let first_master = font
+        .unwrap_or_default()
+        .as_object()
+        .unwrap_or(&serde_json::Map::new())
+        .clone();
+    if lib.contains_key(KEY_GLYPHORDER) {
+        // Update it
+        let glyphorder: Vec<String> = font.glyphs.iter().map(|g| g.name.to_string()).collect();
+        lib.insert(KEY_GLYPHORDER.into(), serde_json::to_value(&glyphorder)?);
+    }
+    // exports
+    let skipped_glyphs = font
+        .glyphs
+        .iter()
+        .filter(|g| !g.exported)
+        .map(|g| g.name.to_string())
+        .collect::<Vec<String>>();
+    // XXX Skipped doing this for now because it doesn't maintain order.
+
+    // if !skipped_glyphs.is_empty() || lib.contains_key(KEY_SKIP_EXPORT) {
+    //     // Update it
+    //     lib.insert(
+    //         KEY_SKIP_EXPORT.into(),
+    //         serde_json::to_value(&skipped_glyphs)?,
+    //     );
+    // }
+    // categories
+    let categories = font
+        .glyphs
+        .iter()
+        .flat_map(|g| match &g.category {
+            GlyphCategory::Base => Some((g.name.to_string(), "base")),
+            GlyphCategory::Ligature => Some((g.name.to_string(), "ligature")),
+            GlyphCategory::Mark => Some((g.name.to_string(), "mark")),
+            GlyphCategory::Unknown => None,
+            GlyphCategory::Custom(x) => Some((g.name.to_string(), x.as_str())),
+        })
+        .collect::<HashMap<_, _>>();
+    let any_non_bases = categories.values().any(|&v| v != "base");
+    if lib.contains_key(KEY_CATEGORIES) || any_non_bases {
+        lib.insert(KEY_CATEGORIES.into(), serde_json::to_value(&categories)?);
+    }
+
+    ufo.lib = serde_json::from_value::<norad::Plist>(lib.into())?;
+    let master = font
         .masters
-        .first()
+        .get(master_ix)
         .ok_or(BabelfontError::NoDefaultMaster)?;
     for g in font.glyphs.iter() {
+        // We want to save:
+        //  The master layer into the default norad layer
+        //  A background layer associated with the master layer, into public.background
+        //  Any layers associated with this master
+        // First find the ID of the layer associated with the master layer
+
+        let master_layer_id = g
+            .layers
+            .iter()
+            .find(|l| l.master == LayerType::DefaultForMaster(master.id.clone()))
+            .and_then(|l| l.id.as_ref())
+            .cloned();
+        let background_layer_id = g
+            .layers
+            .iter()
+            .find(|l| l.master == LayerType::DefaultForMaster(master.id.clone()))
+            .and_then(|l| l.background_layer_id.clone());
         for layer in g.layers.iter() {
             let norad_layer = babelfont_layer_to_norad_glyph(g, layer)?;
             // If the layer ID is the master ID, it's the default layer
-            let layer = if layer.name.as_ref() == Some(&first_master.id) {
-                ufo.default_layer_mut()
-            } else {
+            if layer.id.as_ref() == master_layer_id.as_ref() {
+                ufo.default_layer_mut().insert_glyph(norad_layer);
+            } else if layer.id.as_ref() == background_layer_id.as_ref() {
+                ufo.layers
+                    .get_or_create_layer("public.background")?
+                    .insert_glyph(norad_layer);
+            } else if layer.master == LayerType::AssociatedWithMaster(master.id.clone()) {
                 ufo.layers
                     .get_or_create_layer(layer.name.as_deref().unwrap_or("public.default"))?
-            };
-            layer.insert_glyph(norad_layer);
+                    .insert_glyph(norad_layer);
+            } else {
+                // Ignore?
+            }
         }
     }
 
-    save_kerning(&mut ufo.kerning, &first_master.kerning)?;
-    save_info(&mut ufo.font_info, font);
+    save_kerning(&mut ufo.kerning, &master.kerning)?;
+    save_info(&mut ufo.font_info, font, master_ix);
     save_kern_groups(
         &mut ufo.groups,
         &font.first_kern_groups,
@@ -227,11 +329,17 @@ pub(crate) fn norad_glyph_to_babelfont_layer(
     if layer.is_default() {
         l.name = None;
         l.master = LayerType::DefaultForMaster(master_id.to_string());
+        l.id = Some(master_id.to_string());
+    } else if layer.name().as_str() == "public.background" {
+        l.name = Some(layer.name().to_string());
+        l.is_background = true;
+        l.master = LayerType::FreeFloating;
+        l.id = Uuid::new_v4().to_string().into();
     } else {
         l.name = Some(layer.name().to_string());
-        l.master = LayerType::AssociatedWithMaster(layer.name().to_string());
+        l.master = LayerType::AssociatedWithMaster(master_id.to_string());
+        l.id = Uuid::new_v4().to_string().into();
     }
-    l.id = Some(master_id.to_string());
     if !glyph.lib.is_empty() {
         l.format_specific = stash_lib(Some(&glyph.lib));
     }
@@ -375,10 +483,10 @@ pub(crate) fn save_kern_groups(
     Ok(())
 }
 
-pub(crate) fn save_info(info: &mut norad::FontInfo, font: &Font) {
+pub(crate) fn save_info(info: &mut norad::FontInfo, font: &Font, master_ix: usize) {
     let get_metric = |mt: MetricType| {
         font.masters
-            .first()
+            .get(master_ix)
             .and_then(|m| m.metrics.get(&mt))
             .map(|&v| v as f64)
     };
@@ -389,7 +497,7 @@ pub(crate) fn save_info(info: &mut norad::FontInfo, font: &Font) {
     info.family_name = font.names.family_name.get_default().map(|x| x.to_string());
     let guides: Vec<_> = font
         .masters
-        .first()
+        .get(master_ix)
         .map(|m| m.guides.iter().flat_map(|g| g.try_into()).collect())
         .unwrap_or_default();
     info.guidelines = (!guides.is_empty()).then_some(guides);
@@ -858,7 +966,7 @@ pub(crate) fn load_glyphs(font: &mut Font, ufo: &norad::Font) {
         .collect();
     let glyphorder: Vec<String> = ufo
         .lib
-        .get("public.glyphOrder")
+        .get(KEY_GLYPHORDER)
         .and_then(|x| x.as_array())
         .unwrap_or(&vec![])
         .iter()
@@ -867,10 +975,11 @@ pub(crate) fn load_glyphs(font: &mut Font, ufo: &norad::Font) {
         .collect();
     let mut order: Vec<String> = vec![];
     let mut ufo_names: Vec<String> = ufo.iter_names().map(|x| x.to_string()).collect();
-    if ufo_names.contains(&".notdef".to_string()) {
-        order.push(".notdef".to_string());
-        ufo_names.retain(|x| x != ".notdef");
-    }
+    // We don't do .notdef reordering. We should move it to glyph 0 on TTF build, not at source level.
+    // if ufo_names.contains(&".notdef".to_string()) {
+    //     order.push(".notdef".to_string());
+    //     ufo_names.retain(|x| x != ".notdef");
+    // }
     for name in glyphorder {
         if !ufo_names.contains(&name) {
             continue;
@@ -937,7 +1046,7 @@ fn add_uvs_sequences(font: &mut Font, ufo: &norad::Font) {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     #![allow(clippy::unwrap_used)]
 
     use std::path::PathBuf;
@@ -946,24 +1055,145 @@ mod tests {
     use pretty_assertions::assert_eq;
     use rstest::rstest;
 
+    pub(crate) fn ufo_semantic_test(ufo1: &norad::Font, ufo2: &norad::Font, do_metadata: bool) {
+        assert_eq!(
+            ufo1.default_layer().len(),
+            ufo2.default_layer().len(),
+            "Number of glyphs differs"
+        );
+        assert_eq!(
+            ufo1.layers.len(),
+            ufo2.layers.len(),
+            "Number of layers differs. Layer names 1: {:?}, Layer names 2: {:?}",
+            ufo1.layers.iter().map(|l| l.name()).collect::<Vec<_>>(),
+            ufo2.layers.iter().map(|l| l.name()).collect::<Vec<_>>()
+        );
+        for (layer1, layer2) in ufo1.layers.iter().zip(ufo2.layers.iter()) {
+            assert_eq!(
+                layer1.len(),
+                layer2.len(),
+                "Number of glyphs in layer {} differs",
+                layer1.name()
+            );
+        }
+        for name in ufo1.iter_names().map(|x| x.to_string()) {
+            let g1 = ufo1.get_glyph(&name).unwrap();
+            let g2 = ufo2.get_glyph(&name).unwrap();
+            assert_eq!(g1, g2, "Glyph {} differs", name);
+        }
+        // Compare the skipExportGlyphs as hashsets since order doesn't matter
+        let skipped1: HashSet<String> = ufo1
+            .lib
+            .get(KEY_SKIP_EXPORT)
+            .and_then(|x| x.as_array())
+            .cloned()
+            .unwrap_or_default()
+            .iter()
+            .flat_map(|x| x.as_string())
+            .map(|x| x.to_string())
+            .collect();
+        let skipped2: HashSet<String> = ufo2
+            .lib
+            .get(KEY_SKIP_EXPORT)
+            .and_then(|x| x.as_array())
+            .cloned()
+            .unwrap_or_default()
+            .iter()
+            .flat_map(|x| x.as_string())
+            .map(|x| x.to_string())
+            .collect();
+        assert_eq!(skipped1, skipped2, "skipExportGlyphs differs");
+        assert_eq!(ufo1.kerning, ufo2.kerning);
+        if (!do_metadata) {
+            return;
+        }
+        // Compare the glyph order, ignoring skipped glyphs since they don't have to be in the same order
+        let order1: Vec<String> = ufo1
+            .lib
+            .get(KEY_GLYPHORDER)
+            .and_then(|x| x.as_array())
+            .unwrap_or(&vec![])
+            .iter()
+            .flat_map(|x| x.as_string())
+            .map(|x| x.to_string())
+            .filter(|name| !skipped1.contains(name))
+            .collect();
+        let order2: Vec<String> = ufo2
+            .lib
+            .get(KEY_GLYPHORDER)
+            .and_then(|x| x.as_array())
+            .unwrap_or(&vec![])
+            .iter()
+            .flat_map(|x| x.as_string())
+            .map(|x| x.to_string())
+            .filter(|name| !skipped2.contains(name))
+            .collect();
+        assert_eq!(order1, order2, "Glyph order differs");
+        // Compare categories but be lenient about additional "base" allocations in UFO2
+        let categories1 = ufo1
+            .lib
+            .get(KEY_CATEGORIES)
+            .and_then(|x| x.as_dictionary())
+            .map(|dict| {
+                dict.iter()
+                    .map(|(k, v)| (k.to_string(), v.as_string().unwrap_or_default().to_string()))
+                    .collect::<HashMap<_, _>>()
+            })
+            .unwrap_or_default();
+        let categories2 = ufo2
+            .lib
+            .get(KEY_CATEGORIES)
+            .and_then(|x| x.as_dictionary())
+            .map(|dict| {
+                dict.iter()
+                    .map(|(k, v)| (k.to_string(), v.as_string().unwrap_or_default().to_string()))
+                    .collect::<HashMap<_, _>>()
+            })
+            .unwrap_or_default();
+        let base = "base".to_string();
+        for (glyph, category) in categories1.iter() {
+            let category2 = categories2.get(glyph).unwrap_or(&base);
+            assert_eq!(category, category2, "Category for glyph {} differs", glyph);
+        }
+        // Now compare all lib keys except the ones tested already
+        let all_keys = ufo1
+            .lib
+            .keys()
+            .chain(ufo2.lib.keys())
+            .filter(|k| *k != KEY_SKIP_EXPORT && *k != KEY_GLYPHORDER && *k != KEY_CATEGORIES)
+            .collect::<HashSet<_>>();
+        for key in all_keys {
+            let v1 = ufo1.lib.get(key).unwrap_or_else(|| {
+                panic!(
+                    "Lib key {} is missing in first UFO. First UFO lib keys: {:?}, Second UFO lib keys: {:?}",
+                    key,
+                    ufo1.lib.keys().collect::<Vec<_>>(),
+                    ufo2.lib.keys().collect::<Vec<_>>()
+                )
+            });
+            let v2 = ufo2.lib.get(key).unwrap_or_else(|| {
+                panic!(
+                    "Lib key {} is missing in second UFO. First UFO lib keys: {:?}, Second UFO lib keys: {:?}",
+                    key,
+                    ufo1.lib.keys().collect::<Vec<_>>(),
+                    ufo2.lib.keys().collect::<Vec<_>>()
+                )
+            });
+            assert_eq!(v1, v2, "Lib value for key {} differs", key);
+        }
+        assert_eq!(ufo1.groups, ufo2.groups);
+        assert_eq!(ufo1.features.trim(), ufo2.features.trim());
+        assert_eq!(ufo1.data, ufo2.data);
+        assert_eq!(ufo1.images, ufo2.images);
+        assert_eq!(ufo1.font_info, ufo2.font_info);
+    }
+
     #[test]
     fn test_roundtrip_1() {
         let there = crate::load("resources/NotoSans-LightItalic.ufo").unwrap();
         assert!(there.masters.len() == 1);
-        let backagain = as_norad(&there).unwrap();
+        let backagain = as_norad(&there, 0).unwrap();
         let once_more = norad::Font::load("resources/NotoSans-LightItalic.ufo").unwrap();
-        assert_eq!(there.glyphs.len(), backagain.default_layer().len());
-        assert_eq!(
-            backagain.default_layer().len(),
-            once_more.default_layer().len()
-        );
-        let backagain_layer = backagain.default_layer();
-        let once_more_layer = once_more.default_layer();
-        for name in there.glyphs.iter().map(|x| x.name.as_str()) {
-            let g1 = backagain_layer.get_glyph(name).unwrap();
-            let g2 = once_more_layer.get_glyph(name).unwrap();
-            assert_eq!(g1, g2, "Glyph {} differs", name);
-        }
 
         assert_eq!(
             there.custom_ot_values.os2_unicode_range2,
@@ -972,43 +1202,21 @@ mod tests {
                 1 << 0 | 1 << 1 | 1 << 2 | 1 << 3 | 1 << 4 | 1 << 13 | 1 << 30
             )
         );
-
-        assert_eq!(backagain.lib, once_more.lib);
-        assert_eq!(backagain.groups, once_more.groups);
-        assert_eq!(backagain.kerning, once_more.kerning);
-        assert_eq!(backagain.features.trim(), once_more.features.trim());
-        assert_eq!(backagain.data, once_more.data);
-        assert_eq!(backagain.images, once_more.images);
-        assert_eq!(backagain.font_info, once_more.font_info);
+        ufo_semantic_test(&backagain, &once_more, true);
     }
 
     #[rstest]
-    fn test_roundtrip_2(#[files("resources/*.ufo/lib.plist")] path: PathBuf) {
+    fn test_roundtrip_2(
+        #[files("resources/*.ufo/lib.plist")]
+        #[exclude("resources/NotoSans-LightItalic.ufo/lib.plist")] // Too big
+        path: PathBuf,
+    ) {
         // rstest won't let us match on *.ufo as they're directories.
         let parent = path.parent().unwrap();
         let there = crate::load(parent).unwrap();
         assert!(there.masters.len() == 1);
-        let backagain = as_norad(&there).unwrap();
+        let backagain = as_norad(&there, 0).unwrap();
         let once_more = norad::Font::load(parent).unwrap();
-        assert_eq!(there.glyphs.len(), backagain.default_layer().len());
-        assert_eq!(
-            backagain.default_layer().len(),
-            once_more.default_layer().len()
-        );
-        let backagain_layer = backagain.default_layer();
-        let once_more_layer = once_more.default_layer();
-        for name in there.glyphs.iter().map(|x| x.name.as_str()) {
-            let g1 = backagain_layer.get_glyph(name).unwrap();
-            let g2 = once_more_layer.get_glyph(name).unwrap();
-            assert_eq!(g1, g2, "Glyph {} differs", name);
-        }
-
-        assert_eq!(backagain.lib, once_more.lib);
-        assert_eq!(backagain.groups, once_more.groups);
-        assert_eq!(backagain.kerning, once_more.kerning);
-        assert_eq!(backagain.features.trim(), once_more.features.trim());
-        assert_eq!(backagain.data, once_more.data);
-        assert_eq!(backagain.images, once_more.images);
-        assert_eq!(backagain.font_info, once_more.font_info);
+        ufo_semantic_test(&backagain, &once_more, true);
     }
 }
