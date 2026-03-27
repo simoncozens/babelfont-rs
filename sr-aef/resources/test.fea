@@ -1,3 +1,7 @@
+markClass acute <anchor 350 0> @TOP_MARKS;
+markClass grave <anchor 200 150> @TOP_MARKS;
+markClass dotbelowcomb <anchor 200 -200> @BOTTOM_MARKS;
+
 lookup gsub1 { 
     sub a by b;
 } gsub1;
@@ -5,7 +9,7 @@ lookup gsub2 {
     sub a by b c;
 } gsub2;
 lookup gsub3 { 
-    sub a from [b c];
+    sub a from [b c d e f];
 } gsub3;
 lookup gsub4 { 
     sub b c by a;
@@ -16,3 +20,8 @@ lookup gsub5 {
 lookup gsub6_f1 {
     sub one two three a' lookup gsub1 b' c' lookup gsub2 x y z;
 } gsub6_f1;
+
+lookup gpos4 {
+    pos base A <anchor 150 100> mark @TOP_MARKS <anchor -200 -200> mark @BOTTOM_MARKS;
+
+} gpos4;

@@ -1,21 +1,28 @@
+use std::collections::{HashMap, HashSet};
+
 use crate::UncompileContext;
-use fea_rs_ast::{LookupBlock, Pos, Statement};
+use fea_rs_ast::{
+    Anchor as FeaAnchor, CursivePosStatement, GlyphClass, GlyphContainer, LookupBlock,
+    MarkBasePosStatement, MarkClass, MarkLigPosStatement, MarkMarkPosStatement, Metric,
+    PairPosStatement, Pos, SinglePosStatement, Statement, ValueRecord as FeaValueRecord,
+};
 use skrifa::{
-    GlyphId16,
     raw::{
-        ReadError,
         tables::{
             gpos::{
-                CursivePosFormat1, MarkBasePosFormat1, MarkLigPosFormat1, MarkMarkPosFormat1,
-                PairPos, PairPosFormat1, PairPosFormat2, PositionLookup, PositionSubtables,
-                SinglePos, SinglePosFormat1, SinglePosFormat2,
+                AnchorTable, CursivePosFormat1, MarkBasePosFormat1, MarkLigPosFormat1,
+                MarkMarkPosFormat1, PairPos, PairPosFormat1, PairPosFormat2, PositionLookup,
+                PositionSubtables, SinglePos, SinglePosFormat1, SinglePosFormat2, ValueRecord,
             },
-            gsub::LookupList,
+            gsub::{ClassDef, LookupList},
         },
+        ReadError,
     },
+    GlyphId16,
 };
+use smol_str::SmolStr;
 impl<'a> UncompileContext<'a> {
-    pub(crate) fn uncompile_pos_lookups(&mut self) -> Result<(), ReadError> {
+    pub(crate) fn uncompile_gpos_lookups(&mut self) -> Result<(), ReadError> {
         let gpos_lookup_list: LookupList<PositionLookup> = match self.gpos.as_ref() {
             Some(gpos) => gpos.lookup_list()?,
             None => return Ok(()),
@@ -106,19 +113,82 @@ impl<'a> UncompileContext<'a> {
         Ok(())
     }
 
+    fn resolve_value_record(&self, value_record: &ValueRecord) -> FeaValueRecord {
+        let x_placement = value_record.x_placement().map(Metric::from);
+        let y_placement = value_record.y_placement().map(Metric::from);
+        let x_advance = value_record.x_advance().map(Metric::from);
+        let y_advance = value_record.y_advance().map(Metric::from);
+        FeaValueRecord::new(
+            x_placement,
+            y_placement,
+            x_advance,
+            y_advance,
+            None,
+            None,
+            None,
+            None,
+            false,
+            0..0,
+            None,
+        )
+    }
+
+    fn resolve_anchor(&self, anchor: &AnchorTable) -> FeaAnchor {
+        let x = Metric::from(anchor.x_coordinate());
+        let y = Metric::from(anchor.y_coordinate());
+        println!(
+            "Found anchor at ({}, {})",
+            anchor.x_coordinate(),
+            anchor.y_coordinate()
+        );
+        FeaAnchor::new(x, y, None, None, None, None, 0..0)
+    }
+
     fn uncompile_gpos1_format1(
         &self,
         lookupblock: &mut LookupBlock,
         gpos1f1: SinglePosFormat1,
     ) -> Result<(), ReadError> {
-        todo!()
+        let input = self.resolve_coverage(&gpos1f1.coverage()?);
+        let vr = self.resolve_value_record(&gpos1f1.value_record());
+        let statement = SinglePosStatement::new(
+            vec![],
+            vec![],
+            input
+                .into_iter()
+                .map(|gid| (gid, Some(vr.clone())))
+                .collect(),
+            false,
+            0..0,
+        );
+        lookupblock.statements.push(Statement::SinglePos(statement));
+        Ok(())
     }
     fn uncompile_gpos1_format2(
         &self,
         lookupblock: &mut LookupBlock,
         gpos1f2: SinglePosFormat2,
     ) -> Result<(), ReadError> {
-        todo!()
+        let input = self.resolve_coverage(&gpos1f2.coverage()?);
+        let statement = SinglePosStatement::new(
+            vec![],
+            vec![],
+            input
+                .into_iter()
+                .zip(
+                    gpos1f2
+                        .value_records()
+                        .iter()
+                        .flatten()
+                        .map(|vr| self.resolve_value_record(&vr)),
+                )
+                .map(|(gid, vr)| (gid, Some(vr)))
+                .collect(),
+            false,
+            0..0,
+        );
+        lookupblock.statements.push(Statement::SinglePos(statement));
+        Ok(())
     }
 
     fn uncompile_gpos2_format1(
@@ -126,41 +196,278 @@ impl<'a> UncompileContext<'a> {
         lookupblock: &mut LookupBlock,
         gpos2f1: PairPosFormat1,
     ) -> Result<(), ReadError> {
-        todo!()
+        let coverage = self.resolve_coverage(&gpos2f1.coverage()?);
+        let mut statements = vec![];
+        for (glyph, pairset) in coverage
+            .into_iter()
+            .zip(gpos2f1.pair_sets().iter().flatten())
+        {
+            for pair in pairset.pair_value_records().iter().flatten() {
+                let second_glyph = self.get_name(pair.second_glyph());
+                let vr1 = self.resolve_value_record(pair.value_record1());
+                let vr2 = self.resolve_value_record(pair.value_record2());
+                statements.push(Statement::PairPos(PairPosStatement::new(
+                    glyph.clone(),
+                    GlyphContainer::GlyphName(second_glyph),
+                    vr1.clone(),
+                    if vr2.is_some() {
+                        Some(vr2.clone())
+                    } else {
+                        None
+                    },
+                    false,
+                    0..0,
+                )));
+            }
+        }
+        lookupblock.statements.extend(statements);
+        Ok(())
     }
+
     fn uncompile_gpos2_format2(
         &self,
         lookupblock: &mut LookupBlock,
         gpos2f2: PairPosFormat2,
     ) -> Result<(), ReadError> {
-        todo!()
+        let classes1 = self.resolve_classes(gpos2f2.class_def1()?);
+        let classes2 = self.resolve_classes(gpos2f2.class_def2()?);
+        for (class1, record) in gpos2f2.class1_records().iter().enumerate() {
+            let Ok(record) = record else { continue };
+            for (class2, subrecord) in record.class2_records().iter().enumerate() {
+                let Ok(subrecord) = subrecord else { continue };
+
+                let vr1 = self.resolve_value_record(subrecord.value_record1());
+                let vr2 = self.resolve_value_record(subrecord.value_record2());
+                let statement = Statement::PairPos(PairPosStatement::new(
+                    GlyphContainer::GlyphClass(GlyphClass::new(
+                        classes1.get(&(class1 as u16)).cloned().unwrap_or_default(),
+                        0..0,
+                    )),
+                    GlyphContainer::GlyphClass(GlyphClass::new(
+                        classes2.get(&(class2 as u16)).cloned().unwrap_or_default(),
+                        0..0,
+                    )),
+                    vr1.clone(),
+                    if vr2.is_some() {
+                        Some(vr2.clone())
+                    } else {
+                        None
+                    },
+                    false,
+                    0..0,
+                ));
+                lookupblock.statements.push(statement);
+            }
+        }
+        Ok(())
     }
+
     fn uncompile_gpos3(
-        &self,
+        &mut self,
         lookupblock: &mut LookupBlock,
         gpos3: CursivePosFormat1,
     ) -> Result<(), ReadError> {
-        todo!()
+        let coverage = gpos3
+            .coverage()?
+            .iter()
+            .map(|g| self.get_name(g))
+            .collect::<Vec<_>>();
+        for (glyph, entry) in coverage.into_iter().zip(gpos3.entry_exit_record()) {
+            let entry_anchor = entry
+                .entry_anchor(gpos3.offset_data())
+                .transpose()?
+                .map(|a| self.resolve_anchor(&a));
+            let exit_anchor = entry
+                .exit_anchor(gpos3.offset_data())
+                .transpose()?
+                .map(|a| self.resolve_anchor(&a));
+            if let Some(ref entry_anchor) = entry_anchor {
+                self.register_anchor(&glyph.name, entry_anchor, Some("entry"));
+            }
+            let statement = Statement::CursivePos(CursivePosStatement::new(
+                GlyphContainer::GlyphName(glyph),
+                entry_anchor,
+                exit_anchor,
+                0..0,
+            ));
+            lookupblock.statements.push(statement);
+        }
+        Ok(())
     }
     fn uncompile_gpos4(
-        &self,
+        &mut self,
         lookupblock: &mut LookupBlock,
         gpos4: MarkBasePosFormat1,
     ) -> Result<(), ReadError> {
-        todo!()
+        let mark_coverage = self.resolve_coverage(&gpos4.mark_coverage()?);
+        let base_coverage = gpos4
+            .base_coverage()?
+            .iter()
+            .map(|g| self.get_name(g))
+            .collect::<Vec<_>>();
+        let base_array = gpos4.base_array()?;
+        let mark_array = gpos4.mark_array()?;
+        let mut mark_classes: HashMap<u16, Vec<(GlyphContainer, FeaAnchor)>> = HashMap::new();
+        // Emit mark classes first
+        for (mark_glyph, mark_record) in mark_coverage.into_iter().zip(mark_array.mark_records()) {
+            let mark_anchor = mark_record.mark_anchor(mark_array.offset_data())?;
+            let mark_class = mark_record.mark_class();
+            let mark_anchor = self.resolve_anchor(&mark_anchor);
+            mark_classes
+                .entry(mark_class)
+                .or_default()
+                .push((mark_glyph, mark_anchor.clone()));
+        }
+
+        let class_to_anchor_name: Vec<SmolStr> = self.register_mark_classes(mark_classes);
+
+        for (base_glyph, base_record) in base_coverage
+            .into_iter()
+            .zip(base_array.base_records().iter().flatten())
+        {
+            let base_anchors = base_record.base_anchors(base_array.offset_data());
+            let mut anchors_mark_classes = vec![];
+            for (class_number, base_anchor) in base_anchors.iter().enumerate() {
+                if let Some(base_anchor) = base_anchor.transpose()? {
+                    let base_anchor = self.resolve_anchor(&base_anchor);
+                    let anchor_name = class_to_anchor_name
+                        .get(class_number)
+                        .cloned()
+                        .unwrap_or_else(|| format!("mark_class_{}", class_number).into());
+                    self.register_anchor(&base_glyph.name, &base_anchor, Some(&anchor_name));
+                    anchors_mark_classes.push((base_anchor, MarkClass::new(&anchor_name)));
+                }
+            }
+            let statement = Statement::MarkBasePos(MarkBasePosStatement::new(
+                GlyphContainer::GlyphName(base_glyph.clone()),
+                anchors_mark_classes,
+                0..0,
+            ));
+            lookupblock.statements.push(statement);
+        }
+        Ok(())
     }
     fn uncompile_gpos5(
-        &self,
+        &mut self,
         lookupblock: &mut LookupBlock,
         gpos5: MarkLigPosFormat1,
     ) -> Result<(), ReadError> {
-        todo!()
+        let mark_coverage = self.resolve_coverage(&gpos5.mark_coverage()?);
+        let ligature_coverage = gpos5
+            .ligature_coverage()?
+            .iter()
+            .map(|g| self.get_name(g))
+            .collect::<Vec<_>>();
+        let mark_array = gpos5.mark_array()?;
+        let ligature_array = gpos5.ligature_array()?;
+
+        let mut mark_classes: HashMap<u16, Vec<(GlyphContainer, FeaAnchor)>> = HashMap::new();
+        for (mark_glyph, mark_record) in mark_coverage.into_iter().zip(mark_array.mark_records()) {
+            let mark_anchor = mark_record.mark_anchor(mark_array.offset_data())?;
+            let mark_class = mark_record.mark_class();
+            let mark_anchor = self.resolve_anchor(&mark_anchor);
+            mark_classes
+                .entry(mark_class)
+                .or_default()
+                .push((mark_glyph, mark_anchor.clone()));
+        }
+        let class_to_anchor_name: Vec<SmolStr> = self.register_mark_classes(mark_classes);
+
+        for (ligature_glyph, ligature_attach) in ligature_coverage
+            .into_iter()
+            .zip(ligature_array.ligature_attaches().iter().flatten())
+        {
+            let mut components_anchors_mark_classes = vec![];
+            for component_record in ligature_attach.component_records().iter().flatten() {
+                let mut anchors_mark_classes = vec![];
+                for (class_number, ligature_anchor) in component_record
+                    .ligature_anchors(ligature_attach.offset_data())
+                    .iter()
+                    .enumerate()
+                {
+                    if let Some(ligature_anchor) = ligature_anchor.transpose()? {
+                        let ligature_anchor = self.resolve_anchor(&ligature_anchor);
+                        let anchor_name = class_to_anchor_name
+                            .get(class_number)
+                            .cloned()
+                            .unwrap_or_else(|| format!("mark_class_{}", class_number).into());
+                        self.register_anchor(
+                            &ligature_glyph.name,
+                            &ligature_anchor,
+                            Some(&anchor_name),
+                        );
+                        anchors_mark_classes.push((ligature_anchor, MarkClass::new(&anchor_name)));
+                    }
+                }
+                components_anchors_mark_classes.push(anchors_mark_classes);
+            }
+
+            let statement = Statement::MarkLigPos(MarkLigPosStatement::new(
+                GlyphContainer::GlyphName(ligature_glyph),
+                components_anchors_mark_classes,
+                0..0,
+            ));
+            lookupblock.statements.push(statement);
+        }
+
+        Ok(())
     }
     fn uncompile_gpos6(
-        &self,
+        &mut self,
         lookupblock: &mut LookupBlock,
         gpos6: MarkMarkPosFormat1,
     ) -> Result<(), ReadError> {
-        todo!()
+        let mark1_coverage = self.resolve_coverage(&gpos6.mark1_coverage()?);
+        let mark2_coverage = gpos6
+            .mark2_coverage()?
+            .iter()
+            .map(|g| self.get_name(g))
+            .collect::<Vec<_>>();
+        let mark1_array = gpos6.mark1_array()?;
+        let mark2_array = gpos6.mark2_array()?;
+
+        let mut mark_classes: HashMap<u16, Vec<(GlyphContainer, FeaAnchor)>> = HashMap::new();
+        for (mark_glyph, mark_record) in mark1_coverage.into_iter().zip(mark1_array.mark_records())
+        {
+            let mark_anchor = mark_record.mark_anchor(mark1_array.offset_data())?;
+            let mark_class = mark_record.mark_class();
+            let mark_anchor = self.resolve_anchor(&mark_anchor);
+            mark_classes
+                .entry(mark_class)
+                .or_default()
+                .push((mark_glyph, mark_anchor.clone()));
+        }
+        let class_to_anchor_name: Vec<SmolStr> = self.register_mark_classes(mark_classes);
+
+        for (mark2_glyph, mark2_record) in mark2_coverage
+            .into_iter()
+            .zip(mark2_array.mark2_records().iter().flatten())
+        {
+            let mut anchors_mark_classes = vec![];
+            for (class_number, mark2_anchor) in mark2_record
+                .mark2_anchors(mark2_array.offset_data())
+                .iter()
+                .enumerate()
+            {
+                if let Some(mark2_anchor) = mark2_anchor.transpose()? {
+                    let mark2_anchor = self.resolve_anchor(&mark2_anchor);
+                    let anchor_name = class_to_anchor_name
+                        .get(class_number)
+                        .cloned()
+                        .unwrap_or_else(|| format!("mark_class_{}", class_number).into());
+                    self.register_anchor(&mark2_glyph.name, &mark2_anchor, Some(&anchor_name));
+                    anchors_mark_classes.push((mark2_anchor, MarkClass::new(&anchor_name)));
+                }
+            }
+
+            let statement = Statement::MarkMarkPos(MarkMarkPosStatement::new(
+                GlyphContainer::GlyphName(mark2_glyph),
+                anchors_mark_classes,
+                0..0,
+            ));
+            lookupblock.statements.push(statement);
+        }
+
+        Ok(())
     }
 }

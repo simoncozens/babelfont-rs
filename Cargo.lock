@@ -661,9 +661,9 @@ dependencies = [
 
 [[package]]
 name = "fea-rs-ast"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa22f3a477582cdd56c1fc62982810032b80519a7130008a59c4b4a4c787d779"
+checksum = "2dffa04ab9c4d7dfa8e14ab5ba34413197c668955b7e7be89f57da6f5c0442e4"
 dependencies = [
  "fea-rs 0.22.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "indexmap 2.13.0",
@@ -1948,12 +1948,22 @@ dependencies = [
 
 [[package]]
 name = "smol_str"
-version = "0.3.5"
+version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f7a918bd2a9951d18ee6e48f076843e8e73a9a5d22cf05bcd4b7a81bdd04e17"
+checksum = "4aaa7368fcf4852a4c2dd92df0cace6a71f2091ca0a23391ce7f3a31833f1523"
 dependencies = [
  "borsh",
  "serde_core",
+]
+
+[[package]]
+name = "sr-aef"
+version = "0.1.0"
+dependencies = [
+ "fea-rs-ast",
+ "indexmap 2.13.0",
+ "skrifa",
+ "smol_str",
 ]
 
 [[package]]

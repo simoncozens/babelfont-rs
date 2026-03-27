@@ -1,13 +1,13 @@
 use crate::UncompileContext;
 use fea_rs_ast::{ChainedContextStatement, GlyphContainer, SubOrPos};
 use skrifa::raw::{
-    ReadError,
     tables::{gsub::ChainedSequenceContext, layout::SequenceContext},
+    ReadError,
 };
 
 impl<'a> UncompileContext<'a> {
     pub(crate) fn uncompile_sequence_context<T: SubOrPos>(
-        &self,
+        &mut self,
         sequence: SequenceContext,
         sub_or_pos: T,
     ) -> Result<Vec<ChainedContextStatement<T>>, ReadError> {
@@ -76,7 +76,7 @@ impl<'a> UncompileContext<'a> {
         Ok(statements)
     }
     pub fn uncompile_chain_sequence_context<T: SubOrPos>(
-        &self,
+        &mut self,
         chainsequence: ChainedSequenceContext,
         sub_or_pos: T,
     ) -> Result<Vec<ChainedContextStatement<T>>, ReadError> {
