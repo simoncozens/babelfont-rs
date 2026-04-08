@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use crate::UncompileContext;
 use fea_rs_ast::{
@@ -6,20 +6,17 @@ use fea_rs_ast::{
     MarkBasePosStatement, MarkClass, MarkLigPosStatement, MarkMarkPosStatement, Metric,
     PairPosStatement, Pos, SinglePosStatement, Statement, ValueRecord as FeaValueRecord,
 };
-use skrifa::{
-    raw::{
+use skrifa::raw::{
+        ReadError,
         tables::{
             gpos::{
                 AnchorTable, CursivePosFormat1, MarkBasePosFormat1, MarkLigPosFormat1,
                 MarkMarkPosFormat1, PairPos, PairPosFormat1, PairPosFormat2, PositionLookup,
                 PositionSubtables, SinglePos, SinglePosFormat1, SinglePosFormat2, ValueRecord,
             },
-            gsub::{ClassDef, LookupList},
+            gsub::LookupList,
         },
-        ReadError,
-    },
-    GlyphId16,
-};
+    };
 use smol_str::SmolStr;
 impl<'a> UncompileContext<'a> {
     pub(crate) fn uncompile_gpos_lookups(&mut self) -> Result<(), ReadError> {

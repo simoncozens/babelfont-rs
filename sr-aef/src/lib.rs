@@ -1,25 +1,24 @@
 use std::collections::{HashMap, HashSet};
 
 use fea_rs_ast::{
-    fea_rs::typed::Glyph, Anchor, ChainedContextStatement, FeatureFile, GlyphClass,
-    GlyphClassDefinition, GlyphContainer, GlyphName, LanguageSystemStatement, LookupBlock,
-    MarkClass, MarkClassDefinition, SubOrPos, ToplevelItem,
+    Anchor, FeatureFile, GlyphClass, GlyphClassDefinition, GlyphContainer,
+    GlyphName, LanguageSystemStatement, LookupBlock, MarkClass, MarkClassDefinition,
+    ToplevelItem,
 };
 use indexmap::{IndexMap, IndexSet};
 use skrifa::{
+    FontRef, GlyphId, GlyphId16, GlyphNames, Tag,
     raw::{
+        ReadError, TableProvider,
         tables::{
             gdef::Gdef,
             gpos::Gpos,
             gsub::{
-                ChainedSequenceContext, ClassDef, Gsub, ReverseChainSingleSubstFormat1,
-                SequenceContext,
+                ClassDef, Gsub,
             },
             layout::CoverageTable,
         },
-        ReadError, TableProvider,
     },
-    FontRef, GlyphId, GlyphId16, GlyphNames, Tag,
 };
 use smol_str::SmolStr;
 
@@ -80,7 +79,7 @@ impl<'a> UncompileContext<'a> {
         mark_classes: HashMap<u16, Vec<(GlyphContainer, Anchor)>>,
     ) -> Vec<SmolStr> {
         let mut class_names = vec![];
-        for (class_id, anchors) in mark_classes.iter() {
+        for (_class_id, anchors) in mark_classes.iter() {
             let class_name = format!("mark_class_{}", self.mark_classes.len());
             let definitions = anchors
                 .iter()
@@ -162,7 +161,7 @@ impl<'a> UncompileContext<'a> {
 
         if glyphs.len() >= PROMOTE_TO_NAMED_CLASS_THRESHOLD {
             // Have we seen this exact set of glyphs before (in order)? If so, reuse the same class. Otherwise, make a new one.
-            if let Some(class_name) = self
+            if let Some(_class_name) = self
                 .named_classes
                 .iter()
                 .find(|(_, class)| class.glyphs == glyphclass.glyphs)
@@ -267,6 +266,9 @@ mod tests {
         let data = std::fs::read("resources/test.ttf").unwrap();
         let fontref = FontRef::new(&data).unwrap();
         let ff = uncompile(&fontref).unwrap();
-        assert_eq!(ff.as_fea(""), "markClass grave <anchor 200 150> @mark_class_1;\nmarkClass acute <anchor 350 0> @mark_class_1;\nmarkClass dotbelowcomb <anchor 200 -200> @mark_class_0;\nlookup gsub_single_1 {\n    sub a by b;\n} gsub_single_1;\nlookup gsub_multiple_1 {\n    sub a by b c;\n} gsub_multiple_1;\nlookup gsub_alternate_1 {\n    sub a from [b c d e f];\n} gsub_alternate_1;\nlookup gsub_ligature_1 {\n    sub b c by a;\n} gsub_ligature_1;\nlookup gsub_contextual_1 {\n    sub [one a]' lookup lookup_0 b' [two c]' lookup lookup_1;\n} gsub_contextual_1;\nlookup gsub_chain_contextual_1 {\n    sub one two three a' lookup lookup_0 b' c' lookup lookup_1 x y z;\n} gsub_chain_contextual_1;\nlookup gpos_mark_to_base_1 {\n    pos base A\n        <anchor 150 100> mark @mark_class_0\n        <anchor -200 -200> mark @mark_class_1;\n} gpos_mark_to_base_1;\n");
+        assert_eq!(
+            ff.as_fea(""),
+            "markClass grave <anchor 200 150> @mark_class_1;\nmarkClass acute <anchor 350 0> @mark_class_1;\nmarkClass dotbelowcomb <anchor 200 -200> @mark_class_0;\nlookup gsub_single_1 {\n    sub a by b;\n} gsub_single_1;\nlookup gsub_multiple_1 {\n    sub a by b c;\n} gsub_multiple_1;\nlookup gsub_alternate_1 {\n    sub a from [b c d e f];\n} gsub_alternate_1;\nlookup gsub_ligature_1 {\n    sub b c by a;\n} gsub_ligature_1;\nlookup gsub_contextual_1 {\n    sub [one a]' lookup lookup_0 b' [two c]' lookup lookup_1;\n} gsub_contextual_1;\nlookup gsub_chain_contextual_1 {\n    sub one two three a' lookup lookup_0 b' c' lookup lookup_1 x y z;\n} gsub_chain_contextual_1;\nlookup gpos_mark_to_base_1 {\n    pos base A\n        <anchor 150 100> mark @mark_class_0\n        <anchor -200 -200> mark @mark_class_1;\n} gpos_mark_to_base_1;\n"
+        );
     }
 }

@@ -1,8 +1,8 @@
 use crate::UncompileContext;
 use fea_rs_ast::{ChainedContextStatement, GlyphContainer, SubOrPos};
 use skrifa::raw::{
-    tables::{gsub::ChainedSequenceContext, layout::SequenceContext},
     ReadError,
+    tables::{gsub::ChainedSequenceContext, layout::SequenceContext},
 };
 
 impl<'a> UncompileContext<'a> {
@@ -52,7 +52,7 @@ impl<'a> UncompileContext<'a> {
                     }
                 }
             }
-            SequenceContext::Format2(table_ref) => {
+            SequenceContext::Format2(_table_ref) => {
                 unimplemented!("SequenceContext Format 2 is not supported yet");
             }
             SequenceContext::Format3(table_ref) => {
@@ -134,7 +134,7 @@ impl<'a> UncompileContext<'a> {
                     }
                 }
             }
-            ChainedSequenceContext::Format2(table_ref) => {
+            ChainedSequenceContext::Format2(_table_ref) => {
                 unimplemented!("ChainedSequenceContext Format 2 is not supported yet")
             }
             ChainedSequenceContext::Format3(table_ref) => {
