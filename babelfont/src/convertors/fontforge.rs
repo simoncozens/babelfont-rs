@@ -26,6 +26,12 @@ static FEATURE_NAME_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r#"'(?P<tag>.{4})'\s+(?P<lang>\d+)\s+"(?P<name>.+)""#).unwrap()
 });
 
+const GENERATED_KERN_SUBTABLE: &str = "generated_kern";
+const HEADER_VERSION_KEY: &str = "sfd.splinefontdb_version";
+const COMMENT_ENTRIES_KEY: &str = "sfd.comment_entries";
+const HSTEM_KEY: &str = "sfd.HStem";
+const VSTEM_KEY: &str = "sfd.VStem";
+
 /// A parser for the FontForge SFD/SFDir text format.
 struct SfdParser {
     path: PathBuf,
@@ -47,6 +53,8 @@ struct LayerDefinition {
     name: Option<String>,
     #[allow(dead_code)]
     is_quadratic: bool,
+    #[allow(dead_code)]
+    flags: usize,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -116,11 +124,11 @@ impl SfdParser {
                     "Not an SFD directory: missing font.props".to_string(),
                 ));
             }
-            let content = fs::read_to_string(props)?;
+            let content = read_file_lossy(&props)?;
             return Ok(content.lines().map(|l| l.to_string()).collect());
         }
 
-        let content = fs::read_to_string(&self.path)?;
+        let content = read_file_lossy(&self.path)?;
         Ok(content.lines().map(|l| l.to_string()).collect())
     }
 
@@ -173,7 +181,6 @@ impl SfdParser {
 
         let mut i = 0usize;
         let mut first_line_checked = false;
-
         // Storage for glyph block
         let mut char_data: Option<Vec<String>> = None;
 
@@ -196,11 +203,15 @@ impl SfdParser {
                 continue;
             }
 
-            let (key, value) = if let Some(pos) = raw_line.find(':') {
+            let (key, value, raw_value) = if let Some(pos) = raw_line.find(':') {
                 let (k, v) = raw_line.split_at(pos);
-                (k.trim().to_string(), Some(v[1..].trim().to_string()))
+                (
+                    k.trim().to_string(),
+                    Some(v[1..].trim().to_string()),
+                    Some(v[1..].to_string()),
+                )
             } else {
-                (raw_line.trim().to_string(), None)
+                (raw_line.trim().to_string(), None, None)
             };
 
             if !first_line_checked {
@@ -211,14 +222,25 @@ impl SfdParser {
                     ));
                 }
                 // println!("SplineFontDB version {}", value.unwrap_or_default());
+                if let Some(v) = value {
+                    self.font
+                        .format_specific
+                        .insert(HEADER_VERSION_KEY.to_string(), serde_json::Value::String(v));
+                }
                 continue;
             }
 
             match key.as_str() {
                 // Sections with explicit start/end markers
                 "BeginPrivate" => {
-                    let (_section, next_i) =
+                    let (section, next_i) =
                         self.get_section(&data, i, "EndPrivate", value.as_deref());
+                    self.font.format_specific.insert(
+                        "sfd.private_section".to_string(),
+                        serde_json::Value::Array(
+                            section.into_iter().map(serde_json::Value::String).collect(),
+                        ),
+                    );
                     // println!(
                     //     "BeginPrivate: captured {} lines (end marker EndPrivate)",
                     //     section.len()
@@ -227,7 +249,32 @@ impl SfdParser {
                     i = next_i;
                 }
                 "BeginChars" => {
+                    if let Some(v) = &value {
+                        let mut parts = v.split_whitespace();
+                        if let Some(first) = parts.next() {
+                            if let Ok(slots) = first.parse::<usize>() {
+                                self.font.format_specific.insert(
+                                    "sfd.beginchars_slots".to_string(),
+                                    serde_json::Value::Number(slots.into()),
+                                );
+                            }
+                        }
+                        if let Some(second) = parts.next() {
+                            if let Ok(count) = second.parse::<usize>() {
+                                self.font.format_specific.insert(
+                                    "sfd.beginchars_count".to_string(),
+                                    serde_json::Value::Number(count.into()),
+                                );
+                            }
+                        }
+                    }
                     let (section, next_i) = self.get_section(&data, i, "EndChars", None);
+                    self.font.format_specific.insert(
+                        "sfd.beginchars_blank_line".to_string(),
+                        serde_json::Value::Bool(
+                            section.first().map(|line| line.is_empty()).unwrap_or(false),
+                        ),
+                    );
                     char_data = Some(section);
                     i = next_i;
                 }
@@ -289,6 +336,10 @@ impl SfdParser {
                         if let Some(v) = &value {
                             self.parse_lookup(v);
                         }
+                    } else if let Some(v) = &value {
+                        self.font
+                            .format_specific
+                            .insert(key.clone(), serde_json::Value::String(v.clone()));
                     } else {
                         // These keys will receive real parsing later; for now we just log.
                         // println!("{key}: {}", value.unwrap_or_default());
@@ -300,9 +351,17 @@ impl SfdParser {
                 "LayerCount" => {
                     if let Some(Ok(count)) = value.as_ref().map(|v| v.parse::<usize>()) {
                         self.layer_defs = vec![None; count];
+                        self.font.format_specific.insert(
+                            "sfd.has_header_layers".to_string(),
+                            serde_json::Value::Bool(true),
+                        );
                     }
                 }
                 "Layer" => {
+                    self.font.format_specific.insert(
+                        "sfd.has_header_layers".to_string(),
+                        serde_json::Value::Bool(true),
+                    );
                     if let Some(v) = &value {
                         self.parse_layer_def(v);
                     }
@@ -359,6 +418,14 @@ impl SfdParser {
                 }
                 "LangName" => {
                     if let Some(v) = &value {
+                        let entry = self
+                            .font
+                            .format_specific
+                            .entry("sfd.lang_names".to_string())
+                            .or_insert_with(|| serde_json::Value::Array(Vec::new()));
+                        if let serde_json::Value::Array(arr) = entry {
+                            arr.push(serde_json::Value::String(v.clone()));
+                        }
                         self.parse_language_specific_name(v);
                     }
                 }
@@ -412,6 +479,9 @@ impl SfdParser {
                 "FSType" => {
                     if let Some(Ok(v)) = &value.map(|v| v.parse::<u16>()) {
                         self.font.custom_ot_values.os2_fs_type = Some(*v);
+                        self.font
+                            .format_specific
+                            .insert("sfd.has_fstype".to_string(), serde_json::Value::Bool(true));
                     }
                 }
                 "TTFWeight" | "PfmWeight" => {
@@ -438,7 +508,11 @@ impl SfdParser {
                     }
                 }
                 "OSVendor" => {
-                    if let Some(v) = &value.and_then(|s| tag_from_string(&s).ok()) {
+                    if let Some(v) = &value
+                        .as_ref()
+                        .map(|s| s.trim_matches('\''))
+                        .and_then(|s| tag_from_string(s).ok())
+                    {
                         self.font.custom_ot_values.os2_vendor_id = Some(*v);
                     }
                 }
@@ -448,12 +522,42 @@ impl SfdParser {
                     }
                 }
                 "OS2_UseTypoMetrics" => {
+                    if let Some(v) = &value {
+                        self.font.format_specific.insert(
+                            "OS2_UseTypoMetrics".to_string(),
+                            serde_json::Value::String(v.clone()),
+                        );
+                    }
                     let current_fstype = self.font.custom_ot_values.os2_fs_type.unwrap_or(0);
-                    self.font.custom_ot_values.os2_fs_type = Some(current_fstype | 1 << 7);
+                    let enabled = value
+                        .as_deref()
+                        .and_then(|v| v.parse::<u16>().ok())
+                        .unwrap_or(1)
+                        != 0;
+                    self.font.custom_ot_values.os2_fs_type = Some(if enabled {
+                        current_fstype | 1 << 7
+                    } else {
+                        current_fstype & !(1 << 7)
+                    });
                 }
                 "OS2_WeightWidthSlopeOnly" => {
+                    if let Some(v) = &value {
+                        self.font.format_specific.insert(
+                            "OS2_WeightWidthSlopeOnly".to_string(),
+                            serde_json::Value::String(v.clone()),
+                        );
+                    }
                     let current_fstype = self.font.custom_ot_values.os2_fs_type.unwrap_or(0);
-                    self.font.custom_ot_values.os2_fs_type = Some(current_fstype | 1 << 8);
+                    let enabled = value
+                        .as_deref()
+                        .and_then(|v| v.parse::<u16>().ok())
+                        .unwrap_or(1)
+                        != 0;
+                    self.font.custom_ot_values.os2_fs_type = Some(if enabled {
+                        current_fstype | 1 << 8
+                    } else {
+                        current_fstype & !(1 << 8)
+                    });
                 }
                 "OS2CodePages" => {
                     // These are stored as period-separated hex strings
@@ -489,7 +593,11 @@ impl SfdParser {
                     }
                 }
                 "OS2Vendor" => {
-                    if let Some(v) = &value.and_then(|s| tag_from_string(&s).ok()) {
+                    if let Some(v) = &value
+                        .as_ref()
+                        .map(|s| s.trim_matches('\''))
+                        .and_then(|s| tag_from_string(s).ok())
+                    {
                         self.font.custom_ot_values.os2_vendor_id = Some(*v);
                     }
                 }
@@ -508,7 +616,7 @@ impl SfdParser {
                 "DisplayLayer" | "DisplaySize" | "AntiAlias" | "FitToEm" | "WinInfo"
                 | "Encoding" | "sfntRevision" | "WidthSeparation" | "ModificationTime"
                 | "PfmFamily" | "OS2Version" | "XUID" | "UnicodeInterp" | "NameList" | "DEI"
-                | "TeXData" | "InvalidEm" | "woffMajor" | "woffMinor" => {
+                | "NeedsXUIDChange" | "TeXData" | "InvalidEm" | "woffMajor" | "woffMinor" => {
                     if let Some(v) = &value {
                         self.font
                             .format_specific
@@ -519,6 +627,9 @@ impl SfdParser {
                 "CreationTime" => {
                     // Capture creation time as a timestamp
                     if let Some(v) = &value {
+                        self.font
+                            .format_specific
+                            .insert(key.clone(), serde_json::Value::String(v.clone()));
                         if let Some(ts) = DateTime::<chrono::Utc>::from_timestamp_secs(
                             v.parse::<i64>().map_err(|_| {
                                 BabelfontError::General(
@@ -532,6 +643,7 @@ impl SfdParser {
                 }
                 "Comments" | "FontLog" => {
                     if let Some(v) = &value {
+                        self.push_comment_entry(&key, raw_value.as_deref().unwrap_or(""));
                         if let Some(mut note) = self.font.note.take() {
                             note.push_str(v);
                             note.push('\n');
@@ -543,6 +655,8 @@ impl SfdParser {
                 }
                 "UComments" => {
                     if let Some(v) = &value {
+                        self.push_comment_entry(&key, raw_value.as_deref().unwrap_or(""));
+                        let v = v.trim_matches('"');
                         if let Some(mut note) = self.font.note.take() {
                             note.push_str(v);
                             note.push('\n');
@@ -575,13 +689,18 @@ impl SfdParser {
 
     fn parse_layer_def(&mut self, value: &str) {
         // Expected format: "<idx> <quadratic> \"Name\" <flags>"; we ignore flags
-        let parts: Vec<&str> = value.split_whitespace().collect();
+        let tokenized = Self::tokenize_preserving_quotes(value);
+        let parts: Vec<&str> = tokenized.iter().map(String::as_str).collect();
         if parts.len() < 3 {
             return;
         }
         let idx = parts[0].parse::<usize>().ok();
         let quadratic = parts[1] == "1";
         let name = parts[2].trim_matches('"').to_string();
+        let flags = parts
+            .last()
+            .and_then(|s| s.parse::<usize>().ok())
+            .unwrap_or(0);
         if let Some(i) = idx {
             if self.layer_defs.len() <= i {
                 self.layer_defs.resize(i + 1, None);
@@ -589,7 +708,58 @@ impl SfdParser {
             self.layer_defs[i] = Some(LayerDefinition {
                 name: Some(name),
                 is_quadratic: quadratic,
+                flags,
             });
+            let serialized_defs: Vec<serde_json::Value> = self
+                .layer_defs
+                .iter()
+                .enumerate()
+                .filter_map(|(index, def)| {
+                    let def = def.as_ref()?;
+                    let mut obj = serde_json::Map::new();
+                    obj.insert(
+                        "index".to_string(),
+                        serde_json::Value::Number((index as u64).into()),
+                    );
+                    obj.insert(
+                        "name".to_string(),
+                        serde_json::Value::String(def.name.clone().unwrap_or_default()),
+                    );
+                    obj.insert(
+                        "is_quadratic".to_string(),
+                        serde_json::Value::Bool(def.is_quadratic),
+                    );
+                    obj.insert(
+                        "flags".to_string(),
+                        serde_json::Value::Number((def.flags as u64).into()),
+                    );
+                    Some(serde_json::Value::Object(obj))
+                })
+                .collect();
+            self.font.format_specific.insert(
+                "sfd.layer_defs".to_string(),
+                serde_json::Value::Array(serialized_defs),
+            );
+        }
+    }
+
+    fn push_comment_entry(&mut self, key: &str, raw_value: &str) {
+        let entry = self
+            .font
+            .format_specific
+            .entry(COMMENT_ENTRIES_KEY.to_string())
+            .or_insert_with(|| serde_json::Value::Array(Vec::new()));
+        if let serde_json::Value::Array(entries) = entry {
+            let mut object = serde_json::Map::new();
+            object.insert(
+                "key".to_string(),
+                serde_json::Value::String(key.to_string()),
+            );
+            object.insert(
+                "raw".to_string(),
+                serde_json::Value::String(raw_value.to_string()),
+            );
+            entries.push(serde_json::Value::Object(object));
         }
     }
 
@@ -640,6 +810,34 @@ impl SfdParser {
                 (line.trim(), None)
             };
 
+            // Some SFDs omit the literal "SplineSet" marker and place spline
+            // segment lines directly after Fore/Back/Layer, terminated by EndSplineSet.
+            if current_layer_idx.is_some() && Self::looks_like_spline_line(key) {
+                let mut section = vec![line.to_string()];
+                while idx < data.len() {
+                    let next_line = &data[idx];
+                    idx += 1;
+                    if next_line.trim() == "EndSplineSet" {
+                        break;
+                    }
+                    section.push(next_line.to_string());
+                }
+                if let Some(layer_idx) = current_layer_idx {
+                    if let Some(layer_pos) = layer_map.get(&layer_idx) {
+                        let paths = Self::splines_to_path(&section)?;
+                        let layer = &mut glyph.layers[*layer_pos];
+                        layer.format_specific.insert(
+                            "sfd.explicit_splineset".to_string(),
+                            serde_json::Value::Bool(false),
+                        );
+                        layer
+                            .shapes
+                            .extend(paths.into_iter().map(Shape::Path).collect::<Vec<Shape>>());
+                    }
+                }
+                continue;
+            }
+
             match key {
                 "Width" => {
                     if let Some(v) = value.and_then(|v| v.parse::<f32>().ok()) {
@@ -655,15 +853,63 @@ impl SfdParser {
                         );
                     }
                 }
+                "Flags" => {
+                    if let Some(v) = value {
+                        glyph.format_specific.insert(
+                            "sfd.flags".to_string(),
+                            serde_json::Value::String(v.to_string()),
+                        );
+                        glyph.format_specific.insert(
+                            "sfd.changed_since_last_hinted".to_string(),
+                            serde_json::Value::Bool(v.contains('H')),
+                        );
+                        glyph.format_specific.insert(
+                            "sfd.manual_hints".to_string(),
+                            serde_json::Value::Bool(v.contains('M')),
+                        );
+                        glyph.format_specific.insert(
+                            "sfd.width_set".to_string(),
+                            serde_json::Value::Bool(v.contains('W')),
+                        );
+                        glyph.format_specific.insert(
+                            "sfd.editor_state_saved".to_string(),
+                            serde_json::Value::Bool(v.contains('O')),
+                        );
+                        glyph.format_specific.insert(
+                            "sfd.instructions_out_of_date".to_string(),
+                            serde_json::Value::Bool(v.contains('I')),
+                        );
+                    }
+                }
                 "Encoding" => {
                     if let Some(v) = value {
                         let parts: Vec<&str> = v.split_whitespace().collect();
+                        if let Some(slot) = parts.first().and_then(|p| p.parse::<i64>().ok()) {
+                            glyph.format_specific.insert(
+                                "sfd.encoding_slot".to_string(),
+                                serde_json::Value::Number(slot.into()),
+                            );
+                        }
+                        glyph.format_specific.insert(
+                            "sfd.encoding_has_gid".to_string(),
+                            serde_json::Value::Bool(parts.len() >= 3),
+                        );
                         if parts.len() >= 2 {
                             if let Ok(cp) = parts[1].parse::<i32>() {
+                                glyph.format_specific.insert(
+                                    "sfd.encoding_unicode".to_string(),
+                                    serde_json::Value::Number((cp as i64).into()),
+                                );
                                 if cp >= 0 {
                                     codepoints.push(cp as u32);
                                 }
                             }
+                        }
+                        if let Some(orig_gid) = parts.get(2).and_then(|p| p.parse::<i64>().ok()) {
+                            glyph.format_specific.insert(
+                                "sfd.encoding_gid".to_string(),
+                                serde_json::Value::Number(orig_gid.into()),
+                            );
                         }
                     }
                 }
@@ -705,6 +951,10 @@ impl SfdParser {
                         if let Some(layer_pos) = layer_map.get(&layer_idx) {
                             let paths = Self::splines_to_path(&section)?;
                             let layer = &mut glyph.layers[*layer_pos];
+                            layer.format_specific.insert(
+                                "sfd.explicit_splineset".to_string(),
+                                serde_json::Value::Bool(true),
+                            );
                             layer
                                 .shapes
                                 .extend(paths.into_iter().map(Shape::Path).collect::<Vec<Shape>>());
@@ -742,6 +992,26 @@ impl SfdParser {
                         self.parse_kerns(glyph_name, v);
                     }
                 }
+                "HStem" | "VStem" => {
+                    if let Some(v) = value {
+                        let layer_pos = Self::ensure_default_foreground_layer(
+                            &mut glyph,
+                            &mut layer_map,
+                            width.unwrap_or(0.0),
+                            self.layer_defs.get(1).and_then(|d| d.as_ref()),
+                            master_id,
+                        );
+                        let layer = &mut glyph.layers[layer_pos];
+                        layer.format_specific.insert(
+                            if key == "HStem" {
+                                HSTEM_KEY.to_string()
+                            } else {
+                                VSTEM_KEY.to_string()
+                            },
+                            serde_json::Value::String(v.to_string()),
+                        );
+                    }
+                }
                 "LCarets2" => {
                     if let Some(v) = value {
                         glyph.format_specific.insert(
@@ -766,6 +1036,14 @@ impl SfdParser {
                         serde_json::Value::Bool(true),
                     );
                 }
+                "Comment" => {
+                    if let Some(v) = value {
+                        glyph.format_specific.insert(
+                            "sfd.comment".to_string(),
+                            serde_json::Value::String(v.to_string()),
+                        );
+                    }
+                }
                 "AnchorPoint" => {
                     if let Some(v) = value {
                         if let Some(layer_idx) = current_layer_idx {
@@ -778,7 +1056,12 @@ impl SfdParser {
                         }
                     }
                 }
-                "LayerCount" => {}
+                "LayerCount" => {
+                    glyph.format_specific.insert(
+                        "sfd.has_layer_count".to_string(),
+                        serde_json::Value::Bool(true),
+                    );
+                }
                 "Colour" => {
                     if let Some(v) = value {
                         if let Some(layer_idx) = current_layer_idx {
@@ -820,15 +1103,17 @@ impl SfdParser {
             }
         }
 
-        // If we got to the end and there were no layers, add one
-        Self::ensure_layer(
-            &mut glyph,
-            &mut layer_map,
-            1,
-            width.unwrap_or(0.0),
-            self.layer_defs.get(1).and_then(|d| d.as_ref()),
-            master_id,
-        );
+        // If we got to the end and there were no layers, add one.
+        if glyph.layers.is_empty() {
+            Self::ensure_layer(
+                &mut glyph,
+                &mut layer_map,
+                1,
+                width.unwrap_or(0.0),
+                self.layer_defs.get(1).and_then(|d| d.as_ref()),
+                master_id,
+            );
+        }
 
         glyph.codepoints = codepoints;
         Ok(glyph)
@@ -877,6 +1162,17 @@ impl SfdParser {
         let pos = glyph.layers.len();
         glyph.layers.push(layer);
         layer_map.insert(layer_idx, pos);
+    }
+
+    fn ensure_default_foreground_layer(
+        glyph: &mut Glyph,
+        layer_map: &mut std::collections::HashMap<usize, usize>,
+        width: f32,
+        def: Option<&LayerDefinition>,
+        master_id: &str,
+    ) -> usize {
+        Self::ensure_layer(glyph, layer_map, 1, width, def, master_id);
+        layer_map.get(&1).copied().unwrap_or(0)
     }
 
     fn parse_language_specific_name(&mut self, v: &str) {
@@ -1532,6 +1828,7 @@ impl SfdParser {
     fn splines_to_path(spline_lines: &[String]) -> Result<Vec<Path>, BabelfontError> {
         let mut paths = Vec::new();
         let mut nodes = Vec::new();
+        let mut last_point_flags: Option<String> = None;
 
         for line in spline_lines {
             let line = line.trim();
@@ -1548,10 +1845,11 @@ impl SfdParser {
                 if !nodes.is_empty() {
                     paths.push(Path {
                         nodes: nodes.clone(),
-                        closed: true,
+                        closed: !Self::is_force_open_path(last_point_flags.as_deref()),
                         ..Default::default()
                     });
                     nodes.clear();
+                    last_point_flags = None;
                 }
                 continue;
             }
@@ -1566,31 +1864,44 @@ impl SfdParser {
                         if !nodes.is_empty() {
                             paths.push(Path {
                                 nodes: nodes.clone(),
-                                closed: true,
+                                closed: !Self::is_force_open_path(last_point_flags.as_deref()),
                                 ..Default::default()
                             });
                             nodes.clear();
+                            last_point_flags = None;
                         }
                         if let Some((x, y)) = points.first() {
+                            let mut format_specific = FormatSpecific::default();
+                            format_specific.insert(
+                                "sfd.point_flags".to_string(),
+                                serde_json::Value::String(flags.clone()),
+                            );
                             nodes.push(Node {
                                 x: *x,
                                 y: *y,
                                 nodetype: NodeType::Move,
                                 smooth,
-                                format_specific: Default::default(),
+                                format_specific,
                             });
+                            last_point_flags = Some(flags.clone());
                         }
                     }
                     'l' => {
                         // Line: add a line node
                         if let Some((x, y)) = points.first() {
+                            let mut format_specific = FormatSpecific::default();
+                            format_specific.insert(
+                                "sfd.point_flags".to_string(),
+                                serde_json::Value::String(flags.clone()),
+                            );
                             nodes.push(Node {
                                 x: *x,
                                 y: *y,
                                 nodetype: NodeType::Line,
                                 smooth,
-                                format_specific: Default::default(),
+                                format_specific,
                             });
+                            last_point_flags = Some(flags.clone());
                         }
                     }
                     'c' => {
@@ -1607,13 +1918,19 @@ impl SfdParser {
                                 });
                             } else {
                                 // Final on-curve point
+                                let mut format_specific = FormatSpecific::default();
+                                format_specific.insert(
+                                    "sfd.point_flags".to_string(),
+                                    serde_json::Value::String(flags.clone()),
+                                );
                                 nodes.push(Node {
                                     x: *x,
                                     y: *y,
                                     nodetype: NodeType::Curve,
                                     smooth,
-                                    format_specific: Default::default(),
+                                    format_specific,
                                 });
+                                last_point_flags = Some(flags.clone());
                             }
                         }
                     }
@@ -1626,12 +1943,34 @@ impl SfdParser {
         if !nodes.is_empty() {
             paths.push(Path {
                 nodes: nodes.clone(),
-                closed: true,
+                closed: !Self::is_force_open_path(last_point_flags.as_deref()),
                 ..Default::default()
             });
         }
 
         Ok(paths)
+    }
+
+    fn is_force_open_path(flags: Option<&str>) -> bool {
+        let Some(raw) = flags else {
+            return false;
+        };
+        let parsed = Self::parse_point_flags(raw).unwrap_or(0);
+        (parsed & 0x400) != 0
+    }
+
+    fn parse_point_flags(flags: &str) -> Option<u32> {
+        let token = flags
+            .split(',')
+            .next()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())?;
+
+        if let Some(hex) = token.strip_prefix("0x") {
+            u32::from_str_radix(hex, 16).ok()
+        } else {
+            token.parse::<u32>().ok()
+        }
     }
 
     /// Extract the smooth flag from SFD flags string.
@@ -1688,14 +2027,13 @@ impl SfdParser {
     }
 
     /// Parse a single Refer line from SFD format.
-    /// Format: "<glyph_index> <arg1> <arg2> <xx> <xy> <yx> <yy> <tx> <ty> ..."
-    /// where the first element is the glyph index, and elements 3-8 form the transformation matrix.
+    /// Format: "<glyph_index> <unicodeenc> <N|S> <xx> <xy> <yx> <yy> <tx> <ty> <flags> [base_pt ref_pt [O]]"
     fn parse_refer(
         refer_str: &str,
         glyph_order: &[String],
     ) -> Result<Option<Component>, BabelfontError> {
         let parts: Vec<&str> = refer_str.split_whitespace().collect();
-        if parts.len() < 9 {
+        if parts.len() < 10 {
             // Malformed reference; skip it
             return Ok(None);
         }
@@ -1736,11 +2074,61 @@ impl SfdParser {
         let affine = kurbo::Affine::new(matrix_arr);
         let transform = DecomposedAffine::from(affine);
 
+        let mut format_specific = FormatSpecific::default();
+
+        format_specific.insert(
+            "sfd.refer.unicodeenc".to_string(),
+            serde_json::Value::String(parts[1].to_string()),
+        );
+        format_specific.insert(
+            "sfd.refer.selected".to_string(),
+            serde_json::Value::Bool(parts[2] == "S"),
+        );
+
+        let flags = parts[9].parse::<u32>().unwrap_or(0);
+        format_specific.insert(
+            "sfd.refer.flags".to_string(),
+            serde_json::Value::Number(flags.into()),
+        );
+        format_specific.insert(
+            "sfd.refer.use_my_metrics".to_string(),
+            serde_json::Value::Bool((flags & 0x1) != 0),
+        );
+        format_specific.insert(
+            "sfd.refer.round_translation_to_grid".to_string(),
+            serde_json::Value::Bool((flags & 0x2) != 0),
+        );
+        format_specific.insert(
+            "sfd.refer.point_match".to_string(),
+            serde_json::Value::Bool((flags & 0x4) != 0),
+        );
+
+        if (flags & 0x4) != 0 && parts.len() >= 12 {
+            if let Ok(base_pt) = parts[10].parse::<i64>() {
+                format_specific.insert(
+                    "sfd.refer.match_pt_base".to_string(),
+                    serde_json::Value::Number(base_pt.into()),
+                );
+            }
+            if let Ok(ref_pt) = parts[11].parse::<i64>() {
+                format_specific.insert(
+                    "sfd.refer.match_pt_ref".to_string(),
+                    serde_json::Value::Number(ref_pt.into()),
+                );
+            }
+            if parts.get(12).copied() == Some("O") {
+                format_specific.insert(
+                    "sfd.refer.point_match_out_of_date".to_string(),
+                    serde_json::Value::Bool(true),
+                );
+            }
+        }
+
         let component = Component {
             reference: reference_name.into(),
             transform,
             location: Default::default(),
-            format_specific: Default::default(),
+            format_specific,
         };
 
         Ok(Some(component))
@@ -1791,6 +2179,23 @@ impl SfdParser {
         } else {
             None
         }
+    }
+
+    fn looks_like_spline_line(line: &str) -> bool {
+        let trimmed = line.trim_start();
+        if trimmed.is_empty() {
+            return false;
+        }
+        let starts_numeric = trimmed
+            .chars()
+            .next()
+            .map(|c| c.is_ascii_digit() || c == '-' || c == '+')
+            .unwrap_or(false);
+        if !starts_numeric {
+            return false;
+        }
+        (trimmed.contains(" m ") || trimmed.contains(" l ") || trimmed.contains(" c "))
+            && !trimmed.contains(':')
     }
 
     fn insert_gtables(&mut self) {
@@ -1894,4 +2299,1465 @@ pub fn load_str(content: &str) -> Result<Font, BabelfontError> {
     parser.process_kerning()?;
     parser.insert_gtables();
     Ok(parser.font)
+}
+
+/// Save a Babelfont Font into a FontForge SFD file at the given path.
+pub fn save_sfd(font: &Font, path: &PathBuf) -> Result<(), BabelfontError> {
+    let sfd_str = to_str(font)?;
+    std::fs::write(path, sfd_str)?;
+    Ok(())
+}
+
+/// Serialize a Babelfont Font into a FontForge SFD text representation.
+pub fn to_str(font: &Font) -> Result<String, BabelfontError> {
+    let mut out: Vec<String> = Vec::new();
+    let default_master_id = font
+        .masters
+        .first()
+        .map(|m| m.id.as_str())
+        .unwrap_or("default");
+
+    let layer_registry = LayerRegistry::from_font(font, default_master_id);
+    let glyph_order: Vec<String> = font.glyphs.iter().map(|g| g.name.to_string()).collect();
+    let glyph_index: HashMap<SmolStr, usize> = font
+        .glyphs
+        .iter()
+        .enumerate()
+        .map(|(ix, g)| (g.name.clone(), ix))
+        .collect();
+    let explicit_kerns = collect_explicit_kerns(font, &glyph_index);
+
+    emit_font_header(&mut out, font, &layer_registry);
+    emit_font_level_kerning(&mut out, font, &glyph_order, &glyph_index);
+    emit_features(&mut out, font);
+
+    out.push(format!(
+        "BeginChars: {} {}",
+        begin_chars_encoding_slots(font, &glyph_order),
+        begin_chars_glyph_count(font, &glyph_order)
+    ));
+    if !font.glyphs.is_empty()
+        && font
+            .format_specific
+            .get("sfd.beginchars_blank_line")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true)
+    {
+        out.push(String::new());
+    }
+    for (gid, glyph) in font.glyphs.iter().enumerate() {
+        emit_glyph(
+            &mut out,
+            glyph,
+            gid,
+            &layer_registry,
+            default_master_id,
+            &glyph_index,
+            explicit_kerns.get(&glyph.name),
+        )?;
+        if gid + 1 < font.glyphs.len() {
+            out.push(String::new());
+        }
+    }
+    out.push("EndChars".to_string());
+    out.push("EndSplineFont".to_string());
+
+    Ok(out.join("\n") + "\n")
+}
+
+#[derive(Debug, Default)]
+struct LayerRegistry {
+    layer_count: usize,
+    defs: Vec<(usize, bool, String, usize)>,
+    extras: HashMap<String, usize>,
+}
+
+impl LayerRegistry {
+    fn from_font(font: &Font, default_master_id: &str) -> Self {
+        let mut defs: Vec<(usize, bool, String, usize)> = font
+            .format_specific
+            .get("sfd.layer_defs")
+            .and_then(|v| v.as_array())
+            .map(|defs| {
+                defs.iter()
+                    .filter_map(|entry| {
+                        let obj = entry.as_object()?;
+                        let index = obj.get("index")?.as_u64()? as usize;
+                        let name = obj.get("name")?.as_str()?.to_string();
+                        let is_quadratic = obj
+                            .get("is_quadratic")
+                            .and_then(|v| v.as_bool())
+                            .unwrap_or(false);
+                        let flags = obj.get("flags").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+                        Some((index, is_quadratic, name, flags))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        let mut extras: HashMap<String, usize> = defs
+            .iter()
+            .filter(|(_, _, name, _)| {
+                !name.eq_ignore_ascii_case("Back") && !name.eq_ignore_ascii_case("Fore")
+            })
+            .map(|(idx, _, name, _)| (name.clone(), *idx))
+            .collect();
+        let mut next_idx = defs
+            .iter()
+            .map(|(idx, _, _, _)| *idx)
+            .max()
+            .map(|v| v + 1)
+            .unwrap_or(2);
+
+        for glyph in font.glyphs.iter() {
+            for layer in &glyph.layers {
+                if Self::is_background_layer(layer)
+                    || Self::is_foreground_layer(layer, default_master_id)
+                {
+                    continue;
+                }
+                let key = Self::layer_key(layer);
+                if let std::collections::hash_map::Entry::Vacant(v) = extras.entry(key) {
+                    v.insert(next_idx);
+                    next_idx += 1;
+                }
+            }
+        }
+
+        if defs.is_empty() {
+            defs = vec![
+                (0, false, "Back".to_string(), 1),
+                (1, false, "Fore".to_string(), 0),
+            ];
+        }
+
+        let mut extra_pairs: Vec<(&String, &usize)> = extras.iter().collect();
+        extra_pairs.sort_by_key(|(_, ix)| **ix);
+        for (key, ix) in extra_pairs {
+            if !defs
+                .iter()
+                .any(|(existing_idx, _, _, _)| existing_idx == ix)
+            {
+                defs.push((*ix, false, key.clone(), 0));
+            }
+        }
+        defs.sort_by_key(|(idx, _, _, _)| *idx);
+
+        Self {
+            layer_count: defs.len(),
+            defs,
+            extras,
+        }
+    }
+
+    fn is_background_layer(layer: &Layer) -> bool {
+        layer.is_background
+            || layer
+                .name
+                .as_deref()
+                .map(|n| n.eq_ignore_ascii_case("Back"))
+                .unwrap_or(false)
+    }
+
+    fn is_foreground_layer(layer: &Layer, default_master_id: &str) -> bool {
+        matches!(&layer.master, LayerType::DefaultForMaster(id) if id == default_master_id)
+            || layer
+                .name
+                .as_deref()
+                .map(|n| n.eq_ignore_ascii_case("Fore"))
+                .unwrap_or(false)
+    }
+
+    fn layer_key(layer: &Layer) -> String {
+        layer
+            .name
+            .clone()
+            .or_else(|| layer.id.clone())
+            .unwrap_or_else(|| "Layer".to_string())
+    }
+
+    fn index_for(&self, layer: &Layer, default_master_id: &str) -> usize {
+        if Self::is_background_layer(layer) {
+            0
+        } else if Self::is_foreground_layer(layer, default_master_id) {
+            1
+        } else {
+            self.extras
+                .get(&Self::layer_key(layer))
+                .copied()
+                .unwrap_or(1)
+        }
+    }
+}
+
+fn begin_chars_encoding_slots(font: &Font, glyph_order: &[String]) -> usize {
+    if let Some(slots) = font
+        .format_specific
+        .get("sfd.beginchars_slots")
+        .and_then(|v| v.as_u64())
+    {
+        return slots as usize;
+    }
+
+    let unencoded_count = font
+        .glyphs
+        .iter()
+        .filter(|g| g.codepoints.is_empty())
+        .count();
+
+    if let Some(enc) = font
+        .format_specific
+        .get("Encoding")
+        .and_then(|v| v.as_str())
+    {
+        if enc.eq_ignore_ascii_case("UnicodeBmp") {
+            return 65_536 + unencoded_count;
+        }
+        if enc.eq_ignore_ascii_case("UnicodeFull") {
+            return 1_114_112 + unencoded_count;
+        }
+    }
+
+    let max_cp = font
+        .glyphs
+        .iter()
+        .flat_map(|g| g.codepoints.iter().copied())
+        .max()
+        .map(|v| v as usize + 1)
+        .unwrap_or(0);
+
+    max_cp.max(glyph_order.len())
+}
+
+fn begin_chars_glyph_count(font: &Font, glyph_order: &[String]) -> usize {
+    font.format_specific
+        .get("sfd.beginchars_count")
+        .and_then(|v| v.as_u64())
+        .map(|v| v as usize)
+        .unwrap_or(glyph_order.len())
+}
+
+fn emit_font_header(out: &mut Vec<String>, font: &Font, layer_registry: &LayerRegistry) {
+    let mut state = HeaderEmitState::new(font, layer_registry);
+    let emit_layer_header = font
+        .format_specific
+        .get("sfd.has_header_layers")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+        || layer_registry.layer_count > 2;
+
+    // Follow FontForge's current metadata dump ordering from sfd.cpp.
+    for key in [
+        "SplineFontDB",
+        "FontName",
+        "FullName",
+        "FamilyName",
+        "Weight",
+        "Copyright",
+        "UComments",
+        "Comments",
+        "FontLog",
+        "Version",
+        "FONDName",
+        "DefaultBaseFilename",
+        "StrokeWidth",
+        "ItalicAngle",
+        "UnderlinePosition",
+        "UnderlineWidth",
+        "Ascent",
+        "Descent",
+        "InvalidEm",
+        "sfntRevision",
+        "woffMajor",
+        "woffMinor",
+        "woffMetadata",
+        "UFOAscent",
+        "UFODescent",
+        "LayerCount",
+        "Layer",
+        "PreferredKerning",
+        "StrokedFont",
+        "MultiLayer",
+        "HasVMetrics",
+        "NeedsXUIDChange",
+        "XUID",
+        "UniqueID",
+        "UseXUID",
+        "UseUniqueID",
+        "BaseHoriz",
+        "BaseVert",
+        "StyleMap",
+        "FSType",
+        "OS2Version",
+        "OS2_WeightWidthSlopeOnly",
+        "OS2_UseTypoMetrics",
+        "CreationTime",
+        "ModificationTime",
+        "PfmFamily",
+        "TTFWeight",
+        "TTFWidth",
+        "LineGap",
+        "VLineGap",
+        "Panose",
+        "OS2TypoAscent",
+        "OS2TypoAOffset",
+        "OS2TypoDescent",
+        "OS2TypoDOffset",
+        "OS2TypoLinegap",
+        "OS2WinAscent",
+        "OS2WinAOffset",
+        "OS2WinDescent",
+        "OS2WinDOffset",
+        "HheadAscent",
+        "HheadAOffset",
+        "HheadDescent",
+        "HheadDOffset",
+        "OS2SubXSize",
+        "OS2SubYSize",
+        "OS2SubXOff",
+        "OS2SubYOff",
+        "OS2SupXSize",
+        "OS2SupYSize",
+        "OS2SupXOff",
+        "OS2SupYOff",
+        "OS2StrikeYSize",
+        "OS2StrikeYPos",
+        "OS2CapHeight",
+        "OS2XHeight",
+        "OS2FamilyClass",
+        "OS2Vendor",
+        "MarkAttachClasses",
+        "DEI",
+        "LangName",
+        "Encoding",
+        "UnicodeInterp",
+        "NameList",
+        "DisplaySize",
+        "AntiAlias",
+        "FitToEm",
+        "WinInfo",
+        "BeginPrivate",
+        "Grid",
+    ] {
+        if (key == "LayerCount" || key == "Layer") && !emit_layer_header {
+            continue;
+        }
+        emit_header_key(out, font, layer_registry, key, &mut state);
+    }
+
+    while state.comment_index < comment_entries(font).len() {
+        let entry = &comment_entries(font)[state.comment_index];
+        state.comment_index += 1;
+        out.push(format!("{}:{}", entry.0, entry.1));
+    }
+
+    while emit_layer_header && state.layer_index < layer_registry.defs.len() {
+        emit_header_key(out, font, layer_registry, "Layer", &mut state);
+    }
+
+    emit_font_passthrough_keys_remaining(out, font, &mut state);
+}
+
+struct HeaderEmitState {
+    emitted: HashMap<String, bool>,
+    layer_index: usize,
+    comment_index: usize,
+}
+
+impl HeaderEmitState {
+    fn new(_font: &Font, _layer_registry: &LayerRegistry) -> Self {
+        Self {
+            emitted: HashMap::new(),
+            layer_index: 0,
+            comment_index: 0,
+        }
+    }
+
+    fn is_emitted(&self, key: &str) -> bool {
+        self.emitted.get(key).copied().unwrap_or(false)
+    }
+
+    fn mark_emitted(&mut self, key: &str) {
+        self.emitted.insert(key.to_string(), true);
+    }
+}
+
+fn emit_header_key(
+    out: &mut Vec<String>,
+    font: &Font,
+    layer_registry: &LayerRegistry,
+    key: &str,
+    state: &mut HeaderEmitState,
+) {
+    match key {
+        "SplineFontDB" if !state.is_emitted(key) => {
+            out.push(format!(
+                "SplineFontDB: {}",
+                font.format_specific
+                    .get(HEADER_VERSION_KEY)
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("3.0")
+            ));
+            state.mark_emitted(key);
+        }
+        "FontName" if !state.is_emitted(key) => {
+            if let Some(line) = font_name_line(font) {
+                out.push(line);
+            }
+            state.mark_emitted(key);
+        }
+        "FullName" if !state.is_emitted(key) => {
+            if let Some(line) = full_name_line(font) {
+                out.push(line);
+            }
+            state.mark_emitted(key);
+        }
+        "FamilyName" if !state.is_emitted(key) => {
+            if let Some(line) = family_name_line(font) {
+                out.push(line);
+            }
+            state.mark_emitted(key);
+        }
+        "Weight" if !state.is_emitted(key) => {
+            if let Some(line) = weight_line(font) {
+                out.push(line);
+            }
+            state.mark_emitted(key);
+        }
+        "Copyright" if !state.is_emitted(key) => {
+            if let Some(line) = copyright_line(font) {
+                out.push(line);
+            }
+            state.mark_emitted(key);
+        }
+        "Comments" | "UComments" | "FontLog" => {
+            if let Some(line) = next_comment_line(font, key, state) {
+                out.push(line);
+            }
+        }
+        "Version" if !state.is_emitted(key) => {
+            out.push(version_line(font));
+            state.mark_emitted(key);
+        }
+        "UniqueID" if !state.is_emitted(key) => {
+            if let Some(line) = unique_id_line(font) {
+                out.push(line);
+            }
+            state.mark_emitted(key);
+        }
+        "LayerCount" if !state.is_emitted(key) => {
+            out.push(format!("LayerCount: {}", layer_registry.layer_count));
+            state.mark_emitted(key);
+        }
+        "Layer" => {
+            while let Some((idx, quadratic, name, flags)) =
+                layer_registry.defs.get(state.layer_index)
+            {
+                out.push(format!(
+                    "Layer: {} {} \"{}\" {}",
+                    idx,
+                    if *quadratic { 1 } else { 0 },
+                    escape_quoted(name),
+                    flags
+                ));
+                state.layer_index += 1;
+            }
+            state.mark_emitted(key);
+        }
+        "CreationTime" if !state.is_emitted(key) => {
+            if font.format_specific.contains_key(key) {
+                out.push(format!("CreationTime: {}", font.date.timestamp()));
+                state.mark_emitted(key);
+            }
+        }
+        "LangName" => {
+            if let Some(serde_json::Value::Array(lines)) =
+                font.format_specific.get("sfd.lang_names")
+            {
+                if !state.is_emitted(key) {
+                    for line in lines.iter().filter_map(|v| v.as_str()) {
+                        out.push(format!("LangName: {}", line));
+                    }
+                    state.mark_emitted(key);
+                }
+            }
+        }
+        "BeginPrivate" if !state.is_emitted(key) => {
+            if let Some(serde_json::Value::Array(lines)) =
+                font.format_specific.get("sfd.private_section")
+            {
+                let first = lines.first().and_then(|v| v.as_str()).unwrap_or("0");
+                out.push(format!("BeginPrivate: {}", first));
+                for line in lines.iter().skip(1).filter_map(|v| v.as_str()) {
+                    out.push(line.to_string());
+                }
+                out.push("EndPrivate".to_string());
+                state.mark_emitted(key);
+            }
+        }
+        "Grid" if !state.is_emitted(key) => {
+            emit_guides(out, font);
+            state.mark_emitted(key);
+        }
+        _ => {
+            if emit_metric_key(out, font, key, state)
+                || emit_ot_key(out, font, key, state)
+                || emit_passthrough_key(out, font, key, state)
+            {}
+        }
+    }
+}
+
+fn comment_entries(font: &Font) -> Vec<(String, String)> {
+    font.format_specific
+        .get(COMMENT_ENTRIES_KEY)
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|entry| {
+                    let object = entry.as_object()?;
+                    let key = object.get("key")?.as_str()?.to_string();
+                    let raw = object.get("raw")?.as_str()?.to_string();
+                    Some((key, raw))
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default()
+}
+
+fn next_comment_line(font: &Font, key: &str, state: &mut HeaderEmitState) -> Option<String> {
+    let entries = comment_entries(font);
+    if let Some((entry_key, raw)) = entries.get(state.comment_index) {
+        if entry_key == key {
+            state.comment_index += 1;
+            return Some(format!("{}:{}", key, raw));
+        }
+    }
+    None
+}
+
+fn font_name_line(font: &Font) -> Option<String> {
+    let value = font
+        .names
+        .postscript_name
+        .get_default()
+        .or_else(|| font.names.full_name.get_default())
+        .or_else(|| font.names.family_name.get_default())?;
+    Some(format!("FontName: {}", sanitize_unquoted(value)))
+}
+
+fn full_name_line(font: &Font) -> Option<String> {
+    let fallback = font
+        .names
+        .postscript_name
+        .get_default()
+        .or_else(|| font.names.family_name.get_default())?;
+    let value = font.names.full_name.get_default().unwrap_or(fallback);
+    Some(format!("FullName: {}", sanitize_unquoted(value)))
+}
+
+fn family_name_line(font: &Font) -> Option<String> {
+    let fallback = font
+        .names
+        .full_name
+        .get_default()
+        .or_else(|| font.names.postscript_name.get_default())?;
+    let value = font.names.family_name.get_default().unwrap_or(fallback);
+    Some(format!("FamilyName: {}", sanitize_unquoted(value)))
+}
+
+fn weight_line(font: &Font) -> Option<String> {
+    font.format_specific
+        .get("postscript_weight_name")
+        .and_then(|v| v.as_str())
+        .map(|s| format!("Weight: {}", sanitize_unquoted(s)))
+}
+
+fn copyright_line(font: &Font) -> Option<String> {
+    font.names
+        .copyright
+        .get_default()
+        .map(|s| format!("Copyright: {}", sanitize_unquoted(s)))
+}
+
+fn version_line(font: &Font) -> String {
+    let version_str = font
+        .names
+        .version
+        .get_default()
+        .cloned()
+        .unwrap_or_else(|| format!("{}.{}", font.version.0, font.version.1));
+    format!("Version: {}", sanitize_unquoted(&version_str))
+}
+
+fn unique_id_line(font: &Font) -> Option<String> {
+    font.names
+        .unique_id
+        .get_default()
+        .map(|s| format!("UniqueID: {}", sanitize_unquoted(s)))
+}
+
+fn emit_metric_key(
+    out: &mut Vec<String>,
+    font: &Font,
+    key: &str,
+    state: &mut HeaderEmitState,
+) -> bool {
+    if state.is_emitted(key) {
+        return false;
+    }
+    let Some(master) = font.masters.first() else {
+        return false;
+    };
+    let metric = match key {
+        "ItalicAngle" => MetricType::ItalicAngle,
+        "UnderlinePosition" => MetricType::UnderlinePosition,
+        "UnderlineWidth" => MetricType::UnderlineThickness,
+        "Ascent" => MetricType::Ascender,
+        "Descent" => MetricType::Descender,
+        "LineGap" => MetricType::HheaLineGap,
+        "HheadAscent" => MetricType::HheaAscender,
+        "HheadDescent" => MetricType::HheaDescender,
+        "OS2TypoLinegap" => MetricType::TypoLineGap,
+        "OS2TypoAscent" => MetricType::TypoAscender,
+        "OS2TypoDescent" => MetricType::TypoDescender,
+        "OS2WinAscent" => MetricType::WinAscent,
+        "OS2WinDescent" => MetricType::WinDescent,
+        "OS2SubXSize" => MetricType::SubscriptXSize,
+        "OS2SubYSize" => MetricType::SubscriptYSize,
+        "OS2SubXOff" => MetricType::SubscriptXOffset,
+        "OS2SubYOff" => MetricType::SubscriptYOffset,
+        "OS2SupXSize" => MetricType::SuperscriptXSize,
+        "OS2SupYSize" => MetricType::SuperscriptYSize,
+        "OS2SupXOff" => MetricType::SuperscriptXOffset,
+        "OS2SupYOff" => MetricType::SuperscriptYOffset,
+        "OS2StrikeYSize" => MetricType::StrikeoutSize,
+        "OS2StrikeYPos" => MetricType::StrikeoutPosition,
+        "OS2CapHeight" => MetricType::CapHeight,
+        "OS2XHeight" => MetricType::XHeight,
+        _ => return false,
+    };
+    if master.metrics.contains_key(&metric) {
+        emit_metric(out, master, metric, key);
+        state.mark_emitted(key);
+    }
+    true
+}
+
+fn ot_line_for_key(font: &Font, key: &str) -> Option<String> {
+    let ot = &font.custom_ot_values;
+    match key {
+        "FSType" => font
+            .format_specific
+            .get("sfd.has_fstype")
+            .and_then(|v| v.as_bool())
+            .filter(|v| *v)
+            .and(ot.os2_fs_type)
+            .map(|v| format!("FSType: {}", v)),
+        "OS2_UseTypoMetrics" => {
+            if let Some(raw) = font.format_specific.get(key).and_then(|v| v.as_str()) {
+                Some(format!("{}: {}", key, sanitize_unquoted(raw)))
+            } else if ot.os2_fs_type.map(|v| (v & (1 << 7)) != 0).unwrap_or(false) {
+                Some("OS2_UseTypoMetrics: 1".to_string())
+            } else {
+                None
+            }
+        }
+        "OS2_WeightWidthSlopeOnly" => {
+            if let Some(raw) = font.format_specific.get(key).and_then(|v| v.as_str()) {
+                Some(format!("{}: {}", key, sanitize_unquoted(raw)))
+            } else if ot.os2_fs_type.map(|v| (v & (1 << 8)) != 0).unwrap_or(false) {
+                Some("OS2_WeightWidthSlopeOnly: 1".to_string())
+            } else {
+                None
+            }
+        }
+        "TTFWeight" => ot.os2_us_weight_class.map(|v| format!("TTFWeight: {}", v)),
+        "TTFWidth" => ot.os2_us_width_class.map(|v| format!("TTFWidth: {}", v)),
+        "OS2FamilyClass" => ot
+            .os2_family_class
+            .map(|v| format!("OS2FamilyClass: {}", v)),
+        "Panose" => ot.os2_panose.map(|panose| {
+            format!(
+                "Panose: {}",
+                panose
+                    .iter()
+                    .map(u8::to_string)
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            )
+        }),
+        "OS2Vendor" => ot.os2_vendor_id.map(|v| format!("OS2Vendor: '{}'", v)),
+        "OS2UnicodeRanges" => match (
+            ot.os2_unicode_range1,
+            ot.os2_unicode_range2,
+            ot.os2_unicode_range3,
+            ot.os2_unicode_range4,
+        ) {
+            (Some(r1), Some(r2), Some(r3), Some(r4)) => Some(format!(
+                "OS2UnicodeRanges: {:08x}.{:08x}.{:08x}.{:08x}",
+                r1, r2, r3, r4
+            )),
+            _ => None,
+        },
+        "OS2CodePages" => match (ot.os2_code_page_range1, ot.os2_code_page_range2) {
+            (Some(c1), Some(c2)) => Some(format!("OS2CodePages: {:08x}.{:08x}", c1, c2)),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+fn emit_ot_key(out: &mut Vec<String>, font: &Font, key: &str, state: &mut HeaderEmitState) -> bool {
+    if state.is_emitted(key) {
+        return false;
+    }
+    let Some(line) = ot_line_for_key(font, key) else {
+        return false;
+    };
+    out.push(line);
+    state.mark_emitted(key);
+    true
+}
+
+fn emit_passthrough_key(
+    out: &mut Vec<String>,
+    font: &Font,
+    key: &str,
+    state: &mut HeaderEmitState,
+) -> bool {
+    if state.is_emitted(key) {
+        return false;
+    }
+    let Some(value) = font.format_specific.get(key).and_then(|v| v.as_str()) else {
+        return false;
+    };
+    out.push(format!("{}: {}", key, sanitize_unquoted(value)));
+    state.mark_emitted(key);
+    true
+}
+
+fn emit_font_passthrough_keys_remaining(
+    out: &mut Vec<String>,
+    font: &Font,
+    state: &mut HeaderEmitState,
+) {
+    for key in [
+        "NeedsXUIDChange",
+        "XUID",
+        "OS2Version",
+        "OS2TypoAOffset",
+        "OS2TypoDOffset",
+        "OS2WinAOffset",
+        "OS2WinDOffset",
+        "HheadAOffset",
+        "HheadDOffset",
+        "MarkAttachClasses",
+        "DEI",
+        "Encoding",
+        "UnicodeInterp",
+        "NameList",
+        "DisplaySize",
+        "AntiAlias",
+        "FitToEm",
+        "WinInfo",
+        "ModificationTime",
+    ] {
+        let _ = emit_passthrough_key(out, font, key, state);
+    }
+}
+
+fn read_file_lossy(path: &std::path::Path) -> Result<String, BabelfontError> {
+    let bytes = fs::read(path)?;
+    Ok(String::from_utf8_lossy(&bytes).into_owned())
+}
+
+fn emit_metric(out: &mut Vec<String>, master: &crate::Master, metric: MetricType, key: &str) {
+    if let Some(v) = master.metrics.get(&metric) {
+        out.push(format!("{}: {}", key, v));
+    }
+}
+
+#[allow(dead_code)]
+fn emit_ot_values(out: &mut Vec<String>, font: &Font) {
+    let ot = &font.custom_ot_values;
+    if let Some(v) = ot.os2_fs_type {
+        if font
+            .format_specific
+            .get("sfd.has_fstype")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false)
+        {
+            out.push(format!("FSType: {}", v));
+        }
+        let has_typometrics_line = font.format_specific.contains_key("OS2_UseTypoMetrics");
+        let has_wws_line = font
+            .format_specific
+            .contains_key("OS2_WeightWidthSlopeOnly");
+
+        if !has_typometrics_line && (v & (1 << 7)) != 0 {
+            out.push("OS2_UseTypoMetrics: 1".to_string());
+        }
+        if !has_wws_line && (v & (1 << 8)) != 0 {
+            out.push("OS2_WeightWidthSlopeOnly: 1".to_string());
+        }
+    }
+    if let Some(v) = ot.os2_us_weight_class {
+        out.push(format!("TTFWeight: {}", v));
+    }
+    if let Some(v) = ot.os2_us_width_class {
+        out.push(format!("TTFWidth: {}", v));
+    }
+    if let Some(v) = ot.os2_family_class {
+        out.push(format!("OS2FamilyClass: {}", v));
+    }
+    if let Some(panose) = ot.os2_panose {
+        let vals: Vec<String> = panose.iter().map(u8::to_string).collect();
+        out.push(format!("Panose: {}", vals.join(" ")));
+    }
+    if let Some(vendor) = ot.os2_vendor_id {
+        out.push(format!("OS2Vendor: '{}'", vendor));
+    }
+    if let (Some(r1), Some(r2), Some(r3), Some(r4)) = (
+        ot.os2_unicode_range1,
+        ot.os2_unicode_range2,
+        ot.os2_unicode_range3,
+        ot.os2_unicode_range4,
+    ) {
+        out.push(format!(
+            "OS2UnicodeRanges: {:08x}.{:08x}.{:08x}.{:08x}",
+            r1, r2, r3, r4
+        ));
+    }
+    if let (Some(c1), Some(c2)) = (ot.os2_code_page_range1, ot.os2_code_page_range2) {
+        out.push(format!("OS2CodePages: {:08x}.{:08x}", c1, c2));
+    }
+}
+
+fn emit_guides(out: &mut Vec<String>, font: &Font) {
+    let Some(master) = font.masters.first() else {
+        return;
+    };
+    if master.guides.is_empty() {
+        return;
+    }
+
+    out.push("Grid".to_string());
+    for g in &master.guides {
+        let x1 = g.pos.x as f64;
+        let y1 = g.pos.y as f64;
+        let angle = (g.pos.angle as f64).to_radians();
+        let x2 = x1 + angle.cos() * 1000.0;
+        let y2 = y1 + angle.sin() * 1000.0;
+        out.push(format!("{} {} m 0", fmt_num(x1), fmt_num(y1),));
+        out.push(format!("{} {} l 0", fmt_num(x2), fmt_num(y2),));
+    }
+    out.push("EndSplineSet".to_string());
+}
+
+fn emit_font_level_kerning(
+    _out: &mut Vec<String>,
+    _font: &Font,
+    _glyph_order: &[String],
+    _glyph_index: &HashMap<SmolStr, usize>,
+) {
+    // Placeholder for class-based kerning (KernClass2) emission.
+}
+
+fn emit_features(_out: &mut Vec<String>, _font: &Font) {
+    // Placeholder for Lookup/feature table emission.
+}
+
+fn collect_explicit_kerns(
+    font: &Font,
+    glyph_index: &HashMap<SmolStr, usize>,
+) -> HashMap<SmolStr, Vec<(usize, i16)>> {
+    let mut by_left: HashMap<SmolStr, Vec<(usize, i16)>> = HashMap::new();
+    let Some(master) = font.masters.first() else {
+        return by_left;
+    };
+
+    for ((left, right), value) in &master.kerning {
+        if left.starts_with('@') || right.starts_with('@') {
+            continue;
+        }
+        if let Some(&right_ix) = glyph_index.get(right) {
+            by_left
+                .entry(left.clone())
+                .or_default()
+                .push((right_ix, *value));
+        }
+    }
+
+    by_left
+}
+
+fn emit_glyph(
+    out: &mut Vec<String>,
+    glyph: &Glyph,
+    gid: usize,
+    layer_registry: &LayerRegistry,
+    default_master_id: &str,
+    glyph_index: &HashMap<SmolStr, usize>,
+    kerns: Option<&Vec<(usize, i16)>>,
+) -> Result<(), BabelfontError> {
+    out.push(format!("StartChar: {}", sanitize_unquoted(&glyph.name)));
+
+    let encoding_slot = glyph
+        .format_specific
+        .get("sfd.encoding_slot")
+        .and_then(|v| v.as_i64())
+        .unwrap_or_else(|| {
+            glyph
+                .codepoints
+                .first()
+                .copied()
+                .map(|cp| cp as i64)
+                .unwrap_or(-1)
+        });
+    let unicode_value = glyph
+        .format_specific
+        .get("sfd.encoding_unicode")
+        .and_then(|v| v.as_i64())
+        .unwrap_or_else(|| {
+            glyph
+                .codepoints
+                .first()
+                .copied()
+                .map(|cp| cp as i64)
+                .unwrap_or(-1)
+        });
+    let has_gid = glyph
+        .format_specific
+        .get("sfd.encoding_has_gid")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true);
+    if has_gid {
+        let encoding_gid = glyph
+            .format_specific
+            .get("sfd.encoding_gid")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(gid as i64);
+        out.push(format!(
+            "Encoding: {} {} {}",
+            encoding_slot, unicode_value, encoding_gid
+        ));
+    } else {
+        out.push(format!("Encoding: {} {}", encoding_slot, unicode_value));
+    }
+
+    let width = pick_foreground_width(glyph, default_master_id);
+    out.push(format!("Width: {}", fmt_num(width as f64)));
+
+    if let Some(vwidth) = glyph.format_specific.get("vwidth").and_then(|v| v.as_str()) {
+        out.push(format!("VWidth: {}", sanitize_unquoted(vwidth)));
+    }
+
+    let class_num = match glyph.category {
+        GlyphCategory::Base => 2,
+        GlyphCategory::Ligature => 3,
+        GlyphCategory::Mark => 4,
+        _ => 0,
+    };
+    if class_num != 0 {
+        out.push(format!("GlyphClass: {}", class_num));
+    }
+
+    if let Some(flags) = glyph_flags_for_emit(glyph) {
+        out.push(format!("Flags: {}", sanitize_unquoted(&flags)));
+    }
+
+    if let Some(layer) = glyph_foreground_layer(glyph, default_master_id) {
+        if let Some(hstem) = layer
+            .format_specific
+            .get(HSTEM_KEY)
+            .and_then(|v| v.as_str())
+        {
+            out.push(format!("HStem: {}", sanitize_unquoted(hstem)));
+        }
+        if let Some(vstem) = layer
+            .format_specific
+            .get(VSTEM_KEY)
+            .and_then(|v| v.as_str())
+        {
+            out.push(format!("VStem: {}", sanitize_unquoted(vstem)));
+        }
+    }
+
+    let emit_layer_count = glyph
+        .format_specific
+        .get("sfd.has_layer_count")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+        || glyph.layers.len() > 1;
+
+    if emit_layer_count {
+        out.push(format!("LayerCount: {}", layer_registry.layer_count));
+    }
+
+    let mut indexed_layers: Vec<(usize, &Layer)> = glyph
+        .layers
+        .iter()
+        .map(|l| (layer_registry.index_for(l, default_master_id), l))
+        .collect();
+    indexed_layers.sort_by_key(|(ix, _)| *ix);
+
+    for (ix, layer) in indexed_layers {
+        emit_layer(out, layer, ix, glyph_index)?;
+    }
+
+    if let Some(comment) = glyph
+        .format_specific
+        .get("sfd.comment")
+        .and_then(|v| v.as_str())
+    {
+        out.push(format!("Comment: {}", sanitize_unquoted(comment)));
+    }
+
+    if let Some(entries) = kerns {
+        if !entries.is_empty() {
+            let payload = entries
+                .iter()
+                .map(|(right_gid, value)| {
+                    format!("{} {} \"{}\"", right_gid, value, GENERATED_KERN_SUBTABLE)
+                })
+                .collect::<Vec<_>>()
+                .join(" ");
+            out.push(format!("Kerns2: {}", payload));
+        }
+    }
+
+    out.push("EndChar".to_string());
+    Ok(())
+}
+
+fn pick_foreground_width(glyph: &Glyph, default_master_id: &str) -> f32 {
+    glyph_foreground_layer(glyph, default_master_id)
+        .map(|l| l.width)
+        .unwrap_or(0.0)
+}
+
+fn glyph_foreground_layer<'a>(glyph: &'a Glyph, default_master_id: &str) -> Option<&'a Layer> {
+    glyph
+        .layers
+        .iter()
+        .find(|l| LayerRegistry::is_foreground_layer(l, default_master_id))
+        .or_else(|| {
+            glyph
+                .layers
+                .iter()
+                .find(|l| !LayerRegistry::is_background_layer(l))
+        })
+        .or_else(|| glyph.layers.first())
+}
+
+fn emit_layer(
+    out: &mut Vec<String>,
+    layer: &Layer,
+    layer_idx: usize,
+    glyph_index: &HashMap<SmolStr, usize>,
+) -> Result<(), BabelfontError> {
+    match layer_idx {
+        0 => out.push("Back".to_string()),
+        1 => out.push("Fore".to_string()),
+        _ => out.push(format!("Layer: {}", layer_idx)),
+    }
+
+    if let Some(color) = layer.color {
+        let r = (color.r.clamp(0, 255) as u32) << 16;
+        let g = (color.g.clamp(0, 255) as u32) << 8;
+        let b = color.b.clamp(0, 255) as u32;
+        out.push(format!("Colour: {:06x}", r | g | b));
+    }
+
+    emit_layer_shapes(out, layer, glyph_index)?;
+    emit_layer_anchors(out, layer);
+    Ok(())
+}
+
+fn emit_layer_shapes(
+    out: &mut Vec<String>,
+    layer: &Layer,
+    glyph_index: &HashMap<SmolStr, usize>,
+) -> Result<(), BabelfontError> {
+    let has_path = layer.shapes.iter().any(|s| matches!(s, Shape::Path(_)));
+    if has_path {
+        let explicit_splineset = layer
+            .format_specific
+            .get("sfd.explicit_splineset")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true);
+
+        if explicit_splineset {
+            out.push("SplineSet".to_string());
+        }
+        for shape in &layer.shapes {
+            if let Shape::Path(path) = shape {
+                let path_str = save_path(path)?;
+                out.push(path_str);
+            }
+        }
+        out.push("EndSplineSet".to_string());
+    }
+
+    for shape in &layer.shapes {
+        if let Shape::Component(component) = shape {
+            let component_str = save_component(component, glyph_index)?;
+            out.push(component_str);
+        }
+    }
+    Ok(())
+}
+
+fn emit_layer_anchors(out: &mut Vec<String>, layer: &Layer) {
+    for anchor in &layer.anchors {
+        let kind = anchor
+            .format_specific
+            .get("sfd.kind")
+            .and_then(|v| v.as_str())
+            .unwrap_or("base");
+        let index = anchor
+            .format_specific
+            .get("sfd.index")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
+
+        out.push(format!(
+            "AnchorPoint: \"{}\" {} {} {} {}",
+            escape_quoted(&anchor.name),
+            fmt_num(anchor.x),
+            fmt_num(anchor.y),
+            kind,
+            index
+        ));
+    }
+}
+
+fn save_component(
+    component: &Component,
+    glyph_index: &HashMap<SmolStr, usize>,
+) -> Result<String, BabelfontError> {
+    let Some(gid) = glyph_index.get(&component.reference) else {
+        return Err(BabelfontError::MissingGlyphReference(
+            component.reference.to_string(),
+        ));
+    };
+
+    let coeffs = component.transform.as_affine().as_coeffs();
+    // SFD Refer matrix order is [xx, xy, yx, yy, tx, ty].
+    let xx = coeffs[0];
+    let yx = coeffs[1];
+    let xy = coeffs[2];
+    let yy = coeffs[3];
+    let tx = coeffs[4];
+    let ty = coeffs[5];
+
+    let unicodeenc = component
+        .format_specific
+        .get("sfd.refer.unicodeenc")
+        .and_then(|v| v.as_str())
+        .unwrap_or("0");
+    let selected = component
+        .format_specific
+        .get("sfd.refer.selected")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+
+    let flags = component
+        .format_specific
+        .get("sfd.refer.flags")
+        .and_then(|v| v.as_u64())
+        .map(|v| v as u32)
+        .unwrap_or_else(|| {
+            let mut bits = 0u32;
+            if component
+                .format_specific
+                .get("sfd.refer.use_my_metrics")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false)
+            {
+                bits |= 0x1;
+            }
+            if component
+                .format_specific
+                .get("sfd.refer.round_translation_to_grid")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false)
+            {
+                bits |= 0x2;
+            }
+            if component
+                .format_specific
+                .get("sfd.refer.point_match")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false)
+            {
+                bits |= 0x4;
+            }
+            bits
+        });
+
+    let mut line = format!(
+        "Refer: {} {} {} {} {} {} {} {} {} {}",
+        gid,
+        unicodeenc,
+        if selected { "S" } else { "N" },
+        fmt_num(xx),
+        fmt_num(xy),
+        fmt_num(yx),
+        fmt_num(yy),
+        fmt_num(tx),
+        fmt_num(ty),
+        flags
+    );
+
+    if (flags & 0x4) != 0 {
+        let base_pt = component
+            .format_specific
+            .get("sfd.refer.match_pt_base")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(0);
+        let ref_pt = component
+            .format_specific
+            .get("sfd.refer.match_pt_ref")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(0);
+        line.push_str(&format!(" {} {}", base_pt, ref_pt));
+        if component
+            .format_specific
+            .get("sfd.refer.point_match_out_of_date")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false)
+        {
+            line.push_str(" O");
+        }
+    }
+
+    Ok(line)
+}
+
+fn save_path(path: &Path) -> Result<String, BabelfontError> {
+    let oncurve_indices: Vec<usize> = path
+        .nodes
+        .iter()
+        .enumerate()
+        .filter_map(|(i, n)| {
+            if matches!(n.nodetype, NodeType::OffCurve) {
+                None
+            } else {
+                Some(i)
+            }
+        })
+        .collect();
+
+    let Some(&start_ix) = oncurve_indices.first() else {
+        return Err(BabelfontError::General(
+            "Path has no on-curve points".to_string(),
+        ));
+    };
+    let start = &path.nodes[start_ix];
+    let mut out: Vec<String> = Vec::new();
+    out.push(format!(
+        "{} {} m {}",
+        fmt_num(start.x),
+        fmt_num(start.y),
+        point_flags_for_node(start)
+    ));
+
+    let mut offcurves: Vec<&Node> = Vec::new();
+    for node in path.nodes.iter().skip(start_ix + 1) {
+        match node.nodetype {
+            NodeType::OffCurve => offcurves.push(node),
+            NodeType::Curve | NodeType::QCurve => {
+                if offcurves.len() >= 2 {
+                    let c1 = offcurves[offcurves.len() - 2];
+                    let c2 = offcurves[offcurves.len() - 1];
+                    out.push(format!(
+                        " {} {} {} {} {} {} c {}",
+                        fmt_num(c1.x),
+                        fmt_num(c1.y),
+                        fmt_num(c2.x),
+                        fmt_num(c2.y),
+                        fmt_num(node.x),
+                        fmt_num(node.y),
+                        point_flags_for_node(node)
+                    ));
+                } else {
+                    out.push(format!(
+                        " {} {} l {}",
+                        fmt_num(node.x),
+                        fmt_num(node.y),
+                        point_flags_for_node(node)
+                    ));
+                }
+                offcurves.clear();
+            }
+            NodeType::Line | NodeType::Move => {
+                out.push(format!(
+                    " {} {} l {}",
+                    fmt_num(node.x),
+                    fmt_num(node.y),
+                    point_flags_for_node(node)
+                ));
+                offcurves.clear();
+            }
+        }
+    }
+    Ok(out.join("\n"))
+}
+
+fn point_flags_for_node(node: &Node) -> String {
+    if let Some(flags) = node
+        .format_specific
+        .get("sfd.point_flags")
+        .and_then(|v| v.as_str())
+    {
+        return flags.to_string();
+    }
+
+    if node.smooth {
+        "0x100".to_string()
+    } else {
+        "0".to_string()
+    }
+}
+
+fn glyph_flags_for_emit(glyph: &Glyph) -> Option<String> {
+    if let Some(flags) = glyph
+        .format_specific
+        .get("sfd.flags")
+        .and_then(|v| v.as_str())
+    {
+        return Some(flags.to_string());
+    }
+
+    let mut out = String::new();
+    if glyph
+        .format_specific
+        .get("sfd.changed_since_last_hinted")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+    {
+        out.push('H');
+    }
+    if glyph
+        .format_specific
+        .get("sfd.manual_hints")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+    {
+        out.push('M');
+    }
+    if glyph
+        .format_specific
+        .get("sfd.width_set")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+    {
+        out.push('W');
+    }
+    if glyph
+        .format_specific
+        .get("sfd.editor_state_saved")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+    {
+        out.push('O');
+    }
+    if glyph
+        .format_specific
+        .get("sfd.instructions_out_of_date")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+    {
+        out.push('I');
+    }
+
+    if out.is_empty() {
+        None
+    } else {
+        Some(out)
+    }
+}
+
+fn fmt_num(n: f64) -> String {
+    if (n.round() - n).abs() < 1e-6 {
+        format!("{}", n.round() as i64)
+    } else {
+        let s = format!("{:.6}", n);
+        s.trim_end_matches('0').trim_end_matches('.').to_string()
+    }
+}
+
+fn sanitize_unquoted(s: &str) -> String {
+    s.chars()
+        .map(|c| if c == '\n' || c == '\r' { ' ' } else { c })
+        .collect::<String>()
+}
+
+fn escape_quoted(s: &str) -> String {
+    s.replace('"', "'")
+}
+
+#[allow(clippy::expect_used)]
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use rstest::rstest;
+    use similar::TextDiff;
+
+    use super::*;
+
+    #[rstest]
+    fn test_roundtrip(#[files("resources/fontforge/*.sfd")] path: PathBuf) {
+        let data =
+            String::from_utf8_lossy(&fs::read(&path).expect("Failed to read SFD file bytes"))
+                .into_owned();
+        let font = load_str(&data).expect("Failed to load SFD font");
+        let output = to_str(&font).expect("Failed to convert font back to SFD");
+
+        // Re-parse the generated SFD and compare core model fields.
+        let reparsed = load_str(&output).expect("Failed to reparse emitted SFD");
+
+        assert_eq!(
+            reparsed.glyphs.len(),
+            font.glyphs.len(),
+            "glyph count changed"
+        );
+        assert_eq!(
+            reparsed
+                .glyphs
+                .iter()
+                .map(|g| g.name.to_string())
+                .collect::<Vec<_>>(),
+            font.glyphs
+                .iter()
+                .map(|g| g.name.to_string())
+                .collect::<Vec<_>>(),
+            "glyph order changed"
+        );
+
+        // Check a few key fields so regressions are surfaced early while
+        // acknowledging that this emitter currently serializes only a subset of SFD.
+        assert_eq!(
+            reparsed
+                .names
+                .postscript_name
+                .get_default()
+                .map(|s| s.as_str()),
+            font.names.postscript_name.get_default().map(|s| s.as_str())
+        );
+        assert_eq!(reparsed.masters.len(), font.masters.len());
+
+        // Now do a full diff to see what we're missing
+        if output != data && data.split("\n").count() < 1000 {
+            let diff = TextDiff::from_lines(&data, &output)
+                .unified_diff()
+                .context_radius(5)
+                .header("Original SFD", "Re-emitted SFD")
+                .to_string();
+            println!("{}", diff);
+            panic!("Roundtrip SFD did not match original");
+        }
+    }
 }

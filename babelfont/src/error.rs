@@ -153,6 +153,9 @@ pub enum BabelfontError {
     #[cfg(feature = "ufo")]
     #[error("Multiple masters are not supported when saving a UFO font")]
     MultipleMastersNotSupported,
+    /// A component referenced a glyph that was not found in the font
+    #[error("Component references missing glyph: {0}")]
+    MissingGlyphReference(String),
 }
 
 #[derive(Debug, Serialize)]

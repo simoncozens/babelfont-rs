@@ -272,6 +272,12 @@ impl Font {
                 return crate::convertors::designspace::save_designspace(self, &path);
             }
         }
+        #[cfg(feature = "fontforge")]
+        {
+            if path.extension().and_then(|x| x.to_str()) == Some("sfd") {
+                return crate::convertors::fontforge::save_sfd(self, &path);
+            }
+        }
 
         Err(BabelfontError::UnknownFileType {
             path: path.to_path_buf(),
