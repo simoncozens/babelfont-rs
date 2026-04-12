@@ -1,24 +1,21 @@
 use std::collections::{HashMap, HashSet};
 
 use fea_rs_ast::{
-    Anchor, FeatureFile, GlyphClass, GlyphClassDefinition, GlyphContainer,
-    GlyphName, LanguageSystemStatement, LookupBlock, MarkClass, MarkClassDefinition,
-    ToplevelItem,
+    Anchor, FeatureFile, GlyphClass, GlyphClassDefinition, GlyphContainer, GlyphName,
+    LanguageSystemStatement, LookupBlock, MarkClass, MarkClassDefinition, ToplevelItem,
 };
 use indexmap::{IndexMap, IndexSet};
 use skrifa::{
-    FontRef, GlyphId, GlyphId16, GlyphNames, Tag,
     raw::{
-        ReadError, TableProvider,
         tables::{
             gdef::Gdef,
             gpos::Gpos,
-            gsub::{
-                ClassDef, Gsub,
-            },
+            gsub::{ClassDef, Gsub},
             layout::CoverageTable,
         },
+        ReadError, TableProvider,
     },
+    FontRef, GlyphId, GlyphId16, GlyphNames, Tag,
 };
 use smol_str::SmolStr;
 
@@ -38,8 +35,8 @@ struct UncompileContext<'a> {
     glyph_names: GlyphNames<'a>,
     unnamed_anchors: IndexMap<SmolStr, Vec<Anchor>>,
     anchors: IndexMap<SmolStr, IndexMap<SmolStr, Anchor>>,
-    mark_classes: HashMap<SmolStr, Vec<MarkClassDefinition>>,
-    named_classes: HashMap<SmolStr, GlyphClass>,
+    mark_classes: IndexMap<SmolStr, Vec<MarkClassDefinition>>,
+    named_classes: IndexMap<SmolStr, GlyphClass>,
 }
 
 impl<'a> UncompileContext<'a> {
@@ -55,8 +52,8 @@ impl<'a> UncompileContext<'a> {
             unnamed_anchors: IndexMap::new(),
             anchors: IndexMap::new(),
             glyph_names,
-            mark_classes: HashMap::new(),
-            named_classes: HashMap::new(),
+            mark_classes: IndexMap::new(),
+            named_classes: IndexMap::new(),
         })
     }
 
@@ -76,7 +73,7 @@ impl<'a> UncompileContext<'a> {
 
     fn register_mark_classes(
         &mut self,
-        mark_classes: HashMap<u16, Vec<(GlyphContainer, Anchor)>>,
+        mark_classes: IndexMap<u16, Vec<(GlyphContainer, Anchor)>>,
     ) -> Vec<SmolStr> {
         let mut class_names = vec![];
         for (_class_id, anchors) in mark_classes.iter() {
@@ -268,7 +265,7 @@ mod tests {
         let ff = uncompile(&fontref).unwrap();
         assert_eq!(
             ff.as_fea(""),
-            "markClass grave <anchor 200 150> @mark_class_1;\nmarkClass acute <anchor 350 0> @mark_class_1;\nmarkClass dotbelowcomb <anchor 200 -200> @mark_class_0;\nlookup gsub_single_1 {\n    sub a by b;\n} gsub_single_1;\nlookup gsub_multiple_1 {\n    sub a by b c;\n} gsub_multiple_1;\nlookup gsub_alternate_1 {\n    sub a from [b c d e f];\n} gsub_alternate_1;\nlookup gsub_ligature_1 {\n    sub b c by a;\n} gsub_ligature_1;\nlookup gsub_contextual_1 {\n    sub [one a]' lookup lookup_0 b' [two c]' lookup lookup_1;\n} gsub_contextual_1;\nlookup gsub_chain_contextual_1 {\n    sub one two three a' lookup lookup_0 b' c' lookup lookup_1 x y z;\n} gsub_chain_contextual_1;\nlookup gpos_mark_to_base_1 {\n    pos base A\n        <anchor 150 100> mark @mark_class_0\n        <anchor -200 -200> mark @mark_class_1;\n} gpos_mark_to_base_1;\n"
+            "markClass grave <anchor 200 150> @mark_class_0;\nmarkClass acute <anchor 350 0> @mark_class_0;\nmarkClass dotbelowcomb <anchor 200 -200> @mark_class_1;\nlookup gsub_single_1 {\n    sub a by b;\n} gsub_single_1;\nlookup gsub_multiple_1 {\n    sub a by b c;\n} gsub_multiple_1;\nlookup gsub_alternate_1 {\n    sub a from [b c d e f];\n} gsub_alternate_1;\nlookup gsub_ligature_1 {\n    sub b c by a;\n} gsub_ligature_1;\nlookup gsub_contextual_1 {\n    sub [one a]' lookup lookup_0 b' [two c]' lookup lookup_1;\n} gsub_contextual_1;\nlookup gsub_chain_contextual_1 {\n    sub one two three a' lookup lookup_0 b' c' lookup lookup_1 x y z;\n} gsub_chain_contextual_1;\nlookup gpos_mark_to_base_1 {\n    pos base A\n        <anchor 150 100> mark @mark_class_0\n        <anchor -200 -200> mark @mark_class_1;\n} gpos_mark_to_base_1;\n"
         );
     }
 }

@@ -1,11 +1,10 @@
-use std::collections::HashMap;
-
 use crate::UncompileContext;
 use fea_rs_ast::{
     Anchor as FeaAnchor, CursivePosStatement, GlyphClass, GlyphContainer, LookupBlock,
     MarkBasePosStatement, MarkClass, MarkLigPosStatement, MarkMarkPosStatement, Metric,
     PairPosStatement, Pos, SinglePosStatement, Statement, ValueRecord as FeaValueRecord,
 };
+use indexmap::IndexMap;
 use skrifa::raw::{
     tables::{
         gpos::{
@@ -299,7 +298,7 @@ impl<'a> UncompileContext<'a> {
             .collect::<Vec<_>>();
         let base_array = gpos4.base_array()?;
         let mark_array = gpos4.mark_array()?;
-        let mut mark_classes: HashMap<u16, Vec<(GlyphContainer, FeaAnchor)>> = HashMap::new();
+        let mut mark_classes: IndexMap<u16, Vec<(GlyphContainer, FeaAnchor)>> = IndexMap::new();
         // Emit mark classes first
         for (mark_glyph, mark_record) in mark_coverage.into_iter().zip(mark_array.mark_records()) {
             let mark_anchor = mark_record.mark_anchor(mark_array.offset_data())?;
@@ -353,7 +352,7 @@ impl<'a> UncompileContext<'a> {
         let mark_array = gpos5.mark_array()?;
         let ligature_array = gpos5.ligature_array()?;
 
-        let mut mark_classes: HashMap<u16, Vec<(GlyphContainer, FeaAnchor)>> = HashMap::new();
+        let mut mark_classes: IndexMap<u16, Vec<(GlyphContainer, FeaAnchor)>> = IndexMap::new();
         for (mark_glyph, mark_record) in mark_coverage.into_iter().zip(mark_array.mark_records()) {
             let mark_anchor = mark_record.mark_anchor(mark_array.offset_data())?;
             let mark_class = mark_record.mark_class();
@@ -418,7 +417,7 @@ impl<'a> UncompileContext<'a> {
         let mark1_array = gpos6.mark1_array()?;
         let mark2_array = gpos6.mark2_array()?;
 
-        let mut mark_classes: HashMap<u16, Vec<(GlyphContainer, FeaAnchor)>> = HashMap::new();
+        let mut mark_classes: IndexMap<u16, Vec<(GlyphContainer, FeaAnchor)>> = IndexMap::new();
         for (mark_glyph, mark_record) in mark1_coverage.into_iter().zip(mark1_array.mark_records())
         {
             let mark_anchor = mark_record.mark_anchor(mark1_array.offset_data())?;
