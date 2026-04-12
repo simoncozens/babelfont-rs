@@ -7,16 +7,16 @@ use fea_rs_ast::{
     PairPosStatement, Pos, SinglePosStatement, Statement, ValueRecord as FeaValueRecord,
 };
 use skrifa::raw::{
-        ReadError,
-        tables::{
-            gpos::{
-                AnchorTable, CursivePosFormat1, MarkBasePosFormat1, MarkLigPosFormat1,
-                MarkMarkPosFormat1, PairPos, PairPosFormat1, PairPosFormat2, PositionLookup,
-                PositionSubtables, SinglePos, SinglePosFormat1, SinglePosFormat2, ValueRecord,
-            },
-            gsub::LookupList,
+    tables::{
+        gpos::{
+            AnchorTable, CursivePosFormat1, MarkBasePosFormat1, MarkLigPosFormat1,
+            MarkMarkPosFormat1, PairPos, PairPosFormat1, PairPosFormat2, PositionLookup,
+            PositionSubtables, SinglePos, SinglePosFormat1, SinglePosFormat2, ValueRecord,
         },
-    };
+        gsub::LookupList,
+    },
+    ReadError,
+};
 use smol_str::SmolStr;
 impl<'a> UncompileContext<'a> {
     pub(crate) fn uncompile_gpos_lookups(&mut self) -> Result<(), ReadError> {
@@ -133,11 +133,6 @@ impl<'a> UncompileContext<'a> {
     fn resolve_anchor(&self, anchor: &AnchorTable) -> FeaAnchor {
         let x = Metric::from(anchor.x_coordinate());
         let y = Metric::from(anchor.y_coordinate());
-        println!(
-            "Found anchor at ({}, {})",
-            anchor.x_coordinate(),
-            anchor.y_coordinate()
-        );
         FeaAnchor::new(x, y, None, None, None, None, 0..0)
     }
 
