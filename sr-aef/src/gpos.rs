@@ -6,6 +6,7 @@ use fea_rs_ast::{
 };
 use indexmap::IndexMap;
 use skrifa::raw::{
+    ReadError,
     tables::{
         gpos::{
             AnchorTable, CursivePosFormat1, MarkBasePosFormat1, MarkLigPosFormat1,
@@ -14,7 +15,6 @@ use skrifa::raw::{
         },
         gsub::LookupList,
     },
-    ReadError,
 };
 use smol_str::SmolStr;
 impl<'a> UncompileContext<'a> {
