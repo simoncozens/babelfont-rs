@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
 use fea_rs_ast::{
-    Anchor, FeatureFile, GlyphClass, GlyphClassDefinition, GlyphContainer, GlyphName,
-    LanguageSystemStatement, LookupBlock, MarkClass, MarkClassDefinition, ToplevelItem,
+    Anchor, FeatureFile, GlyphClass, GlyphClassDefStatement, GlyphClassDefinition, GlyphContainer,
+    GlyphName, LanguageSystemStatement, LookupBlock, MarkClass, MarkClassDefinition, ToplevelItem,
 };
 use indexmap::{IndexMap, IndexSet};
 use skrifa::{
@@ -222,13 +222,55 @@ impl<'a> UncompileContext<'a> {
     fn get_lookup_name(&self, lookup_list_index: u16) -> SmolStr {
         format!("lookup_{}", lookup_list_index).into() // This is WRONG but I want to make progress
     }
+
+    fn uncompile_gdef(&mut self) -> Result<Vec<ToplevelItem>, ReadError> {
+        let mut items = vec![];
+        let mut base_glyphs = vec![];
+        let mut mark_glyphs = vec![];
+        let mut ligature_glyphs = vec![];
+        let mut component_glyphs = vec![];
+        let make_class = |v: Vec<GlyphContainer>| {
+            if v.is_empty() {
+                None
+            } else {
+                Some(GlyphContainer::GlyphClass(GlyphClass::new(v, 0..0)))
+            }
+        };
+        if let Some(gdef) = &self.gdef {
+            // Uncompile glyph categories
+            if let Some(Ok(glyph_class_def)) = gdef.glyph_class_def() {
+                for (gid, class) in glyph_class_def.iter() {
+                    let name = self.get_name(gid);
+                    match class {
+                        1 => base_glyphs.push(GlyphContainer::GlyphName(name)),
+                        2 => ligature_glyphs.push(GlyphContainer::GlyphName(name)),
+                        3 => mark_glyphs.push(GlyphContainer::GlyphName(name)),
+                        4 => component_glyphs.push(GlyphContainer::GlyphName(name)),
+                        _ => {}
+                    }
+                }
+                items.push(ToplevelItem::GdefClassDef(GlyphClassDefStatement::new(
+                    make_class(base_glyphs),
+                    make_class(ligature_glyphs),
+                    make_class(mark_glyphs),
+                    make_class(component_glyphs),
+                    0..0,
+                )));
+            }
+        }
+        Ok(items)
+    }
 }
 
-pub fn uncompile(font: &FontRef) -> Result<FeatureFile, ReadError> {
+pub fn uncompile(font: &FontRef, do_gdef: bool) -> Result<FeatureFile, ReadError> {
     let mut context = UncompileContext::new(font)?;
     context.gather_language_systems()?;
     let mut ff = FeatureFile::new(vec![]);
     ff.statements.extend(context.dump_language_systems());
+
+    if do_gdef {
+        ff.statements.extend(context.uncompile_gdef()?);
+    }
 
     context.uncompile_gsub_lookups()?;
     context.uncompile_gpos_lookups()?;
@@ -262,7 +304,7 @@ mod tests {
     fn test_uncompile_static() {
         let data = std::fs::read("resources/test.ttf").unwrap();
         let fontref = FontRef::new(&data).unwrap();
-        let ff = uncompile(&fontref).unwrap();
+        let ff = uncompile(&fontref, false).unwrap();
         assert_eq!(
             ff.as_fea(""),
             "markClass grave <anchor 200 150> @mark_class_0;\nmarkClass acute <anchor 350 0> @mark_class_0;\nmarkClass dotbelowcomb <anchor 200 -200> @mark_class_1;\nlookup gsub_single_1 {\n    sub a by b;\n} gsub_single_1;\nlookup gsub_multiple_1 {\n    sub a by b c;\n} gsub_multiple_1;\nlookup gsub_alternate_1 {\n    sub a from [b c d e f];\n} gsub_alternate_1;\nlookup gsub_ligature_1 {\n    sub b c by a;\n} gsub_ligature_1;\nlookup gsub_contextual_1 {\n    sub [one a]' lookup lookup_0 b' [two c]' lookup lookup_1;\n} gsub_contextual_1;\nlookup gsub_chain_contextual_1 {\n    sub one two three a' lookup lookup_0 b' c' lookup lookup_1 x y z;\n} gsub_chain_contextual_1;\nlookup gpos_mark_to_base_1 {\n    pos base A\n        <anchor 150 100> mark @mark_class_0\n        <anchor -200 -200> mark @mark_class_1;\n} gpos_mark_to_base_1;\n"
