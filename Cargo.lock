@@ -138,6 +138,7 @@ dependencies = [
  "similar",
  "skrifa",
  "smol_str",
+ "sr-aef",
  "tempfile",
  "thiserror",
  "typeshare",

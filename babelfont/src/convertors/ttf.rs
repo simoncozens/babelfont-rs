@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use fea_rs_ast::AsFea;
 use fontdrasil::coords::{
     ConvertSpace, DesignCoord, DesignLocation, NormalizedCoord, NormalizedSpace, UserCoord,
 };
@@ -14,7 +15,7 @@ use skrifa::{
 use write_fonts::types::F2Dot14;
 
 use crate::{
-    BabelfontError, Font, FormatSpecific, Glyph, Instance, Layer, MetricType, PathBuilder,
+    BabelfontError, Features, Font, FormatSpecific, Glyph, Instance, Layer, MetricType, PathBuilder,
 };
 
 /// Load a TTF font from a file path
@@ -31,6 +32,7 @@ pub fn load<T: AsRef<std::path::Path>>(path: T) -> Result<Font, BabelfontError> 
     load_instances(&fontref, &mut font)?;
     load_masters(&fontref, &mut font)?;
     load_glyphs(&fontref, &mut font)?;
+    load_features(&fontref, &mut font)?;
     Ok(font)
 }
 
@@ -254,6 +256,13 @@ fn load_glyphs(fontref: &skrifa::FontRef, font: &mut Font) -> Result<(), Babelfo
             )))?;
         glyph.codepoints.push(unicode);
     }
+    Ok(())
+}
+
+fn load_features(fontref: &skrifa::FontRef, font: &mut Font) -> Result<(), BabelfontError> {
+    let featurefile = sr_aef::uncompile(fontref, true)
+        .map_err(|e| BabelfontError::BinaryFontRead(e.to_string()))?;
+    font.features = Features::from_fea(&featurefile.as_fea(""));
     Ok(())
 }
 
