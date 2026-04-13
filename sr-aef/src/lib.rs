@@ -1,10 +1,17 @@
+//! Uncompile a TTF font into a fea file.
 use std::collections::{HashMap, HashSet};
 
+/// A handle to the version of fea-rs-ast that sr-eaf is using.
+///
+/// The return value of uncompile() will be a [fea_rs_ast::FeatureFile]; you will probably want to call `.as_fea()` on it.
+pub use fea_rs_ast;
 use fea_rs_ast::{
-    Anchor, FeatureFile, GlyphClass, GlyphClassDefStatement, GlyphClassDefinition, GlyphContainer,
-    GlyphName, LanguageSystemStatement, LookupBlock, MarkClass, MarkClassDefinition, ToplevelItem,
+    Anchor, GlyphClass, GlyphClassDefStatement, GlyphClassDefinition, GlyphContainer, GlyphName,
+    LanguageSystemStatement, LookupBlock, MarkClass, MarkClassDefinition, ToplevelItem,
 };
 use indexmap::{IndexMap, IndexSet};
+/// A handle to the version of Skrifa that sr-eaf is using. Pass a skrifa::FontRef to uncompile()
+pub use skrifa;
 use skrifa::{
     raw::{
         tables::{
@@ -15,7 +22,7 @@ use skrifa::{
         },
         ReadError, TableProvider,
     },
-    FontRef, GlyphId, GlyphId16, GlyphNames, Tag,
+    GlyphId, GlyphId16, GlyphNames, Tag,
 };
 use smol_str::SmolStr;
 
@@ -40,7 +47,7 @@ struct UncompileContext<'a> {
 }
 
 impl<'a> UncompileContext<'a> {
-    fn new(font: &'a FontRef) -> Result<Self, ReadError> {
+    fn new(font: &'a skrifa::FontRef) -> Result<Self, ReadError> {
         let glyph_names = GlyphNames::new(font);
         Ok(Self {
             lookups: IndexMap::new(),
@@ -262,10 +269,17 @@ impl<'a> UncompileContext<'a> {
     }
 }
 
-pub fn uncompile(font: &FontRef, do_gdef: bool) -> Result<FeatureFile, ReadError> {
+/// Uncompile a TTF font into a fea file.
+///
+/// If do_gdef is true, also uncompile the GDEF table and include it in the output.
+/// Returns a [fea_rs_ast::FeatureFile] representing the uncompiled font, or a ReadError if something went wrong during reading.
+pub fn uncompile(
+    font: &skrifa::FontRef,
+    do_gdef: bool,
+) -> Result<fea_rs_ast::FeatureFile, ReadError> {
     let mut context = UncompileContext::new(font)?;
     context.gather_language_systems()?;
-    let mut ff = FeatureFile::new(vec![]);
+    let mut ff = fea_rs_ast::FeatureFile::new(vec![]);
     ff.statements.extend(context.dump_language_systems());
 
     if do_gdef {
@@ -295,6 +309,15 @@ pub fn uncompile(font: &FontRef, do_gdef: bool) -> Result<FeatureFile, ReadError
     Ok(ff)
 }
 
+/// Uncompile a TTF font from a byte slice into a fea file. See uncompile() for details.
+pub fn uncompile_bytes(
+    font_data: &[u8],
+    do_gdef: bool,
+) -> Result<fea_rs_ast::FeatureFile, ReadError> {
+    let fontref = skrifa::FontRef::new(font_data)?;
+    uncompile(&fontref, do_gdef)
+}
+
 #[cfg(test)]
 mod tests {
     use fea_rs_ast::AsFea;
@@ -303,7 +326,7 @@ mod tests {
     #[test]
     fn test_uncompile_static() {
         let data = std::fs::read("resources/test.ttf").unwrap();
-        let fontref = FontRef::new(&data).unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
         let ff = uncompile(&fontref, false).unwrap();
         assert_eq!(
             ff.as_fea(""),
