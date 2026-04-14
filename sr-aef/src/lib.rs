@@ -7,22 +7,23 @@ use std::collections::{HashMap, HashSet};
 pub use fea_rs_ast;
 use fea_rs_ast::{
     Anchor, GlyphClass, GlyphClassDefStatement, GlyphClassDefinition, GlyphContainer, GlyphName,
-    LanguageSystemStatement, LookupBlock, MarkClass, MarkClassDefinition, ToplevelItem,
+    LanguageSystemStatement, LookupBlock, LookupReferenceStatement, MarkClass, MarkClassDefinition,
+    Pos, Statement, SubOrPos, Subst, ToplevelItem,
 };
 use indexmap::{IndexMap, IndexSet};
 /// A handle to the version of Skrifa that sr-eaf is using. Pass a skrifa::FontRef to uncompile()
 pub use skrifa;
 use skrifa::{
-    GlyphId, GlyphId16, GlyphNames, Tag,
     raw::{
-        ReadError, TableProvider,
         tables::{
             gdef::Gdef,
             gpos::Gpos,
             gsub::{ClassDef, Gsub},
             layout::CoverageTable,
         },
+        ReadError, TableProvider,
     },
+    GlyphId, GlyphId16, GlyphNames, Tag,
 };
 use smol_str::SmolStr;
 
@@ -32,18 +33,27 @@ mod gsub;
 
 const PROMOTE_TO_NAMED_CLASS_THRESHOLD: usize = 5;
 
-struct UncompileContext<'a> {
-    lookups: IndexMap<SmolStr, LookupBlock>,
+/// The context object that holds all the information we need when uncompiling a font.
+pub struct UncompileContext<'a> {
+    /// All the lookups we have uncompiled so far, keyed by their name.
+    pub lookups: IndexMap<SmolStr, LookupBlock>,
+    pub lookup_map: HashMap<(String, u16), SmolStr>,
     symbols: IndexMap<SmolStr, usize>,
     gpos: Option<Gpos<'a>>,
     gsub: Option<Gsub<'a>>,
     gdef: Option<Gdef<'a>>,
-    language_systems: IndexMap<Tag, IndexSet<Tag>>,
+    /// A mapping from script tags to the language system tags that are present in the font.
+    pub language_systems: IndexMap<Tag, IndexSet<Tag>>,
     glyph_names: GlyphNames<'a>,
-    unnamed_anchors: IndexMap<SmolStr, Vec<Anchor>>,
-    anchors: IndexMap<SmolStr, IndexMap<SmolStr, Anchor>>,
-    mark_classes: IndexMap<SmolStr, Vec<MarkClassDefinition>>,
-    named_classes: IndexMap<SmolStr, GlyphClass>,
+    /// Anchors on a glyph which we haven't worked out what they should be called.
+    pub unnamed_anchors: IndexMap<SmolStr, Vec<Anchor>>,
+    /// Anchors on a glyph which we have worked out what they should be called.
+    pub anchors: IndexMap<SmolStr, IndexMap<SmolStr, Anchor>>,
+    /// Mark classes, indexed by class name.
+    pub mark_classes: IndexMap<SmolStr, Vec<MarkClassDefinition>>,
+    /// Named glyph classes, indexed by class name.
+    pub named_classes: IndexMap<SmolStr, GlyphClass>,
+    features: IndexMap<SmolStr, Vec<LookupReferenceStatement>>,
 }
 
 impl<'a> UncompileContext<'a> {
@@ -51,6 +61,7 @@ impl<'a> UncompileContext<'a> {
         let glyph_names = GlyphNames::new(font);
         Ok(Self {
             lookups: IndexMap::new(),
+            lookup_map: HashMap::new(),
             symbols: IndexMap::new(),
             gpos: font.gpos().ok(),
             gsub: font.gsub().ok(),
@@ -61,6 +72,7 @@ impl<'a> UncompileContext<'a> {
             glyph_names,
             mark_classes: IndexMap::new(),
             named_classes: IndexMap::new(),
+            features: IndexMap::new(),
         })
     }
 
@@ -218,16 +230,26 @@ impl<'a> UncompileContext<'a> {
         );
         classes
     }
-    fn create_next_lookup_block(&mut self, prefix: &str) -> LookupBlock {
+    fn create_next_lookup_block<T: SubOrPos>(
+        &mut self,
+        prefix: &str,
+        index: u16,
+        phase: T,
+    ) -> LookupBlock {
         let symbol_index = self.symbols.entry(prefix.into()).or_insert(1);
         let i = *symbol_index;
         let name = SmolStr::new(format!("{}_{}", prefix, i));
         *symbol_index += 1;
+        self.lookup_map
+            .insert((phase.to_string(), index), name.clone());
         LookupBlock::new(name.clone(), vec![], false, 0..0)
     }
 
-    fn get_lookup_name(&self, lookup_list_index: u16) -> SmolStr {
-        format!("lookup_{}", lookup_list_index).into() // This is WRONG but I want to make progress
+    fn get_lookup_name<T: SubOrPos>(&self, lookup_list_index: u16, phase: T) -> SmolStr {
+        self.lookup_map
+            .get(&(phase.to_string(), lookup_list_index))
+            .cloned()
+            .unwrap_or_else(|| format!("{}_lookup_{}", phase, lookup_list_index).into())
     }
 
     fn uncompile_gdef(&mut self) -> Result<Vec<ToplevelItem>, ReadError> {
@@ -236,13 +258,8 @@ impl<'a> UncompileContext<'a> {
         let mut mark_glyphs = vec![];
         let mut ligature_glyphs = vec![];
         let mut component_glyphs = vec![];
-        let make_class = |v: Vec<GlyphContainer>| {
-            if v.is_empty() {
-                None
-            } else {
-                Some(GlyphContainer::GlyphClass(GlyphClass::new(v, 0..0)))
-            }
-        };
+        let make_class =
+            |v: Vec<GlyphContainer>| Some(GlyphContainer::GlyphClass(GlyphClass::new(v, 0..0)));
         if let Some(gdef) = &self.gdef {
             // Uncompile glyph categories
             if let Some(Ok(glyph_class_def)) = gdef.glyph_class_def() {
@@ -266,6 +283,50 @@ impl<'a> UncompileContext<'a> {
             }
         }
         Ok(items)
+    }
+
+    fn uncompile_feature_table(&mut self) -> Result<(), ReadError> {
+        if let Some(gsub) = &self.gsub {
+            for feature_record in gsub.feature_list()?.feature_records() {
+                let feature_tag = feature_record.feature_tag();
+                let feature = feature_record.feature(gsub.feature_list()?.offset_data())?;
+                let lookup_indices = feature.lookup_list_indices();
+                self.features.insert(
+                    feature_tag.to_string().into(),
+                    lookup_indices
+                        .iter()
+                        .map(|i| {
+                            LookupReferenceStatement::new(
+                                self.get_lookup_name(i.get(), Subst).into(),
+                                0..0,
+                            )
+                        })
+                        .collect(),
+                );
+            }
+        }
+
+        if let Some(gpos) = &self.gpos {
+            for feature_record in gpos.feature_list()?.feature_records() {
+                let feature_tag = feature_record.feature_tag();
+                let feature = feature_record.feature(gpos.feature_list()?.offset_data())?;
+                let lookup_indices = feature.lookup_list_indices();
+                self.features.insert(
+                    feature_tag.to_string().into(),
+                    lookup_indices
+                        .iter()
+                        .map(|i| {
+                            LookupReferenceStatement::new(
+                                self.get_lookup_name(i.get(), Pos).into(),
+                                0..0,
+                            )
+                        })
+                        .collect(),
+                );
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -305,6 +366,20 @@ pub fn uncompile(
     for lookup in context.lookups.values() {
         ff.statements.push(ToplevelItem::Lookup(lookup.clone()));
     }
+    context.uncompile_feature_table()?;
+    // Add all feature references to the feature file
+    for (feature_name, lookup_refs) in context.features.iter() {
+        ff.statements
+            .push(ToplevelItem::Feature(fea_rs_ast::FeatureBlock::new(
+                feature_name.clone(),
+                lookup_refs
+                    .iter()
+                    .map(|lr| Statement::LookupReference(lr.clone()))
+                    .collect(),
+                false,
+                0..0,
+            )));
+    }
 
     Ok(ff)
 }
@@ -318,6 +393,27 @@ pub fn uncompile_bytes(
     uncompile(&fontref, do_gdef)
 }
 
+/// Uncompile a TTF font to a context object.
+///
+/// This partially decompiles the font, giving you the component parts so that you can
+/// put them where you want them. Useful for font editors and other tools that want the
+/// data but don't want to go all the way to a fea file.
+pub fn uncompile_context<'a>(
+    font: &'a skrifa::FontRef,
+    do_gdef: bool,
+) -> Result<UncompileContext<'a>, ReadError> {
+    let mut context = UncompileContext::new(font)?;
+    context.gather_language_systems()?;
+    if do_gdef {
+        context.uncompile_gdef()?;
+    }
+
+    context.uncompile_gsub_lookups()?;
+    context.uncompile_gpos_lookups()?;
+    context.uncompile_feature_table()?;
+    Ok(context)
+}
+
 #[cfg(test)]
 mod tests {
     use fea_rs_ast::AsFea;
@@ -327,10 +423,10 @@ mod tests {
     fn test_uncompile_static() {
         let data = std::fs::read("resources/test.ttf").unwrap();
         let fontref = skrifa::FontRef::new(&data).unwrap();
-        let ff = uncompile(&fontref, false).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
         assert_eq!(
             ff.as_fea(""),
-            "markClass grave <anchor 200 150> @mark_class_0;\nmarkClass acute <anchor 350 0> @mark_class_0;\nmarkClass dotbelowcomb <anchor 200 -200> @mark_class_1;\nlookup gsub_single_1 {\n    sub a by b;\n} gsub_single_1;\nlookup gsub_multiple_1 {\n    sub a by b c;\n} gsub_multiple_1;\nlookup gsub_alternate_1 {\n    sub a from [b c d e f];\n} gsub_alternate_1;\nlookup gsub_ligature_1 {\n    sub b c by a;\n} gsub_ligature_1;\nlookup gsub_contextual_1 {\n    sub [one a]' lookup lookup_0 b' [two c]' lookup lookup_1;\n} gsub_contextual_1;\nlookup gsub_chain_contextual_1 {\n    sub one two three a' lookup lookup_0 b' c' lookup lookup_1 x y z;\n} gsub_chain_contextual_1;\nlookup gpos_mark_to_base_1 {\n    pos base A\n        <anchor 150 100> mark @mark_class_0\n        <anchor -200 -200> mark @mark_class_1;\n} gpos_mark_to_base_1;\n"
+            "GlyphClassDef [A], [], [grave acute dotbelowcomb], [];\nmarkClass grave <anchor 200 150> @mark_class_0;\nmarkClass acute <anchor 350 0> @mark_class_0;\nmarkClass dotbelowcomb <anchor 200 -200> @mark_class_1;\nlookup gsub_single_1 {\n    sub a by b;\n} gsub_single_1;\nlookup gsub_multiple_1 {\n    sub a by b c;\n} gsub_multiple_1;\nlookup gsub_alternate_1 {\n    sub a from [b c d e f];\n} gsub_alternate_1;\nlookup gsub_ligature_1 {\n    sub b c by a;\n} gsub_ligature_1;\nlookup gsub_contextual_1 {\n    sub [one a]' lookup gsub_single_1 b' [two c]' lookup gsub_multiple_1;\n} gsub_contextual_1;\nlookup gsub_chain_contextual_1 {\n    sub one two three a' lookup gsub_single_1 b' c' lookup gsub_multiple_1 x y z;\n} gsub_chain_contextual_1;\nlookup gpos_mark_to_base_1 {\n    pos base A\n        <anchor 150 100> mark @mark_class_0\n        <anchor -200 -200> mark @mark_class_1;\n} gpos_mark_to_base_1;\n"
         );
     }
 }

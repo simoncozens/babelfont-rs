@@ -6,7 +6,6 @@ use fea_rs_ast::{
 };
 use indexmap::IndexMap;
 use skrifa::raw::{
-    ReadError,
     tables::{
         gpos::{
             AnchorTable, CursivePosFormat1, MarkBasePosFormat1, MarkLigPosFormat1,
@@ -15,6 +14,7 @@ use skrifa::raw::{
         },
         gsub::LookupList,
     },
+    ReadError,
 };
 use smol_str::SmolStr;
 impl<'a> UncompileContext<'a> {
@@ -23,11 +23,12 @@ impl<'a> UncompileContext<'a> {
             Some(gpos) => gpos.lookup_list()?,
             None => return Ok(()),
         };
-        for lookup in gpos_lookup_list.lookups().iter().flatten() {
+        for (i, lookup) in gpos_lookup_list.lookups().iter().flatten().enumerate() {
             let subtables = lookup.subtables()?;
             match subtables {
                 PositionSubtables::Single(subtables) => {
-                    let mut lookupblock = self.create_next_lookup_block("gsub_single");
+                    let mut lookupblock =
+                        self.create_next_lookup_block("gpos_single", i as u16, Pos);
                     for subtable in subtables.iter().flatten() {
                         match subtable {
                             SinglePos::Format1(gpos1f1) => {
@@ -41,7 +42,7 @@ impl<'a> UncompileContext<'a> {
                     self.lookups.insert(lookupblock.name.clone(), lookupblock);
                 }
                 PositionSubtables::Pair(subtables) => {
-                    let mut lookupblock = self.create_next_lookup_block("gpos_pair");
+                    let mut lookupblock = self.create_next_lookup_block("gpos_pair", i as u16, Pos);
                     for subtable in subtables.iter().flatten() {
                         match subtable {
                             PairPos::Format1(table_ref) => {
@@ -55,35 +56,40 @@ impl<'a> UncompileContext<'a> {
                     self.lookups.insert(lookupblock.name.clone(), lookupblock);
                 }
                 PositionSubtables::Cursive(subtables) => {
-                    let mut lookupblock = self.create_next_lookup_block("gpos_cursive");
+                    let mut lookupblock =
+                        self.create_next_lookup_block("gpos_cursive", i as u16, Pos);
                     for subtable in subtables.iter().flatten() {
                         self.uncompile_gpos3(&mut lookupblock, subtable)?;
                     }
                     self.lookups.insert(lookupblock.name.clone(), lookupblock);
                 }
                 PositionSubtables::MarkToBase(subtables) => {
-                    let mut lookupblock = self.create_next_lookup_block("gpos_mark_to_base");
+                    let mut lookupblock =
+                        self.create_next_lookup_block("gpos_mark_to_base", i as u16, Pos);
                     for subtable in subtables.iter().flatten() {
                         self.uncompile_gpos4(&mut lookupblock, subtable)?;
                     }
                     self.lookups.insert(lookupblock.name.clone(), lookupblock);
                 }
                 PositionSubtables::MarkToLig(subtables) => {
-                    let mut lookupblock = self.create_next_lookup_block("gpos_mark_to_ligature");
+                    let mut lookupblock =
+                        self.create_next_lookup_block("gpos_mark_to_ligature", i as u16, Pos);
                     for subtable in subtables.iter().flatten() {
                         self.uncompile_gpos5(&mut lookupblock, subtable)?;
                     }
                     self.lookups.insert(lookupblock.name.clone(), lookupblock);
                 }
                 PositionSubtables::MarkToMark(subtables) => {
-                    let mut lookupblock = self.create_next_lookup_block("gpos_mark_to_mark");
+                    let mut lookupblock =
+                        self.create_next_lookup_block("gpos_mark_to_mark", i as u16, Pos);
                     for subtable in subtables.iter().flatten() {
                         self.uncompile_gpos6(&mut lookupblock, subtable)?;
                     }
                     self.lookups.insert(lookupblock.name.clone(), lookupblock);
                 }
                 PositionSubtables::Contextual(subtables) => {
-                    let mut lookupblock = self.create_next_lookup_block("gpos_contextual");
+                    let mut lookupblock =
+                        self.create_next_lookup_block("gpos_contextual", i as u16, Pos);
                     for subtable in subtables.iter().flatten() {
                         lookupblock.statements.extend(
                             self.uncompile_sequence_context(subtable, Pos)?
@@ -94,7 +100,8 @@ impl<'a> UncompileContext<'a> {
                     self.lookups.insert(lookupblock.name.clone(), lookupblock);
                 }
                 PositionSubtables::ChainContextual(subtables) => {
-                    let mut lookupblock = self.create_next_lookup_block("gpos_chain_contextual");
+                    let mut lookupblock =
+                        self.create_next_lookup_block("gpos_chain_contextual", i as u16, Pos);
                     for subtable in subtables.iter().flatten() {
                         lookupblock.statements.extend(
                             self.uncompile_chain_sequence_context(subtable, Pos)?

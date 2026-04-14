@@ -1,8 +1,8 @@
 use crate::UncompileContext;
 use fea_rs_ast::{ChainedContextStatement, GlyphContainer, SubOrPos};
 use skrifa::raw::{
-    ReadError,
     tables::{gsub::ChainedSequenceContext, layout::SequenceContext},
+    ReadError,
 };
 
 impl<'a> UncompileContext<'a> {
@@ -34,9 +34,10 @@ impl<'a> UncompileContext<'a> {
                                 if let Some(lu) =
                                     lookups.get_mut(lookup_record.sequence_index() as usize)
                                 {
-                                    lu.push(
-                                        self.get_lookup_name(lookup_record.lookup_list_index()),
-                                    );
+                                    lu.push(self.get_lookup_name(
+                                        lookup_record.lookup_list_index(),
+                                        sub_or_pos,
+                                    ));
                                 }
                             }
                             let statement = ChainedContextStatement::new(
@@ -65,7 +66,9 @@ impl<'a> UncompileContext<'a> {
                 let mut lookups = vec![vec![]; input.len()];
                 for lookup_record in table_ref.seq_lookup_records() {
                     if let Some(lu) = lookups.get_mut(lookup_record.sequence_index() as usize) {
-                        lu.push(self.get_lookup_name(lookup_record.lookup_list_index()));
+                        lu.push(
+                            self.get_lookup_name(lookup_record.lookup_list_index(), sub_or_pos),
+                        );
                     }
                 }
                 let statement =
@@ -116,9 +119,10 @@ impl<'a> UncompileContext<'a> {
                                 if let Some(lu) =
                                     lookups.get_mut(lookup_record.sequence_index() as usize)
                                 {
-                                    lu.push(
-                                        self.get_lookup_name(lookup_record.lookup_list_index()),
-                                    );
+                                    lu.push(self.get_lookup_name(
+                                        lookup_record.lookup_list_index(),
+                                        sub_or_pos,
+                                    ));
                                 }
                             }
                             let statement = ChainedContextStatement::new(
@@ -161,7 +165,9 @@ impl<'a> UncompileContext<'a> {
                 let mut lookups = vec![vec![]; input.len()];
                 for lookup_record in table_ref.seq_lookup_records() {
                     if let Some(lu) = lookups.get_mut(lookup_record.sequence_index() as usize) {
-                        lu.push(self.get_lookup_name(lookup_record.lookup_list_index()));
+                        lu.push(
+                            self.get_lookup_name(lookup_record.lookup_list_index(), sub_or_pos),
+                        );
                     }
                 }
                 let statement =

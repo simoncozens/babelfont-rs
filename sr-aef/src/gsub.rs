@@ -4,15 +4,15 @@ use fea_rs_ast::{
     MultipleSubstStatement, SingleSubstStatement, Statement, Subst,
 };
 use skrifa::{
-    GlyphId16,
     raw::{
-        ReadError,
         tables::gsub::{
             AlternateSubstFormat1, LigatureSubstFormat1, LookupList, MultipleSubstFormat1,
             ReverseChainSingleSubstFormat1, SingleSubst, SingleSubstFormat1, SingleSubstFormat2,
             SubstitutionLookup, SubstitutionSubtables,
         },
+        ReadError,
     },
+    GlyphId16,
 };
 impl<'a> UncompileContext<'a> {
     pub(crate) fn uncompile_gsub_lookups(&mut self) -> Result<(), ReadError> {
@@ -20,11 +20,12 @@ impl<'a> UncompileContext<'a> {
             Some(gsub) => gsub.lookup_list()?,
             None => return Ok(()),
         };
-        for lookup in gsub_lookup_list.lookups().iter().flatten() {
+        for (i, lookup) in gsub_lookup_list.lookups().iter().flatten().enumerate() {
             let subtables = lookup.subtables()?;
             match subtables {
                 SubstitutionSubtables::Single(subtables) => {
-                    let mut lookupblock = self.create_next_lookup_block("gsub_single");
+                    let mut lookupblock =
+                        self.create_next_lookup_block("gsub_single", i as u16, Subst);
                     for subtable in subtables.iter().flatten() {
                         match subtable {
                             SingleSubst::Format1(table_ref) => {
@@ -38,28 +39,32 @@ impl<'a> UncompileContext<'a> {
                     self.lookups.insert(lookupblock.name.clone(), lookupblock);
                 }
                 SubstitutionSubtables::Multiple(subtables) => {
-                    let mut lookupblock = self.create_next_lookup_block("gsub_multiple");
+                    let mut lookupblock =
+                        self.create_next_lookup_block("gsub_multiple", i as u16, Subst);
                     for subtable in subtables.iter().flatten() {
                         self.uncompile_gsub2(&mut lookupblock, subtable)?;
                     }
                     self.lookups.insert(lookupblock.name.clone(), lookupblock);
                 }
                 SubstitutionSubtables::Alternate(subtables) => {
-                    let mut lookupblock = self.create_next_lookup_block("gsub_alternate");
+                    let mut lookupblock =
+                        self.create_next_lookup_block("gsub_alternate", i as u16, Subst);
                     for subtable in subtables.iter().flatten() {
                         self.uncompile_gsub3(&mut lookupblock, subtable)?;
                     }
                     self.lookups.insert(lookupblock.name.clone(), lookupblock);
                 }
                 SubstitutionSubtables::Ligature(subtables) => {
-                    let mut lookupblock = self.create_next_lookup_block("gsub_ligature");
+                    let mut lookupblock =
+                        self.create_next_lookup_block("gsub_ligature", i as u16, Subst);
                     for subtable in subtables.iter().flatten() {
                         self.uncompile_gsub4(&mut lookupblock, subtable)?;
                     }
                     self.lookups.insert(lookupblock.name.clone(), lookupblock);
                 }
                 SubstitutionSubtables::Contextual(subtables) => {
-                    let mut lookupblock = self.create_next_lookup_block("gsub_contextual");
+                    let mut lookupblock =
+                        self.create_next_lookup_block("gsub_contextual", i as u16, Subst);
                     for subtable in subtables.iter().flatten() {
                         lookupblock.statements.extend(
                             self.uncompile_sequence_context(subtable, Subst)?
@@ -70,7 +75,8 @@ impl<'a> UncompileContext<'a> {
                     self.lookups.insert(lookupblock.name.clone(), lookupblock);
                 }
                 SubstitutionSubtables::ChainContextual(subtables) => {
-                    let mut lookupblock = self.create_next_lookup_block("gsub_chain_contextual");
+                    let mut lookupblock =
+                        self.create_next_lookup_block("gsub_chain_contextual", i as u16, Subst);
                     for subtable in subtables.iter().flatten() {
                         lookupblock.statements.extend(
                             self.uncompile_chain_sequence_context(subtable, Subst)?
@@ -81,7 +87,8 @@ impl<'a> UncompileContext<'a> {
                     self.lookups.insert(lookupblock.name.clone(), lookupblock);
                 }
                 SubstitutionSubtables::Reverse(subtables) => {
-                    let mut lookupblock = self.create_next_lookup_block("gsub_reverse");
+                    let mut lookupblock =
+                        self.create_next_lookup_block("gsub_reverse", i as u16, Subst);
                     for subtable in subtables.iter().flatten() {
                         self.uncompile_gsub7(&mut lookupblock, subtable)?;
                     }
