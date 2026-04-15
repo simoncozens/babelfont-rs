@@ -292,6 +292,8 @@ impl Work<Context, WorkId, Error> for DummyWork {
             WorkId::Anchor(_glyph_name) => todo!(),
             WorkId::ColorPalettes => todo!(),
             WorkId::PaintGraph => todo!(),
+            WorkId::PreliminaryGdefCategories => todo!(),
+            WorkId::GdefCategories => todo!(),
         }
         Ok(())
     }

@@ -2,11 +2,10 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::{
     common::decomposition::DecomposedAffine, convertors::fontir::debug_location, Axis,
-    BabelfontError, Component, Font, Glyph, Layer, LayerType,
+    BabelfontError, Component, Font, Glyph, Layer, LayerType, Tag,
 };
 use fontdrasil::{
     coords::{Location, NormalizedCoord, NormalizedLocation, NormalizedSpace},
-    types::Tag,
     variations::{VariationModel, VariationRegion},
 };
 use smol_str::SmolStr;
@@ -44,7 +43,10 @@ pub fn insert_varc_table(binary: &[u8], font: &Font) -> Result<Vec<u8>, Babelfon
     // We must get the axis names and tags from the fvar table,
     // just in case fontc reordered things or didn't include all axes.
     let fvar = existing_font.fvar()?.axes()?;
-    let axis_order = fvar.iter().map(|a| a.axis_tag()).collect::<Vec<Tag>>();
+    let axis_order = fvar
+        .iter()
+        .map(|a| crate::Tag::from_be_bytes(a.axis_tag().to_be_bytes()))
+        .collect::<Vec<Tag>>();
     let fontdrasil_axes = font.fontdrasil_axes()?;
 
     let master = font

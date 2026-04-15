@@ -1,3 +1,4 @@
+use crate::Tag;
 use crate::{
     convertors::fontir::{debug_location, CompilationOptions},
     Component, Font, Layer, NodeType, Shape,
@@ -17,7 +18,6 @@ use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
-use write_fonts::types::Tag;
 
 #[derive(Debug)]
 pub(crate) struct GlyphIrWork {
@@ -297,6 +297,7 @@ fn to_ir_component(glyph_name: GlyphName, component: &Component) -> ir::Componen
     ir::Component {
         base: component.reference.as_str().into(),
         transform: component.transform.as_affine(),
+        anchor: None,
     }
 }
 

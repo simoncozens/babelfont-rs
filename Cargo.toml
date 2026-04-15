@@ -5,18 +5,15 @@ members = ["babelfont", "fontmerge", "sr-aef"]
 [workspace.dependencies]
 log = "0.4"
 env_logger = "0.10"
-# Branch nonsense is temporary until fontc works with WASM better
-fontdrasil = { version = "0.4.0", git = "https://github.com/simoncozens/fontc", branch = "new-varc-writefonts" }
-fontir = { version = "0.5.0", git = "https://github.com/simoncozens/fontc", branch = "new-varc-writefonts" } # Must use version fondrasil uses
-fontbe = { version = "0.5.0", git = "https://github.com/simoncozens/fontc", branch = "new-varc-writefonts", default-features = false } # Must use version fondrasil uses
-fontc = { version = "0.6.0", git = "https://github.com/simoncozens/fontc", branch = "new-varc-writefonts", default-features = false } # Must use version fondrasil uses
-write-fonts = { version = "0.45.0", features = [
-    "read",
-], git = "https://github.com/googlefonts/fontations" } # Must use version fontdrasil uses
-skrifa = { version = "0.40.0", git = "https://github.com/googlefonts/fontations" } # Must use version fontdrasil uses
+fontdrasil = { git = "https://github.com/googlefonts/fontc", rev = "3518040e" }
+fontir = { version = "0.5.0", git = "https://github.com/googlefonts/fontc", rev = "3518040e" }                           # Must use version fondrasil uses
+fontbe = { version = "0.5.0", git = "https://github.com/googlefonts/fontc", rev = "3518040e", default-features = false } # Must use version fondrasil uses
+fontc = { version = "0.6.0", git = "https://github.com/googlefonts/fontc", rev = "3518040e", default-features = false }  # Must use version fondrasil uses
+write-fonts = { version = "0.48.0", features = ["read"] }
+skrifa = { version = "0.42.0" }                                                                                          # Must use version fontdrasil uses
 
 kurbo = "0.13"                                          # Must use same version as norad / fontir /etc.
-fea-rs-ast = { version = "0.1.4" }
+fea-rs-ast = { version = "0.1.5" }
 regex = "1.12.2"
 thiserror = "2.0.17"
 indexmap = { version = "2.12.0", features = ["serde"] }

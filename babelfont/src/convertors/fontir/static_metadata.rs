@@ -6,8 +6,8 @@ use fontdrasil::{orchestration::Work, types::GlyphName};
 use fontir::{
     error::{BadSourceKind, Error},
     ir::{
-        GdefCategories, GlyphOrder, NameBuilder, NameKey, NamedInstance, PostscriptNames,
-        StaticMetadata,
+        GlyphOrder, NameBuilder, NameKey, NamedInstance, PostscriptNames,
+        PreliminaryGdefCategories, StaticMetadata,
     },
     orchestration::{Context, Flags, WorkId},
 };
@@ -16,7 +16,7 @@ use write_fonts::{
     types::NameId,
 };
 
-fn make_glyph_categories(font: &Font) -> GdefCategories {
+fn make_glyph_categories(font: &Font) -> PreliminaryGdefCategories {
     let categories = font
         .glyphs
         .iter()
@@ -32,9 +32,11 @@ fn make_glyph_categories(font: &Font) -> GdefCategories {
             )
         })
         .collect();
-    GdefCategories {
+    PreliminaryGdefCategories {
         categories,
         prefer_gdef_categories_in_fea: false,
+        infer_from_anchors: false,
+        mark_category_glyphs: Default::default(),
     }
 }
 
@@ -113,7 +115,10 @@ impl Work<Context, WorkId, Error> for StaticMetadataWork {
     }
 
     fn also_completes(&self) -> Vec<WorkId> {
-        vec![WorkId::PreliminaryGlyphOrder]
+        vec![
+            WorkId::PreliminaryGlyphOrder,
+            WorkId::PreliminaryGdefCategories,
+        ]
     }
 
     fn exec(&self, context: &Context) -> Result<(), Error> {
@@ -237,11 +242,11 @@ impl Work<Context, WorkId, Error> for StaticMetadataWork {
             global_locations,
             postscript_names,
             italic_angle.into(),
-            categories,
-            None,
+            None, // glyphsapp_number_values,
             build_vertical,
         )
         .map_err(Error::VariationModelError)?;
+        context.preliminary_gdef_categories.set(categories);
         static_metadata.misc.selection_flags = selection_flags;
         static_metadata.variations = None;
 

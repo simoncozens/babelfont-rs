@@ -1,3 +1,4 @@
+use crate::Tag;
 use crate::{
     common::tag_from_string, Anchor, Axis, BabelfontError, Component, Font, Glyph, GlyphCategory,
     Layer, LayerType, Master, Node, NodeType, Path, Shape,
@@ -10,7 +11,6 @@ use indexmap::IndexMap;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, convert::TryInto, fs, path::PathBuf, sync::LazyLock};
-use write_fonts::types::Tag;
 
 fn to_point(s: String) -> Result<(f64, f64), BabelfontError> {
     let mut i = s.split(' ');

@@ -79,6 +79,7 @@ num-traits = "0.2.19"
 vfbreader = { git = "https://github.com/simoncozens/vfbLib-rust", optional = true }
 skrifa = { workspace = true, optional = true }
 sr-aef = { version = "0.1.0", path = "../sr-aef" }
+itertools = "0.14.0"
 [dev-dependencies]
 pretty_assertions = "1.4.1"
 rstest = "0.26.1"

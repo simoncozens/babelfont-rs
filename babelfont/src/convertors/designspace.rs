@@ -1,3 +1,4 @@
+use crate::Tag;
 use crate::{
     convertors::ufo::{as_norad, load_kerning, stash_lib, KEY_LIB},
     glyph::GlyphList,
@@ -10,7 +11,6 @@ use norad::{
     Plist,
 };
 use std::collections::{BTreeMap, HashMap};
-use write_fonts::types::Tag;
 // use rayon::prelude::*;
 use std::path::PathBuf;
 
@@ -38,7 +38,7 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
         .filter_map(|dsax| dsax.try_into().ok())
         .collect();
     #[allow(clippy::unwrap_used)] // We put a default there
-    let axis_name_tag_map = axes
+    let axis_name_tag_map: HashMap<String, crate::Tag> = axes
         .iter()
         .map(|ax| (ax.name.get_default().unwrap().clone(), ax.tag))
         .collect();

@@ -1,3 +1,4 @@
+use crate::Tag;
 use crate::{
     common::FormatSpecific,
     glyph::{self, glyphs::glyph_to_glyphs},
@@ -16,7 +17,6 @@ use std::{
     path::PathBuf,
     str::FromStr,
 };
-use write_fonts::types::Tag;
 
 mod customparameters;
 
