@@ -4,14 +4,14 @@ use fontdrasil::coords::{
     CoordConverter, DesignCoord, NormalizedCoord, NormalizedLocation, UserCoord, UserLocation,
 };
 use skrifa::{
+    MetadataProvider,
     raw::{
+        ReadError, TableProvider as _,
         tables::{
             gpos::DeviceOrVariationIndex,
             variations::{DeltaSetIndex, ItemVariationStore},
         },
-        ReadError, TableProvider as _,
     },
-    MetadataProvider,
 };
 
 use crate::{SimpleUserLocation, UncompileContext};

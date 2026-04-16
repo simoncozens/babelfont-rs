@@ -8,6 +8,7 @@ use fea_rs_ast::{
 };
 use indexmap::IndexMap;
 use skrifa::raw::{
+    ReadError,
     tables::{
         gpos::{
             AnchorTable, CursivePosFormat1, MarkBasePosFormat1, MarkLigPosFormat1,
@@ -16,7 +17,6 @@ use skrifa::raw::{
         },
         gsub::LookupList,
     },
-    ReadError,
 };
 use smol_str::SmolStr;
 impl<'a> UncompileContext<'a> {
@@ -147,7 +147,8 @@ impl<'a> UncompileContext<'a> {
             y_variations =
                 self.resolve_variation_index(anchor.y_coordinate(), anchor.y_device(), &ivs)?;
         }
-        let x = if x_variations.len() < 2 { // we always have the default
+        let x = if x_variations.len() < 2 {
+            // we always have the default
             Metric::Scalar(anchor.x_coordinate())
         } else {
             Metric::Variable(x_variations)
@@ -542,12 +543,13 @@ impl<'a> UncompileContext<'a> {
             // Now guess: if they're all majority in top, topright, topleft, bottom, bottomright, bottomleft, center, etc
             // in order if not already registered in the "anchors" field.
             if let Some(name) = majority_in_quadrant(&xs, &ys)
-                && self.anchors.get(name).is_none() {
-                    new_names.push(name.into());
-                    self.anchors
-                        .insert(name.into(), base_glyphs_anchors.clone());
-                    continue;
-                }
+                && self.anchors.get(name).is_none()
+            {
+                new_names.push(name.into());
+                self.anchors
+                    .insert(name.into(), base_glyphs_anchors.clone());
+                continue;
+            }
             // Create one with a symbol
             let name = self.gensym(&format!("mark_class_{}", class_number));
             self.anchors

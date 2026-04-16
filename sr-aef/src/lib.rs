@@ -14,18 +14,18 @@ use indexmap::{IndexMap, IndexSet};
 /// A handle to the version of Skrifa that sr-eaf is using. Pass a skrifa::FontRef to uncompile()
 pub use skrifa;
 use skrifa::{
+    GlyphId, GlyphId16, GlyphNames, Tag,
     metrics::GlyphMetrics,
     prelude::{LocationRef, Size},
     raw::{
+        ReadError, TableProvider,
         tables::{
             gdef::Gdef,
             gpos::Gpos,
             gsub::{ClassDef, Gsub},
             layout::CoverageTable,
         },
-        ReadError, TableProvider,
     },
-    GlyphId, GlyphId16, GlyphNames, Tag,
 };
 use smol_str::SmolStr;
 
