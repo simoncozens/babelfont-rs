@@ -1,21 +1,27 @@
-use std::collections::HashSet;
-
-use fea_rs_ast::AsFea;
-use fontdrasil::coords::{
-    ConvertSpace, DesignCoord, DesignLocation, NormalizedCoord, NormalizedSpace, UserCoord,
+use fea_rs_ast::LanguageSystemStatement;
+use fontdrasil::{
+    coords::{
+        ConvertSpace, DesignCoord, DesignLocation, NormalizedCoord, NormalizedSpace, UserCoord,
+    },
+    types::Axes,
 };
 use indexmap::IndexMap;
+use itertools::Itertools;
 use skrifa::{
     outline::DrawSettings,
     prelude::{LocationRef, Size},
     raw::{tables::glyf, TableProvider},
     string::StringId,
-    GlyphId, GlyphNames, MetadataProvider, Tag,
+    GlyphId, GlyphNames, MetadataProvider,
 };
+use smol_str::SmolStr;
+use sr_aef::fea_rs_ast::AsFea;
+use std::collections::{HashMap, HashSet};
 use write_fonts::types::F2Dot14;
 
 use crate::{
-    BabelfontError, Features, Font, FormatSpecific, Glyph, Instance, Layer, MetricType, PathBuilder,
+    features::PossiblyAutomaticCode, Anchor, BabelfontError, Features, Font, FormatSpecific, Glyph,
+    Instance, Layer, LayerType, MetricType, PathBuilder, Tag,
 };
 
 /// Load a TTF font from a file path
@@ -61,7 +67,7 @@ fn load_axes(fontref: &skrifa::FontRef, font: &mut Font) -> Result<(), Babelfont
         let max = axis.max_value();
         font.axes.push(crate::Axis {
             name,
-            tag,
+            tag: crate::Tag::from_be_bytes(tag.to_be_bytes()), // hateful
             min: Some(UserCoord::new(min as f64)),
             default: Some(UserCoord::new(default as f64)),
             max: Some(UserCoord::new(max as f64)),
@@ -114,7 +120,7 @@ fn load_instances(fontref: &skrifa::FontRef, font: &mut Font) -> Result<(), Babe
     for (id, instance) in fontref.named_instances().iter().enumerate() {
         let name = name_id_to_i18n(fontref, instance.subfamily_name_id());
         let coordinates = instance.location();
-        let location: Vec<(Tag, DesignCoord)> = font
+        let location: Vec<(crate::Tag, DesignCoord)> = font
             .axes
             .iter()
             .zip(coordinates.coords().iter())
@@ -260,10 +266,134 @@ fn load_glyphs(fontref: &skrifa::FontRef, font: &mut Font) -> Result<(), Babelfo
 }
 
 fn load_features(fontref: &skrifa::FontRef, font: &mut Font) -> Result<(), BabelfontError> {
-    let featurefile = sr_aef::uncompile(fontref, true)
+    let axes = font.fontdrasil_axes()?;
+    let uncompile_context = sr_aef::uncompile_context(fontref)
         .map_err(|e| BabelfontError::BinaryFontRead(e.to_string()))?;
-    font.features = Features::from_fea(&featurefile.as_fea(""));
+    let master_ids = font
+        .masters
+        .iter()
+        .map(|m| (m.id.clone(), m))
+        .collect::<HashMap<_, _>>();
+    let mut features = Features::default();
+    for (anchor_name, anchors) in uncompile_context.anchors {
+        for (glyph_name, anchor) in anchors {
+            if let Some(glyph) = font.glyphs.get_mut(&glyph_name) {
+                for layer in glyph.layers.iter_mut() {
+                    let LayerType::DefaultForMaster(mid) = &layer.master else {
+                        continue;
+                    };
+                    let Some(master) = master_ids.get(mid) else {
+                        log::warn!(
+                            "Master ID {} from anchor {} does not exist in the font",
+                            mid,
+                            &anchor_name
+                        );
+                        continue;
+                    };
+                    let location = master.location.clone();
+                    let (x, y) = get_x_y_location_for_anchor(location, &anchor, &axes)?;
+                    layer.anchors.push(Anchor {
+                        name: anchor_name.clone().into(),
+                        x,
+                        y,
+                        format_specific: FormatSpecific::default(),
+                    });
+                }
+            } else {
+                log::warn!(
+                    "Glyph {} from anchor {} does not exist in the font",
+                    glyph_name,
+                    &anchor_name
+                );
+            }
+        }
+    }
+
+    for (class_name, glyphs) in uncompile_context.named_classes.iter() {
+        features.classes.insert(
+            class_name.clone(),
+            PossiblyAutomaticCode::new(glyphs.as_fea("")),
+        );
+    }
+    let mut language_systems = vec![];
+    for (script_tag, lang_sys_tags) in &uncompile_context.language_systems {
+        for lang_sys_tag in lang_sys_tags {
+            let lss =
+                LanguageSystemStatement::new(script_tag.to_string(), lang_sys_tag.to_string());
+            language_systems.push(lss.as_fea(""));
+        }
+    }
+    let language_systems_block = language_systems.join("\n");
+    if !language_systems_block.is_empty() {
+        features.prefixes.insert(
+            "LanguageSystems".into(),
+            PossiblyAutomaticCode::new(language_systems_block),
+        );
+    }
+    for (lookup_name, statements) in uncompile_context.lookups.iter() {
+        features.prefixes.insert(
+            lookup_name.clone(),
+            PossiblyAutomaticCode::new(statements.as_fea("")),
+        );
+    }
+    for (feature_name, lookups) in uncompile_context.features.iter() {
+        features.features.push((
+            feature_name.clone(),
+            PossiblyAutomaticCode::new(lookups.iter().map(|l| l.as_fea("")).join("\n")),
+        ));
+    }
+    font.features = features;
     Ok(())
+}
+
+fn get_x_y_location_for_anchor(
+    location: DesignLocation,
+    anchor: &sr_aef::fea_rs_ast::Anchor,
+    axes: &Axes,
+) -> Result<(f64, f64), BabelfontError> {
+    let user_loc = location.to_user(&axes)?;
+    let simple_user_loc = user_loc
+        .iter()
+        .map(|(tag, coord)| (SmolStr::from(tag.to_string()), coord.to_f64() as i16))
+        .collect::<IndexMap<SmolStr, i16>>();
+
+    let x = match &anchor.x {
+        fea_rs_ast::Metric::Scalar(x_scalar) => *x_scalar as f64,
+        fea_rs_ast::Metric::Variable(items) => {
+            // Anchor must exist at this location, so find the first item that matches the location
+            items
+                .iter()
+                .find_map(|(loc, item)| {
+                    if loc == &simple_user_loc {
+                        Some(*item as f64)
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_default()
+        }
+        fea_rs_ast::Metric::GlyphsAppNumber(_) => unreachable!(),
+    };
+
+    let y = match &anchor.y {
+        fea_rs_ast::Metric::Scalar(y_scalar) => *y_scalar as f64,
+        fea_rs_ast::Metric::Variable(items) => {
+            // Anchor must exist at this location, so find the first item that matches the location
+            items
+                .iter()
+                .find_map(|(loc, item)| {
+                    if loc == &simple_user_loc {
+                        Some(*item as f64)
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_default()
+        }
+        fea_rs_ast::Metric::GlyphsAppNumber(_) => unreachable!(),
+    };
+
+    Ok((x, y))
 }
 
 fn fontdrasil_location_to_skrifa_location<Space: ConvertSpace<NormalizedSpace>>(
@@ -276,7 +406,7 @@ fn fontdrasil_location_to_skrifa_location<Space: ConvertSpace<NormalizedSpace>>(
         let converter = axis._converter()?;
         let coord = loc
             .get(axis.tag)
-            .map(|c| c.to_normalized(&converter).to_f2dot14())
+            .map(|c| F2Dot14::from_f32(c.to_normalized(&converter).to_f64() as f32))
             .unwrap_or(F2Dot14::from_f32(0.0));
         coords.push(coord);
     }

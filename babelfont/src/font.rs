@@ -175,11 +175,10 @@ impl Font {
     /// Find the layer for a given glyph and master, if it exists
     pub fn master_layer_for(&self, glyphname: &str, master: &Master) -> Option<&Layer> {
         if let Some(glyph) = self.glyphs.get(glyphname) {
-            for layer in &glyph.layers {
-                if layer.master == LayerType::DefaultForMaster(master.id.clone()) {
-                    return Some(layer);
-                }
-            }
+            return glyph
+                .layers
+                .iter()
+                .find(|layer| layer.master == LayerType::DefaultForMaster(master.id.clone()));
         }
         None
     }
