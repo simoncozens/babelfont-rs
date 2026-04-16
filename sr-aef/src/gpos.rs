@@ -1,4 +1,6 @@
-use crate::UncompileContext;
+use std::collections::HashMap;
+
+use crate::{SimpleUserLocation, UncompileContext};
 use fea_rs_ast::{
     Anchor as FeaAnchor, CursivePosStatement, GlyphClass, GlyphContainer, LookupBlock,
     MarkBasePosStatement, MarkClass, MarkLigPosStatement, MarkMarkPosStatement, Metric,
@@ -136,10 +138,27 @@ impl<'a> UncompileContext<'a> {
         )
     }
 
-    fn resolve_anchor(&self, anchor: &AnchorTable) -> FeaAnchor {
-        let x = Metric::from(anchor.x_coordinate());
-        let y = Metric::from(anchor.y_coordinate());
-        FeaAnchor::new(x, y, None, None, None, None, 0..0)
+    fn resolve_anchor(&self, anchor: &AnchorTable) -> Result<FeaAnchor, ReadError> {
+        let mut x_variations: Vec<(SimpleUserLocation, i16)> = Vec::new();
+        let mut y_variations: Vec<(SimpleUserLocation, i16)> = Vec::new();
+        if let Some(ivs) = self.variation_store()? {
+            x_variations =
+                self.resolve_variation_index(anchor.x_coordinate(), anchor.x_device(), &ivs)?;
+            y_variations =
+                self.resolve_variation_index(anchor.y_coordinate(), anchor.y_device(), &ivs)?;
+        }
+        let x = if x_variations.len() < 2 { // we always have the default
+            Metric::Scalar(anchor.x_coordinate())
+        } else {
+            Metric::Variable(x_variations)
+        };
+        let y = if y_variations.len() < 2 {
+            Metric::Scalar(anchor.y_coordinate())
+        } else {
+            Metric::Variable(y_variations)
+        };
+
+        Ok(FeaAnchor::new(x, y, None, None, None, None, 0..0))
     }
 
     fn uncompile_gpos1_format1(
@@ -274,13 +293,18 @@ impl<'a> UncompileContext<'a> {
             let entry_anchor = entry
                 .entry_anchor(gpos3.offset_data())
                 .transpose()?
-                .map(|a| self.resolve_anchor(&a));
+                .map(|a| self.resolve_anchor(&a))
+                .transpose()?;
             let exit_anchor = entry
                 .exit_anchor(gpos3.offset_data())
                 .transpose()?
-                .map(|a| self.resolve_anchor(&a));
+                .map(|a| self.resolve_anchor(&a))
+                .transpose()?;
             if let Some(ref entry_anchor) = entry_anchor {
                 self.register_anchor(&glyph.name, entry_anchor, Some("entry"));
+            }
+            if let Some(ref exit_anchor) = exit_anchor {
+                self.register_anchor(&glyph.name, exit_anchor, Some("exit"));
             }
             let statement = Statement::CursivePos(CursivePosStatement::new(
                 GlyphContainer::GlyphName(glyph),
@@ -307,17 +331,38 @@ impl<'a> UncompileContext<'a> {
         let mark_array = gpos4.mark_array()?;
         let mut mark_classes: IndexMap<u16, Vec<(GlyphContainer, FeaAnchor)>> = IndexMap::new();
         // Emit mark classes first
-        for (mark_glyph, mark_record) in mark_coverage.into_iter().zip(mark_array.mark_records()) {
+        for (mark_glyph, mark_record) in mark_coverage.iter().zip(mark_array.mark_records()) {
             let mark_anchor = mark_record.mark_anchor(mark_array.offset_data())?;
             let mark_class = mark_record.mark_class();
-            let mark_anchor = self.resolve_anchor(&mark_anchor);
+            let mark_anchor = self.resolve_anchor(&mark_anchor)?;
             mark_classes
                 .entry(mark_class)
                 .or_default()
-                .push((mark_glyph, mark_anchor.clone()));
+                .push((mark_glyph.clone(), mark_anchor.clone()));
         }
 
-        let class_to_anchor_name: Vec<SmolStr> = self.register_mark_classes(mark_classes);
+        // let class_to_anchor_name: Vec<SmolStr> = self.register_mark_classes(mark_classes);
+
+        let mut mark_class_to_base_glyph_anchor: IndexMap<u16, IndexMap<SmolStr, FeaAnchor>> =
+            IndexMap::new();
+        for (base_glyph, base_record) in base_coverage
+            .iter()
+            .zip(base_array.base_records().iter().flatten())
+        {
+            let base_anchors = base_record.base_anchors(base_array.offset_data());
+            for (class_number, base_anchor) in base_anchors.iter().enumerate() {
+                if let Some(base_anchor) = base_anchor.transpose()? {
+                    let base_anchor = self.resolve_anchor(&base_anchor)?;
+                    mark_class_to_base_glyph_anchor
+                        .entry(class_number as u16)
+                        .or_default()
+                        .insert(base_glyph.name.clone(), base_anchor.clone());
+                }
+            }
+        }
+
+        let class_to_anchor_name: Vec<SmolStr> =
+            self.guess_anchor_names(&mark_class_to_base_glyph_anchor);
 
         for (base_glyph, base_record) in base_coverage
             .into_iter()
@@ -325,15 +370,11 @@ impl<'a> UncompileContext<'a> {
         {
             let base_anchors = base_record.base_anchors(base_array.offset_data());
             let mut anchors_mark_classes = vec![];
-            for (class_number, base_anchor) in base_anchors.iter().enumerate() {
+            for (base_anchor, anchor_name) in base_anchors.iter().zip(class_to_anchor_name.iter()) {
                 if let Some(base_anchor) = base_anchor.transpose()? {
-                    let base_anchor = self.resolve_anchor(&base_anchor);
-                    let anchor_name = class_to_anchor_name
-                        .get(class_number)
-                        .cloned()
-                        .unwrap_or_else(|| format!("mark_class_{}", class_number).into());
-                    self.register_anchor(&base_glyph.name, &base_anchor, Some(&anchor_name));
-                    anchors_mark_classes.push((base_anchor, MarkClass::new(&anchor_name)));
+                    let base_anchor = self.resolve_anchor(&base_anchor)?;
+                    self.register_anchor(&base_glyph.name, &base_anchor, Some(anchor_name));
+                    anchors_mark_classes.push((base_anchor, MarkClass::new(anchor_name)));
                 }
             }
             let statement = Statement::MarkBasePos(MarkBasePosStatement::new(
@@ -363,7 +404,7 @@ impl<'a> UncompileContext<'a> {
         for (mark_glyph, mark_record) in mark_coverage.into_iter().zip(mark_array.mark_records()) {
             let mark_anchor = mark_record.mark_anchor(mark_array.offset_data())?;
             let mark_class = mark_record.mark_class();
-            let mark_anchor = self.resolve_anchor(&mark_anchor);
+            let mark_anchor = self.resolve_anchor(&mark_anchor)?;
             mark_classes
                 .entry(mark_class)
                 .or_default()
@@ -384,7 +425,7 @@ impl<'a> UncompileContext<'a> {
                     .enumerate()
                 {
                     if let Some(ligature_anchor) = ligature_anchor.transpose()? {
-                        let ligature_anchor = self.resolve_anchor(&ligature_anchor);
+                        let ligature_anchor = self.resolve_anchor(&ligature_anchor)?;
                         let anchor_name = class_to_anchor_name
                             .get(class_number)
                             .cloned()
@@ -429,7 +470,7 @@ impl<'a> UncompileContext<'a> {
         {
             let mark_anchor = mark_record.mark_anchor(mark1_array.offset_data())?;
             let mark_class = mark_record.mark_class();
-            let mark_anchor = self.resolve_anchor(&mark_anchor);
+            let mark_anchor = self.resolve_anchor(&mark_anchor)?;
             mark_classes
                 .entry(mark_class)
                 .or_default()
@@ -448,7 +489,7 @@ impl<'a> UncompileContext<'a> {
                 .enumerate()
             {
                 if let Some(mark2_anchor) = mark2_anchor.transpose()? {
-                    let mark2_anchor = self.resolve_anchor(&mark2_anchor);
+                    let mark2_anchor = self.resolve_anchor(&mark2_anchor)?;
                     let anchor_name = class_to_anchor_name
                         .get(class_number)
                         .cloned()
@@ -468,4 +509,106 @@ impl<'a> UncompileContext<'a> {
 
         Ok(())
     }
+
+    fn guess_anchor_names(
+        &mut self,
+        mark_class_to_base_glyph_anchor: &IndexMap<u16, IndexMap<SmolStr, FeaAnchor>>,
+    ) -> Vec<SmolStr> {
+        let mut new_names = vec![];
+        for (class_number, base_glyphs_anchors) in mark_class_to_base_glyph_anchor {
+            let mut xs = vec![];
+            let mut ys = vec![];
+            for (base_glyph, anchor) in base_glyphs_anchors {
+                let Some(gid) = self.glyph_name_to_id.get(base_glyph).cloned() else {
+                    continue;
+                };
+                let bounds = self.glyph_metrics.bounds(gid).unwrap_or_default();
+                let width = bounds.x_max - bounds.x_min;
+                let height = bounds.y_max - bounds.y_min;
+                let (x, y) = anchor_location(anchor);
+                let x_percentage = if width > 0.0 {
+                    (x - bounds.x_min) / width
+                } else {
+                    0.5
+                };
+                let y_percentage = if height > 0.0 {
+                    (y - bounds.y_min) / height
+                } else {
+                    0.5
+                };
+                xs.push(x_percentage);
+                ys.push(y_percentage);
+            }
+            // Now guess: if they're all majority in top, topright, topleft, bottom, bottomright, bottomleft, center, etc
+            // in order if not already registered in the "anchors" field.
+            if let Some(name) = majority_in_quadrant(&xs, &ys)
+                && self.anchors.get(name).is_none() {
+                    new_names.push(name.into());
+                    self.anchors
+                        .insert(name.into(), base_glyphs_anchors.clone());
+                    continue;
+                }
+            // Create one with a symbol
+            let name = self.gensym(&format!("mark_class_{}", class_number));
+            self.anchors
+                .insert(name.clone(), base_glyphs_anchors.clone());
+            new_names.push(name);
+        }
+        new_names
+    }
+}
+
+fn anchor_location(anchor: &FeaAnchor) -> (f32, f32) {
+    let x = match &anchor.x {
+        Metric::Scalar(s) => *s as f32,
+        Metric::Variable(items) => items
+            .first()
+            .map(|(_loc, value)| *value as f32)
+            .unwrap_or(0.0),
+        Metric::GlyphsAppNumber(_) => 0.0, // You deserve to lose
+    };
+    let y = match &anchor.y {
+        Metric::Scalar(s) => *s as f32,
+        Metric::Variable(items) => items
+            .first()
+            .map(|(_loc, value)| *value as f32)
+            .unwrap_or(0.0),
+        Metric::GlyphsAppNumber(_) => 0.0,
+    };
+    (x, y)
+}
+
+fn majority_in_quadrant(xs: &[f32], ys: &[f32]) -> Option<&'static str> {
+    let mut counts = HashMap::new();
+    for (x, y) in xs.iter().zip(ys) {
+        let quadrant = if *x < 0.5 && *y > 0.5 {
+            "topleft"
+        } else if *x > 0.5 && *y > 0.5 {
+            "topright"
+        } else if *x < 0.5 && *y < 0.5 {
+            "bottomleft"
+        } else if *x > 0.5 && *y < 0.5 {
+            "bottomright"
+        } else if *y > 0.5 {
+            "top"
+        } else if *y < 0.5 {
+            "bottom"
+        } else if *x < 0.5 {
+            "left"
+        } else if *x > 0.5 {
+            "right"
+        } else {
+            "center"
+        };
+        *counts.entry(quadrant).or_insert(0) += 1;
+    }
+    // If there's a clear winner, report it
+    let total = xs.len() as f32;
+    counts.into_iter().find_map(|(quadrant, count)| {
+        if count as f32 / total > 0.5 {
+            Some(quadrant)
+        } else {
+            None
+        }
+    })
 }

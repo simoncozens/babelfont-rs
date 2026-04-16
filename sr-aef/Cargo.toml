@@ -3,9 +3,28 @@ name = "sr-aef"
 version = "0.1.0"
 edition = "2024"
 
-[dependencies]
-fea-rs-ast.workspace = true
-indexmap.workspace = true
-skrifa.workspace = true
-smol_str = "0.3.6"
+[[bin]]
+name = "sr-aef"
+path = "src/main.rs"
+required-features = ["cli"]
 
+[features]
+default = []
+cli = [
+    "dep:serde",
+    "dep:serde_json",
+    "dep:clap",
+    "smol_str/serde",
+    "fea-rs-ast/serde",
+    "indexmap/serde",
+]
+
+[dependencies]
+serde = { version = "1.0", optional = true }
+fea-rs-ast = { workspace = true }
+indexmap.workspace = true
+skrifa = { workspace = true }
+smol_str = "0.3.6"
+serde_json = { version = "1.0", optional = true }
+clap = { workspace = true, optional = true, features = ["derive"] }
+fontdrasil.workspace = true

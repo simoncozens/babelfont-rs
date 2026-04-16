@@ -14,6 +14,8 @@ use indexmap::{IndexMap, IndexSet};
 /// A handle to the version of Skrifa that sr-eaf is using. Pass a skrifa::FontRef to uncompile()
 pub use skrifa;
 use skrifa::{
+    metrics::GlyphMetrics,
+    prelude::{LocationRef, Size},
     raw::{
         tables::{
             gdef::Gdef,
@@ -30,36 +32,95 @@ use smol_str::SmolStr;
 mod contextual;
 mod gpos;
 mod gsub;
+#[cfg(feature = "cli")]
+mod serialize;
+mod variations;
+
+pub(crate) type SimpleUserLocation = IndexMap<SmolStr, i16>; // as used by fea-rs-ast metrics
 
 const PROMOTE_TO_NAMED_CLASS_THRESHOLD: usize = 5;
 
 /// The context object that holds all the information we need when uncompiling a font.
+#[cfg_attr(feature = "cli", derive(serde::Serialize))]
 pub struct UncompileContext<'a> {
     /// All the lookups we have uncompiled so far, keyed by their name.
     pub lookups: IndexMap<SmolStr, LookupBlock>,
+    /// A mapping from ("sub"|"pos", lookup_list_index) to the name of the lookup block we created for it. This is used to generate the correct lookup names in contextual lookups.
+    #[cfg_attr(
+        feature = "cli",
+        serde(serialize_with = "crate::serialize::serialize_lookup_map")
+    )]
     pub lookup_map: HashMap<(String, u16), SmolStr>,
-    symbols: IndexMap<SmolStr, usize>,
-    gpos: Option<Gpos<'a>>,
-    gsub: Option<Gsub<'a>>,
-    gdef: Option<Gdef<'a>>,
     /// A mapping from script tags to the language system tags that are present in the font.
+    #[cfg_attr(
+        feature = "cli",
+        serde(serialize_with = "crate::serialize::serialize_language_systems")
+    )]
     pub language_systems: IndexMap<Tag, IndexSet<Tag>>,
-    glyph_names: GlyphNames<'a>,
     /// Anchors on a glyph which we haven't worked out what they should be called.
+    /// class -> glyphname -> anchor
     pub unnamed_anchors: IndexMap<SmolStr, Vec<Anchor>>,
     /// Anchors on a glyph which we have worked out what they should be called.
     pub anchors: IndexMap<SmolStr, IndexMap<SmolStr, Anchor>>,
     /// Mark classes, indexed by class name.
     pub mark_classes: IndexMap<SmolStr, Vec<MarkClassDefinition>>,
     /// Named glyph classes, indexed by class name.
+    #[cfg_attr(
+        feature = "cli",
+        serde(serialize_with = "crate::serialize::serialize_named_classes")
+    )]
     pub named_classes: IndexMap<SmolStr, GlyphClass>,
-    features: IndexMap<SmolStr, Vec<LookupReferenceStatement>>,
+    /// Features, indexed by feature name.
+    #[cfg_attr(
+        feature = "cli",
+        serde(serialize_with = "crate::serialize::serialize_features")
+    )]
+    pub features: IndexMap<SmolStr, Vec<LookupReferenceStatement>>,
+    #[cfg_attr(feature = "cli", serde(skip))]
+    symbols: IndexMap<SmolStr, usize>,
+    #[cfg_attr(feature = "cli", serde(skip))]
+    gpos: Option<Gpos<'a>>,
+    #[cfg_attr(feature = "cli", serde(skip))]
+    gsub: Option<Gsub<'a>>,
+    #[cfg_attr(feature = "cli", serde(skip))]
+    gdef: Option<Gdef<'a>>,
+    #[cfg_attr(feature = "cli", serde(skip))]
+    glyph_metrics: GlyphMetrics<'a>,
+    #[cfg_attr(feature = "cli", serde(skip))]
+    glyph_id_to_name: HashMap<GlyphId, SmolStr>,
+    #[cfg_attr(feature = "cli", serde(skip))]
+    glyph_name_to_id: HashMap<SmolStr, GlyphId>,
+    #[cfg_attr(feature = "cli", serde(skip))]
+    axis_tags: Vec<Tag>,
+    #[cfg_attr(feature = "cli", serde(skip))]
+    axes: Option<fontdrasil::types::Axes>,
+    num_glyphs: u16,
 }
 
 impl<'a> UncompileContext<'a> {
     fn new(font: &'a skrifa::FontRef) -> Result<Self, ReadError> {
         let glyph_names = GlyphNames::new(font);
-        Ok(Self {
+        let default = LocationRef::default();
+        let glyph_metrics = GlyphMetrics::new(font, Size::unscaled(), default);
+        let glyph_id_to_name: HashMap<GlyphId, SmolStr> = (0..glyph_names.num_glyphs())
+            .map(GlyphId::new)
+            .map(|gid| {
+                (
+                    gid,
+                    SmolStr::new(
+                        glyph_names
+                            .get(gid)
+                            .map(|s| s.to_string())
+                            .unwrap_or_else(|| format!("gid{:04}", gid)),
+                    ),
+                )
+            })
+            .collect();
+        let glyph_name_to_id = glyph_id_to_name
+            .iter()
+            .map(|(gid, name): (&GlyphId, &SmolStr)| (name.clone(), *gid))
+            .collect();
+        let mut slf = Self {
             lookups: IndexMap::new(),
             lookup_map: HashMap::new(),
             symbols: IndexMap::new(),
@@ -69,11 +130,26 @@ impl<'a> UncompileContext<'a> {
             language_systems: IndexMap::new(),
             unnamed_anchors: IndexMap::new(),
             anchors: IndexMap::new(),
-            glyph_names,
             mark_classes: IndexMap::new(),
             named_classes: IndexMap::new(),
             features: IndexMap::new(),
-        })
+            glyph_metrics,
+            glyph_id_to_name,
+            glyph_name_to_id,
+            axis_tags: font
+                .fvar()
+                .ok()
+                .and_then(|fvar| fvar.axes().ok())
+                .map(|axes| axes.iter().map(|axis| axis.axis_tag()).collect())
+                .unwrap_or_default(),
+            axes: variations::fontdrasil_axes(font)?,
+            num_glyphs: glyph_names.num_glyphs() as u16,
+        };
+        slf.gather_language_systems()?;
+        slf.uncompile_gsub_lookups()?;
+        slf.uncompile_gpos_lookups()?;
+        slf.uncompile_feature_table()?;
+        Ok(slf)
     }
 
     fn register_anchor(&mut self, glyphname: &SmolStr, anchor: &Anchor, anchor_name: Option<&str>) {
@@ -116,11 +192,10 @@ impl<'a> UncompileContext<'a> {
 
     fn get_name(&self, id: GlyphId16) -> GlyphName {
         let str: SmolStr = self
-            .glyph_names
-            .get(GlyphId::new(id.to_u32()))
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| format!("gid{:04}", id.to_u32()))
-            .into();
+            .glyph_id_to_name
+            .get(&GlyphId::new(id.to_u32()))
+            .cloned()
+            .unwrap_or_else(|| format!("gid{:04}", id.to_u32()).into());
         GlyphName::new(&str)
     }
 
@@ -220,7 +295,7 @@ impl<'a> UncompileContext<'a> {
             }
         }
         // Now fill class 0 with unused glyphs from font
-        let full_font: HashSet<_> = (0..self.glyph_names.num_glyphs() as u16).collect();
+        let full_font: HashSet<_> = (0..self.num_glyphs).collect();
         classes.insert(
             0,
             full_font
@@ -230,16 +305,21 @@ impl<'a> UncompileContext<'a> {
         );
         classes
     }
+
+    pub(crate) fn gensym(&mut self, prefix: &str) -> SmolStr {
+        let symbol_index = self.symbols.entry(prefix.into()).or_insert(1);
+        let name = SmolStr::new(format!("{}_{}", prefix, symbol_index));
+        *symbol_index += 1;
+        name
+    }
+
     fn create_next_lookup_block<T: SubOrPos>(
         &mut self,
         prefix: &str,
         index: u16,
         phase: T,
     ) -> LookupBlock {
-        let symbol_index = self.symbols.entry(prefix.into()).or_insert(1);
-        let i = *symbol_index;
-        let name = SmolStr::new(format!("{}_{}", prefix, i));
-        *symbol_index += 1;
+        let name = self.gensym(prefix);
         self.lookup_map
             .insert((phase.to_string(), index), name.clone());
         LookupBlock::new(name.clone(), vec![], false, 0..0)
@@ -339,7 +419,7 @@ pub fn uncompile(
     do_gdef: bool,
 ) -> Result<fea_rs_ast::FeatureFile, ReadError> {
     let mut context = UncompileContext::new(font)?;
-    context.gather_language_systems()?;
+
     let mut ff = fea_rs_ast::FeatureFile::new(vec![]);
     ff.statements.extend(context.dump_language_systems());
 
@@ -347,8 +427,6 @@ pub fn uncompile(
         ff.statements.extend(context.uncompile_gdef()?);
     }
 
-    context.uncompile_gsub_lookups()?;
-    context.uncompile_gpos_lookups()?;
     // Add mark classes to the feature file
     for definitions in context.mark_classes.values() {
         for definition in definitions {
@@ -366,7 +444,6 @@ pub fn uncompile(
     for lookup in context.lookups.values() {
         ff.statements.push(ToplevelItem::Lookup(lookup.clone()));
     }
-    context.uncompile_feature_table()?;
     // Add all feature references to the feature file
     for (feature_name, lookup_refs) in context.features.iter() {
         ff.statements
@@ -398,20 +475,8 @@ pub fn uncompile_bytes(
 /// This partially decompiles the font, giving you the component parts so that you can
 /// put them where you want them. Useful for font editors and other tools that want the
 /// data but don't want to go all the way to a fea file.
-pub fn uncompile_context<'a>(
-    font: &'a skrifa::FontRef,
-    do_gdef: bool,
-) -> Result<UncompileContext<'a>, ReadError> {
-    let mut context = UncompileContext::new(font)?;
-    context.gather_language_systems()?;
-    if do_gdef {
-        context.uncompile_gdef()?;
-    }
-
-    context.uncompile_gsub_lookups()?;
-    context.uncompile_gpos_lookups()?;
-    context.uncompile_feature_table()?;
-    Ok(context)
+pub fn uncompile_context<'a>(font: &'a skrifa::FontRef) -> Result<UncompileContext<'a>, ReadError> {
+    UncompileContext::new(font)
 }
 
 #[cfg(test)]
