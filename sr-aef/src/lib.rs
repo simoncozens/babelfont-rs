@@ -264,39 +264,28 @@ impl<'a> UncompileContext<'a> {
         }
     }
 
-    fn resolve_classes(&self, class_def: ClassDef) -> HashMap<u16, Vec<GlyphContainer>> {
+    fn resolve_classes(&self, class_def: &ClassDef) -> HashMap<u16, Vec<GlyphContainer>> {
         let mut classes: HashMap<u16, Vec<GlyphContainer>> = HashMap::new();
         let mut used_glyphs = HashSet::new();
-        match class_def {
-            ClassDef::Format1(class_def1) => {
-                for (class_id, glyph_id) in class_def1.class_value_array().iter().enumerate() {
-                    used_glyphs.insert(glyph_id.get());
-                    // We +1 to leave room for class 0, which is the "unclassified" class that we will fill in later with any glyphs not mentioned in the class def
-                    classes.entry((class_id + 1) as u16).or_default().push(
-                        GlyphContainer::GlyphName(self.get_name(GlyphId16::new(glyph_id.get()))),
-                    );
-                }
-            }
-            ClassDef::Format2(class_def2) => {
-                for (class_id, range) in class_def2.class_range_records().iter().enumerate() {
-                    for gid in range.start_glyph_id().to_u16()..=range.end_glyph_id().to_u16() {
-                        used_glyphs.insert(gid);
-                        classes.entry((class_id + 1) as u16).or_default().push(
-                            GlyphContainer::GlyphName(self.get_name(GlyphId16::new(gid))),
-                        );
-                    }
-                }
+        for (glyph_id, class_id) in class_def.iter() {
+            used_glyphs.insert(glyph_id.to_u16());
+            classes
+                .entry(class_id)
+                .or_default()
+                .push(GlyphContainer::GlyphName(self.get_name(glyph_id)));
+        }
+
+        // Class 0 is all glyphs that are not explicitly assigned by the ClassDef.
+        for gid in 0..self.num_glyphs {
+            if !used_glyphs.contains(&gid) {
+                classes
+                    .entry(0)
+                    .or_default()
+                    .push(GlyphContainer::GlyphName(
+                        self.get_name(GlyphId16::new(gid)),
+                    ));
             }
         }
-        // Now fill class 0 with unused glyphs from font
-        let full_font: HashSet<_> = (0..self.num_glyphs).collect();
-        classes.insert(
-            0,
-            full_font
-                .difference(&used_glyphs)
-                .map(|gid| GlyphContainer::GlyphName(self.get_name(GlyphId16::new(*gid))))
-                .collect(),
-        );
         classes
     }
 

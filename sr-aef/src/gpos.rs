@@ -231,8 +231,8 @@ impl<'a> UncompileContext<'a> {
         lookupblock: &mut LookupBlock,
         gpos2f2: PairPosFormat2,
     ) -> Result<(), ReadError> {
-        let classes1 = self.resolve_classes(gpos2f2.class_def1()?);
-        let classes2 = self.resolve_classes(gpos2f2.class_def2()?);
+        let classes1 = self.resolve_classes(&gpos2f2.class_def1()?);
+        let classes2 = self.resolve_classes(&gpos2f2.class_def2()?);
         let offset_data = gpos2f2.offset_data();
         for (class1, record) in gpos2f2.class1_records().iter().enumerate() {
             let Ok(record) = record else { continue };
