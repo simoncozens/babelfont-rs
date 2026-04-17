@@ -677,6 +677,7 @@ dependencies = [
  "itertools",
  "log",
  "read-fonts 0.36.0",
+ "serde",
  "smol_str",
  "thiserror",
 ]
@@ -2021,6 +2022,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "fea-rs-ast",
+ "fontdrasil 0.4.0 (git+https://github.com/googlefonts/fontc?rev=3518040e)",
  "indexmap 2.14.0",
  "serde",
  "serde_json",

@@ -1,17 +1,18 @@
 use std::collections::{BTreeSet, HashMap};
 
+use fea_rs_ast::Metric;
 use fontdrasil::coords::{
     CoordConverter, DesignCoord, NormalizedCoord, NormalizedLocation, UserCoord, UserLocation,
 };
 use skrifa::{
-    MetadataProvider,
     raw::{
-        ReadError, TableProvider as _,
         tables::{
             gpos::DeviceOrVariationIndex,
             variations::{DeltaSetIndex, ItemVariationStore},
         },
+        ReadError, TableProvider as _,
     },
+    MetadataProvider,
 };
 
 use crate::{SimpleUserLocation, UncompileContext};
@@ -131,15 +132,16 @@ impl<'a> UncompileContext<'a> {
         Ok(master_locations)
     }
 
-    pub(crate) fn resolve_variation_index(
+    pub(crate) fn resolve_pos_with_variations(
         &self,
         default: i16,
-        x_device: Option<Result<DeviceOrVariationIndex<'_>, ReadError>>,
-        ivs: &ItemVariationStore<'_>,
-    ) -> Result<Vec<(SimpleUserLocation, i16)>, ReadError> {
-        Ok(
-            if let Some(Ok(DeviceOrVariationIndex::VariationIndex(varix))) = x_device {
-                self.interesting_locations()?
+        device: Option<Result<DeviceOrVariationIndex<'_>, ReadError>>,
+    ) -> Result<Metric, ReadError> {
+        let mut variations: Vec<(SimpleUserLocation, i16)> = Vec::new();
+        if let Some(ivs) = self.variation_store()?
+            && let Some(Ok(DeviceOrVariationIndex::VariationIndex(varix))) = device {
+                variations = self
+                    .interesting_locations()?
                     .iter()
                     .map(|(user_loc, norm_loc)| {
                         let coords = norm_loc
@@ -162,10 +164,14 @@ impl<'a> UncompileContext<'a> {
 
                         (simple_user_loc, (default as i32 + delta) as i16)
                     })
-                    .collect()
-            } else {
-                vec![]
-            },
-        )
+                    .collect();
+            }
+
+        if variations.len() < 2 {
+            // we always have the default
+            Ok(Metric::Scalar(default))
+        } else {
+            Ok(Metric::Variable(variations))
+        }
     }
 }

@@ -14,18 +14,18 @@ use indexmap::{IndexMap, IndexSet};
 /// A handle to the version of Skrifa that sr-eaf is using. Pass a skrifa::FontRef to uncompile()
 pub use skrifa;
 use skrifa::{
-    GlyphId, GlyphId16, GlyphNames, Tag,
     metrics::GlyphMetrics,
     prelude::{LocationRef, Size},
     raw::{
-        ReadError, TableProvider,
         tables::{
             gdef::Gdef,
             gpos::Gpos,
             gsub::{ClassDef, Gsub},
             layout::CoverageTable,
         },
+        ReadError, TableProvider,
     },
+    GlyphId, GlyphId16, GlyphNames, Tag,
 };
 use smol_str::SmolStr;
 
@@ -166,28 +166,22 @@ impl<'a> UncompileContext<'a> {
         }
     }
 
-    fn register_mark_classes(
+    fn register_mark_class(
         &mut self,
-        mark_classes: IndexMap<u16, Vec<(GlyphContainer, Anchor)>>,
-    ) -> Vec<SmolStr> {
-        let mut class_names = vec![];
-        for (_class_id, anchors) in mark_classes.iter() {
-            let class_name = format!("mark_class_{}", self.mark_classes.len());
-            let definitions = anchors
-                .iter()
-                .map(|(members, anchor)| {
-                    MarkClassDefinition::new(
-                        MarkClass::new(&class_name),
-                        anchor.clone(),
-                        members.clone(),
-                    )
-                })
-                .collect();
-            self.mark_classes
-                .insert(class_name.clone().into(), definitions);
-            class_names.push(class_name.into());
-        }
-        class_names
+        anchors: Vec<(GlyphContainer, Anchor)>,
+        class_name: &SmolStr,
+    ) {
+        let definitions = anchors
+            .iter()
+            .map(|(members, anchor)| {
+                MarkClassDefinition::new(
+                    MarkClass::new(class_name),
+                    anchor.clone(),
+                    members.clone(),
+                )
+            })
+            .collect();
+        self.mark_classes.insert(class_name.clone(), definitions);
     }
 
     fn get_name(&self, id: GlyphId16) -> GlyphName {
