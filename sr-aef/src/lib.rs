@@ -7,8 +7,8 @@ use std::collections::{HashMap, HashSet};
 pub use fea_rs_ast;
 use fea_rs_ast::{
     Anchor, GlyphClass, GlyphClassDefStatement, GlyphClassDefinition, GlyphContainer, GlyphName,
-    LanguageSystemStatement, LookupBlock, LookupReferenceStatement, MarkClass, MarkClassDefinition,
-    Pos, Statement, SubOrPos, Subst, ToplevelItem,
+    LanguageSystemStatement, LookupBlock, LookupFlagStatement, LookupReferenceStatement, MarkClass,
+    MarkClassDefinition, Pos, Statement, SubOrPos, Subst, ToplevelItem,
 };
 use indexmap::{IndexMap, IndexSet};
 /// A handle to the version of Skrifa that sr-eaf is using. Pass a skrifa::FontRef to uncompile()
@@ -21,7 +21,7 @@ use skrifa::{
             gdef::Gdef,
             gpos::Gpos,
             gsub::{ClassDef, Gsub},
-            layout::CoverageTable,
+            layout::{CoverageTable, LookupFlag},
         },
         ReadError, TableProvider,
     },
@@ -390,6 +390,53 @@ impl<'a> UncompileContext<'a> {
         }
 
         Ok(())
+    }
+
+    fn add_lookup_flags(
+        &mut self,
+        lookupblock: &mut LookupBlock,
+        flags: LookupFlag,
+        mark_filtering_set: Option<u16>,
+    ) {
+        if flags == LookupFlag::empty() {
+            return;
+        }
+        let mark_glyph_sets = self.gdef.as_ref().and_then(|x| {
+            let mark_glyph_sets = x.mark_glyph_sets_def();
+            if let Some(Ok(mark_glyph_sets)) = mark_glyph_sets {
+                Some(mark_glyph_sets)
+            } else {
+                None
+            }
+        });
+        let mark_attachment_classes = self.gdef.as_ref().and_then(|x| {
+            let mark_attachment_classes = x.mark_attach_class_def();
+            if let Some(Ok(mark_attachment_classes)) = mark_attachment_classes {
+                Some(mark_attachment_classes)
+            } else {
+                None
+            }
+        });
+        let set = mark_filtering_set.and_then(|set| {
+            mark_glyph_sets
+                .and_then(|mgss| mgss.coverages().get(set as usize).ok())
+                .map(|coverage| self.resolve_coverage_to_class(&coverage))
+        });
+        let mark_attachment_class = flags.mark_attachment_class().and_then(|class| {
+            mark_attachment_classes
+                .and_then(|mac| self.resolve_classes(&mac).get(&class).cloned())
+                .map(|classes| GlyphContainer::GlyphClass(GlyphClass::new(classes, 0..0)))
+        });
+
+        lookupblock.statements.insert(
+            0,
+            Statement::LookupFlag(LookupFlagStatement::new(
+                flags.to_bits(),
+                mark_attachment_class,
+                set,
+                0..0,
+            )),
+        );
     }
 }
 

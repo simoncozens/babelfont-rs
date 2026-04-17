@@ -4,15 +4,15 @@ use fea_rs_ast::{
     MultipleSubstStatement, SingleSubstStatement, Statement, Subst,
 };
 use skrifa::{
-    GlyphId16,
     raw::{
-        ReadError,
         tables::gsub::{
             AlternateSubstFormat1, LigatureSubstFormat1, LookupList, MultipleSubstFormat1,
             ReverseChainSingleSubstFormat1, SingleSubst, SingleSubstFormat1, SingleSubstFormat2,
             SubstitutionLookup, SubstitutionSubtables,
         },
+        ReadError,
     },
+    GlyphId16,
 };
 impl<'a> UncompileContext<'a> {
     pub(crate) fn uncompile_gsub_lookups(&mut self) -> Result<(), ReadError> {
@@ -22,7 +22,7 @@ impl<'a> UncompileContext<'a> {
         };
         for (i, lookup) in gsub_lookup_list.lookups().iter().flatten().enumerate() {
             let subtables = lookup.subtables()?;
-            match subtables {
+            let mut lookupblock = match subtables {
                 SubstitutionSubtables::Single(subtables) => {
                     let mut lookupblock =
                         self.create_next_lookup_block("gsub_single", i as u16, Subst);
@@ -36,7 +36,7 @@ impl<'a> UncompileContext<'a> {
                             }
                         }
                     }
-                    self.lookups.insert(lookupblock.name.clone(), lookupblock);
+                    lookupblock
                 }
                 SubstitutionSubtables::Multiple(subtables) => {
                     let mut lookupblock =
@@ -44,7 +44,7 @@ impl<'a> UncompileContext<'a> {
                     for subtable in subtables.iter().flatten() {
                         self.uncompile_gsub2(&mut lookupblock, subtable)?;
                     }
-                    self.lookups.insert(lookupblock.name.clone(), lookupblock);
+                    lookupblock
                 }
                 SubstitutionSubtables::Alternate(subtables) => {
                     let mut lookupblock =
@@ -52,7 +52,7 @@ impl<'a> UncompileContext<'a> {
                     for subtable in subtables.iter().flatten() {
                         self.uncompile_gsub3(&mut lookupblock, subtable)?;
                     }
-                    self.lookups.insert(lookupblock.name.clone(), lookupblock);
+                    lookupblock
                 }
                 SubstitutionSubtables::Ligature(subtables) => {
                     let mut lookupblock =
@@ -60,7 +60,7 @@ impl<'a> UncompileContext<'a> {
                     for subtable in subtables.iter().flatten() {
                         self.uncompile_gsub4(&mut lookupblock, subtable)?;
                     }
-                    self.lookups.insert(lookupblock.name.clone(), lookupblock);
+                    lookupblock
                 }
                 SubstitutionSubtables::Contextual(subtables) => {
                     let mut lookupblock =
@@ -72,7 +72,7 @@ impl<'a> UncompileContext<'a> {
                                 .map(Statement::ChainedContextSubst),
                         );
                     }
-                    self.lookups.insert(lookupblock.name.clone(), lookupblock);
+                    lookupblock
                 }
                 SubstitutionSubtables::ChainContextual(subtables) => {
                     let mut lookupblock =
@@ -84,7 +84,7 @@ impl<'a> UncompileContext<'a> {
                                 .map(Statement::ChainedContextSubst),
                         );
                     }
-                    self.lookups.insert(lookupblock.name.clone(), lookupblock);
+                    lookupblock
                 }
                 SubstitutionSubtables::Reverse(subtables) => {
                     let mut lookupblock =
@@ -92,9 +92,15 @@ impl<'a> UncompileContext<'a> {
                     for subtable in subtables.iter().flatten() {
                         self.uncompile_gsub7(&mut lookupblock, subtable)?;
                     }
-                    self.lookups.insert(lookupblock.name.clone(), lookupblock);
+                    lookupblock
                 }
-            }
+            };
+            self.add_lookup_flags(
+                &mut lookupblock,
+                lookup.lookup_flag(),
+                lookup.mark_filtering_set(),
+            );
+            self.lookups.insert(lookupblock.name.clone(), lookupblock);
         }
         Ok(())
     }

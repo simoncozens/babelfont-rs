@@ -2,9 +2,7 @@ use std::collections::HashMap;
 
 use crate::{UncompileContext};
 use fea_rs_ast::{
-    Anchor as FeaAnchor, CursivePosStatement, GlyphClass, GlyphContainer, LookupBlock,
-    MarkBasePosStatement, MarkClass, MarkLigPosStatement, MarkMarkPosStatement, Metric,
-    PairPosStatement, Pos, SinglePosStatement, Statement, ValueRecord as FeaValueRecord,
+    Anchor as FeaAnchor, CursivePosStatement, GlyphClass, GlyphContainer, LookupBlock, MarkBasePosStatement, MarkClass, MarkLigPosStatement, MarkMarkPosStatement, Metric, PairPosStatement, Pos, SinglePosStatement, Statement, ValueRecord as FeaValueRecord,
 };
 use indexmap::IndexMap;
 use skrifa::raw::{
@@ -25,7 +23,7 @@ impl<'a> UncompileContext<'a> {
         };
         for (i, lookup) in gpos_lookup_list.lookups().iter().flatten().enumerate() {
             let subtables = lookup.subtables()?;
-            match subtables {
+            let mut lookupblock = match subtables {
                 PositionSubtables::Single(subtables) => {
                     let mut lookupblock =
                         self.create_next_lookup_block("gpos_single", i as u16, Pos);
@@ -39,7 +37,7 @@ impl<'a> UncompileContext<'a> {
                             }
                         }
                     }
-                    self.lookups.insert(lookupblock.name.clone(), lookupblock);
+                    lookupblock
                 }
                 PositionSubtables::Pair(subtables) => {
                     let mut lookupblock = self.create_next_lookup_block("gpos_pair", i as u16, Pos);
@@ -53,7 +51,7 @@ impl<'a> UncompileContext<'a> {
                             }
                         }
                     }
-                    self.lookups.insert(lookupblock.name.clone(), lookupblock);
+                    lookupblock
                 }
                 PositionSubtables::Cursive(subtables) => {
                     let mut lookupblock =
@@ -61,7 +59,7 @@ impl<'a> UncompileContext<'a> {
                     for subtable in subtables.iter().flatten() {
                         self.uncompile_gpos3(&mut lookupblock, subtable)?;
                     }
-                    self.lookups.insert(lookupblock.name.clone(), lookupblock);
+                    lookupblock
                 }
                 PositionSubtables::MarkToBase(subtables) => {
                     let mut lookupblock =
@@ -69,7 +67,7 @@ impl<'a> UncompileContext<'a> {
                     for subtable in subtables.iter().flatten() {
                         self.uncompile_gpos4(&mut lookupblock, subtable)?;
                     }
-                    self.lookups.insert(lookupblock.name.clone(), lookupblock);
+                    lookupblock
                 }
                 PositionSubtables::MarkToLig(subtables) => {
                     let mut lookupblock =
@@ -77,7 +75,7 @@ impl<'a> UncompileContext<'a> {
                     for subtable in subtables.iter().flatten() {
                         self.uncompile_gpos5(&mut lookupblock, subtable)?;
                     }
-                    self.lookups.insert(lookupblock.name.clone(), lookupblock);
+                    lookupblock
                 }
                 PositionSubtables::MarkToMark(subtables) => {
                     let mut lookupblock =
@@ -85,7 +83,7 @@ impl<'a> UncompileContext<'a> {
                     for subtable in subtables.iter().flatten() {
                         self.uncompile_gpos6(&mut lookupblock, subtable)?;
                     }
-                    self.lookups.insert(lookupblock.name.clone(), lookupblock);
+                    lookupblock
                 }
                 PositionSubtables::Contextual(subtables) => {
                     let mut lookupblock =
@@ -97,7 +95,7 @@ impl<'a> UncompileContext<'a> {
                                 .map(Statement::ChainedContextPos),
                         );
                     }
-                    self.lookups.insert(lookupblock.name.clone(), lookupblock);
+                    lookupblock
                 }
                 PositionSubtables::ChainContextual(subtables) => {
                     let mut lookupblock =
@@ -109,9 +107,11 @@ impl<'a> UncompileContext<'a> {
                                 .map(Statement::ChainedContextPos),
                         );
                     }
-                    self.lookups.insert(lookupblock.name.clone(), lookupblock);
+                    lookupblock
                 }
-            }
+            };
+            self.add_lookup_flags(&mut lookupblock, lookup.lookup_flag(), lookup.mark_filtering_set());
+            self.lookups.insert(lookupblock.name.clone(), lookupblock);
         }
         Ok(())
     }
