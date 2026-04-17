@@ -1,10 +1,9 @@
-use crate::Tag;
 use crate::{
     common::FormatSpecific,
     glyph::{self, glyphs::glyph_to_glyphs},
     i18ndictionary::I18NDictionary,
     names::Names,
-    Axis, BabelfontError, CustomOTValues, Font, GlyphList, Master,
+    Axis, BabelfontError, CustomOTValues, Font, GlyphList, Master, Tag,
 };
 use fontdrasil::coords::{DesignCoord, DesignLocation, UserCoord};
 use glyphslib::glyphs3::{self, Property};

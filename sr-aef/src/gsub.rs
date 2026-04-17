@@ -4,15 +4,15 @@ use fea_rs_ast::{
     MultipleSubstStatement, SingleSubstStatement, Statement, Subst,
 };
 use skrifa::{
+    GlyphId16,
     raw::{
+        ReadError,
         tables::gsub::{
             AlternateSubstFormat1, LigatureSubstFormat1, LookupList, MultipleSubstFormat1,
             ReverseChainSingleSubstFormat1, SingleSubst, SingleSubstFormat1, SingleSubstFormat2,
             SubstitutionLookup, SubstitutionSubtables,
         },
-        ReadError,
     },
-    GlyphId16,
 };
 impl<'a> UncompileContext<'a> {
     pub(crate) fn uncompile_gsub_lookups(&mut self) -> Result<(), ReadError> {

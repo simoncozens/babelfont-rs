@@ -1,7 +1,6 @@
-use crate::Tag;
 use crate::{
     convertors::fontir::{debug_location, CompilationOptions},
-    Component, Font, Layer, NodeType, Shape,
+    Component, Font, Layer, NodeType, Shape, Tag,
 };
 use fontdrasil::{
     coords::{Location, NormalizedCoord, NormalizedLocation},

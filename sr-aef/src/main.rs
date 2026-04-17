@@ -1,6 +1,5 @@
 use clap::Parser;
-use sr_aef::fea_rs_ast::AsFea;
-use sr_aef::{skrifa::FontRef, uncompile, uncompile_context};
+use sr_aef::{fea_rs_ast::AsFea, skrifa::FontRef, uncompile, uncompile_context};
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]

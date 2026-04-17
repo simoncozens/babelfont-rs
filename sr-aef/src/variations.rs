@@ -5,14 +5,14 @@ use fontdrasil::coords::{
     CoordConverter, DesignCoord, NormalizedCoord, NormalizedLocation, UserCoord, UserLocation,
 };
 use skrifa::{
+    MetadataProvider,
     raw::{
+        ReadError, TableProvider as _,
         tables::{
             gpos::DeviceOrVariationIndex,
             variations::{DeltaSetIndex, ItemVariationStore},
         },
-        ReadError, TableProvider as _,
     },
-    MetadataProvider,
 };
 
 use crate::{SimpleUserLocation, UncompileContext};
@@ -139,33 +139,34 @@ impl<'a> UncompileContext<'a> {
     ) -> Result<Metric, ReadError> {
         let mut variations: Vec<(SimpleUserLocation, i16)> = Vec::new();
         if let Some(ivs) = self.variation_store()?
-            && let Some(Ok(DeviceOrVariationIndex::VariationIndex(varix))) = device {
-                variations = self
-                    .interesting_locations()?
-                    .iter()
-                    .map(|(user_loc, norm_loc)| {
-                        let coords = norm_loc
-                            .iter()
-                            .map(|(_tag, coord)| coord.to_f2dot14())
-                            .collect::<Vec<_>>();
-                        let delta = ivs
-                            .compute_delta(
-                                DeltaSetIndex {
-                                    outer: varix.delta_set_outer_index(),
-                                    inner: varix.delta_set_inner_index(),
-                                },
-                                &coords,
-                            )
-                            .unwrap_or_default();
-                        let simple_user_loc: SimpleUserLocation = user_loc
-                            .iter()
-                            .map(|(tag, coord)| (tag.to_string().into(), coord.to_f64() as i16))
-                            .collect();
+            && let Some(Ok(DeviceOrVariationIndex::VariationIndex(varix))) = device
+        {
+            variations = self
+                .interesting_locations()?
+                .iter()
+                .map(|(user_loc, norm_loc)| {
+                    let coords = norm_loc
+                        .iter()
+                        .map(|(_tag, coord)| coord.to_f2dot14())
+                        .collect::<Vec<_>>();
+                    let delta = ivs
+                        .compute_delta(
+                            DeltaSetIndex {
+                                outer: varix.delta_set_outer_index(),
+                                inner: varix.delta_set_inner_index(),
+                            },
+                            &coords,
+                        )
+                        .unwrap_or_default();
+                    let simple_user_loc: SimpleUserLocation = user_loc
+                        .iter()
+                        .map(|(tag, coord)| (tag.to_string().into(), coord.to_f64() as i16))
+                        .collect();
 
-                        (simple_user_loc, (default as i32 + delta) as i16)
-                    })
-                    .collect();
-            }
+                    (simple_user_loc, (default as i32 + delta) as i16)
+                })
+                .collect();
+        }
 
         if variations.len() < 2 {
             // we always have the default

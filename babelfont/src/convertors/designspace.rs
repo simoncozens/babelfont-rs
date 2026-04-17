@@ -1,9 +1,8 @@
-use crate::Tag;
 use crate::{
     convertors::ufo::{as_norad, load_kerning, stash_lib, KEY_LIB},
     glyph::GlyphList,
     names::Names,
-    I18NDictionary, Instance, Layer,
+    I18NDictionary, Instance, Layer, Tag,
 };
 use fontdrasil::coords::{DesignCoord, DesignLocation};
 use norad::{

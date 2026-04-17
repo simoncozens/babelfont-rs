@@ -1,7 +1,6 @@
-use crate::Tag;
 use crate::{
     common::tag_from_string, Anchor, Axis, BabelfontError, Component, Font, Glyph, GlyphCategory,
-    Layer, LayerType, Master, Node, NodeType, Path, Shape,
+    Layer, LayerType, Master, Node, NodeType, Path, Shape, Tag,
 };
 use fontdrasil::{
     coords::{DesignCoord, DesignLocation, Location, UserCoord},

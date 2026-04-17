@@ -1,8 +1,8 @@
 use crate::UncompileContext;
 use fea_rs_ast::{ChainedContextStatement, GlyphContainer, SubOrPos};
 use skrifa::raw::{
-    tables::{gsub::ChainedSequenceContext, layout::SequenceContext},
     ReadError,
+    tables::{gsub::ChainedSequenceContext, layout::SequenceContext},
 };
 use std::collections::HashMap;
 

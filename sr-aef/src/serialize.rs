@@ -1,8 +1,6 @@
-use fea_rs_ast::AsFea;
-use fea_rs_ast::{GlyphClass, LookupReferenceStatement};
+use fea_rs_ast::{AsFea, GlyphClass, LookupReferenceStatement};
 use indexmap::{IndexMap, IndexSet};
-use serde::ser::SerializeMap;
-use serde::{Serialize, Serializer};
+use serde::{Serializer, ser::SerializeMap};
 use skrifa::Tag;
 use smol_str::SmolStr;
 use std::collections::HashMap;

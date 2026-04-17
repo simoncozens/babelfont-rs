@@ -1,18 +1,22 @@
 use std::collections::HashMap;
 
-use crate::{UncompileContext};
+use crate::UncompileContext;
 use fea_rs_ast::{
-    Anchor as FeaAnchor, CursivePosStatement, GlyphClass, GlyphContainer, LookupBlock, MarkBasePosStatement, MarkClass, MarkLigPosStatement, MarkMarkPosStatement, Metric, PairPosStatement, Pos, SinglePosStatement, Statement, ValueRecord as FeaValueRecord,
+    Anchor as FeaAnchor, CursivePosStatement, GlyphClass, GlyphContainer, LookupBlock,
+    MarkBasePosStatement, MarkClass, MarkLigPosStatement, MarkMarkPosStatement, Metric,
+    PairPosStatement, Pos, SinglePosStatement, Statement, ValueRecord as FeaValueRecord,
 };
 use indexmap::IndexMap;
 use skrifa::raw::{
-    FontData, ReadError, tables::{
+    FontData, ReadError,
+    tables::{
         gpos::{
             AnchorTable, CursivePosFormat1, MarkBasePosFormat1, MarkLigPosFormat1,
             MarkMarkPosFormat1, PairPos, PairPosFormat1, PairPosFormat2, PositionLookup,
             PositionSubtables, SinglePos, SinglePosFormat1, SinglePosFormat2, ValueRecord,
-        }, gsub::LookupList
-    }
+        },
+        gsub::LookupList,
+    },
 };
 use smol_str::SmolStr;
 impl<'a> UncompileContext<'a> {
@@ -110,15 +114,39 @@ impl<'a> UncompileContext<'a> {
                     lookupblock
                 }
             };
-            self.add_lookup_flags(&mut lookupblock, lookup.lookup_flag(), lookup.mark_filtering_set());
+            self.add_lookup_flags(
+                &mut lookupblock,
+                lookup.lookup_flag(),
+                lookup.mark_filtering_set(),
+            );
             self.lookups.insert(lookupblock.name.clone(), lookupblock);
         }
         Ok(())
     }
 
-    fn resolve_value_record(&self, value_record: &ValueRecord, parent_offset_data: FontData<'_>) -> Result<FeaValueRecord, ReadError> {
-        let x_placement = value_record.x_placement().map(|vr| self.resolve_pos_with_variations(vr, value_record.x_placement_device(parent_offset_data))).transpose()?;
-        let y_placement = value_record.y_placement().map(|vr| self.resolve_pos_with_variations(vr, value_record.y_placement_device(parent_offset_data))).transpose()?;
+    fn resolve_value_record(
+        &self,
+        value_record: &ValueRecord,
+        parent_offset_data: FontData<'_>,
+    ) -> Result<FeaValueRecord, ReadError> {
+        let x_placement = value_record
+            .x_placement()
+            .map(|vr| {
+                self.resolve_pos_with_variations(
+                    vr,
+                    value_record.x_placement_device(parent_offset_data),
+                )
+            })
+            .transpose()?;
+        let y_placement = value_record
+            .y_placement()
+            .map(|vr| {
+                self.resolve_pos_with_variations(
+                    vr,
+                    value_record.y_placement_device(parent_offset_data),
+                )
+            })
+            .transpose()?;
         let x_advance = value_record.x_advance().map(Metric::from);
         let y_advance = value_record.y_advance().map(Metric::from);
         Ok(FeaValueRecord::new(
@@ -141,7 +169,6 @@ impl<'a> UncompileContext<'a> {
         let y = self.resolve_pos_with_variations(anchor.y_coordinate(), anchor.y_device())?;
         Ok(FeaAnchor::new(x, y, None, None, None, None, 0..0))
     }
-
 
     fn uncompile_gpos1_format1(
         &self,
@@ -371,7 +398,11 @@ impl<'a> UncompileContext<'a> {
         Ok(())
     }
 
-    fn gather_mark_classes(&mut self, mark_coverage: Vec<GlyphContainer>, mark_array: skrifa::raw::tables::gpos::MarkArray<'_>) -> Result<IndexMap<u16, Vec<(GlyphContainer, FeaAnchor)>>, ReadError> {
+    fn gather_mark_classes(
+        &mut self,
+        mark_coverage: Vec<GlyphContainer>,
+        mark_array: skrifa::raw::tables::gpos::MarkArray<'_>,
+    ) -> Result<IndexMap<u16, Vec<(GlyphContainer, FeaAnchor)>>, ReadError> {
         let mut mark_classes: IndexMap<u16, Vec<(GlyphContainer, FeaAnchor)>> = IndexMap::new();
         for (mark_glyph, mark_record) in mark_coverage.iter().zip(mark_array.mark_records()) {
             let mark_anchor = mark_record.mark_anchor(mark_array.offset_data())?;
@@ -392,10 +423,7 @@ impl<'a> UncompileContext<'a> {
         mark_class_to_target_glyph_anchor: &IndexMap<u16, IndexMap<SmolStr, FeaAnchor>>,
     ) -> Result<IndexMap<u16, SmolStr>, ReadError> {
         let mark_classes = self.gather_mark_classes(mark_coverage, mark_array)?;
-        Ok(self.register_guessed_mark_classes(
-            mark_classes,
-            mark_class_to_target_glyph_anchor,
-        ))
+        Ok(self.register_guessed_mark_classes(mark_classes, mark_class_to_target_glyph_anchor))
     }
 
     fn register_guessed_mark_classes(
@@ -408,7 +436,7 @@ impl<'a> UncompileContext<'a> {
         for (class_number, name) in mark_class_to_target_glyph_anchor
             .keys()
             .cloned()
-            .zip(guessed_names.into_iter())
+            .zip(guessed_names)
         {
             guessed_name_by_class.insert(class_number, name);
         }
@@ -463,7 +491,7 @@ impl<'a> UncompileContext<'a> {
         }
         anchors_mark_classes
     }
-    
+
     fn uncompile_gpos5(
         &mut self,
         lookupblock: &mut LookupBlock,
@@ -700,7 +728,7 @@ fn majority_in_quadrant(xs: &[f32], ys: &[f32]) -> Option<&'static str> {
         } else if (*x >= 0.33 && *x <= 0.66) && (*y >= 0.33 && *y <= 0.66) {
             "center"
         } else {
-            continue
+            continue;
         };
         *counts.entry(quadrant).or_insert(0) += 1;
     }
