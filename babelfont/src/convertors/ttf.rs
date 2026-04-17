@@ -265,6 +265,23 @@ fn load_glyphs(fontref: &skrifa::FontRef, font: &mut Font) -> Result<(), Babelfo
     Ok(())
 }
 
+// This is only sound for mark class definitions
+fn expand_glyphcontainer(glyphs: &fea_rs_ast::GlyphContainer) -> Vec<SmolStr> {
+    let mut r = vec![];
+    match glyphs {
+        fea_rs_ast::GlyphContainer::GlyphName(glyph_name) => {
+            return glyph_name.glyphset().cloned().collect()
+        }
+        fea_rs_ast::GlyphContainer::GlyphClass(glyph_class) => {
+            glyph_class.glyphs.iter().for_each(|g| {
+                r.extend(expand_glyphcontainer(g));
+            });
+        }
+        _ => unreachable!(),
+    }
+    r
+}
+
 fn load_features(fontref: &skrifa::FontRef, font: &mut Font) -> Result<(), BabelfontError> {
     let axes = font.fontdrasil_axes()?;
     let uncompile_context = sr_aef::uncompile_context(fontref)
@@ -305,6 +322,47 @@ fn load_features(fontref: &skrifa::FontRef, font: &mut Font) -> Result<(), Babel
                     glyph_name,
                     &anchor_name
                 );
+            }
+        }
+    }
+
+    // Do the same but for mark classes.
+    for (anchor_name, classdefs) in uncompile_context.mark_classes {
+        let anchor_name = format!("_{}", anchor_name);
+        for definition in classdefs.iter() {
+            let anchor = &definition.anchor;
+            let glyphs = &definition.glyphs;
+            let glyphset = expand_glyphcontainer(glyphs);
+            for glyph_name in glyphset {
+                if let Some(glyph) = font.glyphs.get_mut(&glyph_name) {
+                    for layer in glyph.layers.iter_mut() {
+                        let LayerType::DefaultForMaster(mid) = &layer.master else {
+                            continue;
+                        };
+                        let Some(master) = master_ids.get(mid) else {
+                            log::warn!(
+                                "Master ID {} from anchor {} does not exist in the font",
+                                mid,
+                                &anchor_name
+                            );
+                            continue;
+                        };
+                        let location = master.location.clone();
+                        let (x, y) = get_x_y_location_for_anchor(location, anchor, &axes)?;
+                        layer.anchors.push(Anchor {
+                            name: anchor_name.clone(),
+                            x,
+                            y,
+                            format_specific: FormatSpecific::default(),
+                        });
+                    }
+                } else {
+                    log::warn!(
+                        "Glyph {} from anchor {} does not exist in the font",
+                        glyph_name,
+                        &anchor_name
+                    );
+                }
             }
         }
     }
@@ -351,7 +409,7 @@ fn get_x_y_location_for_anchor(
     anchor: &sr_aef::fea_rs_ast::Anchor,
     axes: &Axes,
 ) -> Result<(f64, f64), BabelfontError> {
-    let user_loc = location.to_user(&axes)?;
+    let user_loc = location.to_user(axes)?;
     let simple_user_loc = user_loc
         .iter()
         .map(|(tag, coord)| (SmolStr::from(tag.to_string()), coord.to_f64() as i16))

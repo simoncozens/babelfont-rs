@@ -80,7 +80,7 @@ mod glyphs {
             if val.locked {
                 format_specific.insert(KEY_ANCHOR_LOCKED.into(), serde_json::json!(true));
             }
-            if val.orientation != glyphslib::common::Orientation::Center {
+            if val.orientation != glyphslib::common::Orientation::Left {
                 format_specific.insert(
                     KEY_ANCHOR_ORIENTATION.into(),
                     serde_json::json!(match val.orientation {
@@ -105,7 +105,7 @@ mod glyphs {
                 .format_specific
                 .get(KEY_ANCHOR_ORIENTATION)
                 .and_then(|v| v.as_str())
-                .unwrap_or("center")
+                .unwrap_or("left")
             {
                 "left" => glyphslib::common::Orientation::Left,
                 "right" => glyphslib::common::Orientation::Right,
