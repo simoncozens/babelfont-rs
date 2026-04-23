@@ -31,6 +31,7 @@ const HEADER_VERSION_KEY: &str = "sfd.splinefontdb_version";
 const COMMENT_ENTRIES_KEY: &str = "sfd.comment_entries";
 const HSTEM_KEY: &str = "sfd.HStem";
 const VSTEM_KEY: &str = "sfd.VStem";
+const LAYER_QUADRATIC_KEY: &str = "sfd.is_quadratic";
 
 /// A parser for the FontForge SFD/SFDir text format.
 struct SfdParser {
@@ -77,7 +78,27 @@ macro_rules! parse_metric {
     };
 }
 
+fn remove_implicit_move_in_closed_path(p: &mut Path) {
+    #[allow(clippy::unwrap_used)] // We check for is_empty() before, so unwrap is safe
+    if p.closed
+        && p.nodes.len() > 1
+        && p.nodes.first().map(|n| n.nodetype) == Some(NodeType::Move)
+        && p.nodes.first().unwrap().x == p.nodes.last().unwrap().x
+        && p.nodes.first().unwrap().y == p.nodes.last().unwrap().y
+    {
+        p.nodes = p.nodes[1..].to_vec(); // Remove the initial move node if path is closed
+    }
+}
+
 type SplineSegment = (Vec<(f64, f64)>, char, String);
+
+fn layer_is_quadratic(layer: &Layer) -> bool {
+    layer
+        .format_specific
+        .get(LAYER_QUADRATIC_KEY)
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+}
 
 impl SfdParser {
     fn new(path: PathBuf) -> Self {
@@ -307,7 +328,7 @@ impl SfdParser {
                 "Grid" => {
                     let (section, next_i) = self.get_section(&data, i, "EndSplineSet", None);
                     // This is a splineset, so we parse it into paths
-                    let paths = Self::splines_to_path(&section)?;
+                    let paths = Self::splines_to_path(&section, false)?;
                     // We only want the ones which are two nodes, move + line
                     for gridline in paths.iter().filter(|p| {
                         p.nodes.len() == 2
@@ -824,8 +845,8 @@ impl SfdParser {
                 }
                 if let Some(layer_idx) = current_layer_idx {
                     if let Some(layer_pos) = layer_map.get(&layer_idx) {
-                        let paths = Self::splines_to_path(&section)?;
                         let layer = &mut glyph.layers[*layer_pos];
+                        let paths = Self::splines_to_path(&section, layer_is_quadratic(layer))?;
                         layer.format_specific.insert(
                             "sfd.explicit_splineset".to_string(),
                             serde_json::Value::Bool(false),
@@ -949,8 +970,8 @@ impl SfdParser {
                     idx = next_idx;
                     if let Some(layer_idx) = current_layer_idx {
                         if let Some(layer_pos) = layer_map.get(&layer_idx) {
-                            let paths = Self::splines_to_path(&section)?;
                             let layer = &mut glyph.layers[*layer_pos];
+                            let paths = Self::splines_to_path(&section, layer_is_quadratic(layer))?;
                             layer.format_specific.insert(
                                 "sfd.explicit_splineset".to_string(),
                                 serde_json::Value::Bool(true),
@@ -1133,6 +1154,10 @@ impl SfdParser {
         let mut layer = Layer::new(width);
         layer.id = Some(master_id.to_string());
         layer.name = def.and_then(|d| d.name.clone());
+        layer.format_specific.insert(
+            LAYER_QUADRATIC_KEY.to_string(),
+            serde_json::Value::Bool(def.map(|d| d.is_quadratic).unwrap_or(false)),
+        );
 
         // In SFD, index 1 / "Fore" is the primary drawable layer.
         // Non-foreground layers should not be treated as default master layers,
@@ -1825,7 +1850,10 @@ impl SfdParser {
 
     /// Convert SFD spline lines into a Path structure.
     /// Handles contours, segments, and node types.
-    fn splines_to_path(spline_lines: &[String]) -> Result<Vec<Path>, BabelfontError> {
+    fn splines_to_path(
+        spline_lines: &[String],
+        is_quadratic: bool,
+    ) -> Result<Vec<Path>, BabelfontError> {
         let mut paths = Vec::new();
         let mut nodes = Vec::new();
         let mut last_point_flags: Option<String> = None;
@@ -1862,11 +1890,13 @@ impl SfdParser {
                     'm' => {
                         // Move: start a new contour
                         if !nodes.is_empty() {
-                            paths.push(Path {
+                            let mut path = Path {
                                 nodes: nodes.clone(),
                                 closed: !Self::is_force_open_path(last_point_flags.as_deref()),
                                 ..Default::default()
-                            });
+                            };
+                            remove_implicit_move_in_closed_path(&mut path);
+                            paths.push(path);
                             nodes.clear();
                             last_point_flags = None;
                         }
@@ -1905,19 +1935,16 @@ impl SfdParser {
                         }
                     }
                     'c' => {
-                        // Cubic curve: add 2 off-curve points, then 1 on-curve
-                        for (i, (x, y)) in points.iter().enumerate() {
-                            if i < 2 {
-                                // Off-curve control points
+                        if is_quadratic {
+                            if let (Some((cx, cy)), Some((x, y))) = (points.first(), points.last())
+                            {
                                 nodes.push(Node {
-                                    x: *x,
-                                    y: *y,
+                                    x: *cx,
+                                    y: *cy,
                                     nodetype: NodeType::OffCurve,
                                     smooth: false,
                                     format_specific: Default::default(),
                                 });
-                            } else {
-                                // Final on-curve point
                                 let mut format_specific = FormatSpecific::default();
                                 format_specific.insert(
                                     "sfd.point_flags".to_string(),
@@ -1926,11 +1953,40 @@ impl SfdParser {
                                 nodes.push(Node {
                                     x: *x,
                                     y: *y,
-                                    nodetype: NodeType::Curve,
+                                    nodetype: NodeType::QCurve,
                                     smooth,
                                     format_specific,
                                 });
                                 last_point_flags = Some(flags.clone());
+                            }
+                        } else {
+                            // Cubic curve: add 2 off-curve points, then 1 on-curve
+                            for (i, (x, y)) in points.iter().enumerate() {
+                                if i < 2 {
+                                    // Off-curve control points
+                                    nodes.push(Node {
+                                        x: *x,
+                                        y: *y,
+                                        nodetype: NodeType::OffCurve,
+                                        smooth: false,
+                                        format_specific: Default::default(),
+                                    });
+                                } else {
+                                    // Final on-curve point
+                                    let mut format_specific = FormatSpecific::default();
+                                    format_specific.insert(
+                                        "sfd.point_flags".to_string(),
+                                        serde_json::Value::String(flags.clone()),
+                                    );
+                                    nodes.push(Node {
+                                        x: *x,
+                                        y: *y,
+                                        nodetype: NodeType::Curve,
+                                        smooth,
+                                        format_specific,
+                                    });
+                                    last_point_flags = Some(flags.clone());
+                                }
                             }
                         }
                     }
@@ -1941,11 +1997,13 @@ impl SfdParser {
 
         // Finish the last path
         if !nodes.is_empty() {
-            paths.push(Path {
+            let mut path = Path {
                 nodes: nodes.clone(),
                 closed: !Self::is_force_open_path(last_point_flags.as_deref()),
                 ..Default::default()
-            });
+            };
+            remove_implicit_move_in_closed_path(&mut path);
+            paths.push(path);
         }
 
         Ok(paths)
@@ -2374,6 +2432,7 @@ struct LayerRegistry {
 
 impl LayerRegistry {
     fn from_font(font: &Font, default_master_id: &str) -> Self {
+        let mut extra_quadratic: HashMap<String, bool> = HashMap::new();
         let mut defs: Vec<(usize, bool, String, usize)> = font
             .format_specific
             .get("sfd.layer_defs")
@@ -2417,6 +2476,7 @@ impl LayerRegistry {
                 }
                 let key = Self::layer_key(layer);
                 if let std::collections::hash_map::Entry::Vacant(v) = extras.entry(key) {
+                    extra_quadratic.insert(v.key().clone(), layer_is_quadratic(layer));
                     v.insert(next_idx);
                     next_idx += 1;
                 }
@@ -2437,7 +2497,12 @@ impl LayerRegistry {
                 .iter()
                 .any(|(existing_idx, _, _, _)| existing_idx == ix)
             {
-                defs.push((*ix, false, key.clone(), 0));
+                defs.push((
+                    *ix,
+                    extra_quadratic.get(key).copied().unwrap_or(false),
+                    key.clone(),
+                    0,
+                ));
             }
         }
         defs.sort_by_key(|(idx, _, _, _)| *idx);
@@ -3302,7 +3367,7 @@ fn emit_glyph(
     indexed_layers.sort_by_key(|(ix, _)| *ix);
 
     for (ix, layer) in indexed_layers {
-        emit_layer(out, layer, ix, glyph_index)?;
+        emit_layer(out, glyph, layer, ix, glyph_index)?;
     }
 
     if let Some(comment) = glyph
@@ -3352,6 +3417,7 @@ fn glyph_foreground_layer<'a>(glyph: &'a Glyph, default_master_id: &str) -> Opti
 
 fn emit_layer(
     out: &mut Vec<String>,
+    glyph: &Glyph,
     layer: &Layer,
     layer_idx: usize,
     glyph_index: &HashMap<SmolStr, usize>,
@@ -3369,14 +3435,16 @@ fn emit_layer(
         out.push(format!("Colour: {:06x}", r | g | b));
     }
 
-    emit_layer_shapes(out, layer, glyph_index)?;
+    emit_layer_shapes(out, glyph, layer, layer_idx, glyph_index)?;
     emit_layer_anchors(out, layer);
     Ok(())
 }
 
 fn emit_layer_shapes(
     out: &mut Vec<String>,
+    glyph: &Glyph,
     layer: &Layer,
+    layer_idx: usize,
     glyph_index: &HashMap<SmolStr, usize>,
 ) -> Result<(), BabelfontError> {
     let has_path = layer.shapes.iter().any(|s| matches!(s, Shape::Path(_)));
@@ -3390,9 +3458,14 @@ fn emit_layer_shapes(
         if explicit_splineset {
             out.push("SplineSet".to_string());
         }
-        for shape in &layer.shapes {
+        for (shape_index, shape) in layer.shapes.iter().enumerate() {
             if let Shape::Path(path) = shape {
-                let path_str = save_path(path)?;
+                let path_str = save_path(path, layer_is_quadratic(layer)).map_err(|error| {
+                    BabelfontError::General(format!(
+                        "Failed to save path for glyph '{}' layer {} shape {}: {}",
+                        glyph.name, layer_idx, shape_index, error
+                    ))
+                })?;
                 out.push(path_str);
             }
         }
@@ -3535,7 +3608,7 @@ fn save_component(
     Ok(line)
 }
 
-fn save_path(path: &Path) -> Result<String, BabelfontError> {
+fn save_path(path: &Path, is_quadratic: bool) -> Result<String, BabelfontError> {
     let oncurve_indices: Vec<usize> = path
         .nodes
         .iter()
@@ -3549,10 +3622,33 @@ fn save_path(path: &Path) -> Result<String, BabelfontError> {
         })
         .collect();
 
-    let Some(&start_ix) = oncurve_indices.first() else {
-        return Err(BabelfontError::General(
-            "Path has no on-curve points".to_string(),
-        ));
+    let implicit_move_closed = path.closed
+        && path
+            .nodes
+            .first()
+            .map(|node| node.nodetype != NodeType::Move)
+            .unwrap_or(false);
+    let start_ix = if implicit_move_closed {
+        oncurve_indices.last().copied()
+    } else {
+        oncurve_indices.first().copied()
+    };
+
+    let Some(start_ix) = start_ix else {
+        return Err(BabelfontError::General(format!(
+            "Path has no on-curve points ({} nodes: {})",
+            path.nodes.len(),
+            path.nodes
+                .iter()
+                .map(|node| format!(
+                    "{:?}@{},{}",
+                    node.nodetype,
+                    fmt_num(node.x),
+                    fmt_num(node.y)
+                ))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )));
     };
     let start = &path.nodes[start_ix];
     let mut out: Vec<String> = Vec::new();
@@ -3563,11 +3659,21 @@ fn save_path(path: &Path) -> Result<String, BabelfontError> {
         point_flags_for_node(start)
     ));
 
+    let mut current = start;
     let mut offcurves: Vec<&Node> = Vec::new();
-    for node in path.nodes.iter().skip(start_ix + 1) {
+    let remaining_nodes: Vec<&Node> = if path.closed {
+        path.nodes[start_ix + 1..]
+            .iter()
+            .chain(path.nodes[..start_ix].iter())
+            .collect()
+    } else {
+        path.nodes[start_ix + 1..].iter().collect()
+    };
+
+    for node in remaining_nodes {
         match node.nodetype {
             NodeType::OffCurve => offcurves.push(node),
-            NodeType::Curve | NodeType::QCurve => {
+            NodeType::Curve => {
                 if offcurves.len() >= 2 {
                     let c1 = offcurves[offcurves.len() - 2];
                     let c2 = offcurves[offcurves.len() - 1];
@@ -3589,6 +3695,41 @@ fn save_path(path: &Path) -> Result<String, BabelfontError> {
                         point_flags_for_node(node)
                     ));
                 }
+                current = node;
+                offcurves.clear();
+            }
+            NodeType::QCurve => {
+                if let Some(control) = offcurves.last() {
+                    out.push(format!(
+                        " {} {} {} {} {} {} c {}",
+                        fmt_num(control.x),
+                        fmt_num(control.y),
+                        fmt_num(control.x),
+                        fmt_num(control.y),
+                        fmt_num(node.x),
+                        fmt_num(node.y),
+                        point_flags_for_node(node)
+                    ));
+                } else if is_quadratic {
+                    out.push(format!(
+                        " {} {} {} {} {} {} c {}",
+                        fmt_num(current.x),
+                        fmt_num(current.y),
+                        fmt_num(current.x),
+                        fmt_num(current.y),
+                        fmt_num(node.x),
+                        fmt_num(node.y),
+                        point_flags_for_node(node)
+                    ));
+                } else {
+                    out.push(format!(
+                        " {} {} l {}",
+                        fmt_num(node.x),
+                        fmt_num(node.y),
+                        point_flags_for_node(node)
+                    ));
+                }
+                current = node;
                 offcurves.clear();
             }
             NodeType::Line | NodeType::Move => {
@@ -3598,10 +3739,53 @@ fn save_path(path: &Path) -> Result<String, BabelfontError> {
                     fmt_num(node.y),
                     point_flags_for_node(node)
                 ));
+                current = node;
                 offcurves.clear();
             }
         }
     }
+
+    if path.closed
+        && (implicit_move_closed
+            || current.x != start.x
+            || current.y != start.y
+            || !offcurves.is_empty())
+    {
+        if is_quadratic && !offcurves.is_empty() {
+            let control = offcurves[offcurves.len() - 1];
+            out.push(format!(
+                " {} {} {} {} {} {} c {}",
+                fmt_num(control.x),
+                fmt_num(control.y),
+                fmt_num(control.x),
+                fmt_num(control.y),
+                fmt_num(start.x),
+                fmt_num(start.y),
+                point_flags_for_node(start)
+            ));
+        } else if offcurves.len() >= 2 {
+            let c1 = offcurves[offcurves.len() - 2];
+            let c2 = offcurves[offcurves.len() - 1];
+            out.push(format!(
+                " {} {} {} {} {} {} c {}",
+                fmt_num(c1.x),
+                fmt_num(c1.y),
+                fmt_num(c2.x),
+                fmt_num(c2.y),
+                fmt_num(start.x),
+                fmt_num(start.y),
+                point_flags_for_node(start)
+            ));
+        } else {
+            out.push(format!(
+                " {} {} l {}",
+                fmt_num(start.x),
+                fmt_num(start.y),
+                point_flags_for_node(start)
+            ));
+        }
+    }
+
     Ok(out.join("\n"))
 }
 
@@ -3759,5 +3943,47 @@ mod tests {
             println!("{}", diff);
             panic!("Roundtrip SFD did not match original");
         }
+    }
+
+    #[test]
+    fn test_quadratic_layer_parses_and_emits_qcurves() {
+        let data = concat!(
+            "SplineFontDB: 3.0\n",
+            "LayerCount: 2\n",
+            "Layer: 0 1 \"Back\" 1\n",
+            "Layer: 1 1 \"Fore\" 0\n",
+            "BeginChars: 1 1\n",
+            "StartChar: quad\n",
+            "Encoding: -1 -1 0\n",
+            "Width: 500\n",
+            "Fore\n",
+            "SplineSet\n",
+            "268 610 m 4,0,1\n",
+            " 336 610 336 610 386.5 585.5 c 0x400,-1,2\n",
+            "EndSplineSet\n",
+            "EndChar\n",
+            "EndChars\n",
+            "EndSplineFont\n"
+        );
+
+        let font = load_str(data).expect("Failed to parse quadratic SFD");
+        let layer = glyph_foreground_layer(&font.glyphs[0], "default").expect("Missing layer");
+        let path = layer.paths().next().expect("Missing path");
+
+        assert_eq!(
+            layer
+                .format_specific
+                .get(LAYER_QUADRATIC_KEY)
+                .and_then(|v| v.as_bool()),
+            Some(true)
+        );
+        assert_eq!(path.nodes.len(), 3);
+        assert_eq!(path.nodes[0].nodetype, NodeType::Move);
+        assert_eq!(path.nodes[1].nodetype, NodeType::OffCurve);
+        assert_eq!(path.nodes[2].nodetype, NodeType::QCurve);
+
+        let emitted = to_str(&font).expect("Failed to emit quadratic SFD");
+        assert!(emitted.contains("Layer: 1 1 \"Fore\" 0"));
+        assert!(emitted.contains(" 336 610 336 610 386.5 585.5 c 0x400,-1,2"));
     }
 }
