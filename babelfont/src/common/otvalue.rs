@@ -127,6 +127,6 @@ pub struct CustomOTValues {
 impl CustomOTValues {
     /// Check if there are any custom OpenType values set
     pub fn is_empty(&self) -> bool {
-        self != &CustomOTValues::default()
+        self == &CustomOTValues::default()
     }
 }

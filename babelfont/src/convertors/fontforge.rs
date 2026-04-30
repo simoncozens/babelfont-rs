@@ -690,6 +690,13 @@ impl SfdParser {
                 "GlyphOrder" | "Compacted" => {
                     // Ignore for now
                 }
+                "Stylemap" => {
+                    if let Some(v) = &value {
+                        self.font
+                            .format_specific
+                            .insert(key.clone(), serde_json::Value::String(v.clone()));
+                    }
+                }
                 _ => {
                     // Default case: log any other key/value pair.
                     match &value {

@@ -46,7 +46,10 @@ fn names(font: &Font, flags: SelectionFlags) -> HashMap<NameKey, String> {
 
     for name_id_u32 in 0..=25 {
         let name_id = NameId::from(name_id_u32);
-        if let Some(name) = font.names.get(name_id).and_then(|n| n.get_default()) {
+        if let Some(name) = font.names.get(name_id).and_then(|n| {
+            n.get_default()
+                .or(n.is_single().then(|| n.0.values().next()).flatten())
+        }) {
             builder.add(name_id, name.clone());
         }
     }
@@ -249,6 +252,12 @@ impl Work<Context, WorkId, Error> for StaticMetadataWork {
         context.preliminary_gdef_categories.set(categories);
         static_metadata.misc.selection_flags = selection_flags;
         static_metadata.variations = None;
+
+        if let Some(vendor_id) = font.custom_ot_values.os2_vendor_id {
+            if vendor_id != crate::Tag::new(b"    ") {
+                static_metadata.misc.vendor_id = vendor_id;
+            }
+        }
 
         // treat "    " (four spaces) as equivalent to no value; it means
         // 'null', per the spec
