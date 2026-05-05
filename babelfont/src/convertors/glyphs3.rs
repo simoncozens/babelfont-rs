@@ -717,17 +717,83 @@ fn load_master(master: &glyphs3::Master, glyphs_font: &glyphs3::Glyphs3, font: &
     m
 }
 
+fn find_base_style(masters: &[Master]) -> String {
+    if masters.is_empty() {
+        return String::new();
+    }
+    let first_name = masters[0]
+        .name
+        .get_default()
+        .map(|s| s.as_str())
+        .unwrap_or("");
+    let mut base_style: Vec<&str> = first_name.split_whitespace().collect();
+    for master in masters.iter().skip(1) {
+        let name = master.name.get_default().map(|s| s.as_str()).unwrap_or("");
+        let style: Vec<&str> = name.split_whitespace().collect();
+        base_style.retain(|s| style.contains(s));
+    }
+    base_style.join(" ")
+}
+
+fn get_origin_master(font: &Font) -> Option<&Master> {
+    if font.masters.is_empty() {
+        return None;
+    }
+    // The current Glyphs spec uses "Variable Font Origin" (matched by master ID).
+    if let Some(id) = get_cp(&font.format_specific, "Variable Font Origin").and_then(|x| x.as_str())
+    {
+        if let Some(master) = font.masters.iter().find(|m| m.id == id) {
+            return Some(master);
+        }
+    }
+    // Older name: "Variation Font Origin" (matched by master name).
+    if let Some(name) =
+        get_cp(&font.format_specific, "Variation Font Origin").and_then(|x| x.as_str())
+    {
+        if let Some(master) = font
+            .masters
+            .iter()
+            .find(|m| m.name.get_default().map(|n| n.as_str()) == Some(name))
+        {
+            return Some(master);
+        }
+    }
+    // Fall back to the base style shared by all masters (default "Regular").
+    let base_style = find_base_style(&font.masters);
+    let base_style = if base_style.is_empty() {
+        "Regular".to_string()
+    } else {
+        base_style
+    };
+    if let Some(master) = font
+        .masters
+        .iter()
+        .find(|m| m.name.get_default().map(|n| n.as_str()) == Some(base_style.as_str()))
+    {
+        return Some(master);
+    }
+    // Second attempt: master whose name with "Regular" stripped matches base_style.
+    if let Some(master) = font.masters.iter().find(|m| {
+        m.name.get_default().is_some_and(|name| {
+            let without_regular = name
+                .split_whitespace()
+                .filter(|&w| w != "Regular")
+                .collect::<Vec<_>>()
+                .join(" ");
+            without_regular == base_style
+        })
+    }) {
+        return Some(master);
+    }
+    font.masters.first()
+}
+
 fn interpret_axes(font: &mut Font) -> Result<(), BabelfontError> {
     // This is going to look very wrong, but after much trial and error I can confirm
     // it works. First: load the axes assuming that userspace=designspace. Then
     // work out the axis mappings. Then apply the mappings to the axis locations.
 
-    let origin: &Master = font.masters.first().unwrap_or_else(|| {
-        get_cp(&font.format_specific, "Variable Font Origin")
-            .and_then(|x| x.as_str())
-            .and_then(|id| font.masters.iter().find(|m| m.id == id))
-            .unwrap_or(&font.masters[0])
-    });
+    let origin_id = get_origin_master(font).map(|m| m.id.clone());
     for master in font.masters.iter() {
         for axis in font.axes.iter_mut() {
             let loc = master
@@ -744,7 +810,7 @@ fn interpret_axes(font: &mut Font) -> Result<(), BabelfontError> {
             } else {
                 axis.max.map(|v| v.max(UserCoord::new(loc.to_f64())))
             };
-            if master.id == origin.id {
+            if Some(&master.id) == origin_id.as_ref() {
                 axis.default = Some(UserCoord::new(loc.to_f64()));
             }
         }
