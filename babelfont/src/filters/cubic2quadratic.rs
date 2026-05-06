@@ -5,6 +5,7 @@ use kurbo::{cubics_to_quadratic_splines, BezPath, CubicBez, PathEl};
 use crate::{filters::FontFilter, Node, Path};
 
 /// A filter that renames glyphs in the font
+#[derive(Debug, Clone, Default)]
 pub struct CubicToQuadratic;
 
 const TOLERANCE: f64 = 0.5;
@@ -265,6 +266,7 @@ impl FontFilter for CubicToQuadratic {
                     .map(|ix| (*ix, Vec::with_capacity(first_length)))
                     .collect::<HashMap<usize, Vec<Path>>>();
 
+                #[allow(clippy::needless_range_loop)]
                 for path_ix in 0..first_length {
                     let correlated_paths = layer_order
                         .iter()
