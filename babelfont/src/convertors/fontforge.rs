@@ -1438,6 +1438,11 @@ impl SfdParser {
             let grp = toks.into_iter().skip(1).collect();
             groups1.push(grp);
         }
+        if classstart != 0 {
+            // FontForge omits explicit class 0 unless n1 has a '+' suffix.
+            // Keep a placeholder so kern matrix row indexing matches SFD semantics.
+            groups1.insert(0, Vec::new());
+        }
         i += count1;
 
         // Second-side groups
@@ -1501,15 +1506,13 @@ impl SfdParser {
         let head = value.split('"').next().unwrap_or("").trim();
         let mut it = head.split_whitespace();
         if let Some(a) = it.next() {
-            n1 = a.parse().unwrap_or(0);
+            if a.contains('+') {
+                classstart = 0;
+            }
+            n1 = a.trim_matches('+').parse().unwrap_or(0);
         }
         if let Some(b) = it.next() {
-            if b.contains('+') {
-                classstart = 0;
-                n2 = b.trim_matches('+').parse().unwrap_or(0);
-            } else {
-                n2 = b.parse().unwrap_or(0);
-            }
+            n2 = b.parse().unwrap_or(0);
         }
         (n1, classstart, n2, name)
     }
