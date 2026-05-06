@@ -152,6 +152,13 @@ impl Shape {
         matches!(self, Shape::Path(_))
     }
 
+    pub(crate) fn as_path(&self) -> Option<&Path> {
+        match self {
+            Shape::Component(_) => None,
+            Shape::Path(p) => Some(p),
+        }
+    }
+
     /// Apply a DecomposedAffine transform to the shape
     pub fn apply_transform(&self, transform: DecomposedAffine) -> Self {
         match self {

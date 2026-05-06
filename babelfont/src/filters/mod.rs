@@ -74,6 +74,7 @@ declare_filters! {
     GlyphsStylisticSetLabel(glyphsstylisticsetlabel) => "glyphsstylisticsetlabel",
     GlyphsBracketLayers(glyphsbracketlayers) => "glyphsbracketlayers",
     RenameGlyphs(renameglyphs) => "renameglyphs",
+    CubicToQuadratic(cubic2quadratic) => "cubic2quadratic",
 }
 
 /// A trait for font filters that can be applied to a font
