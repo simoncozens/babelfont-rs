@@ -1125,6 +1125,144 @@ impl SfdParser {
                         ));
                     }
                 }
+                "Substitution2" => {
+                    if let Some((subtable_name, glyphs)) = self.parse_oneline_layout(value) {
+                        let Some(replacement) = glyphs.first() else {
+                            log::error!("Substitution2 has no replacement glyph for {}", glyph_name);
+                            continue;
+                        };
+                        let Some(subtable) = self.gsub_lookups.find_subtable_mut(&subtable_name)
+                        else {
+                            log::error!(
+                                "Substitution2 references unknown subtable: {}",
+                                subtable_name
+                            );
+                            continue;
+                        };
+                        subtable.push(fea_rs_ast::Statement::SingleSubst(
+                            fea_rs_ast::SingleSubstStatement::new(
+                                vec![Self::glyph_container(glyph_name)],
+                                vec![Self::glyph_container(replacement)],
+                                vec![],
+                                vec![],
+                                0..0,
+                                false,
+                            ),
+                        ));
+                    }
+                }
+                "AlternateSubs2" => {
+                    if let Some((subtable_name, glyphs)) = self.parse_oneline_layout(value) {
+                        if glyphs.is_empty() {
+                            log::error!("AlternateSubs2 has no replacements for {}", glyph_name);
+                            continue;
+                        }
+                        let Some(subtable) = self.gsub_lookups.find_subtable_mut(&subtable_name)
+                        else {
+                            log::error!(
+                                "AlternateSubs2 references unknown subtable: {}",
+                                subtable_name
+                            );
+                            continue;
+                        };
+                        let replacement_class = fea_rs_ast::GlyphContainer::GlyphClass(
+                            fea_rs_ast::GlyphClass::new(
+                                glyphs.iter().map(Self::glyph_container).collect(),
+                                0..0,
+                            ),
+                        );
+                        subtable.push(fea_rs_ast::Statement::AlternateSubst(
+                            fea_rs_ast::AlternateSubstStatement::new(
+                                Self::glyph_container(glyph_name),
+                                replacement_class,
+                                vec![],
+                                vec![],
+                                0..0,
+                                false,
+                            ),
+                        ));
+                    }
+                }
+                "MultipleSubs2" => {
+                    if let Some((subtable_name, glyphs)) = self.parse_oneline_layout(value) {
+                        if glyphs.is_empty() {
+                            log::error!("MultipleSubs2 has no replacements for {}", glyph_name);
+                            continue;
+                        }
+                        let Some(subtable) = self.gsub_lookups.find_subtable_mut(&subtable_name)
+                        else {
+                            log::error!(
+                                "MultipleSubs2 references unknown subtable: {}",
+                                subtable_name
+                            );
+                            continue;
+                        };
+                        subtable.push(fea_rs_ast::Statement::MultipleSubst(
+                            fea_rs_ast::MultipleSubstStatement::new(
+                                Self::glyph_container(glyph_name),
+                                glyphs.iter().map(Self::glyph_container).collect(),
+                                vec![],
+                                vec![],
+                                0..0,
+                                false,
+                            ),
+                        ));
+                    }
+                }
+                "Position2" => {
+                    if let Some((subtable_name, tokens)) = self.parse_oneline_layout(value) {
+                        let Some(vr) = Self::parse_pos_value_record(&tokens) else {
+                            log::error!("Position2 has invalid value record for {}", glyph_name);
+                            continue;
+                        };
+                        let Some(subtable) = self.gpos_lookups.find_subtable_mut(&subtable_name)
+                        else {
+                            log::error!("Position2 references unknown subtable: {}", subtable_name);
+                            continue;
+                        };
+                        subtable.push(fea_rs_ast::Statement::SinglePos(
+                            fea_rs_ast::SinglePosStatement::new(
+                                vec![],
+                                vec![],
+                                vec![(Self::glyph_container(glyph_name), Some(vr))],
+                                false,
+                                0..0,
+                            ),
+                        ));
+                    }
+                }
+                "PairPos2" => {
+                    if let Some((subtable_name, tokens)) = self.parse_oneline_layout(value) {
+                        if tokens.len() < 9 {
+                            log::error!("PairPos2 has insufficient tokens for {}", glyph_name);
+                            continue;
+                        }
+                        let right = &tokens[0];
+                        let Some(vr1) = Self::parse_pos_value_record(&tokens[1..5]) else {
+                            log::error!("PairPos2 first value record is invalid for {}", glyph_name);
+                            continue;
+                        };
+                        let Some(vr2) = Self::parse_pos_value_record(&tokens[5..9]) else {
+                            log::error!("PairPos2 second value record is invalid for {}", glyph_name);
+                            continue;
+                        };
+                        let Some(subtable) = self.gpos_lookups.find_subtable_mut(&subtable_name)
+                        else {
+                            log::error!("PairPos2 references unknown subtable: {}", subtable_name);
+                            continue;
+                        };
+                        subtable.push(fea_rs_ast::Statement::PairPos(
+                            fea_rs_ast::PairPosStatement::new(
+                                Self::glyph_container(glyph_name),
+                                Self::glyph_container(right),
+                                vr1,
+                                Some(vr2),
+                                false,
+                                0..0,
+                            ),
+                        ));
+                    }
+                }
                 _ => {
                     log::debug!("Unhandled FontForge glyph key: {}", key);
                 }
@@ -2247,6 +2385,43 @@ impl SfdParser {
         } else {
             None
         }
+    }
+
+    fn glyph_container(name: impl AsRef<str>) -> fea_rs_ast::GlyphContainer {
+        fea_rs_ast::GlyphContainer::GlyphName(fea_rs_ast::GlyphName::new(name.as_ref()))
+    }
+
+    fn parse_pos_value_record(tokens: &[SmolStr]) -> Option<fea_rs_ast::ValueRecord> {
+        let mut x_placement: Option<fea_rs_ast::Metric> = None;
+        let mut y_placement: Option<fea_rs_ast::Metric> = None;
+        let mut x_advance: Option<fea_rs_ast::Metric> = None;
+        let mut y_advance: Option<fea_rs_ast::Metric> = None;
+
+        for token in tokens {
+            let (k, v) = token.split_once('=')?;
+            let value: i16 = v.parse().ok()?;
+            match k {
+                "dx" => x_placement = Some(value.into()),
+                "dy" => y_placement = Some(value.into()),
+                "dh" => x_advance = Some(value.into()),
+                "dv" => y_advance = Some(value.into()),
+                _ => {}
+            }
+        }
+
+        Some(fea_rs_ast::ValueRecord::new(
+            x_placement,
+            y_placement,
+            x_advance,
+            y_advance,
+            None,
+            None,
+            None,
+            None,
+            false,
+            0..0,
+            None,
+        ))
     }
 
     fn looks_like_spline_line(line: &str) -> bool {
@@ -3995,5 +4170,48 @@ mod tests {
         let emitted = to_str(&font).expect("Failed to emit quadratic SFD");
         assert!(emitted.contains("Layer: 1 1 \"Fore\" 0"));
         assert!(emitted.contains(" 336 610 336 610 386.5 585.5 c 0x400,-1,2"));
+    }
+
+    #[test]
+    fn test_oneline_glyph_rules_are_added_to_lookups() {
+        let data = concat!(
+            "SplineFontDB: 3.0\n",
+            "Lookup: 1 0 0 \"Latin Smallcaps Lookup\" {\"Latin Smallcaps\"} [ ]\n",
+            "Lookup: 2 0 0 \"Latin Decomp Lookup\" {\"Latin Decomposition\"} [ ]\n",
+            "Lookup: 3 0 0 \"Latin Alt Lookup\" {\"Latin Swash\"} [ ]\n",
+            "Lookup: 4 0 0 \"Latin Liga Lookup\" {\"Latin Ligatures\"} [ ]\n",
+            "Lookup: 257 0 0 \"Inferiors Lookup\" {\"Inferiors\"} [ ]\n",
+            "Lookup: 258 0 0 \"Distances Lookup\" {\"Distances\"} [ ]\n",
+            "BeginChars: 1 1\n",
+            "StartChar: agrave\n",
+            "Encoding: -1 224 0\n",
+            "Width: 500\n",
+            "Fore\n",
+            "Substitution2: \"Latin Smallcaps\" agrave.sc\n",
+            "AlternateSubs2: \"Latin Swash\" agrave.alt agrave.swash\n",
+            "MultipleSubs2: \"Latin Decomposition\" a grave\n",
+            "Ligature2: \"Latin Ligatures\" a grave\n",
+            "Position2: \"Inferiors\" dx=0 dy=-900 dh=0 dv=0\n",
+            "PairPos2: \"Distances\" B dx=0 dy=0 dh=0 dv=0 dx=-10 dy=0 dh=0 dv=0\n",
+            "EndChar\n",
+            "EndChars\n",
+            "EndSplineFont\n"
+        );
+
+        let font = load_str(data).expect("Failed to parse one-line glyph rule SFD");
+        let prefixes = font
+            .features
+            .prefixes
+            .values()
+            .map(|p| p.code.clone())
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        assert!(prefixes.contains("sub agrave by agrave.sc;"));
+        assert!(prefixes.contains("sub agrave by a grave;"));
+        assert!(prefixes.contains("sub agrave from [agrave.alt agrave.swash];"));
+        assert!(prefixes.contains("sub a grave by agrave;"));
+        assert!(prefixes.contains("pos agrave <0 -900 0 0>;"));
+        assert!(prefixes.contains("pos agrave <0 0 0 0> B <-10 0 0 0>;"));
     }
 }
