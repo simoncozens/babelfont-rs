@@ -88,10 +88,15 @@ impl Path {
             .cycle()
             .skip(rotate)
             .take(self.nodes.len());
+        let mut start_point = None;
+        let mut start_type = None;
         // We do this because all kurbo paths (even closed ones)
         // must start with a move_to (otherwise get_segs doesn't work)
-        if let Some(start) = nodes.next() {
-            path.move_to(start.to_kurbo());
+        if let Some(start_node) = nodes.next() {
+            let start = start_node.to_kurbo();
+            path.move_to(start);
+            start_point = Some(start);
+            start_type = Some(start_node.nodetype);
         }
         for pt in nodes {
             let kurbo_point = pt.to_kurbo();
@@ -119,6 +124,31 @@ impl Path {
                     }
                     offs.clear();
                 }
+            }
+        }
+        if self.closed && !offs.is_empty() {
+            let Some(start_point) = start_point else {
+                return Err(BabelfontError::BadPath);
+            };
+            match start_type {
+                Some(NodeType::Curve) => {
+                    match offs.make_contiguous() {
+                        [p1, p2] => path.curve_to(*p1, *p2, start_point),
+                        _ => return Err(BabelfontError::BadPath),
+                    }
+                    offs.clear();
+                }
+                Some(NodeType::QCurve) => {
+                    while let Some(pt) = offs.pop_front() {
+                        if let Some(next) = offs.front() {
+                            let implied_point = pt.midpoint(*next);
+                            path.quad_to(pt, implied_point);
+                        } else {
+                            path.quad_to(pt, start_point);
+                        }
+                    }
+                }
+                _ => return Err(BabelfontError::BadPath),
             }
         }
         if self.closed {
@@ -492,6 +522,8 @@ mod fontra {
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used)]
+    use kurbo::PathEl;
+
     use super::*;
 
     #[test]
@@ -624,5 +656,25 @@ mod tests {
             assert_eq!(a.nodetype, b.nodetype);
             assert_eq!(a.smooth, b.smooth);
         }
+    }
+
+    #[test]
+    fn test_to_kurbo() {
+        let path: Path = serde_json::from_str(r#"
+            {
+              "nodes": "394 173 o 467 246 o 467 337 cs 467 427 o 394 500 o 304 500 cs 213 500 o 140 427 o 140 337 cs 140 246 o 213 173 o 304 173 cs",
+              "closed": true
+            }
+"#).unwrap();
+        let kurbo = path.to_kurbo().unwrap();
+        // Check to_kurbo works; there should be four cubic segments
+        assert_eq!(
+            kurbo
+                .elements()
+                .iter()
+                .filter(|el| matches!(el, PathEl::CurveTo(_, _, _)))
+                .count(),
+            4
+        );
     }
 }

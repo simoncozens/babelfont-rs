@@ -1,3 +1,8 @@
+use crate::Tag;
+use fontdrasil::coords::{DesignCoord, DesignLocation};
+
+mod curve_filter_common;
+
 /// Macro to declare filters with less boilerplate
 ///
 /// Usage: `declare_filters! { TypeName(module_name) => "cli_name", ... }`
@@ -75,6 +80,9 @@ declare_filters! {
     GlyphsBracketLayers(glyphsbracketlayers) => "glyphsbracketlayers",
     RenameGlyphs(renameglyphs) => "renameglyphs",
     CubicToQuadratic(cubic2quadratic) => "cubic2quadratic",
+    QuadraticToCubic(quadratic2cubic) => "quadratic2cubic",
+    SetDefaultLocation(setdefaultlocation) => "setdefaultlocation",
+    AddMaster(addmaster) => "addmaster",
 }
 
 /// A trait for font filters that can be applied to a font
@@ -92,4 +100,34 @@ pub trait FontFilter {
     fn arg() -> clap::Arg
     where
         Self: Sized;
+}
+
+pub(crate) fn parse_location(s: &str) -> Result<DesignLocation, crate::BabelfontError> {
+    let mut location = DesignLocation::new();
+    for pair in s.split(',') {
+        let mut parts = pair.splitn(2, '=');
+        let axis = parts
+            .next()
+            .ok_or_else(|| {
+                crate::BabelfontError::FilterError(format!("Invalid location pair: {}", pair))
+            })?
+            .trim();
+        let value_str = parts
+            .next()
+            .ok_or_else(|| {
+                crate::BabelfontError::FilterError(format!("Invalid location pair: {}", pair))
+            })?
+            .trim();
+        let tag: Tag = axis.parse().map_err(|_| {
+            crate::BabelfontError::FilterError(format!("Invalid axis tag: {}", axis))
+        })?;
+        let value: f64 = value_str.parse().map_err(|_| {
+            crate::BabelfontError::FilterError(format!(
+                "Invalid value for axis '{}': {}",
+                axis, value_str
+            ))
+        })?;
+        location.insert(tag, DesignCoord::new(value));
+    }
+    Ok(location)
 }

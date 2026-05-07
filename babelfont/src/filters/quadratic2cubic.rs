@@ -1,4 +1,4 @@
-use kurbo::{cubics_to_quadratic_splines, BezPath, CubicBez, PathEl};
+use kurbo::{BezPath, PathEl, QuadBez};
 
 use crate::{filters::FontFilter, Node, Path};
 
@@ -6,11 +6,9 @@ use super::curve_filter_common::{
     apply_interpolatable_path_filter, mark_closed_and_normalize, path_el_kind,
 };
 
-/// A filter that converts cubic Bézier curves to quadratic Bézier curves in all glyphs of a font, attempting to keep corresponding paths across layers consistent for better interpolation results. This filter requires the `kurbo` feature to be enabled.
+/// A filter that converts quadratic Bézier curves to cubic Bézier curves in all glyphs of a font, attempting to keep corresponding paths across layers consistent for better interpolation results. This filter requires the `kurbo` feature to be enabled.
 #[derive(Debug, Clone, Default)]
-pub struct CubicToQuadratic;
-
-const TOLERANCE: f64 = 0.5;
+pub struct QuadraticToCubic;
 
 fn convert_bezpaths_in_parallel(paths: Vec<&BezPath>) -> Result<Vec<Path>, crate::BabelfontError> {
     if paths.is_empty() {
@@ -38,7 +36,7 @@ fn convert_bezpaths_in_parallel(paths: Vec<&BezPath>) -> Result<Vec<Path>, crate
         let last_point = if let Some(PathEl::MoveTo(p)) = elements.first() {
             Some(*p)
         } else {
-            // Closed contours may not start with a move command.
+            // Closed contours in kurbo may not start with a move command.
             elements.last().and_then(|el| el.end_point())
         };
         let Some(last_point) = last_point else {
@@ -96,58 +94,33 @@ fn convert_bezpaths_in_parallel(paths: Vec<&BezPath>) -> Result<Vec<Path>, crate
                     let PathEl::QuadTo(p1, p2) = &elements[el_ix] else {
                         unreachable!("element kind checked above")
                     };
+                    let quadbez = QuadBez::new(last_points[path_ix], *p1, *p2);
+                    let cubicbez = quadbez.raise();
                     new_paths[path_ix]
                         .nodes
-                        .push(Node::new_offcurve(p1.x, p1.y));
-                    new_paths[path_ix].nodes.push(Node::new_qcurve(p2.x, p2.y));
-                    last_points[path_ix] = *p2;
+                        .push(Node::new_offcurve(cubicbez.p1.x, cubicbez.p1.y));
+                    new_paths[path_ix]
+                        .nodes
+                        .push(Node::new_offcurve(cubicbez.p2.x, cubicbez.p2.y));
+                    new_paths[path_ix]
+                        .nodes
+                        .push(Node::new_curve(cubicbez.p3.x, cubicbez.p3.y));
+                    last_points[path_ix] = cubicbez.p3;
                 }
             }
             PathEl::CurveTo(_, _, _) => {
-                let mut cubics = Vec::with_capacity(all_elements.len());
-                let mut end_points = Vec::with_capacity(all_elements.len());
                 for (path_ix, elements) in all_elements.iter().enumerate() {
                     let PathEl::CurveTo(p1, p2, p3) = &elements[el_ix] else {
                         unreachable!("element kind checked above")
                     };
-                    cubics.push(CubicBez::new(last_points[path_ix], *p1, *p2, *p3));
-                    end_points.push(*p3);
-                }
-
-                let Some(quadsplines) = cubics_to_quadratic_splines(&cubics, TOLERANCE) else {
-                    return Err(crate::BabelfontError::FilterError(format!(
-                        "Failed to convert cubic segments to quadratic splines at element index {}",
-                        el_ix
-                    )));
-                };
-                if quadsplines.len() != new_paths.len() {
-                    return Err(crate::BabelfontError::FilterError(format!(
-                        "Parallel conversion produced {} splines for {} input paths",
-                        quadsplines.len(),
-                        new_paths.len()
-                    )));
-                }
-
-                for (path_ix, spline) in quadsplines.iter().enumerate() {
-                    // spline.points is [start, offcurves..., end]
-                    let points = spline.points();
-                    for (i, point) in points.iter().enumerate() {
-                        if i == 0 {
-                            // Start point equals the previous segment endpoint.
-                        } else if i == points.len() - 1 {
-                            new_paths[path_ix]
-                                .nodes
-                                .push(Node::new_qcurve(point.x, point.y));
-                        } else {
-                            new_paths[path_ix]
-                                .nodes
-                                .push(Node::new_offcurve(point.x, point.y));
-                        }
-                    }
-                }
-
-                for (path_ix, end_point) in end_points.into_iter().enumerate() {
-                    last_points[path_ix] = end_point;
+                    new_paths[path_ix]
+                        .nodes
+                        .push(Node::new_offcurve(p1.x, p1.y));
+                    new_paths[path_ix]
+                        .nodes
+                        .push(Node::new_offcurve(p2.x, p2.y));
+                    new_paths[path_ix].nodes.push(Node::new_curve(p3.x, p3.y));
+                    last_points[path_ix] = *p3;
                 }
             }
             PathEl::ClosePath => {
@@ -164,18 +137,18 @@ fn convert_bezpath_independently(path: &BezPath) -> Result<Path, crate::Babelfon
     Ok(converted.into_iter().next().unwrap_or_default())
 }
 
-impl CubicToQuadratic {
-    /// Create a new CubicToQuadratic filter
+impl QuadraticToCubic {
+    /// Create a new QuadraticToCubic filter
     pub fn new() -> Self {
-        CubicToQuadratic
+        QuadraticToCubic
     }
 }
 
-impl FontFilter for CubicToQuadratic {
+impl FontFilter for QuadraticToCubic {
     fn apply(&self, font: &mut crate::Font) -> Result<(), crate::BabelfontError> {
         apply_interpolatable_path_filter(
             font,
-            "CubicToQuadratic",
+            "QuadraticToCubic",
             convert_bezpath_independently,
             convert_bezpaths_in_parallel,
         )
@@ -185,7 +158,7 @@ impl FontFilter for CubicToQuadratic {
     where
         Self: Sized,
     {
-        Ok(CubicToQuadratic::new())
+        Ok(QuadraticToCubic::new())
     }
 
     #[cfg(feature = "cli")]
@@ -193,9 +166,9 @@ impl FontFilter for CubicToQuadratic {
     where
         Self: Sized,
     {
-        clap::Arg::new("cubic2quadratic")
-            .long("cubic-to-quadratic")
-            .help("Convert cubic Bézier curves to quadratic Bézier curves")
+        clap::Arg::new("quadratic2cubic")
+            .long("quadratic-to-cubic")
+            .help("Convert quadratic Bézier curves to cubic Bézier curves")
             .action(clap::ArgAction::SetTrue)
     }
 }
