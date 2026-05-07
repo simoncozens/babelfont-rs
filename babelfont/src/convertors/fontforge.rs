@@ -1128,7 +1128,10 @@ impl SfdParser {
                 "Substitution2" => {
                     if let Some((subtable_name, glyphs)) = self.parse_oneline_layout(value) {
                         let Some(replacement) = glyphs.first() else {
-                            log::error!("Substitution2 has no replacement glyph for {}", glyph_name);
+                            log::error!(
+                                "Substitution2 has no replacement glyph for {}",
+                                glyph_name
+                            );
                             continue;
                         };
                         let Some(subtable) = self.gsub_lookups.find_subtable_mut(&subtable_name)
@@ -1165,12 +1168,11 @@ impl SfdParser {
                             );
                             continue;
                         };
-                        let replacement_class = fea_rs_ast::GlyphContainer::GlyphClass(
-                            fea_rs_ast::GlyphClass::new(
+                        let replacement_class =
+                            fea_rs_ast::GlyphContainer::GlyphClass(fea_rs_ast::GlyphClass::new(
                                 glyphs.iter().map(Self::glyph_container).collect(),
                                 0..0,
-                            ),
-                        );
+                            ));
                         subtable.push(fea_rs_ast::Statement::AlternateSubst(
                             fea_rs_ast::AlternateSubstStatement::new(
                                 Self::glyph_container(glyph_name),
@@ -1239,11 +1241,17 @@ impl SfdParser {
                         }
                         let right = &tokens[0];
                         let Some(vr1) = Self::parse_pos_value_record(&tokens[1..5]) else {
-                            log::error!("PairPos2 first value record is invalid for {}", glyph_name);
+                            log::error!(
+                                "PairPos2 first value record is invalid for {}",
+                                glyph_name
+                            );
                             continue;
                         };
                         let Some(vr2) = Self::parse_pos_value_record(&tokens[5..9]) else {
-                            log::error!("PairPos2 second value record is invalid for {}", glyph_name);
+                            log::error!(
+                                "PairPos2 second value record is invalid for {}",
+                                glyph_name
+                            );
                             continue;
                         };
                         let Some(subtable) = self.gpos_lookups.find_subtable_mut(&subtable_name)
