@@ -131,7 +131,7 @@ pub(crate) fn apply_interpolatable_path_filter(
                     .map(|layer_ix| &pathsets[layer_ix][path_ix])
                     .collect::<Vec<_>>();
                 let converted = convert_bezpaths_in_parallel(correlated_paths)?;
-                for (layer_ix, new_path) in layer_order.iter().copied().zip(converted.into_iter()) {
+                for (layer_ix, new_path) in layer_order.iter().copied().zip(converted) {
                     if let Some(paths) = converted_by_layer.get_mut(&layer_ix) {
                         paths.push(new_path);
                     }
