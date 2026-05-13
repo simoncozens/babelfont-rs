@@ -4,6 +4,8 @@ use crate::{
 };
 use fontdrasil::coords::DesignCoord;
 use indexmap::IndexMap;
+use itertools::Itertools as _;
+use kurbo::PathEl;
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 use typeshare::typeshare;
@@ -156,6 +158,92 @@ impl Path {
         }
         Ok(path)
     }
+
+    // We represent closed curves with an initial Bezier segment in the
+    // Glyphs.app convention: no move nodes, the path begins with two
+    // off-curves which bound a segment beginning with the last node in the path.
+    pub(crate) fn rotate_to_preferred_representation(&mut self) {
+        if !self.closed || self.nodes.is_empty() {
+            return;
+        }
+        let trailing = self
+            .nodes
+            .iter()
+            .rev()
+            .take_while(|n| n.nodetype == NodeType::OffCurve)
+            .count();
+        if trailing == 0 {
+            return;
+        }
+        let len = self.nodes.len();
+        self.nodes.rotate_left(len - trailing);
+    }
+
+    pub(crate) fn set_smooth(&mut self) {
+        let mut to_set_smooth = vec![];
+        for (prev_ix, node_ix, next_ix) in (0..self.nodes.len()).circular_tuple_windows() {
+            let node = &self.nodes[node_ix];
+            let prev_node = &self.nodes[prev_ix];
+            let next_node = &self.nodes[next_ix];
+            if node.nodetype == NodeType::Curve
+                && prev_node.nodetype == NodeType::OffCurve
+                && next_node.nodetype == NodeType::OffCurve
+            {
+                to_set_smooth.push((node_ix, is_contiguous(prev_node, node, next_node)));
+            }
+        }
+        for (node_ix, smooth) in to_set_smooth {
+            self.nodes[node_ix].smooth = smooth;
+        }
+    }
+}
+
+fn is_contiguous(prev: &Node, node: &Node, next: &Node) -> bool {
+    let v1 = kurbo::Vec2::new(node.x - prev.x, node.y - prev.y);
+    let v2 = kurbo::Vec2::new(next.x - node.x, next.y - node.y);
+    (v1.x * v2.y - v1.y * v2.x).abs() < 1e-6
+}
+
+impl From<kurbo::BezPath> for Path {
+    fn from(val: kurbo::BezPath) -> Self {
+        let mut closed = false;
+        let mut nodes = Vec::new();
+        for el in val.elements() {
+            match el {
+                PathEl::MoveTo(p) => nodes.push(Node::new_move(p.x, p.y)),
+                PathEl::LineTo(p) => nodes.push(Node::new_line(p.x, p.y)),
+                PathEl::QuadTo(p1, p2) => {
+                    nodes.push(Node::new_offcurve(p1.x, p1.y));
+                    nodes.push(Node::new_qcurve(p2.x, p2.y));
+                }
+                PathEl::CurveTo(p1, p2, p3) => {
+                    nodes.push(Node::new_offcurve(p1.x, p1.y));
+                    nodes.push(Node::new_offcurve(p2.x, p2.y));
+                    nodes.push(Node::new_curve(p3.x, p3.y));
+                }
+                PathEl::ClosePath => closed = true,
+            }
+        }
+        let mut path = Path {
+            nodes,
+            closed,
+            format_specific: FormatSpecific::default(),
+        };
+        // If path is closed drop initial move if it is redundant with the final point, otherwise convert to line
+        if path.closed && !path.nodes.is_empty() {
+            if let Some(last) = path.nodes.last().cloned() {
+                let first = &mut path.nodes[0];
+                if first.x == last.x && first.y == last.y {
+                    path.nodes.remove(0);
+                } else {
+                    first.nodetype = NodeType::Line;
+                }
+            }
+        }
+        path.set_smooth();
+        path.rotate_to_preferred_representation();
+        path
+    }
 }
 
 /// A shape in a glyph, either a component or a path
@@ -189,6 +277,12 @@ impl Shape {
         }
     }
 
+    pub(crate) fn as_path_mut(&mut self) -> Option<&mut Path> {
+        match self {
+            Shape::Component(_) => None,
+            Shape::Path(p) => Some(p),
+        }
+    }
     /// Apply a DecomposedAffine transform to the shape
     pub fn apply_transform(&self, transform: DecomposedAffine) -> Self {
         match self {
@@ -676,5 +770,23 @@ mod tests {
                 .count(),
             4
         );
+        // Check we can round-trip back to a Path
+
+        let converted = Path::from(kurbo);
+        assert_eq!(converted.nodes.len(), path.nodes.len());
+        for (ix, (a, b)) in converted.nodes.iter().zip(path.nodes.iter()).enumerate() {
+            assert_eq!(a.x, b.x, "Node {}: x mismatch: {} != {}", ix, a.x, b.x);
+            assert_eq!(a.y, b.y, "Node {}: y mismatch: {} != {}", ix, a.y, b.y);
+            assert_eq!(
+                a.nodetype, b.nodetype,
+                "Node {}: nodetype mismatch: {:?} != {:?}",
+                ix, a.nodetype, b.nodetype
+            );
+            assert_eq!(
+                a.smooth, b.smooth,
+                "Node {}: smooth mismatch: {} != {}",
+                ix, a.smooth, b.smooth
+            );
+        }
     }
 }

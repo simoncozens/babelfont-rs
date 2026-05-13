@@ -83,6 +83,8 @@ declare_filters! {
     QuadraticToCubic(quadratic2cubic) => "quadratic2cubic",
     SetDefaultLocation(setdefaultlocation) => "setdefaultlocation",
     AddMaster(addmaster) => "addmaster",
+    CleanupPaths(cleanuppaths) => "cleanuppaths",
+    MakeCompatible(makecompatible) => "makecompatible",
 }
 
 /// A trait for font filters that can be applied to a font
