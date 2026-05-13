@@ -100,11 +100,14 @@ fn main() {
         );
         std::process::exit(1);
     }
-    let output_extension = output_name.extension().unwrap().to_str().unwrap();
+    let output_extension = output_name
+        .extension()
+        .and_then(|x| x.to_str())
+        .unwrap_or("");
     if !SUPPORTED_EXTENSIONS.contains(&output_extension) {
         log::error!(
             "Output extension {:?} is not in the list of supported extensions: {}",
-            output_name.extension().unwrap(),
+            output_extension,
             SUPPORTED_EXTENSIONS.join(", ")
         );
         std::process::exit(1);
