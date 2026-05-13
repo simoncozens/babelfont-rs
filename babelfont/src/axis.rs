@@ -233,14 +233,24 @@ impl TryInto<fontdrasil::types::Axis> for &Axis {
 pub struct CrossAxisMapping {
     /// Description
     pub description: Option<String>,
-    /// Source designspace locations
-    #[typeshare(python(type = "List[Dict[str, float]]"))]
-    #[typeshare(typescript(type = "import('@simoncozens/fonttypes').DesignspaceLocation[]"))]
-    pub input: Vec<Location<DesignSpace>>,
-    /// Target designspace locations
-    #[typeshare(python(type = "List[Dict[str, float]]"))]
-    #[typeshare(typescript(type = "import('@simoncozens/fonttypes').DesignspaceLocation[]"))]
-    pub output: Vec<Location<DesignSpace>>,
+    /// Source designspace location
+    #[typeshare(python(type = "Dict[str, float]]"))]
+    #[typeshare(typescript(type = "import('@simoncozens/fonttypes').DesignspaceLocation"))]
+    #[serde(
+        default,
+        serialize_with = "crate::serde_helpers::design_location_to_map",
+        deserialize_with = "crate::serde_helpers::design_location_from_map"
+    )]
+    pub input: Location<DesignSpace>,
+    /// Target designspace location
+    #[typeshare(python(type = "Dict[str, float]]"))]
+    #[typeshare(typescript(type = "import('@simoncozens/fonttypes').DesignspaceLocation"))]
+    #[serde(
+        default,
+        serialize_with = "crate::serde_helpers::design_location_to_map",
+        deserialize_with = "crate::serde_helpers::design_location_from_map"
+    )]
+    pub output: Location<DesignSpace>,
 }
 
 #[cfg(feature = "fontra")]
