@@ -21,6 +21,7 @@ use fontir::{
 };
 use std::sync::Arc;
 
+mod avar2;
 mod color;
 mod features;
 mod global_metrics;
@@ -141,8 +142,11 @@ impl BabelfontIrSource {
             font: Arc::new(font),
             options,
         };
-        let binary = fontc::generate_font(Box::new(source.clone()), Options::default())
+        let mut binary = fontc::generate_font(Box::new(source.clone()), Options::default())
             .map_err(improve_ir_error)?;
+        if !source.font.cross_axis_mappings.is_empty() {
+            binary = avar2::insert_avar2_table(&binary, &source.font)?;
+        }
         if source.options.produce_varc_table {
             insert_varc_table(&binary, &source.font)
         } else {
