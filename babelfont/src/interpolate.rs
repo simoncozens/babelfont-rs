@@ -1,11 +1,12 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
-use crate::{common::decomposition::DecomposedAffine, BabelfontError, Layer, Path, Shape};
+use crate::{common::decomposition::DecomposedAffine, BabelfontError, Glyph, Layer, Path, Shape};
 use fontdrasil::{
     coords::{DesignSpace, Location, NormalizedSpace},
     types::Axes,
     variations::{RoundingBehaviour, VariationModel},
 };
+use thiserror::Error;
 
 pub(crate) fn interpolate_layer(
     glyphname: &str,
@@ -258,5 +259,123 @@ impl Path {
         }
         new_path.closed = self.closed;
         new_path
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum CompatibilityError {
+    #[error("Shape type mismatch between layer {layer1} ({layer1_shapes}) and layer {layer2} ({layer2_shapes})")]
+    ShapeType {
+        layer1: usize,
+        layer1_shapes: String,
+        layer2: usize,
+        layer2_shapes: String,
+    },
+    #[error("Path signature mismatch between layer {layer1} and layer {layer2} at shape index {shape_index}")]
+    PathSignature {
+        layer1: usize,
+        layer2: usize,
+        shape_index: usize,
+    },
+    #[error("Component reference mismatch between layer {layer1} (reference '{reference1}') and layer {layer2} (reference '{reference2}') at shape index {shape_index}")]
+    ComponentReference {
+        layer1: usize,
+        layer2: usize,
+        shape_index: usize,
+        reference1: String,
+        reference2: String,
+    },
+}
+impl Glyph {
+    /// Check if this glyph is interpolation compatible;
+    pub fn compatibility_errors(&self) -> Vec<CompatibilityError> {
+        let shapes_by_layer = self
+            .layers
+            .iter()
+            .enumerate()
+            .filter(|(_ix, l)| l.should_interpolate())
+            .map(|(ix, l)| (ix, &l.shapes))
+            .collect::<BTreeMap<_, _>>();
+        // Check shape types are consistent
+        let mut shape_types = shapes_by_layer.iter().map(|(ix, shapes)| {
+            (
+                ix,
+                shapes
+                    .iter()
+                    .map(|s| {
+                        if matches!(s, Shape::Component(_)) {
+                            "C"
+                        } else {
+                            "P"
+                        }
+                    })
+                    .collect::<Vec<_>>(),
+            )
+        });
+        let first = shape_types.next();
+        let mut errors = vec![];
+        for (ix, types) in shape_types {
+            if let Some((first_ix, first_types)) = &first {
+                let first_sig = first_types
+                    .iter()
+                    .map(|t| t.to_string())
+                    .collect::<Vec<_>>()
+                    .join("");
+                let this_layer_sig = types
+                    .iter()
+                    .map(|t| t.to_string())
+                    .collect::<Vec<_>>()
+                    .join("");
+                if first_sig != this_layer_sig {
+                    errors.push(CompatibilityError::ShapeType {
+                        layer1: **first_ix,
+                        layer1_shapes: first_sig,
+                        layer2: *ix,
+                        layer2_shapes: this_layer_sig,
+                    });
+                }
+            }
+        }
+        if !errors.is_empty() {
+            return errors; // No point checking further if shape types don't match
+        }
+        // Compare path signatures for paths, and component references for components
+        let first = shapes_by_layer.iter().next();
+        for (ix, shapes) in shapes_by_layer.iter().skip(1) {
+            for (shape_ix, shape) in shapes.iter().enumerate() {
+                match shape {
+                    Shape::Path(p) => {
+                        let sig = p.signature();
+                        if let Some((first_ix, first_shapes)) = &first {
+                            if let Shape::Path(first_p) = &first_shapes[shape_ix] {
+                                if sig != first_p.signature() {
+                                    errors.push(CompatibilityError::PathSignature {
+                                        layer1: **first_ix,
+                                        layer2: *ix,
+                                        shape_index: shape_ix,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    Shape::Component(c) => {
+                        if let Some((first_ix, first_shapes)) = &first {
+                            if let Shape::Component(first_c) = &first_shapes[shape_ix] {
+                                if c.reference != first_c.reference {
+                                    errors.push(CompatibilityError::ComponentReference {
+                                        layer1: **first_ix,
+                                        layer2: *ix,
+                                        shape_index: shape_ix,
+                                        reference1: first_c.reference.to_string(),
+                                        reference2: c.reference.to_string(),
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        errors
     }
 }

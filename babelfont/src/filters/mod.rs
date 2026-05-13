@@ -85,6 +85,7 @@ declare_filters! {
     AddMaster(addmaster) => "addmaster",
     CleanupPaths(cleanuppaths) => "cleanuppaths",
     MakeCompatible(makecompatible) => "makecompatible",
+    RemoveExtraneousLayers(removeextraneouslayers) => "removeextraneouslayers",
 }
 
 /// A trait for font filters that can be applied to a font
