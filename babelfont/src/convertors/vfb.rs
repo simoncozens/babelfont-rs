@@ -9,8 +9,10 @@ use uuid::Uuid;
 use vfbreader::{read_vfb, GlyphEntry, Node as VFBNode, Vfb, VfbEntry};
 
 use crate::{
-    common::decomposition::DecomposedAffine, features::PossiblyAutomaticCode, Axis, BabelfontError,
-    Features, Font, FormatSpecific, Glyph, Layer, LayerType, Master, OutlinePen as _, Shape,
+    common::{decomposition::DecomposedAffine, Node, NodeType},
+    features::PossiblyAutomaticCode,
+    Axis, BabelfontError, Features, Font, FormatSpecific, Glyph, Layer, LayerType, Master, Path,
+    Shape,
 };
 /// VFB convertor
 pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
@@ -174,12 +176,14 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
             VfbEntry::PrimaryInstanceLocations(_items) => {}            // => todo!(),
             VfbEntry::PrimaryInstances(_raw_data) => {}                 // => todo!(),
             VfbEntry::BlockMMFontInfoEnd(_raw_data) => {}
+            VfbEntry::FlVersion(_raw_data) => {}
+            VfbEntry::FontOptions(_raw_data) => {}
             VfbEntry::GlobalGuides(_guides) => {} // => todo!(),
             VfbEntry::GlobalGuideProperties(_raw_data) => {} // => todo!(),
             VfbEntry::GlobalMask(_raw_data) => {} // => todo!(),
-            VfbEntry::OpenTypeExportOptions(_raw_data) => {} // => todo!(),
+            // VfbEntry::OpenTypeExportOptions(_raw_data) => {} // => todo!(),
             VfbEntry::ExportOptions(_export_options) => {} // => todo!(),
-            VfbEntry::MappingMode(_raw_data) => {} // => todo!(),
+            VfbEntry::MappingMode(_raw_data) => {}         // => todo!(),
             VfbEntry::BlockMMKerningStart(_raw_data) => {}
             VfbEntry::MMKernPair(_raw_data) => {} // => todo!(),
             VfbEntry::BlockMMKerningEnd(_raw_data) => {}
@@ -341,94 +345,7 @@ fn load_glyph(font: &mut Font, items: Vec<GlyphEntry>) -> Result<(), BabelfontEr
             GlyphEntry::Outlines(nodes) => {
                 // For each layer, build the path
                 for (index, layer) in glyph.layers.iter_mut().enumerate() {
-                    let mut pathbuilder = crate::shape::PathBuilder::new();
-                    for node in nodes.iter() {
-                        match node {
-                            VFBNode::Move { coords, flags: _ } => {
-                                // close any open path
-                                pathbuilder.close();
-                                let these_coords = coords.get(index).ok_or_else(|| {
-                                    BabelfontError::GlyphNotInterpolatable {
-                                        glyph: glyph.name.clone().into(),
-                                        reason: "Not enough coordinates for move node".to_string(),
-                                    }
-                                })?;
-                                pathbuilder.move_to(these_coords.0 as f32, these_coords.1 as f32);
-                            }
-                            VFBNode::Line { coords, flags: _ } => {
-                                let these_coords = coords.get(index).ok_or_else(|| {
-                                    BabelfontError::GlyphNotInterpolatable {
-                                        glyph: glyph.name.clone().into(),
-                                        reason: "Not enough coordinates for line node".to_string(),
-                                    }
-                                })?;
-                                pathbuilder.line_to(these_coords.0 as f32, these_coords.1 as f32);
-                            }
-                            VFBNode::Curve {
-                                coords,
-                                c1_coords,
-                                c2_coords,
-                                flags: _,
-                            } => {
-                                let these_coords = coords.get(index).ok_or_else(|| {
-                                    BabelfontError::GlyphNotInterpolatable {
-                                        glyph: glyph.name.clone().into(),
-                                        reason: "Not enough coordinates for curve node".to_string(),
-                                    }
-                                })?;
-                                let these_c1_coords = c1_coords.get(index).ok_or_else(|| {
-                                    BabelfontError::GlyphNotInterpolatable {
-                                        glyph: glyph.name.clone().into(),
-                                        reason: "Not enough c1 coordinates for curve node"
-                                            .to_string(),
-                                    }
-                                })?;
-                                let these_c2_coords = c2_coords.get(index).ok_or_else(|| {
-                                    BabelfontError::GlyphNotInterpolatable {
-                                        glyph: glyph.name.clone().into(),
-                                        reason: "Not enough c2 coordinates for curve node"
-                                            .to_string(),
-                                    }
-                                })?;
-                                pathbuilder.curve_to(
-                                    these_c1_coords.0 as f32,
-                                    these_c1_coords.1 as f32,
-                                    these_c2_coords.0 as f32,
-                                    these_c2_coords.1 as f32,
-                                    these_coords.0 as f32,
-                                    these_coords.1 as f32,
-                                );
-                            }
-                            VFBNode::QCurve {
-                                coords,
-                                c1_coords,
-                                flags: _,
-                            } => {
-                                let these_coords = coords.get(index).ok_or_else(|| {
-                                    BabelfontError::GlyphNotInterpolatable {
-                                        glyph: glyph.name.clone().into(),
-                                        reason: "Not enough coordinates for qcurve node"
-                                            .to_string(),
-                                    }
-                                })?;
-                                let these_c1_coords = c1_coords.get(index).ok_or_else(|| {
-                                    BabelfontError::GlyphNotInterpolatable {
-                                        glyph: glyph.name.clone().into(),
-                                        reason: "Not enough c1 coordinates for qcurve node"
-                                            .to_string(),
-                                    }
-                                })?;
-                                pathbuilder.quad_to(
-                                    these_c1_coords.0 as f32,
-                                    these_c1_coords.1 as f32,
-                                    these_coords.0 as f32,
-                                    these_coords.1 as f32,
-                                );
-                            }
-                        }
-                    }
-                    pathbuilder.close();
-                    let paths = pathbuilder.build();
+                    let paths = build_vfb_paths_for_layer(&glyph.name, &nodes, index)?;
                     layer.shapes.extend(paths.into_iter().map(Shape::Path));
                 }
             }
@@ -438,4 +355,120 @@ fn load_glyph(font: &mut Font, items: Vec<GlyphEntry>) -> Result<(), BabelfontEr
     }
     font.glyphs.push(glyph);
     Ok(())
+}
+
+fn point_for_layer(
+    glyph_name: &str,
+    kind: &str,
+    coords: &[(i32, i32)],
+    layer_index: usize,
+) -> Result<(f64, f64), BabelfontError> {
+    let these_coords = coords
+        .get(layer_index)
+        .ok_or_else(|| BabelfontError::GlyphNotInterpolatable {
+            glyph: glyph_name.into(),
+            reason: format!("Not enough coordinates for {kind} node"),
+        })?;
+    Ok((these_coords.0 as f64, these_coords.1 as f64))
+}
+
+fn flush_vfb_contour(contours: &mut Vec<Path>, contour: &mut Path, path_is_open: bool) {
+    if contour.nodes.is_empty() {
+        return;
+    }
+
+    if !path_is_open {
+        let last_nodetype = contour.nodes.last().map(|n| n.nodetype);
+        if matches!(
+            last_nodetype,
+            Some(NodeType::Line | NodeType::Curve | NodeType::QCurve)
+        ) {
+            let last = contour.nodes.last().cloned();
+            let first = contour.nodes.first().cloned();
+            if let (Some(last), Some(first)) = (last, first) {
+                if last.x == first.x
+                    && last.y == first.y
+                    && !matches!(last.nodetype, NodeType::Line | NodeType::QCurve)
+                {
+                    let replacement = contour.nodes.pop().unwrap_or_default();
+                    if let Some(first_node) = contour.nodes.first_mut() {
+                        *first_node = replacement;
+                    }
+                } else if let Some(first_node) = contour.nodes.first_mut() {
+                    first_node.nodetype = NodeType::Line;
+                }
+            }
+        } else if matches!(last_nodetype, Some(NodeType::OffCurve))
+            && let Some(first_node) = contour.nodes.first_mut()
+        {
+            first_node.nodetype = NodeType::QCurve;
+        }
+    }
+
+    contour.closed = !path_is_open;
+    contours.push(std::mem::take(contour));
+}
+
+fn build_vfb_paths_for_layer(
+    glyph_name: &str,
+    nodes: &[VFBNode],
+    layer_index: usize,
+) -> Result<Vec<Path>, BabelfontError> {
+    let mut contours = Vec::new();
+    let mut contour = Path::default();
+    let mut path_is_open = false;
+    let mut in_qcurve = false;
+
+    for node in nodes {
+        match node {
+            VFBNode::Move { coords, flags } => {
+                flush_vfb_contour(&mut contours, &mut contour, path_is_open);
+                let (x, y) = point_for_layer(glyph_name, "move", coords, layer_index)?;
+                let mut move_node = Node::new_move(x, y);
+                move_node.smooth = (*flags & 1) != 0;
+                contour.nodes.push(move_node);
+                path_is_open = (*flags & 8) != 0;
+                in_qcurve = false;
+            }
+            VFBNode::Line { coords, flags } => {
+                let (x, y) = point_for_layer(glyph_name, "line", coords, layer_index)?;
+                if in_qcurve {
+                    let mut qcurve_node = Node::new_qcurve(x, y);
+                    qcurve_node.smooth = (*flags & 1) != 0;
+                    contour.nodes.push(qcurve_node);
+                    in_qcurve = false;
+                } else {
+                    let mut line_node = Node::new_line(x, y);
+                    line_node.smooth = (*flags & 1) != 0;
+                    contour.nodes.push(line_node);
+                }
+            }
+            VFBNode::Curve {
+                coords,
+                c1_coords,
+                c2_coords,
+                flags,
+            } => {
+                let (x, y) = point_for_layer(glyph_name, "curve", coords, layer_index)?;
+                let (c1x, c1y) = point_for_layer(glyph_name, "curve c1", c1_coords, layer_index)?;
+                let (c2x, c2y) = point_for_layer(glyph_name, "curve c2", c2_coords, layer_index)?;
+                contour.nodes.push(Node::new_offcurve(c1x, c1y));
+                contour.nodes.push(Node::new_offcurve(c2x, c2y));
+                let mut curve_node = Node::new_curve(x, y);
+                curve_node.smooth = (*flags & 1) != 0;
+                contour.nodes.push(curve_node);
+                in_qcurve = false;
+            }
+            VFBNode::QCurve { coords, flags: _ , .. } => {
+                // In VFB data these are off-curves; they are resolved into qcurves when a
+                // following line arrives, or at contour flush time.
+                let (x, y) = point_for_layer(glyph_name, "qcurve", coords, layer_index)?;
+                contour.nodes.push(Node::new_offcurve(x, y));
+                in_qcurve = true;
+            }
+        }
+    }
+
+    flush_vfb_contour(&mut contours, &mut contour, path_is_open);
+    Ok(contours)
 }
