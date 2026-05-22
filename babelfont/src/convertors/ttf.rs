@@ -113,6 +113,8 @@ fn load_names(fontref: &skrifa::FontRef, font: &mut Font) -> Result<(), Babelfon
             *record = name_id_to_i18n(fontref, name_id);
         }
     }
+
+    font.custom_ot_values.os2_vendor_id = Some(fontref.os2()?.ach_vend_id());
     Ok(())
 }
 
@@ -216,6 +218,46 @@ fn load_metrics(
     if let Some(x_height) = skrifa_metrics.x_height {
         metrics.insert(MetricType::XHeight, x_height as i32);
     }
+    if let Some(cap_height) = skrifa_metrics.cap_height {
+        metrics.insert(MetricType::CapHeight, cap_height as i32);
+    }
+    if let Some(strikeout) = skrifa_metrics.strikeout {
+        metrics.insert(MetricType::StrikeoutPosition, strikeout.offset as i32);
+        metrics.insert(MetricType::StrikeoutSize, strikeout.thickness as i32);
+    }
+    if let Some(underline) = skrifa_metrics.underline {
+        metrics.insert(MetricType::UnderlinePosition, underline.offset as i32);
+        metrics.insert(MetricType::UnderlineThickness, underline.thickness as i32);
+    }
+    // Some things skrifa doesn't know yet
+    macro_rules! copy_os2_metric {
+        ($metric_type:ident, $method:ident) => {
+            metrics.insert(MetricType::$metric_type, fontref.os2()?.$method() as i32);
+        };
+    }
+    copy_os2_metric!(SuperscriptXSize, y_superscript_x_size);
+    copy_os2_metric!(SuperscriptYSize, y_superscript_y_size);
+    copy_os2_metric!(SuperscriptXOffset, y_superscript_x_offset);
+    copy_os2_metric!(SuperscriptYOffset, y_superscript_y_offset);
+    copy_os2_metric!(SubscriptXSize, y_subscript_x_size);
+    copy_os2_metric!(SubscriptYSize, y_subscript_y_size);
+    copy_os2_metric!(SubscriptXOffset, y_subscript_x_offset);
+    copy_os2_metric!(SubscriptYOffset, y_subscript_y_offset);
+    copy_os2_metric!(WinAscent, us_win_ascent);
+    copy_os2_metric!(WinDescent, us_win_descent);
+    copy_os2_metric!(TypoLineGap, s_typo_line_gap);
+    copy_os2_metric!(TypoAscender, s_typo_ascender);
+    copy_os2_metric!(TypoDescender, s_typo_descender);
+
+    metrics.insert(
+        MetricType::HheaAscender,
+        fontref.hhea()?.ascender().to_i16() as i32,
+    );
+    metrics.insert(
+        MetricType::HheaDescender,
+        fontref.hhea()?.descender().to_i16() as i32,
+    );
+
     metrics.insert(
         MetricType::ItalicAngle,
         fontref.post()?.italic_angle().to_f32() as i32,
