@@ -3,49 +3,65 @@ use fontdrasil::coords::{DesignCoord, DesignLocation};
 
 mod curve_filter_common;
 
-/// Macro to declare filters with less boilerplate
+/// Macro to declare filters with less boilerplate, organized into named groups.
 ///
-/// Usage: `declare_filters! { TypeName(module_name) => "cli_name", ... }`
+/// Usage:
+/// ```ignore
+/// declare_filters! {
+///     group "Group heading" {
+///         TypeName(module_name) => "cli_name",
+///         ...
+///     }
+///     ...
+/// }
+/// ```
 macro_rules! declare_filters {
-    ($($(#[$meta:meta])* $type:ident($module:ident) => $name:literal),* $(,)?) => {
+    ($(
+        group $group_name:literal {
+            $($(#[$meta:meta])* $type:ident($module:ident) => $name:literal),* $(,)?
+        }
+    )*) => {
         // Import modules
-        $(
+        $($(
             $(#[$meta])*
             mod $module;
-        )*
+        )*)*
 
         // Re-export types
-        $(
+        $($(
             $(#[$meta])*
             pub use $module::$type;
-        )*
+        )*)*
 
-        // Generate filter_group function
+        // Generate filter_group function — each group gets its own help heading,
+        // and all filters are collected into a single "filters" ArgGroup.
         #[cfg(feature = "cli")]
-        #[doc="Add filter arguments to a clap Command"]
+        #[doc="Add filter arguments to a clap Command, organized under named headings"]
         pub fn filter_group(mut command: clap::Command) -> clap::Command {
-            command = command.next_help_heading("Font filters");
-            let mut ids = Vec::new();
+            let mut all_ids = Vec::new();
             $(
-                $(#[$meta])*
-                {
-                    let arg = $type::arg();
-                    ids.push(arg.get_id().clone());
-                    command = command.arg(arg);
-                }
+                command = command.next_help_heading($group_name);
+                $(
+                    $(#[$meta])*
+                    {
+                        let arg = $type::arg();
+                        all_ids.push(arg.get_id().clone());
+                        command = command.arg(arg);
+                    }
+                )*
             )*
-            command.group(clap::ArgGroup::new("filters").args(ids).multiple(true))
+            command.group(clap::ArgGroup::new("filters").args(all_ids).multiple(true))
         }
 
-        // Generate cli_to_filter function
+        // Generate cli_to_filter function — flattens all groups into one match
         #[cfg(feature = "cli")]
         #[doc="Convert a CLI filter name and argument to a FontFilter instance"]
         pub fn cli_to_filter(name: &str, arg: &str) -> Result<Box<dyn FontFilter>, crate::BabelfontError> {
             Ok(match name {
-                $(
+                $($(
                     $(#[$meta])*
                     $name => Box::new($type::from_str(arg)?),
-                )*
+                )*)*
                 _ => {
                     return Err(crate::BabelfontError::FilterError(format!(
                         "Unknown filter: {}",
@@ -57,35 +73,46 @@ macro_rules! declare_filters {
     };
 }
 
-// Declare all filters in one place
+// Declare all filters, organized into groups that appear as separate sections in --help output.
 declare_filters! {
-    DropKerning(dropkerning) => "dropkerning",
-    DropGuides(dropguides) => "dropguides",
-    DropFeatures(dropfeatures) => "dropfeatures",
-    DropInstances(dropinstances) => "dropinstances",
-    DropVariations(dropvariations) => "dropvariations",
-    DropAxis(dropaxis) => "dropaxis",
-    DropSparseMasters(dropsparsemasters) => "dropsparsemasters",
-    ResolveIncludes(resolveincludes) => "resolveincludes",
-    RetainGlyphs(retainglyphs) => "retainglyphs",
-    DecomposeComponentReferences(decomposecomponentreferences) => "decomposecomponents",
-    RewriteSmartAxes(rewritesmartaxes) => "rewritesmartaxes",
-    ScaleUpem(scaleupem) => "scaleupem",
-    SubsetLayout(subsetlayout) => "subsetlayout",
-    #[cfg(feature = "glyphs")]
-    GlyphsData(glyphsdata) => "glyphsdata",
-    DropIncompatiblePaths(dropincompatiblepaths) => "dropincompatiblepaths",
-    GlyphsNumberValue(glyphsnumbervalue) => "glyphsnumbervalue",
-    GlyphsStylisticSetLabel(glyphsstylisticsetlabel) => "glyphsstylisticsetlabel",
-    GlyphsBracketLayers(glyphsbracketlayers) => "glyphsbracketlayers",
-    RenameGlyphs(renameglyphs) => "renameglyphs",
-    CubicToQuadratic(cubic2quadratic) => "cubic2quadratic",
-    QuadraticToCubic(quadratic2cubic) => "quadratic2cubic",
-    SetDefaultLocation(setdefaultlocation) => "setdefaultlocation",
-    AddMaster(addmaster) => "addmaster",
-    CleanupPaths(cleanuppaths) => "cleanuppaths",
-    MakeCompatible(makecompatible) => "makecompatible",
-    RemoveExtraneousLayers(removeextraneouslayers) => "removeextraneouslayers",
+    group "Filters for subsetting fonts" {
+        DropKerning(dropkerning) => "dropkerning",
+        DropGuides(dropguides) => "dropguides",
+        DropFeatures(dropfeatures) => "dropfeatures",
+        DropInstances(dropinstances) => "dropinstances",
+        DropVariations(dropvariations) => "dropvariations",
+        DropAxis(dropaxis) => "dropaxis",
+        DropSparseMasters(dropsparsemasters) => "dropsparsemasters",
+        DropIncompatiblePaths(dropincompatiblepaths) => "dropincompatiblepaths",
+        RetainGlyphs(retainglyphs) => "retainglyphs",
+    }
+    group "Filters for manipulating outlines" {
+        DecomposeComponentReferences(decomposecomponentreferences) => "decomposecomponents",
+        CubicToQuadratic(cubic2quadratic) => "cubic2quadratic",
+        QuadraticToCubic(quadratic2cubic) => "quadratic2cubic",
+        CleanupPaths(cleanuppaths) => "cleanuppaths",
+        MakeCompatible(makecompatible) => "makecompatible",
+    }
+    group "Filters for Glyphs font sources" {
+        #[cfg(feature = "glyphs")]
+        GlyphsData(glyphsdata) => "glyphsdata",
+        GlyphsNumberValue(glyphsnumbervalue) => "glyphsnumbervalue",
+        GlyphsStylisticSetLabel(glyphsstylisticsetlabel) => "glyphsstylisticsetlabel",
+        GlyphsBracketLayers(glyphsbracketlayers) => "glyphsbracketlayers",
+    }
+    group "Filters for manipulating feature code" {
+        ResolveIncludes(resolveincludes) => "resolveincludes",
+        SubsetLayout(subsetlayout) => "subsetlayout",
+        MoveKerningFromFeatures(movekerningfromfeatures) => "movekerningfromfeatures",
+    }
+    group "General font filters" {
+        RewriteSmartAxes(rewritesmartaxes) => "rewritesmartaxes",
+        ScaleUpem(scaleupem) => "scaleupem",
+        RenameGlyphs(renameglyphs) => "renameglyphs",
+        SetDefaultLocation(setdefaultlocation) => "setdefaultlocation",
+        AddMaster(addmaster) => "addmaster",
+        RemoveExtraneousLayers(removeextraneouslayers) => "removeextraneouslayers",
+    }
 }
 
 /// A trait for font filters that can be applied to a font
