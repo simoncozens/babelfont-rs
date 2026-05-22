@@ -46,7 +46,7 @@ impl FontFilter for DropAxis {
             // and are non-default on the dropped axis
             glyph.layers.retain(|layer| {
                 let mut keep = true;
-                if let LayerType::DefaultForMaster(ref master_id) = &layer.master {
+                if let LayerType::DefaultForMaster(master_id) = &layer.master {
                     keep = !droppable_master_ids.iter().any(|m| m == master_id)
                 }
                 if let Some(loc) = &layer.location {

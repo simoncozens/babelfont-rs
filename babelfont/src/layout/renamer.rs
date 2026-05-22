@@ -18,23 +18,23 @@ impl GlyphRenamerVisitor {
 
     fn visit_glyph_container(&self, gc: &mut GlyphContainer) {
         match gc {
-            GlyphContainer::GlyphName(ref mut glyph_name) => {
+            GlyphContainer::GlyphName(glyph_name) => {
                 *glyph_name = GlyphName::new(&self.rename(&glyph_name.name));
             }
             GlyphContainer::GlyphClassName(_) => {
                 // Keep it
             }
-            GlyphContainer::GlyphClass(ref mut glyph_class) => {
+            GlyphContainer::GlyphClass(glyph_class) => {
                 // Visit recursively
                 for gc in glyph_class.glyphs.iter_mut() {
                     self.visit_glyph_container(gc);
                 }
             }
-            GlyphContainer::GlyphNameOrRange(ref mut name) => {
+            GlyphContainer::GlyphNameOrRange(name) => {
                 // I'm just going to treat it as a glyph name for now
                 *name = self.rename(name);
             }
-            GlyphContainer::GlyphRange(ref mut range) => {
+            GlyphContainer::GlyphRange(range) => {
                 range.start = self.rename(&range.start);
                 range.end = self.rename(&range.end);
             }
