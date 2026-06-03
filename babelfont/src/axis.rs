@@ -10,6 +10,7 @@ use typeshare::typeshare;
 
 /// An axis in a variable font
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "reactive", derive(reactive_stores::Store))]
 #[typeshare]
 pub struct Axis {
     /// Name of the axis

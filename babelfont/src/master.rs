@@ -14,6 +14,7 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[typeshare]
+#[cfg_attr(feature = "reactive", derive(reactive_stores::Store))]
 /// A master/source font in a design space
 pub struct Master {
     /// Name of the master

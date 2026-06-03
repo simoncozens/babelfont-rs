@@ -33,6 +33,7 @@ impl PossiblyAutomaticCode {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "reactive", derive(reactive_stores::Store))]
 #[typeshare]
 /// A representation of OpenType features, classes, and prefixes.
 pub struct Features {

@@ -20,6 +20,7 @@ pub enum StyleMapStyle {
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 #[typeshare]
+#[cfg_attr(feature = "reactive", derive(reactive_stores::Store))]
 /// Name table values for a font or individual master
 pub struct Names {
     #[serde(default, skip_serializing_if = "I18NDictionary::is_empty")]

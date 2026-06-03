@@ -5,6 +5,7 @@ use typeshare::typeshare;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[typeshare]
+#[cfg_attr(feature = "reactive", derive(reactive_stores::Store))]
 /// A font instance
 pub struct Instance {
     /// Unique identifier for the instance

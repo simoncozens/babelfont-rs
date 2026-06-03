@@ -1,7 +1,7 @@
 [package]
 name = "babelfont"
 version = "0.2.0-pre"
-edition = "2024"
+edition = "2021"
 authors = ["Simon Cozens <simon@simon-cozens.org>"]
 license = "MIT OR Apache-2.0"
 description = "A universal font format converter and processor"
@@ -49,6 +49,7 @@ cli = [
 ]
 rayon = ["norad/rayon"]
 types = ["dep:typeshare"]
+reactive = ["dep:reactive_stores"]
 
 [dependencies]
 chrono = { version = "0.4.3", features = ["serde"] }
@@ -80,6 +81,9 @@ vfbreader = { git = "https://github.com/simoncozens/vfbLib-rust", optional = tru
 skrifa = { workspace = true, optional = true }
 sr-aef = { version = "0.1.0", path = "../sr-aef" }
 itertools = "0.14.0"
+unicode-normalization = "0.1.25"
+reactive_stores = { version = "0.4.3", optional = true }
+
 [dev-dependencies]
 pretty_assertions = "1.4.1"
 rstest = "0.26.1"

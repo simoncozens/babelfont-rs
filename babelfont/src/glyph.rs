@@ -6,10 +6,11 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
-use std::ops::{Deref, DerefMut};
+use std::ops::{Deref, DerefMut, Index, IndexMut};
 use typeshare::typeshare;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "reactive", derive(reactive_stores::Store))]
 /// A list of glyphs in the font
 pub struct GlyphList(pub Vec<Glyph>);
 impl GlyphList {
@@ -47,6 +48,26 @@ impl DerefMut for GlyphList {
         &mut self.0
     }
 }
+impl Index<usize> for GlyphList {
+    type Output = Glyph;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.0[index]
+    }
+}
+
+impl IndexMut<usize> for GlyphList {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.0[index]
+    }
+}
+
+#[cfg(feature = "reactive")]
+impl reactive_stores::Len for GlyphList {
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 #[typeshare]
@@ -79,6 +100,7 @@ impl From<&GlyphCategory> for Option<String> {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[typeshare]
+#[cfg_attr(feature = "reactive", derive(reactive_stores::Store))]
 /// A glyph in the font
 pub struct Glyph {
     /// The name of the glyph

@@ -9,6 +9,7 @@ pub(crate) static DFLT: &str = "dflt";
 #[derive(Default, Clone, Serialize, Deserialize, PartialEq)]
 #[typeshare]
 #[typeshare(serialized_as = "HashMap<String, String>")]
+#[cfg_attr(feature = "reactive", derive(reactive_stores::Store))]
 pub struct I18NDictionary(pub IndexMap<String, String>);
 
 impl I18NDictionary {

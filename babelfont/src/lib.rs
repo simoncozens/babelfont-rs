@@ -177,6 +177,13 @@ pub use crate::{
     names::Names,
     shape::{Component, OutlinePen, Path, PathBuilder, Shape},
 };
+#[cfg(feature = "reactive")]
+pub use crate::{
+    font::FontStoreFields,
+    glyph::{GlyphListStoreFields, GlyphStoreFields},
+    layer::LayerStoreFields,
+    master::MasterStoreFields,
+};
 pub use fontdrasil::coords::{
     DesignCoord, DesignLocation, NormalizedCoord, NormalizedLocation, UserCoord, UserLocation,
 };

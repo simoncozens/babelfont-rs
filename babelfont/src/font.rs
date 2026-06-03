@@ -22,6 +22,7 @@ use typeshare::typeshare;
 extern crate serde_json_path_to_error as serde_json;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "reactive", derive(reactive_stores::Store))]
 #[typeshare]
 /// A representation of a font source file
 pub struct Font {
@@ -41,9 +42,11 @@ pub struct Font {
     pub cross_axis_mappings: Vec<CrossAxisMapping>,
     /// A list of named/static instances
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "reactive", store(key: String = |row| row.id.clone()))]
     pub instances: Vec<Instance>,
     /// A list of the font's masters
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "reactive", store(key: String = |row| row.id.clone()))]
     pub masters: Vec<Master>,
     /// A list of the font's glyphs
     #[typeshare(serialized_as = "Vec<Glyph>")]

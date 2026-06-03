@@ -13,7 +13,7 @@ use kurbo::Shape as KurboShape;
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(tag = "type", content = "master")]
 #[typeshare]
 /// The type of a layer in relation to masters
@@ -34,6 +34,7 @@ impl LayerType {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[typeshare]
+#[cfg_attr(feature = "reactive", derive(reactive_stores::Store))]
 /// A layer of a glyph in a font
 pub struct Layer {
     /// The advance width of the layer
