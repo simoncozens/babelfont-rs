@@ -153,7 +153,7 @@ impl Path {
                 _ => return Err(BabelfontError::BadPath),
             }
         }
-        if self.closed {
+        if self.closed && path.elements().len() > 0 {
             path.close_path()
         }
         Ok(path)
@@ -270,10 +270,19 @@ impl Shape {
         matches!(self, Shape::Path(_))
     }
 
-    pub(crate) fn as_path(&self) -> Option<&Path> {
+    /// If this shape is a path, return it. Otherwise, return None.
+    pub fn as_path(&self) -> Option<&Path> {
         match self {
             Shape::Component(_) => None,
             Shape::Path(p) => Some(p),
+        }
+    }
+
+    /// If this shape is a component, return it. Otherwise, return None.
+    pub fn as_component(&self) -> Option<&Component> {
+        match self {
+            Shape::Component(c) => Some(c),
+            Shape::Path(_) => None,
         }
     }
 

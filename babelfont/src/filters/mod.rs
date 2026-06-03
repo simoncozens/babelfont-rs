@@ -92,6 +92,7 @@ declare_filters! {
         QuadraticToCubic(quadratic2cubic) => "quadratic2cubic",
         CleanupPaths(cleanuppaths) => "cleanuppaths",
         MakeCompatible(makecompatible) => "makecompatible",
+        Recompose(recomposition) => "recompose",
     }
     group "Filters for Glyphs font sources" {
         #[cfg(feature = "glyphs")]
