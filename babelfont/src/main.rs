@@ -51,7 +51,10 @@ fn main() {
                 .long("verbosity")
                 .help("Set the level of verbosity")
                 .action(clap::ArgAction::Count),
-        )
+        );
+
+    let command = command.next_help_heading("TTF Compilation Options");
+    let command = command
         .arg(
             clap::Arg::new("no_production_names")
                 .long("no-production-names")
