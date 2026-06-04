@@ -120,6 +120,7 @@ pub struct Glyph {
     ///
     /// These include background layers, design-only layers, etc. as well as
     /// the main master and location-specific layers.
+    #[cfg_attr(feature = "reactive", store(key: Option<String> = |l| l.id.clone()))]
     pub layers: Vec<Layer>,
     #[serde(default = "default_true", skip_serializing_if = "is_true")]
     /// Whether the glyph is exported
