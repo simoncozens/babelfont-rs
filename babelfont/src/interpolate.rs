@@ -13,6 +13,7 @@ pub(crate) fn interpolate_layer(
     layers_locations: &[(Location<DesignSpace>, &Layer)],
     axes: &Axes,
     target_location: &Location<NormalizedSpace>,
+    extrapolate: bool,
 ) -> Result<Layer, BabelfontError> {
     let mut new_layer = Layer::default();
     let locations_in_order = layers_locations
@@ -22,7 +23,11 @@ pub(crate) fn interpolate_layer(
     let locations: HashSet<Location<NormalizedSpace>> =
         locations_in_order.iter().cloned().collect();
 
-    let model = VariationModel::new(locations, axes.axis_order());
+    let model = if extrapolate {
+        VariationModel::new_extrapolating(locations, axes.axis_order())
+    } else {
+        VariationModel::new(locations, axes.axis_order())
+    };
     // Interpolate shapes
     let first_layer = layers_locations
         .first()

@@ -2254,6 +2254,7 @@ dependencies = [
  "fea-rs-ast",
  "fontdrasil 0.4.0 (git+https://github.com/googlefonts/fontc?rev=3518040e)",
  "indexmap 2.14.0",
+ "read-fonts 0.39.1",
  "serde",
  "serde_json",
  "skrifa",
