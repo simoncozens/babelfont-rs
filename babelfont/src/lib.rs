@@ -179,6 +179,7 @@ pub use crate::{
 };
 #[cfg(feature = "reactive")]
 pub use crate::{
+    axis::AxisStoreFields,
     font::FontStoreFields,
     glyph::{GlyphListStoreFields, GlyphStoreFields},
     layer::LayerStoreFields,

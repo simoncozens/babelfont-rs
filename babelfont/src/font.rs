@@ -36,6 +36,7 @@ pub struct Font {
     ///
     /// May be empty.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "reactive", store(key: String = |row| row.tag.to_string()))]
     pub axes: Vec<Axis>,
     /// A list of cross-axis mappings (avar2 mappings)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
