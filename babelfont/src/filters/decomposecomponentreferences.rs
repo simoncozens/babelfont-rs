@@ -537,6 +537,7 @@ fn decompose_smart_component_with_glyph(
         &layers_locations,
         &axes,
         &normalized_location?,
+        false,
     )?;
     // I guess we should also think about the anchors of the component glyphs etc? Not sure.
     Ok(interpolated_layer

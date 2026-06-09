@@ -17,6 +17,11 @@ use skrifa::{
 
 use crate::{SimpleUserLocation, UncompileContext};
 
+/// Convert a skrifa Tag to a fontdrasil Tag through their common string representation.
+fn to_fd_tag(tag: skrifa::Tag) -> fontdrasil::types::Tag {
+    fontdrasil::types::Tag::new_checked(tag.to_string().as_bytes()).unwrap()
+}
+
 /// Returns a set of fontdrasil `Axes` for the font
 /// Stolen from fontspector
 pub(crate) fn fontdrasil_axes(
@@ -104,7 +109,7 @@ impl<'a> UncompileContext<'a> {
                 .iter()
                 .map(|x| NormalizedCoord::new(x.peak_coord().to_f32() as f64))
                 .zip(self.axis_tags.iter())
-                .map(|(coord, tag)| (*tag, coord))
+                .map(|(coord, tag)| (to_fd_tag(*tag), coord))
                 .collect();
             if let Some(axes) = &self.axes {
                 master_locations.insert((
@@ -120,7 +125,7 @@ impl<'a> UncompileContext<'a> {
             let location: NormalizedLocation = self
                 .axis_tags
                 .iter()
-                .map(|tag| (*tag, NormalizedCoord::new(0.0)))
+                .map(|tag| (to_fd_tag(*tag), NormalizedCoord::new(0.0)))
                 .collect();
             master_locations.insert((
                 location.convert(axes).map_err(|_e| {
@@ -147,7 +152,13 @@ impl<'a> UncompileContext<'a> {
                 .map(|(user_loc, norm_loc)| {
                     let coords = norm_loc
                         .iter()
-                        .map(|(_tag, coord)| coord.to_f2dot14())
+                        .map(|(_tag, coord)| {
+                            // to_f2dot14() returns write-fonts' F2Dot14; compute_delta
+                            // expects read-fonts' F2Dot14 (different font-types version).
+                            // Convert via raw bits since both are [u16; 1] wrappers.
+                            let wf = coord.to_f2dot14();
+                            read_fonts::types::F2Dot14::from_bits(wf.to_bits())
+                        })
                         .collect::<Vec<_>>();
                     let delta = ivs
                         .compute_delta(

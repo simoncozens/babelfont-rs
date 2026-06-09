@@ -250,6 +250,7 @@ fn contribution_for_layer(
         &layers_locations,
         axes,
         &normalized_target,
+        false,
     ) {
         Ok(layer) => layer,
         Err(_) => return Ok(f64::INFINITY),

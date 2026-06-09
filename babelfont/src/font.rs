@@ -434,6 +434,16 @@ impl Font {
         glyphname: &str,
         location: &Location<DesignSpace>,
     ) -> Result<crate::Layer, BabelfontError> {
+        self.interpolate_glyph_with_extrapolation(glyphname, location, false)
+    }
+
+    /// Interpolate a glyph at a given location in design space, with optional extrapolation
+    pub fn interpolate_glyph_with_extrapolation(
+        &self,
+        glyphname: &str,
+        location: &Location<DesignSpace>,
+        extrapolate: bool,
+    ) -> Result<crate::Layer, BabelfontError> {
         let glyph = self
             .glyphs
             .get(glyphname)
@@ -481,7 +491,13 @@ impl Font {
                 }
             });
         }
-        crate::interpolate::interpolate_layer(glyphname, &layers, &axes, &target_location)
+        crate::interpolate::interpolate_layer(
+            glyphname,
+            &layers,
+            &axes,
+            &target_location,
+            extrapolate,
+        )
     }
 }
 
