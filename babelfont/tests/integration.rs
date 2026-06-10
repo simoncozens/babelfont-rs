@@ -141,3 +141,51 @@ fn test_convert_to_ttf_static2() {
     let font_ref = FontRef::new(&bytes).expect("Failed to read font bytes");
     assert!(font_ref.fvar().is_err());
 }
+
+#[test]
+fn test_ufo_export_unifies_glyphs3_rtl_kerning() {
+    let font = load("resources/G3RTLKerning.glyphs").expect("Failed to load RTL sample");
+
+    let ufo = babelfont::convertors::ufo::as_norad(&font, 0)
+        .expect("Failed to export Glyphs RTL sample to UFO");
+
+    let reh_side1 = norad::Name::new("public.kern1.reh").unwrap();
+    let alef_side2 = norad::Name::new("public.kern2.alef").unwrap();
+    let reh_side2 = norad::Name::new("public.kern2.reh").unwrap();
+    let a_side1 = norad::Name::new("public.kern1.A").unwrap();
+    let t_side1 = norad::Name::new("public.kern1.T").unwrap();
+    let a_side2 = norad::Name::new("public.kern2.A").unwrap();
+    let t_side2 = norad::Name::new("public.kern2.T").unwrap();
+
+    // RTL kerning (from glyphsLib convention: RTL pairs merged into LTR)
+    assert_eq!(
+        ufo.kerning
+            .get(&reh_side1)
+            .and_then(|pairs| pairs.get(&alef_side2))
+            .copied(),
+        Some(-90.0)
+    );
+    assert_eq!(
+        ufo.kerning
+            .get(&reh_side1)
+            .and_then(|pairs| pairs.get(&reh_side2))
+            .copied(),
+        Some(-40.0)
+    );
+
+    // LTR kerning (original pairs preserved)
+    assert_eq!(
+        ufo.kerning
+            .get(&a_side1)
+            .and_then(|pairs| pairs.get(&t_side2))
+            .copied(),
+        Some(-80.0)
+    );
+    assert_eq!(
+        ufo.kerning
+            .get(&t_side1)
+            .and_then(|pairs| pairs.get(&a_side2))
+            .copied(),
+        Some(-80.0)
+    );
+}
