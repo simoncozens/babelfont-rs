@@ -156,8 +156,9 @@ impl<'a> UncompileContext<'a> {
                             // to_f2dot14() returns write-fonts' F2Dot14; compute_delta
                             // expects read-fonts' F2Dot14 (different font-types version).
                             // Convert via raw bits since both are [u16; 1] wrappers.
+                            // Use skrifa::raw::types instead of direct read-fonts dep.
                             let wf = coord.to_f2dot14();
-                            read_fonts::types::F2Dot14::from_bits(wf.to_bits())
+                            skrifa::raw::types::F2Dot14::from_bits(wf.to_bits())
                         })
                         .collect::<Vec<_>>();
                     let delta = ivs
