@@ -28,4 +28,3 @@ smol_str = "0.3.6"
 serde_json = { version = "1.0", optional = true }
 clap = { workspace = true, optional = true, features = ["derive"] }
 fontdrasil.workspace = true
-read-fonts = "0.39"
