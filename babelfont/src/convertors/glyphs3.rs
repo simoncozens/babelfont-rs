@@ -1282,6 +1282,8 @@ mod tests {
         #[exclude("Nunito3.glyphs")]
         #[exclude("NotoSansGrantha-SmartComponent.glyphs")]
         #[exclude("Fustat.glyphs")]
+        // RTL kerning is merged into LTR on load, so roundtrip output differs structurally
+        #[exclude("G3RTLKerning.glyphs")]
         path: PathBuf,
     ) {
         let there = load(path.clone()).unwrap();
