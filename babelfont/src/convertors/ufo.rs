@@ -257,11 +257,7 @@ pub fn as_norad(font: &Font, master_ix: usize) -> Result<norad::Font, BabelfontE
     save_kerning(&mut ufo.kerning, &merged)?;
     save_info(&mut ufo.font_info, font, master_ix);
     let (swapped_first, swapped_second) = font.kern_groups_with_rtl_swaps();
-    save_kern_groups(
-        &mut ufo.groups,
-        &swapped_first,
-        &swapped_second,
-    )?;
+    save_kern_groups(&mut ufo.groups, &swapped_first, &swapped_second)?;
     // Insert non-kerning groups into ufo.groups
     for (group_name, glyphs) in font
         .format_specific

@@ -15,8 +15,14 @@ use fontdrasil::coords::{
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
-use std::{collections::{BTreeMap, HashSet}, path::PathBuf};
+use std::{
+    collections::{BTreeMap, HashSet},
+    path::PathBuf,
+};
 use typeshare::typeshare;
+
+/// Per-master RTL kerning map: master_id → kern1 → kern2 → value.
+type RtlKerningMap = BTreeMap<String, BTreeMap<String, BTreeMap<String, f32>>>;
 
 #[cfg(feature = "cli")]
 extern crate serde_json_path_to_error as serde_json;
@@ -224,13 +230,9 @@ impl Font {
     // }
 
     /// Read the Glyphs-style RTL kerning dict from `format_specific`.
-    pub(crate) fn read_rtl_kerning(
-        &self,
-    ) -> Option<BTreeMap<String, BTreeMap<String, BTreeMap<String, f32>>>> {
+    pub(crate) fn read_rtl_kerning(&self) -> Option<RtlKerningMap> {
         self.format_specific
-            .get_parse_opt::<BTreeMap<String, BTreeMap<String, BTreeMap<String, f32>>>>(
-                Self::KEY_KERNING_RTL,
-            )
+            .get_parse_opt::<RtlKerningMap>(Self::KEY_KERNING_RTL)
     }
 
     fn strip_mmk_prefix(raw: &str, expected_side: &str) -> SmolStr {
@@ -279,7 +281,7 @@ impl Font {
         let mut rtl_left_groups: HashSet<String> = HashSet::new();
         let mut rtl_right_groups: HashSet<String> = HashSet::new();
 
-        for (_master_id, rtl_dict) in &rtl_kerning {
+        for rtl_dict in rtl_kerning.values() {
             for (kern1, subtable) in rtl_dict {
                 if let Some(stripped) = kern1.strip_prefix("@MMK_R_") {
                     rtl_left_groups.insert(stripped.to_string());
@@ -315,7 +317,10 @@ impl Font {
     /// Apply the glyphsLib RTL group-side swap to the kern groups.
     pub(crate) fn kern_groups_with_rtl_swaps(
         &self,
-    ) -> (IndexMap<SmolStr, Vec<SmolStr>>, IndexMap<SmolStr, Vec<SmolStr>>) {
+    ) -> (
+        IndexMap<SmolStr, Vec<SmolStr>>,
+        IndexMap<SmolStr, Vec<SmolStr>>,
+    ) {
         let rtl_glyphs = self.rtl_kerning_glyphs();
         if rtl_glyphs.is_empty() {
             return (
