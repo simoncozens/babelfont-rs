@@ -303,14 +303,28 @@ impl Font {
 
         let mut layers: Vec<(DesignLocation, &Layer)> = vec![];
         for layer in &glyph.layers {
-            if let Some(master) = self
+            // Resolve master via layer.master (DefaultForMaster),
+            // which is the primary way layers reference their master.
+            // Only DefaultForMaster layers map directly to their master's
+            // location. AssociatedWithMaster layers (brace layers, etc.)
+            // have their own location and should use that instead.
+            let master = match &layer.master {
+                LayerType::DefaultForMaster(master_id) => {
+                    self.masters.iter().find(|m| m.id == *master_id)
+                }
+                LayerType::AssociatedWithMaster(_) | LayerType::FreeFloating => None,
+            };
+
+            if let Some(master) = master {
+                layers.push((master.location.clone(), layer));
+            } else if let Some(master) = self
                 .masters
                 .iter()
                 .find(|m| Some(&m.id) == layer.id.as_ref())
             {
                 layers.push((master.location.clone(), layer));
             } else if let Some(loc) = &layer.location {
-                // Intermediate layer
+                // Intermediate layer or free-floating layer with location
                 layers.push((loc.clone(), layer));
             }
         }
