@@ -391,8 +391,8 @@ pub(crate) mod glyphs {
         }
     }
 
-    impl From<&glyphslib::glyphs3::SmartComponentSetting> for Axis {
-        fn from(val: &glyphslib::glyphs3::SmartComponentSetting) -> Self {
+    impl From<&glyphslib::common::SmartComponentSetting> for Axis {
+        fn from(val: &glyphslib::common::SmartComponentSetting) -> Self {
             Axis {
                 name: crate::I18NDictionary::from(&val.name),
                 tag: Tag::new(b"VARC"), // placeholder
@@ -406,9 +406,9 @@ pub(crate) mod glyphs {
         }
     }
 
-    impl From<&Axis> for glyphslib::glyphs3::SmartComponentSetting {
+    impl From<&Axis> for glyphslib::common::SmartComponentSetting {
         fn from(val: &Axis) -> Self {
-            glyphslib::glyphs3::SmartComponentSetting {
+            glyphslib::common::SmartComponentSetting {
                 bottom_value: val.min.unwrap_or(UserCoord::new(0.0)).to_f64() as i32,
                 top_value: val.max.unwrap_or(UserCoord::new(0.0)).to_f64() as i32,
                 name: val

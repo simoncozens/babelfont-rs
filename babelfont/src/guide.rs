@@ -139,40 +139,30 @@ mod ufo {
 
 #[cfg(feature = "glyphs")]
 mod glyphs {
-    use glyphslib::{common::Orientation, glyphs3::Guide as G3Guide};
+    use glyphslib::glyphs3::Guide as G3Guide;
 
     use super::*;
     impl From<&G3Guide> for Guide {
         fn from(val: &G3Guide) -> Self {
             let mut format_specific = crate::common::FormatSpecific::default();
-            format_specific.insert(
-                "locked".to_string(),
-                serde_json::to_value(val.locked).unwrap_or_default(),
-            );
-            format_specific.insert(
-                "lockAngle".to_string(),
-                serde_json::to_value(val.lock_angle).unwrap_or_default(),
-            );
-            format_specific.insert(
-                "orientation".to_string(),
-                serde_json::to_value(val.orientation).unwrap_or_default(),
-            );
-            format_specific.insert(
-                "showMeasurement".to_string(),
-                serde_json::to_value(val.show_measurement).unwrap_or_default(),
-            );
-            format_specific.insert(
-                "size".to_string(),
-                serde_json::to_value(val.size).unwrap_or_default(),
-            );
-            format_specific.insert(
-                "type".to_string(),
-                serde_json::to_value(val.guide_type).unwrap_or_default(),
-            );
-            format_specific.insert(
-                "userData".to_string(),
-                serde_json::to_value(&val.user_data).unwrap_or_default(),
-            );
+            macro_rules! extract_and_insert {
+                ($key:expr, $getter:expr) => {
+                    format_specific.insert(
+                        $key.to_string(),
+                        serde_json::to_value($getter(val)).unwrap_or_default(),
+                    );
+                };
+            }
+            extract_and_insert!("filter", |v: &G3Guide| v.filter.clone());
+            extract_and_insert!("grid", |v: &G3Guide| v.grid);
+            extract_and_insert!("length", |v: &G3Guide| v.length);
+            extract_and_insert!("locked", |v: &G3Guide| v.locked);
+            extract_and_insert!("lockAngle", |v: &G3Guide| v.lock_angle);
+            extract_and_insert!("orientation", |v: &G3Guide| v.orientation);
+            extract_and_insert!("showMeasurement", |v: &G3Guide| v.show_measurement);
+            extract_and_insert!("size", |v: &G3Guide| v.size);
+            extract_and_insert!("type", |v: &G3Guide| v.guide_type);
+            extract_and_insert!("userData", |v: &G3Guide| v.user_data.clone());
 
             Guide {
                 pos: Position {
@@ -180,7 +170,11 @@ mod glyphs {
                     y: val.pos.1,
                     angle: val.angle,
                 },
-                name: None,
+                name: if val.name.is_empty() {
+                    None
+                } else {
+                    Some(val.name.clone())
+                },
                 color: None,
                 format_specific,
             }
@@ -189,44 +183,28 @@ mod glyphs {
 
     impl From<&Guide> for G3Guide {
         fn from(val: &Guide) -> Self {
+            macro_rules! extract_format_specific {
+                ($key:expr, $ty:ty) => {
+                    val.format_specific
+                        .get($key)
+                        .and_then(|x| serde_json::from_value(x.clone()).ok())
+                        .unwrap_or_default()
+                };
+            }
             G3Guide {
                 pos: (val.pos.x, val.pos.y),
                 angle: val.pos.angle,
-                locked: val
-                    .format_specific
-                    .get("locked")
-                    .and_then(|x| serde_json::from_value(x.clone()).ok())
-                    .unwrap_or(false),
-                lock_angle: val
-                    .format_specific
-                    .get("lockAngle")
-                    .and_then(|x| serde_json::from_value(x.clone()).ok())
-                    .unwrap_or(false),
-                orientation: val
-                    .format_specific
-                    .get("orientation")
-                    .and_then(|x| serde_json::from_value(x.clone()).ok())
-                    .unwrap_or(Orientation::Left),
-                show_measurement: val
-                    .format_specific
-                    .get("showMeasurement")
-                    .and_then(|x| serde_json::from_value(x.clone()).ok())
-                    .unwrap_or(false),
-                size: val
-                    .format_specific
-                    .get("size")
-                    .and_then(|x| serde_json::from_value(x.clone()).ok())
-                    .unwrap_or((0.0, 0.0)),
-                guide_type: val
-                    .format_specific
-                    .get("type")
-                    .and_then(|x| serde_json::from_value(x.clone()).ok())
-                    .unwrap_or_default(),
-                user_data: val
-                    .format_specific
-                    .get("userData")
-                    .and_then(|x| serde_json::from_value(x.clone()).ok())
-                    .unwrap_or_default(),
+                name: val.name.clone().unwrap_or_default(),
+                grid: extract_format_specific!("grid", bool),
+                length: extract_format_specific!("length", bool),
+                locked: extract_format_specific!("locked", bool),
+                lock_angle: extract_format_specific!("lockAngle", bool),
+                orientation: extract_format_specific!("orientation", Orientation),
+                show_measurement: extract_format_specific!("showMeasurement", bool),
+                size: extract_format_specific!("size", (f32, f32)),
+                guide_type: extract_format_specific!("type", String),
+                filter: extract_format_specific!("filter", String),
+                user_data: extract_format_specific!("userData", String),
             }
         }
     }

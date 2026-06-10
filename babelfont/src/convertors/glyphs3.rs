@@ -39,8 +39,6 @@ pub(crate) const KEY_ICON_NAME: &str = "com.schriftgestalt.Glyphs.iconName";
 pub(crate) const KEY_INSTANCE_EXPORTS: &str = "com.schriftgestalt.Glyphs.exports";
 pub(crate) const KEY_IS_BOLD: &str = "com.schriftgestalt.Glyphs.isBold";
 pub(crate) const KEY_IS_ITALIC: &str = "com.schriftgestalt.Glyphs.isItalic";
-pub(crate) const KEY_KEEP_ALTERNATES_TOGETHER: &str =
-    "com.schriftgestalt.Glyphs.keepAlternatesTogether";
 pub(crate) const KEY_KERNING_RTL: &str = "com.schriftgestalt.Glyphs.kerningRTL";
 pub(crate) const KEY_KERNING_VERTICAL: &str = "com.schriftgestalt.Glyphs.kerningVertical";
 pub(crate) const KEY_LAYER_HINTS: &str = "com.schriftgestalt.Glyphs.layerHints";
@@ -50,6 +48,7 @@ pub(crate) const KEY_METRIC_BOTTOM: &str = "com.schriftgestalt.Glyphs.metricBott
 pub(crate) const KEY_METRIC_LEFT: &str = "com.schriftgestalt.Glyphs.metricLeft";
 pub(crate) const KEY_METRIC_RIGHT: &str = "com.schriftgestalt.Glyphs.metricRight";
 pub(crate) const KEY_METRIC_TOP: &str = "com.schriftgestalt.Glyphs.metricTop";
+pub(crate) const KEY_METRIC_VERT_ORIGIN: &str = "com.schriftgestalt.Glyphs.metricVertOrigin";
 pub(crate) const KEY_METRIC_VERT_WIDTH: &str = "com.schriftgestalt.Glyphs.metricVertWidth";
 pub(crate) const KEY_METRIC_WIDTH: &str = "com.schriftgestalt.Glyphs.metricWidth";
 pub(crate) const KEY_NUMBER_NAMES: &str = "com.schriftgestalt.Glyphs.numberNames";
@@ -235,13 +234,6 @@ fn _load(glyphs_font: &glyphslib::Font, path: PathBuf) -> Result<Font, Babelfont
         .iter()
         .map(|i| load_instance(&font, i))
         .collect();
-    // Keep alternates together
-    if glyphs_font.keep_alternates_together {
-        font.format_specific.insert(
-            KEY_KEEP_ALTERNATES_TOGETHER.into(),
-            serde_json::Value::Bool(true),
-        );
-    }
     // Handle kerning when we do masters
     // Metrics
     // Note
@@ -1128,7 +1120,6 @@ pub(crate) fn as_glyphs3(font: &Font) -> Result<glyphs3::Glyphs3, BabelfontError
             .iter()
             .map(|x| save_instance(x, &font.axes))
             .collect(),
-        keep_alternates_together: false,
         kerning,
         kerning_rtl: font
             .format_specific
@@ -1221,6 +1212,7 @@ fn save_master(master: &Master, axes: &[Axis], metrics: &[crate::MetricType]) ->
             .and_then(|x| x.as_bool())
             .unwrap_or(true),
         properties: vec![], // Wait what?
+        temp_data: Default::default(),
     }
 }
 

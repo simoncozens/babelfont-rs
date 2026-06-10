@@ -153,7 +153,7 @@ impl Path {
                 _ => return Err(BabelfontError::BadPath),
             }
         }
-        if self.closed && path.elements().len() > 0 {
+        if self.closed && !path.elements().is_empty() {
             path.close_path()
         }
         Ok(path)

@@ -156,6 +156,7 @@ mod glyphs {
                 G3MetricType::Descender => MetricType::Descender,
                 G3MetricType::Baseline => MetricType::Custom("baseline".to_string()),
                 G3MetricType::ItalicAngle => MetricType::ItalicAngle,
+                G3MetricType::ItalicSlope => MetricType::Custom("italicSlope".to_string()),
             }
         }
     }
@@ -175,6 +176,7 @@ mod glyphs {
                 "descender" => Ok(G3MetricType::Descender),
                 "baseline" => Ok(G3MetricType::Baseline),
                 "italicAngle" => Ok(G3MetricType::ItalicAngle),
+                "italicSlope" => Ok(G3MetricType::ItalicSlope),
 
                 _ => Err(()),
             }
