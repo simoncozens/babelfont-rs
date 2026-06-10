@@ -629,7 +629,7 @@ mod tests {
 
         // Should have just one region since both apply to the same space
         assert!(!result.is_empty());
-        for (_region, substs) in result.iter() {
+        for substs in result.values() {
             assert_eq!(substs.len(), 1);
             assert!(substs.contains_key(&SmolStr::new("dollar")));
         }
@@ -689,7 +689,7 @@ mod tests {
 
         // Single ruleset should produce one region
         assert_eq!(result.len(), 1);
-        for (_region, substs) in result.iter() {
+        for substs in result.values() {
             assert_eq!(substs.len(), 1);
             assert!(substs.contains_key(&SmolStr::new("a")));
         }

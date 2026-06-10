@@ -12,7 +12,7 @@ impl MoveKerningFromFeatures {
 }
 
 impl FontFilter for MoveKerningFromFeatures {
-    fn apply(&self, font: &mut crate::Font) -> Result<(), crate::BabelfontError> {
+    fn apply(&self, _font: &mut crate::Font) -> Result<(), crate::BabelfontError> {
         log::info!("Moving explicit FEA-based kerning rules into the kerning table");
         // Implementation for moving kerning rules goes here
         Ok(())
