@@ -252,12 +252,15 @@ pub fn as_norad(font: &Font, master_ix: usize) -> Result<norad::Font, BabelfontE
         }
     }
 
-    save_kerning(&mut ufo.kerning, &master.kerning)?;
+    let merged: IndexMap<(SmolStr, SmolStr), i16> =
+        font.merged_kerning_for_master(master).into_iter().collect();
+    save_kerning(&mut ufo.kerning, &merged)?;
     save_info(&mut ufo.font_info, font, master_ix);
+    let (swapped_first, swapped_second) = font.kern_groups_with_rtl_swaps();
     save_kern_groups(
         &mut ufo.groups,
-        &font.first_kern_groups,
-        &font.second_kern_groups,
+        &swapped_first,
+        &swapped_second,
     )?;
     // Insert non-kerning groups into ufo.groups
     for (group_name, glyphs) in font

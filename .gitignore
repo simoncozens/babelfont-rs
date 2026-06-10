@@ -3,4 +3,5 @@ __pycache__
 target
 *.babelfont
 *.glyphs
+!babelfont/resources/G3RTLKerning.glyphs
 *.ttf

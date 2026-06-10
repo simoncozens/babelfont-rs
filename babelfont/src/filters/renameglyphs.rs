@@ -1,9 +1,9 @@
 use crate::layout::renamer::GlyphRenamerVisitor;
-use crate::{filters::FontFilter, Features};
+use crate::{filters::FontFilter, font::Font, Features};
 use fea_rs_ast::{AsFea, FeatureFile, LayoutVisitor};
 use regex::Regex;
 use smol_str::SmolStr;
-use std::{collections::HashMap, sync::LazyLock};
+use std::{collections::{BTreeMap, HashMap}, sync::LazyLock};
 
 // Glyph names are [\w_\.]+; we fold in @ to avoid matching classes.
 #[allow(clippy::unwrap_used)]
@@ -68,6 +68,44 @@ impl FontFilter for RenameGlyphs {
                     ((new_left.clone(), new_right.clone()), *value)
                 })
                 .collect();
+        }
+        // Update RTL kerning in format_specific
+        if let Some(rtl) = font
+            .format_specific
+            .get_parse_opt::<BTreeMap<String, BTreeMap<String, BTreeMap<String, f32>>>>(
+                Font::KEY_KERNING_RTL,
+            )
+        {
+            let renamed: BTreeMap<String, BTreeMap<String, BTreeMap<String, f32>>> = rtl
+                .into_iter()
+                .map(|(master_id, inner)| {
+                    let renamed_inner: BTreeMap<String, BTreeMap<String, f32>> = inner
+                        .into_iter()
+                        .map(|(kern1, subtable)| {
+                            let new_kern1 = self
+                                .0
+                                .get(&SmolStr::from(kern1.as_str()))
+                                .map(|s| s.to_string())
+                                .unwrap_or(kern1);
+                            let renamed_subtable: BTreeMap<String, f32> = subtable
+                                .into_iter()
+                                .map(|(kern2, value)| {
+                                    let new_kern2 = self
+                                        .0
+                                        .get(&SmolStr::from(kern2.as_str()))
+                                        .map(|s| s.to_string())
+                                        .unwrap_or(kern2);
+                                    (new_kern2, value)
+                                })
+                                .collect();
+                            (new_kern1, renamed_subtable)
+                        })
+                        .collect();
+                    (master_id, renamed_inner)
+                })
+                .collect();
+            font.format_specific
+                .insert_json(Font::KEY_KERNING_RTL, &renamed);
         }
         for (_group, members) in font.first_kern_groups.iter_mut() {
             *members = members

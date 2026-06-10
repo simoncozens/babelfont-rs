@@ -141,3 +141,30 @@ fn test_convert_to_ttf_static2() {
     let font_ref = FontRef::new(&bytes).expect("Failed to read font bytes");
     assert!(font_ref.fvar().is_err());
 }
+
+#[test]
+fn test_ufo_export_unifies_glyphs3_rtl_kerning() {
+    let font = load("resources/G3RTLKerning.glyphs").expect("Failed to load RTL sample");
+
+    let ufo = babelfont::convertors::ufo::as_norad(&font, 0)
+        .expect("Failed to export Glyphs RTL sample to UFO");
+
+    let reh_side1 = norad::Name::new("public.kern1.reh").unwrap();
+    let alef_side2 = norad::Name::new("public.kern2.alef").unwrap();
+    let reh_side2 = norad::Name::new("public.kern2.reh").unwrap();
+
+    assert_eq!(
+        ufo.kerning
+            .get(&reh_side1)
+            .and_then(|pairs| pairs.get(&alef_side2))
+            .copied(),
+        Some(-90.0)
+    );
+    assert_eq!(
+        ufo.kerning
+            .get(&reh_side1)
+            .and_then(|pairs| pairs.get(&reh_side2))
+            .copied(),
+        Some(-40.0)
+    );
+}
