@@ -345,7 +345,7 @@ fn load_features(fontref: &skrifa::FontRef, font: &mut Font) -> Result<(), Babel
                         log::warn!(
                             "Master ID {} from anchor {} does not exist in the font",
                             mid,
-                            &anchor_name
+                            anchor_name
                         );
                         continue;
                     };
@@ -362,7 +362,7 @@ fn load_features(fontref: &skrifa::FontRef, font: &mut Font) -> Result<(), Babel
                 log::warn!(
                     "Glyph {} from anchor {} does not exist in the font",
                     glyph_name,
-                    &anchor_name
+                    anchor_name
                 );
             }
         }
@@ -385,7 +385,7 @@ fn load_features(fontref: &skrifa::FontRef, font: &mut Font) -> Result<(), Babel
                             log::warn!(
                                 "Master ID {} from anchor {} does not exist in the font",
                                 mid,
-                                &anchor_name
+                                anchor_name
                             );
                             continue;
                         };
@@ -402,7 +402,7 @@ fn load_features(fontref: &skrifa::FontRef, font: &mut Font) -> Result<(), Babel
                     log::warn!(
                         "Glyph {} from anchor {} does not exist in the font",
                         glyph_name,
-                        &anchor_name
+                        anchor_name
                     );
                 }
             }

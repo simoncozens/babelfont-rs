@@ -15,8 +15,14 @@ use fontdrasil::coords::{
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
-use std::{collections::BTreeMap, path::PathBuf};
+use std::{
+    collections::{BTreeMap, HashSet},
+    path::PathBuf,
+};
 use typeshare::typeshare;
+
+/// Per-master RTL kerning map: master_id → kern1 → kern2 → value.
+type RtlKerningMap = BTreeMap<String, BTreeMap<String, BTreeMap<String, f32>>>;
 
 #[cfg(feature = "cli")]
 extern crate serde_json_path_to_error as serde_json;
@@ -111,6 +117,9 @@ impl Default for Font {
 }
 
 impl Font {
+    /// Key in `format_specific` where Glyphs 3 RTL kerning is stored.
+    pub(crate) const KEY_KERNING_RTL: &str = "com.schriftgestalt.Glyphs.kerningRTL";
+
     /// Create a new, empty Font
     pub fn new() -> Self {
         Font {
@@ -220,6 +229,138 @@ impl Font {
     // fn axis_order(&self) -> Vec<Tag> {
     //     self.axes.iter().map(|ax| ax.tag.clone()).collect()
     // }
+
+    /// Read the Glyphs-style RTL kerning dict from `format_specific`.
+    pub(crate) fn read_rtl_kerning(&self) -> Option<RtlKerningMap> {
+        self.format_specific
+            .get_parse_opt::<RtlKerningMap>(Self::KEY_KERNING_RTL)
+    }
+
+    fn strip_mmk_prefix(raw: &str, expected_side: &str) -> SmolStr {
+        let prefix = format!("@MMK_{}_", expected_side);
+        if let Some(stripped) = raw.strip_prefix(&prefix) {
+            SmolStr::from(format!("@{}", stripped))
+        } else {
+            SmolStr::from(raw)
+        }
+    }
+
+    /// Merge LTR and RTL kerning into one flat set of pairs for a master.
+    pub(crate) fn merged_kerning_for_master(
+        &self,
+        master: &Master,
+    ) -> Vec<((SmolStr, SmolStr), i16)> {
+        let mut result: IndexMap<(SmolStr, SmolStr), i16> = IndexMap::new();
+
+        for ((left, right), value) in &master.kerning {
+            result.insert((left.clone(), right.clone()), *value);
+        }
+
+        if let Some(rtl_by_master) = self.read_rtl_kerning() {
+            if let Some(rtl_dict) = rtl_by_master.get(&master.id.to_string()) {
+                for (kern1, subtable) in rtl_dict {
+                    let left = Self::strip_mmk_prefix(kern1, "R");
+                    for (kern2, value) in subtable {
+                        let right = Self::strip_mmk_prefix(kern2, "L");
+                        result.insert((left.clone(), right), *value as i16);
+                    }
+                }
+            }
+        }
+
+        result.into_iter().collect()
+    }
+
+    /// Identify glyphs that participate in RTL kerning.
+    pub(crate) fn rtl_kerning_glyphs(&self) -> HashSet<SmolStr> {
+        let mut rtl_glyphs: HashSet<SmolStr> = HashSet::new();
+
+        let Some(rtl_kerning) = self.read_rtl_kerning() else {
+            return rtl_glyphs;
+        };
+
+        let mut rtl_left_groups: HashSet<String> = HashSet::new();
+        let mut rtl_right_groups: HashSet<String> = HashSet::new();
+
+        for rtl_dict in rtl_kerning.values() {
+            for (kern1, subtable) in rtl_dict {
+                if let Some(stripped) = kern1.strip_prefix("@MMK_R_") {
+                    rtl_left_groups.insert(stripped.to_string());
+                } else {
+                    rtl_glyphs.insert(SmolStr::from(kern1.as_str()));
+                }
+                for kern2 in subtable.keys() {
+                    if let Some(stripped) = kern2.strip_prefix("@MMK_L_") {
+                        rtl_right_groups.insert(stripped.to_string());
+                    } else {
+                        rtl_glyphs.insert(SmolStr::from(kern2.as_str()));
+                    }
+                }
+            }
+        }
+
+        for glyph in self.glyphs.iter() {
+            if rtl_glyphs.contains(&glyph.name) {
+                continue;
+            }
+            let left_group = glyph.format_specific.get_string("kern_left");
+            let right_group = glyph.format_specific.get_string("kern_right");
+            if (!left_group.is_empty() && rtl_left_groups.contains(left_group.as_str()))
+                || (!right_group.is_empty() && rtl_right_groups.contains(right_group.as_str()))
+            {
+                rtl_glyphs.insert(glyph.name.clone());
+            }
+        }
+
+        rtl_glyphs
+    }
+
+    /// Apply the glyphsLib RTL group-side swap to the kern groups.
+    pub(crate) fn kern_groups_with_rtl_swaps(
+        &self,
+    ) -> (
+        IndexMap<SmolStr, Vec<SmolStr>>,
+        IndexMap<SmolStr, Vec<SmolStr>>,
+    ) {
+        let rtl_glyphs = self.rtl_kerning_glyphs();
+        if rtl_glyphs.is_empty() {
+            return (
+                self.first_kern_groups.clone(),
+                self.second_kern_groups.clone(),
+            );
+        }
+
+        let mut first = self.first_kern_groups.clone();
+        let mut second = self.second_kern_groups.clone();
+        for glyph_name in &rtl_glyphs {
+            for (_group, members) in first.iter_mut() {
+                members.retain(|member| member != glyph_name);
+            }
+            for (_group, members) in second.iter_mut() {
+                members.retain(|member| member != glyph_name);
+            }
+
+            if let Some(glyph) = self.glyphs.iter().find(|glyph| glyph.name == *glyph_name) {
+                let left_group = glyph.format_specific.get_string("kern_left");
+                let right_group = glyph.format_specific.get_string("kern_right");
+
+                if !right_group.is_empty() {
+                    first
+                        .entry(SmolStr::from(right_group.as_str()))
+                        .or_default()
+                        .push(glyph_name.clone());
+                }
+                if !left_group.is_empty() {
+                    second
+                        .entry(SmolStr::from(left_group.as_str()))
+                        .or_default()
+                        .push(glyph_name.clone());
+                }
+            }
+        }
+
+        (first, second)
+    }
 
     /// Save the font to a file
     ///

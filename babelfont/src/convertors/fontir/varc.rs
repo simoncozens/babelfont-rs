@@ -188,7 +188,7 @@ fn to_varcomp(
     // we need to add them with the default value for that axis, so that they have
     // a base value from which to derive variation.
     for (_, other_av) in other_axis_values.iter() {
-        for (axis_index, _) in other_av.iter() {
+        for axis_index in other_av.keys() {
             if !axis_values.contains_key(axis_index) {
                 let axis_tag = axis_order[*axis_index as usize];
                 let default = axes

@@ -1,5 +1,4 @@
 use std::{
-    borrow::Cow,
     collections::{BTreeMap, BTreeSet},
     sync::Arc,
 };
@@ -77,20 +76,23 @@ impl Work<Context, WorkId, Error> for KerningGroupWork {
             ))
         })?;
 
+        let (first, second) = font.kern_groups_with_rtl_swaps();
+
         let mut groups = KerningGroups::default();
 
-        for (group, members) in font.first_kern_groups.iter() {
+        for (group, members) in first.iter() {
             groups.groups.insert(
                 KernGroup::Side1(group.clone()),
                 members.iter().map(GlyphName::new).collect(),
             );
         }
-        for (group, members) in font.second_kern_groups.iter() {
+        for (group, members) in second.iter() {
             groups.groups.insert(
                 KernGroup::Side2(group.clone()),
                 members.iter().map(GlyphName::new).collect(),
             );
         }
+
         let mut normalized_locations = BTreeSet::new();
         for master in &font.masters {
             normalized_locations.insert(
@@ -159,16 +161,11 @@ impl Work<Context, WorkId, Error> for KerningInstanceWork {
 
 type Kerns = BTreeMap<(SmolStr, SmolStr), OrderedFloat<f64>>;
 
-/// get the combined LTR & RTL kerns at the given location.
+/// Get the merged LTR+RTL kerning pairs for a given master at a location.
 ///
-/// If only LTR exists, it can be borrowed directly. If RTL exists, it has to
-/// be converted into LTR.
-///
-/// see <https://github.com/googlefonts/glyphsLib/blob/682ff4b17711/Lib/glyphsLib/builder/kerning.py#L41>
-fn kerning_at_location<'a>(
-    font: &'a Font,
-    location: &NormalizedLocation,
-) -> Option<Cow<'a, Kerns>> {
+/// Uses `crate::kerning::merge_kerning` to produce a single flat set of pairs
+/// from both `master.kerning` and `format_specific["...kerningRTL"]`.
+fn kerning_at_location(font: &Font, location: &NormalizedLocation) -> Option<Kerns> {
     let axes = font.fontdrasil_axes().ok()?;
     let master = font.masters.iter().find(|master| {
         master
@@ -176,13 +173,13 @@ fn kerning_at_location<'a>(
             .to_normalized(&axes)
             .is_ok_and(|normalized| normalized == *location)
     })?;
-    Some(Cow::Owned(
-        master
-            .kerning
-            .iter()
-            .map(|((side1, side2), value)| {
-                ((side1.clone(), side2.clone()), OrderedFloat(*value as f64))
-            })
-            .collect::<Kerns>(),
-    ))
+
+    let merged = font.merged_kerning_for_master(master);
+
+    Some(
+        merged
+            .into_iter()
+            .map(|((l, r), v)| ((l, r), OrderedFloat(v as f64)))
+            .collect(),
+    )
 }
