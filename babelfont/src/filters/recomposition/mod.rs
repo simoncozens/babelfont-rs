@@ -1,6 +1,8 @@
 use crate::filters::FontFilter;
 mod encoded;
 
+/// A filter that recomposes decomposed components
+#[derive(Default)]
 pub struct Recompose;
 
 impl FontFilter for Recompose {
@@ -9,7 +11,7 @@ impl FontFilter for Recompose {
         encoded::RecomposeEncoded::default().apply(font)
     }
 
-    fn from_str(s: &str) -> Result<Self, crate::BabelfontError>
+    fn from_str(_s: &str) -> Result<Self, crate::BabelfontError>
     where
         Self: Sized,
     {

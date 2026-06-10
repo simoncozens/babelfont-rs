@@ -32,7 +32,7 @@ impl LayerType {
     }
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[typeshare]
 #[cfg_attr(feature = "reactive", derive(reactive_stores::Store))]
 /// A layer of a glyph in a font
@@ -325,8 +325,8 @@ impl Layer {
 pub(crate) mod glyphs {
     use crate::convertors::glyphs3::{
         copy_user_data, KEY_ATTR, KEY_COLOR_LABEL, KEY_METRIC_BOTTOM, KEY_METRIC_LEFT,
-        KEY_METRIC_RIGHT, KEY_METRIC_TOP, KEY_METRIC_VERT_WIDTH, KEY_METRIC_WIDTH, KEY_VERT_ORIGIN,
-        KEY_VERT_WIDTH,
+        KEY_METRIC_RIGHT, KEY_METRIC_TOP, KEY_METRIC_VERT_ORIGIN, KEY_METRIC_VERT_WIDTH,
+        KEY_METRIC_WIDTH, KEY_VERT_ORIGIN, KEY_VERT_WIDTH,
     };
     use std::collections::BTreeMap;
 
@@ -483,6 +483,7 @@ pub(crate) mod glyphs {
             metric_left: val.format_specific.get_optionstring(KEY_METRIC_LEFT),
             metric_right: val.format_specific.get_optionstring(KEY_METRIC_RIGHT),
             metric_top: val.format_specific.get_optionstring(KEY_METRIC_TOP),
+            metric_vert_origin: val.format_specific.get_optionstring(KEY_METRIC_VERT_ORIGIN),
             metric_vert_width: val.format_specific.get_optionstring(KEY_METRIC_VERT_WIDTH),
             metric_width: val.format_specific.get_optionstring(KEY_METRIC_WIDTH),
             part_selection,

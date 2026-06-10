@@ -1,0 +1,6041 @@
+{
+  "upm": 1000,
+  "version": [
+    2,
+    15
+  ],
+  "axes": [
+    {
+      "name": {
+        "dflt": "Weight"
+      },
+      "tag": "wght",
+      "min": 100.0,
+      "max": 900.0,
+      "default": 400.0,
+      "map": [
+        [
+          100.0,
+          28.0
+        ],
+        [
+          200.0,
+          42.0
+        ],
+        [
+          300.0,
+          64.0
+        ],
+        [
+          400.0,
+          94.0
+        ],
+        [
+          500.0,
+          110.0
+        ],
+        [
+          600.0,
+          130.0
+        ],
+        [
+          700.0,
+          152.0
+        ],
+        [
+          800.0,
+          175.0
+        ],
+        [
+          900.0,
+          194.0
+        ]
+      ]
+    }
+  ],
+  "instances": [
+    {
+      "id": "Thin",
+      "name": {
+        "dflt": "Thin"
+      },
+      "location": {
+        "wght": 28.0
+      },
+      "custom_names": {},
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            2,
+            2,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.customParameters.xHeight": {
+          "disabled": false,
+          "value": "536"
+        },
+        "com.schriftgestalt.Glyphs.weightClass": 100
+      }
+    },
+    {
+      "id": "ExtraLight",
+      "name": {
+        "dflt": "ExtraLight"
+      },
+      "location": {
+        "wght": 42.0
+      },
+      "custom_names": {},
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            3,
+            2,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.customParameters.xHeight": {
+          "disabled": false,
+          "value": "536"
+        },
+        "com.schriftgestalt.Glyphs.weightClass": 200
+      }
+    },
+    {
+      "id": "Light",
+      "name": {
+        "dflt": "Light"
+      },
+      "location": {
+        "wght": 64.0
+      },
+      "custom_names": {},
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            4,
+            2,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.customParameters.xHeight": {
+          "disabled": false,
+          "value": "536"
+        },
+        "com.schriftgestalt.Glyphs.weightClass": 300
+      }
+    },
+    {
+      "id": "Regular",
+      "name": {
+        "dflt": "Regular"
+      },
+      "location": {
+        "wght": 94.0
+      },
+      "custom_names": {},
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            5,
+            2,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.customParameters.xHeight": {
+          "disabled": false,
+          "value": "536"
+        }
+      }
+    },
+    {
+      "id": "Medium",
+      "name": {
+        "dflt": "Medium"
+      },
+      "location": {
+        "wght": 110.0
+      },
+      "custom_names": {},
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            6,
+            2,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.customParameters.xHeight": {
+          "disabled": false,
+          "value": "536"
+        },
+        "com.schriftgestalt.Glyphs.weightClass": 500
+      }
+    },
+    {
+      "id": "SemiBold",
+      "name": {
+        "dflt": "SemiBold"
+      },
+      "location": {
+        "wght": 130.0
+      },
+      "custom_names": {},
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            7,
+            2,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.customParameters.xHeight": {
+          "disabled": false,
+          "value": "536"
+        },
+        "com.schriftgestalt.Glyphs.weightClass": 600
+      }
+    },
+    {
+      "id": "Bold",
+      "name": {
+        "dflt": "Bold"
+      },
+      "location": {
+        "wght": 152.0
+      },
+      "custom_names": {},
+      "linked_style": "Regular",
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            8,
+            2,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.customParameters.xHeight": {
+          "disabled": false,
+          "value": "536"
+        },
+        "com.schriftgestalt.Glyphs.weightClass": 700,
+        "com.schriftgestalt.Glyphs.isBold": true
+      }
+    },
+    {
+      "id": "ExtraBold",
+      "name": {
+        "dflt": "ExtraBold"
+      },
+      "location": {
+        "wght": 175.0
+      },
+      "custom_names": {},
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            9,
+            2,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.customParameters.xHeight": {
+          "disabled": false,
+          "value": "536"
+        },
+        "com.schriftgestalt.Glyphs.weightClass": 800
+      }
+    },
+    {
+      "id": "Black",
+      "name": {
+        "dflt": "Black"
+      },
+      "location": {
+        "wght": 194.0
+      },
+      "custom_names": {},
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            10,
+            2,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.customParameters.xHeight": {
+          "disabled": false,
+          "value": "536"
+        },
+        "com.schriftgestalt.Glyphs.weightClass": 900
+      }
+    },
+    {
+      "id": "SemiCondensed Thin",
+      "name": {
+        "dflt": "SemiCondensed Thin"
+      },
+      "location": {
+        "wght": 28.0
+      },
+      "custom_names": {},
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            2,
+            2,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.customParameters.xHeight": {
+          "disabled": false,
+          "value": "536"
+        },
+        "com.schriftgestalt.Glyphs.weightClass": 100,
+        "com.schriftgestalt.Glyphs.widthClass": 4
+      }
+    },
+    {
+      "id": "SemiCondensed ExtraLight",
+      "name": {
+        "dflt": "SemiCondensed ExtraLight"
+      },
+      "location": {
+        "wght": 42.0
+      },
+      "custom_names": {},
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            3,
+            2,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.customParameters.xHeight": {
+          "disabled": false,
+          "value": "536"
+        },
+        "com.schriftgestalt.Glyphs.weightClass": 200,
+        "com.schriftgestalt.Glyphs.widthClass": 4
+      }
+    },
+    {
+      "id": "SemiCondensed Light",
+      "name": {
+        "dflt": "SemiCondensed Light"
+      },
+      "location": {
+        "wght": 64.0
+      },
+      "custom_names": {},
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            4,
+            2,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.customParameters.xHeight": {
+          "disabled": false,
+          "value": "536"
+        },
+        "com.schriftgestalt.Glyphs.weightClass": 300,
+        "com.schriftgestalt.Glyphs.widthClass": 4
+      }
+    },
+    {
+      "id": "SemiCondensed",
+      "name": {
+        "dflt": "SemiCondensed"
+      },
+      "location": {
+        "wght": 94.0
+      },
+      "custom_names": {},
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            5,
+            2,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.customParameters.xHeight": {
+          "disabled": false,
+          "value": "536"
+        },
+        "com.schriftgestalt.Glyphs.widthClass": 4
+      }
+    },
+    {
+      "id": "SemiCondensed Medium",
+      "name": {
+        "dflt": "SemiCondensed Medium"
+      },
+      "location": {
+        "wght": 110.0
+      },
+      "custom_names": {},
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            6,
+            2,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.customParameters.xHeight": {
+          "disabled": false,
+          "value": "536"
+        },
+        "com.schriftgestalt.Glyphs.weightClass": 500,
+        "com.schriftgestalt.Glyphs.widthClass": 4
+      }
+    },
+    {
+      "id": "SemiCondensed SemiBold",
+      "name": {
+        "dflt": "SemiCondensed SemiBold"
+      },
+      "location": {
+        "wght": 130.0
+      },
+      "custom_names": {},
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            7,
+            2,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.customParameters.xHeight": {
+          "disabled": false,
+          "value": "536"
+        },
+        "com.schriftgestalt.Glyphs.weightClass": 600,
+        "com.schriftgestalt.Glyphs.widthClass": 4
+      }
+    },
+    {
+      "id": "SemiCondensed Bold",
+      "name": {
+        "dflt": "SemiCondensed Bold"
+      },
+      "location": {
+        "wght": 152.0
+      },
+      "custom_names": {},
+      "linked_style": "SemiCondensed",
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            8,
+            2,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.customParameters.xHeight": {
+          "disabled": false,
+          "value": "536"
+        },
+        "com.schriftgestalt.Glyphs.weightClass": 700,
+        "com.schriftgestalt.Glyphs.widthClass": 4,
+        "com.schriftgestalt.Glyphs.isBold": true
+      }
+    },
+    {
+      "id": "SemiCondensed ExtraBold",
+      "name": {
+        "dflt": "SemiCondensed ExtraBold"
+      },
+      "location": {
+        "wght": 175.0
+      },
+      "custom_names": {},
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            9,
+            2,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.customParameters.xHeight": {
+          "disabled": false,
+          "value": "536"
+        },
+        "com.schriftgestalt.Glyphs.weightClass": 800,
+        "com.schriftgestalt.Glyphs.widthClass": 4
+      }
+    },
+    {
+      "id": "SemiCondensed Black",
+      "name": {
+        "dflt": "SemiCondensed Black"
+      },
+      "location": {
+        "wght": 194.0
+      },
+      "custom_names": {},
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            10,
+            2,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.customParameters.xHeight": {
+          "disabled": false,
+          "value": "536"
+        },
+        "com.schriftgestalt.Glyphs.weightClass": 900,
+        "com.schriftgestalt.Glyphs.widthClass": 4
+      }
+    },
+    {
+      "id": "Condensed Thin",
+      "name": {
+        "dflt": "Condensed Thin"
+      },
+      "location": {
+        "wght": 28.0
+      },
+      "custom_names": {},
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            2,
+            6,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.customParameters.xHeight": {
+          "disabled": false,
+          "value": "536"
+        },
+        "com.schriftgestalt.Glyphs.weightClass": 100,
+        "com.schriftgestalt.Glyphs.widthClass": 3
+      }
+    },
+    {
+      "id": "Condensed ExtraLight",
+      "name": {
+        "dflt": "Condensed ExtraLight"
+      },
+      "location": {
+        "wght": 42.0
+      },
+      "custom_names": {},
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            3,
+            6,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.customParameters.xHeight": {
+          "disabled": false,
+          "value": "536"
+        },
+        "com.schriftgestalt.Glyphs.weightClass": 200,
+        "com.schriftgestalt.Glyphs.widthClass": 3
+      }
+    },
+    {
+      "id": "Condensed Light",
+      "name": {
+        "dflt": "Condensed Light"
+      },
+      "location": {
+        "wght": 64.0
+      },
+      "custom_names": {},
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            4,
+            6,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.customParameters.xHeight": {
+          "disabled": false,
+          "value": "536"
+        },
+        "com.schriftgestalt.Glyphs.weightClass": 300,
+        "com.schriftgestalt.Glyphs.widthClass": 3
+      }
+    },
+    {
+      "id": "Condensed",
+      "name": {
+        "dflt": "Condensed"
+      },
+      "location": {
+        "wght": 94.0
+      },
+      "custom_names": {},
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            5,
+            6,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.customParameters.xHeight": {
+          "disabled": false,
+          "value": "536"
+        },
+        "com.schriftgestalt.Glyphs.widthClass": 3
+      }
+    },
+    {
+      "id": "Condensed Medium",
+      "name": {
+        "dflt": "Condensed Medium"
+      },
+      "location": {
+        "wght": 110.0
+      },
+      "custom_names": {},
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            6,
+            6,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.customParameters.xHeight": {
+          "disabled": false,
+          "value": "536"
+        },
+        "com.schriftgestalt.Glyphs.weightClass": 500,
+        "com.schriftgestalt.Glyphs.widthClass": 3
+      }
+    },
+    {
+      "id": "Condensed SemiBold",
+      "name": {
+        "dflt": "Condensed SemiBold"
+      },
+      "location": {
+        "wght": 130.0
+      },
+      "custom_names": {},
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            7,
+            6,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.customParameters.xHeight": {
+          "disabled": false,
+          "value": "536"
+        },
+        "com.schriftgestalt.Glyphs.weightClass": 600,
+        "com.schriftgestalt.Glyphs.widthClass": 3
+      }
+    },
+    {
+      "id": "Condensed Bold",
+      "name": {
+        "dflt": "Condensed Bold"
+      },
+      "location": {
+        "wght": 152.0
+      },
+      "custom_names": {},
+      "linked_style": "Condensed",
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            8,
+            6,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.customParameters.xHeight": {
+          "disabled": false,
+          "value": "536"
+        },
+        "com.schriftgestalt.Glyphs.weightClass": 700,
+        "com.schriftgestalt.Glyphs.widthClass": 3,
+        "com.schriftgestalt.Glyphs.isBold": true
+      }
+    },
+    {
+      "id": "Condensed ExtraBold",
+      "name": {
+        "dflt": "Condensed ExtraBold"
+      },
+      "location": {
+        "wght": 175.0
+      },
+      "custom_names": {},
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            9,
+            6,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.customParameters.xHeight": {
+          "disabled": false,
+          "value": "536"
+        },
+        "com.schriftgestalt.Glyphs.weightClass": 800,
+        "com.schriftgestalt.Glyphs.widthClass": 3
+      }
+    },
+    {
+      "id": "Condensed Black",
+      "name": {
+        "dflt": "Condensed Black"
+      },
+      "location": {
+        "wght": 194.0
+      },
+      "custom_names": {},
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            10,
+            6,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.customParameters.xHeight": {
+          "disabled": false,
+          "value": "536"
+        },
+        "com.schriftgestalt.Glyphs.weightClass": 900,
+        "com.schriftgestalt.Glyphs.widthClass": 3
+      }
+    },
+    {
+      "id": "ExtraCondensed Thin",
+      "name": {
+        "dflt": "ExtraCondensed Thin"
+      },
+      "location": {
+        "wght": 28.0
+      },
+      "custom_names": {},
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            2,
+            6,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.customParameters.xHeight": {
+          "disabled": false,
+          "value": "536"
+        },
+        "com.schriftgestalt.Glyphs.weightClass": 100,
+        "com.schriftgestalt.Glyphs.widthClass": 2
+      }
+    },
+    {
+      "id": "ExtraCondensed ExtraLight",
+      "name": {
+        "dflt": "ExtraCondensed ExtraLight"
+      },
+      "location": {
+        "wght": 42.0
+      },
+      "custom_names": {},
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            3,
+            6,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.customParameters.xHeight": {
+          "disabled": false,
+          "value": "536"
+        },
+        "com.schriftgestalt.Glyphs.weightClass": 200,
+        "com.schriftgestalt.Glyphs.widthClass": 2
+      }
+    },
+    {
+      "id": "ExtraCondensed Light",
+      "name": {
+        "dflt": "ExtraCondensed Light"
+      },
+      "location": {
+        "wght": 64.0
+      },
+      "custom_names": {},
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            4,
+            6,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.customParameters.xHeight": {
+          "disabled": false,
+          "value": "536"
+        },
+        "com.schriftgestalt.Glyphs.weightClass": 300,
+        "com.schriftgestalt.Glyphs.widthClass": 2
+      }
+    },
+    {
+      "id": "ExtraCondensed",
+      "name": {
+        "dflt": "ExtraCondensed"
+      },
+      "location": {
+        "wght": 94.0
+      },
+      "custom_names": {},
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            5,
+            6,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.customParameters.xHeight": {
+          "disabled": false,
+          "value": "536"
+        },
+        "com.schriftgestalt.Glyphs.widthClass": 2
+      }
+    },
+    {
+      "id": "ExtraCondensed Medium",
+      "name": {
+        "dflt": "ExtraCondensed Medium"
+      },
+      "location": {
+        "wght": 110.0
+      },
+      "custom_names": {},
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            6,
+            6,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.customParameters.xHeight": {
+          "disabled": false,
+          "value": "536"
+        },
+        "com.schriftgestalt.Glyphs.weightClass": 500,
+        "com.schriftgestalt.Glyphs.widthClass": 2
+      }
+    },
+    {
+      "id": "ExtraCondensed SemiBold",
+      "name": {
+        "dflt": "ExtraCondensed SemiBold"
+      },
+      "location": {
+        "wght": 130.0
+      },
+      "custom_names": {},
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            7,
+            6,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.customParameters.xHeight": {
+          "disabled": false,
+          "value": "536"
+        },
+        "com.schriftgestalt.Glyphs.weightClass": 600,
+        "com.schriftgestalt.Glyphs.widthClass": 2
+      }
+    },
+    {
+      "id": "ExtraCondensed Bold",
+      "name": {
+        "dflt": "ExtraCondensed Bold"
+      },
+      "location": {
+        "wght": 152.0
+      },
+      "custom_names": {},
+      "linked_style": "ExtraCondensed",
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            8,
+            6,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.customParameters.xHeight": {
+          "disabled": false,
+          "value": "536"
+        },
+        "com.schriftgestalt.Glyphs.weightClass": 700,
+        "com.schriftgestalt.Glyphs.widthClass": 2,
+        "com.schriftgestalt.Glyphs.isBold": true
+      }
+    },
+    {
+      "id": "ExtraCondensed ExtraBold",
+      "name": {
+        "dflt": "ExtraCondensed ExtraBold"
+      },
+      "location": {
+        "wght": 175.0
+      },
+      "custom_names": {},
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            9,
+            6,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.customParameters.xHeight": {
+          "disabled": false,
+          "value": "536"
+        },
+        "com.schriftgestalt.Glyphs.weightClass": 800,
+        "com.schriftgestalt.Glyphs.widthClass": 2
+      }
+    },
+    {
+      "id": "ExtraCondensed Black",
+      "name": {
+        "dflt": "ExtraCondensed Black"
+      },
+      "location": {
+        "wght": 194.0
+      },
+      "custom_names": {},
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            10,
+            6,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.customParameters.xHeight": {
+          "disabled": false,
+          "value": "536"
+        },
+        "com.schriftgestalt.Glyphs.weightClass": 900,
+        "com.schriftgestalt.Glyphs.widthClass": 2
+      }
+    }
+  ],
+  "masters": [
+    {
+      "name": {
+        "dflt": "Light"
+      },
+      "id": "1D4F67F9-897D-45AD-B7F0-CA61A6862C03",
+      "location": {
+        "wght": 28.0
+      },
+      "metrics": {
+        "Ascender": 760,
+        "ascender overshoot": 13,
+        "CapHeight": 714,
+        "capHeight overshoot": 12,
+        "XHeight": 536,
+        "xHeight overshoot": 7,
+        "baseline": 0,
+        "baseline overshoot": -11,
+        "Descender": -240,
+        "descender overshoot": -16,
+        "xHeight (filter case == 3)": 571,
+        "xHeight (filter case == 3) overshoot": 11,
+        "ItalicAngle": 0,
+        "italicAngle overshoot": 0
+      },
+      "kerning": {
+        "@A:@O": -20,
+        "@O:@A": -20
+      },
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.typoAscender": {
+          "disabled": false,
+          "value": 1069
+        },
+        "com.schriftgestalt.Glyphs.customParameters.typoDescender": {
+          "disabled": false,
+          "value": -293
+        },
+        "com.schriftgestalt.Glyphs.customParameters.typoLineGap": {
+          "disabled": false,
+          "value": 0
+        },
+        "com.schriftgestalt.Glyphs.customParameters.winAscent": {
+          "disabled": false,
+          "value": 1069
+        },
+        "com.schriftgestalt.Glyphs.customParameters.winDescent": {
+          "disabled": false,
+          "value": 389
+        },
+        "com.schriftgestalt.Glyphs.customParameters.hheaAscender": {
+          "disabled": false,
+          "value": 1069
+        },
+        "com.schriftgestalt.Glyphs.customParameters.hheaDescender": {
+          "disabled": false,
+          "value": -293
+        },
+        "com.schriftgestalt.Glyphs.customParameters.hheaLineGap": {
+          "disabled": false,
+          "value": 0
+        },
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            2,
+            2,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.stemValues": [
+          25.0,
+          0.0,
+          28.0,
+          0.0
+        ],
+        "com.schriftgestalt.Glyphs.numberValues": [],
+        "com.schriftgestalt.Glyphs.iconName": "Light",
+        "com.schriftgestalt.Glyphs.userData": {
+          "GSOffsetHorizontal": 1,
+          "GSOffsetVertical": 1
+        },
+        "com.schriftgestalt.Glyphs.visible": false
+      }
+    },
+    {
+      "name": {
+        "dflt": "Regular"
+      },
+      "id": "UUID0",
+      "location": {
+        "wght": 94.0
+      },
+      "metrics": {
+        "Ascender": 760,
+        "ascender overshoot": 11,
+        "CapHeight": 714,
+        "capHeight overshoot": 12,
+        "XHeight": 536,
+        "xHeight overshoot": 11,
+        "baseline": 0,
+        "baseline overshoot": -11,
+        "Descender": -240,
+        "descender overshoot": -16,
+        "xHeight (filter case == 3)": 571,
+        "xHeight (filter case == 3) overshoot": 11,
+        "ItalicAngle": 0,
+        "italicAngle overshoot": 0
+      },
+      "kerning": {
+        "@A:@O": -20,
+        "@O:@A": -20
+      },
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.typoAscender": {
+          "disabled": false,
+          "value": 1069
+        },
+        "com.schriftgestalt.Glyphs.customParameters.typoDescender": {
+          "disabled": false,
+          "value": -293
+        },
+        "com.schriftgestalt.Glyphs.customParameters.typoLineGap": {
+          "disabled": false,
+          "value": 0
+        },
+        "com.schriftgestalt.Glyphs.customParameters.winAscent": {
+          "disabled": false,
+          "value": 1069
+        },
+        "com.schriftgestalt.Glyphs.customParameters.winDescent": {
+          "disabled": false,
+          "value": 389
+        },
+        "com.schriftgestalt.Glyphs.customParameters.hheaAscender": {
+          "disabled": false,
+          "value": 1069
+        },
+        "com.schriftgestalt.Glyphs.customParameters.hheaDescender": {
+          "disabled": false,
+          "value": -293
+        },
+        "com.schriftgestalt.Glyphs.customParameters.hheaLineGap": {
+          "disabled": false,
+          "value": 0
+        },
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            5,
+            2,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.stemValues": [
+          50.0,
+          64.0,
+          94.0,
+          101.0
+        ],
+        "com.schriftgestalt.Glyphs.numberValues": [],
+        "com.schriftgestalt.Glyphs.iconName": "",
+        "com.schriftgestalt.Glyphs.userData": {
+          "GSOffsetHorizontal": 5,
+          "GSOffsetProportional": 1,
+          "GSOffsetVertical": 10
+        },
+        "com.schriftgestalt.Glyphs.visible": true
+      }
+    },
+    {
+      "name": {
+        "dflt": "Bold"
+      },
+      "id": "E17BEC9D-CAAD-449F-91D9-03766E30097E",
+      "location": {
+        "wght": 194.0
+      },
+      "metrics": {
+        "Ascender": 760,
+        "ascender overshoot": 9,
+        "CapHeight": 714,
+        "capHeight overshoot": 12,
+        "XHeight": 536,
+        "xHeight overshoot": 16,
+        "baseline": 0,
+        "baseline overshoot": -11,
+        "Descender": -240,
+        "descender overshoot": -16,
+        "xHeight (filter case == 3)": 571,
+        "xHeight (filter case == 3) overshoot": 10,
+        "ItalicAngle": 0,
+        "italicAngle overshoot": 0
+      },
+      "kerning": {
+        "@A:@O": -20,
+        "@O:@A": -20
+      },
+      "format_specific": {
+        "com.schriftgestalt.Glyphs.customParameters.typoAscender": {
+          "disabled": false,
+          "value": 1069
+        },
+        "com.schriftgestalt.Glyphs.customParameters.typoDescender": {
+          "disabled": false,
+          "value": -293
+        },
+        "com.schriftgestalt.Glyphs.customParameters.typoLineGap": {
+          "disabled": false,
+          "value": 0
+        },
+        "com.schriftgestalt.Glyphs.customParameters.winAscent": {
+          "disabled": false,
+          "value": 1069
+        },
+        "com.schriftgestalt.Glyphs.customParameters.winDescent": {
+          "disabled": false,
+          "value": 389
+        },
+        "com.schriftgestalt.Glyphs.customParameters.hheaAscender": {
+          "disabled": false,
+          "value": 1069
+        },
+        "com.schriftgestalt.Glyphs.customParameters.hheaDescender": {
+          "disabled": false,
+          "value": -293
+        },
+        "com.schriftgestalt.Glyphs.customParameters.hheaLineGap": {
+          "disabled": false,
+          "value": 0
+        },
+        "com.schriftgestalt.Glyphs.customParameters.panose": {
+          "disabled": false,
+          "value": [
+            2,
+            2,
+            10,
+            2,
+            6,
+            5,
+            5,
+            2,
+            2,
+            4
+          ]
+        },
+        "com.schriftgestalt.Glyphs.stemValues": [
+          69.0,
+          100.0,
+          194.0,
+          200.0
+        ],
+        "com.schriftgestalt.Glyphs.numberValues": [],
+        "com.schriftgestalt.Glyphs.iconName": "Bold",
+        "com.schriftgestalt.Glyphs.userData": {
+          "GSOffsetHorizontal": 7,
+          "GSOffsetProportional": 1,
+          "GSOffsetVertical": 1
+        },
+        "com.schriftgestalt.Glyphs.visible": false
+      }
+    }
+  ],
+  "glyphs": [
+    {
+      "name": "A",
+      "category": {
+        "Custom": "Letter"
+      },
+      "codepoints": [
+        65
+      ],
+      "layers": [
+        {
+          "width": 788.0,
+          "id": "E17BEC9D-CAAD-449F-91D9-03766E30097E",
+          "master": {
+            "type": "DefaultForMaster",
+            "master": "E17BEC9D-CAAD-449F-91D9-03766E30097E"
+          },
+          "shapes": [
+            {
+              "nodes": "279 0 l 279 61 l 230 61 ls 202 61 o 193 73 o 193 93 cs 193 112 o 203 144 o 207 160 cs 230 232 l 458 232 l 489 141 l 492 133 o 500 111 o 500 92 cs 500 67 o 479 61 o 458 61 cs 418 61 l 418 0 l 788 0 l 788 61 l 777 61 ls 740 61 o 712 81 o 695 128 cs 491 714 l 310 714 l 97 130 ls 76 73 o 48 61 o 14 61 cs 7 61 l 7 0 l",
+              "closed": true
+            },
+            {
+              "nodes": "315 493 ls 326 527 o 338 567 o 349 610 c 357 566 o 369 527 o 379 492 cs 436 301 l 252 301 l",
+              "closed": true
+            }
+          ],
+          "anchors": [
+            {
+              "x": 610.0,
+              "y": 0.0,
+              "name": "bottom"
+            },
+            {
+              "x": 397.0,
+              "y": 357.0,
+              "name": "center"
+            },
+            {
+              "x": 394.0,
+              "y": 714.0,
+              "name": "top"
+            },
+            {
+              "x": 668.0,
+              "y": 714.0,
+              "name": "topright"
+            }
+          ],
+          "format_specific": {
+            "com.schriftgestalt.Glyphs.attr": {}
+          }
+        },
+        {
+          "width": 705.0,
+          "id": "UUID0",
+          "master": {
+            "type": "DefaultForMaster",
+            "master": "UUID0"
+          },
+          "shapes": [
+            {
+              "nodes": "244 0 l 244 42 l 221 42 ls 177 42 o 155 57 o 155 91 cs 155 102 o 158 118 o 164 134 cs 202 239 l 465 239 l 505 127 ls 510 112 o 513 101 o 513 90 cs 513 57 o 493 42 o 453 42 cs 430 42 l 430 0 l 705 0 l 705 42 l 692 42 ls 653 42 o 636 53 o 621 95 cs 395 714 l 317 714 l 95 120 ls 71 56 o 58 42 o 19 42 cs 0 42 l 0 0 l",
+              "closed": true
+            },
+            {
+              "nodes": "289 473 ls 312 535 o 325 574 o 335 622 c 346 574 o 364 523 o 385 464 cs 447 289 l 221 289 l",
+              "closed": true
+            }
+          ],
+          "anchors": [
+            {
+              "x": 582.0,
+              "y": 0.0,
+              "name": "bottom"
+            },
+            {
+              "x": 352.0,
+              "y": 357.0,
+              "name": "center"
+            },
+            {
+              "x": 353.0,
+              "y": 714.0,
+              "name": "top"
+            },
+            {
+              "x": 555.0,
+              "y": 714.0,
+              "name": "topright"
+            }
+          ],
+          "format_specific": {
+            "com.schriftgestalt.Glyphs.attr": {}
+          }
+        },
+        {
+          "width": 645.0,
+          "id": "1D4F67F9-897D-45AD-B7F0-CA61A6862C03",
+          "master": {
+            "type": "DefaultForMaster",
+            "master": "1D4F67F9-897D-45AD-B7F0-CA61A6862C03"
+          },
+          "shapes": [
+            {
+              "nodes": "220 0 l 220 20 l 167 20 ls 117 20 o 112 29 o 112 48 cs 112 71 o 134 129 o 140 147 cs 176 251 l 465 251 l 501 147 ls 507 129 o 529 71 o 529 48 cs 529 29 o 524 20 o 474 20 cs 440 20 l 440 0 l 645 0 l 645 20 l 623 20 ls 577 20 o 573 24 o 558 68 cs 335 714 l 306 714 l 83 68 ls 68 24 o 64 20 o 18 20 cs -4 20 l -4 0 l",
+              "closed": true
+            },
+            {
+              "nodes": "266 515 ls 281 560 o 313 649 o 321 680 c 335 638 o 360 559 o 379 505 cs 456 276 l 184 276 l",
+              "closed": true
+            }
+          ],
+          "anchors": [
+            {
+              "x": 553.0,
+              "y": 0.0,
+              "name": "bottom"
+            },
+            {
+              "x": 320.0,
+              "y": 357.0,
+              "name": "center"
+            },
+            {
+              "x": 323.0,
+              "y": 714.0,
+              "name": "top"
+            },
+            {
+              "x": 525.0,
+              "y": 714.0,
+              "name": "topright"
+            }
+          ],
+          "format_specific": {
+            "com.schriftgestalt.Glyphs.attr": {}
+          }
+        }
+      ],
+      "format_specific": {
+        "case": "",
+        "kern_left": "A",
+        "kern_right": "A",
+        "locked": false,
+        "note": "",
+        "script": "latin",
+        "subcategory": "Uppercase"
+      }
+    },
+    {
+      "name": "O",
+      "category": {
+        "Custom": "Letter"
+      },
+      "codepoints": [
+        79
+      ],
+      "layers": [
+        {
+          "width": 820.0,
+          "id": "E17BEC9D-CAAD-449F-91D9-03766E30097E",
+          "master": {
+            "type": "DefaultForMaster",
+            "master": "E17BEC9D-CAAD-449F-91D9-03766E30097E"
+          },
+          "shapes": [
+            {
+              "nodes": "639 -10 o 766 137 o 766 358 cs 766 580 o 639 725 o 412 725 cs 171 725 o 54 580 o 54 359 cs 54 137 o 171 -10 o 411 -10 cs",
+              "closed": true
+            },
+            {
+              "nodes": "304 63 o 264 172 o 264 358 cs 264 544 o 304 652 o 412 652 cs 518 652 o 556 544 o 556 358 cs 556 172 o 518 63 o 411 63 cs",
+              "closed": true
+            }
+          ],
+          "anchors": [
+            {
+              "x": 410.0,
+              "y": 0.0,
+              "name": "bottom"
+            },
+            {
+              "x": 410.0,
+              "y": 357.0,
+              "name": "center"
+            },
+            {
+              "x": 410.0,
+              "y": 714.0,
+              "name": "top"
+            },
+            {
+              "x": 800.0,
+              "y": 714.0,
+              "name": "topright"
+            }
+          ],
+          "format_specific": {
+            "com.schriftgestalt.Glyphs.attr": {}
+          }
+        },
+        {
+          "width": 742.0,
+          "id": "UUID0",
+          "master": {
+            "type": "DefaultForMaster",
+            "master": "UUID0"
+          },
+          "shapes": [
+            {
+              "nodes": "573 -10 o 685 137 o 685 358 cs 685 580 o 573 725 o 372 725 cs 159 725 o 56 580 o 56 359 cs 56 137 o 159 -10 o 371 -10 cs",
+              "closed": true
+            },
+            {
+              "nodes": "223 44 o 167 160 o 167 358 cs 167 556 o 223 671 o 372 671 cs 520 671 o 574 556 o 574 358 cs 574 160 o 520 44 o 371 44 cs",
+              "closed": true
+            }
+          ],
+          "anchors": [
+            {
+              "x": 371.0,
+              "y": 0.0,
+              "name": "bottom"
+            },
+            {
+              "x": 371.0,
+              "y": 357.0,
+              "name": "center"
+            },
+            {
+              "x": 371.0,
+              "y": 714.0,
+              "name": "top"
+            },
+            {
+              "x": 722.0,
+              "y": 714.0,
+              "name": "topright"
+            }
+          ],
+          "format_specific": {
+            "com.schriftgestalt.Glyphs.attr": {}
+          }
+        },
+        {
+          "width": 686.0,
+          "id": "1D4F67F9-897D-45AD-B7F0-CA61A6862C03",
+          "master": {
+            "type": "DefaultForMaster",
+            "master": "1D4F67F9-897D-45AD-B7F0-CA61A6862C03"
+          },
+          "shapes": [
+            {
+              "nodes": "545 -10 o 627 135 o 627 358 cs 627 590 o 547 725 o 344 725 cs 157 725 o 58 592 o 58 359 cs 58 125 o 153 -10 o 343 -10 cs",
+              "closed": true
+            },
+            {
+              "nodes": "172 15 o 86 143 o 86 358 cs 86 573 o 172 700 o 344 700 cs 530 700 o 599 573 o 599 358 cs 599 145 o 524 15 o 343 15 cs",
+              "closed": true
+            }
+          ],
+          "anchors": [
+            {
+              "x": 343.0,
+              "y": 0.0,
+              "name": "bottom"
+            },
+            {
+              "x": 343.0,
+              "y": 357.0,
+              "name": "center"
+            },
+            {
+              "x": 343.0,
+              "y": 714.0,
+              "name": "top"
+            },
+            {
+              "x": 666.0,
+              "y": 714.0,
+              "name": "topright"
+            }
+          ],
+          "format_specific": {
+            "com.schriftgestalt.Glyphs.attr": {}
+          }
+        }
+      ],
+      "format_specific": {
+        "case": "",
+        "kern_left": "O",
+        "kern_right": "O",
+        "locked": false,
+        "note": "",
+        "script": "latin",
+        "subcategory": "Uppercase"
+      }
+    },
+    {
+      "name": "Aacute",
+      "category": {
+        "Custom": "Letter"
+      },
+      "codepoints": [
+        193
+      ],
+      "layers": [
+        {
+          "width": 788.0,
+          "id": "E17BEC9D-CAAD-449F-91D9-03766E30097E",
+          "master": {
+            "type": "DefaultForMaster",
+            "master": "E17BEC9D-CAAD-449F-91D9-03766E30097E"
+          },
+          "shapes": [
+            {
+              "reference": "A",
+              "format_specific": {
+                "com.schriftgestalt.Glyphs.alignment": 0
+              }
+            },
+            {
+              "nodes": "315 771 l 405 771 l 475 807 o 588 886 o 613 921 c 613 931 l 419 931 l 398 886 o 344 822 o 315 784 c",
+              "closed": true
+            }
+          ],
+          "anchors": [
+            {
+              "x": 394.0,
+              "y": 0.0,
+              "name": "bottom"
+            },
+            {
+              "x": 394.0,
+              "y": 931.0,
+              "name": "top"
+            }
+          ],
+          "format_specific": {
+            "com.schriftgestalt.Glyphs.attr": {}
+          }
+        },
+        {
+          "width": 705.0,
+          "id": "UUID0",
+          "master": {
+            "type": "DefaultForMaster",
+            "master": "UUID0"
+          },
+          "shapes": [
+            {
+              "reference": "A",
+              "format_specific": {
+                "com.schriftgestalt.Glyphs.alignment": 0
+              }
+            },
+            {
+              "nodes": "311 771 l 349 771 l 402 807 o 480 886 o 505 921 c 505 931 l 398 931 l 377 886 o 340 822 o 311 784 c",
+              "closed": true
+            }
+          ],
+          "anchors": [
+            {
+              "x": 353.0,
+              "y": 0.0,
+              "name": "bottom"
+            },
+            {
+              "x": 353.0,
+              "y": 931.0,
+              "name": "top"
+            }
+          ],
+          "format_specific": {
+            "com.schriftgestalt.Glyphs.attr": {}
+          }
+        },
+        {
+          "width": 645.0,
+          "id": "1D4F67F9-897D-45AD-B7F0-CA61A6862C03",
+          "master": {
+            "type": "DefaultForMaster",
+            "master": "1D4F67F9-897D-45AD-B7F0-CA61A6862C03"
+          },
+          "shapes": [
+            {
+              "reference": "A"
+            },
+            {
+              "nodes": "289 771 l 291 771 l 332 807 o 402 886 o 427 921 c 427 931 l 384 931 l 363 886 o 318 822 o 289 784 c",
+              "closed": true
+            }
+          ],
+          "anchors": [
+            {
+              "x": 323.0,
+              "y": 0.0,
+              "name": "bottom"
+            },
+            {
+              "x": 323.0,
+              "y": 931.0,
+              "name": "top"
+            }
+          ],
+          "format_specific": {
+            "com.schriftgestalt.Glyphs.attr": {}
+          }
+        }
+      ],
+      "format_specific": {
+        "case": "",
+        "kern_left": "A",
+        "kern_right": "A",
+        "locked": false,
+        "note": "",
+        "script": "latin",
+        "subcategory": "Uppercase"
+      }
+    },
+    {
+      "name": "Oacute",
+      "category": {
+        "Custom": "Letter"
+      },
+      "codepoints": [
+        211
+      ],
+      "layers": [
+        {
+          "width": 820.0,
+          "id": "E17BEC9D-CAAD-449F-91D9-03766E30097E",
+          "master": {
+            "type": "DefaultForMaster",
+            "master": "E17BEC9D-CAAD-449F-91D9-03766E30097E"
+          },
+          "shapes": [
+            {
+              "reference": "O",
+              "format_specific": {
+                "com.schriftgestalt.Glyphs.alignment": 0
+              }
+            },
+            {
+              "nodes": "331 771 l 421 771 l 491 807 o 604 886 o 629 921 c 629 931 l 435 931 l 414 886 o 360 822 o 331 784 c",
+              "closed": true
+            }
+          ],
+          "anchors": [
+            {
+              "x": 410.0,
+              "y": 0.0,
+              "name": "bottom"
+            },
+            {
+              "x": 410.0,
+              "y": 931.0,
+              "name": "top"
+            }
+          ],
+          "format_specific": {
+            "com.schriftgestalt.Glyphs.attr": {}
+          }
+        },
+        {
+          "width": 742.0,
+          "id": "UUID0",
+          "master": {
+            "type": "DefaultForMaster",
+            "master": "UUID0"
+          },
+          "shapes": [
+            {
+              "reference": "O",
+              "format_specific": {
+                "com.schriftgestalt.Glyphs.alignment": 0
+              }
+            },
+            {
+              "nodes": "317 771 l 355 771 l 408 807 o 486 886 o 511 921 c 511 931 l 404 931 l 383 886 o 346 822 o 317 784 c",
+              "closed": true
+            }
+          ],
+          "anchors": [
+            {
+              "x": 371.0,
+              "y": 0.0,
+              "name": "bottom"
+            },
+            {
+              "x": 371.0,
+              "y": 931.0,
+              "name": "top"
+            }
+          ],
+          "format_specific": {
+            "com.schriftgestalt.Glyphs.attr": {}
+          }
+        },
+        {
+          "width": 686.0,
+          "id": "1D4F67F9-897D-45AD-B7F0-CA61A6862C03",
+          "master": {
+            "type": "DefaultForMaster",
+            "master": "1D4F67F9-897D-45AD-B7F0-CA61A6862C03"
+          },
+          "shapes": [
+            {
+              "reference": "O"
+            },
+            {
+              "nodes": "287 771 l 289 771 l 330 807 o 400 886 o 425 921 c 425 931 l 382 931 l 361 886 o 316 822 o 287 784 c",
+              "closed": true
+            }
+          ],
+          "anchors": [
+            {
+              "x": 343.0,
+              "y": 0.0,
+              "name": "bottom"
+            },
+            {
+              "x": 343.0,
+              "y": 931.0,
+              "name": "top"
+            }
+          ],
+          "format_specific": {
+            "com.schriftgestalt.Glyphs.attr": {}
+          }
+        }
+      ],
+      "format_specific": {
+        "case": "",
+        "kern_left": "O",
+        "kern_right": "O",
+        "locked": false,
+        "note": "",
+        "script": "latin",
+        "subcategory": "Uppercase"
+      }
+    },
+    {
+      "name": "Otilde",
+      "category": {
+        "Custom": "Letter"
+      },
+      "codepoints": [
+        213
+      ],
+      "layers": [
+        {
+          "width": 820.0,
+          "id": "E17BEC9D-CAAD-449F-91D9-03766E30097E",
+          "master": {
+            "type": "DefaultForMaster",
+            "master": "E17BEC9D-CAAD-449F-91D9-03766E30097E"
+          },
+          "shapes": [
+            {
+              "reference": "O",
+              "format_specific": {
+                "com.schriftgestalt.Glyphs.alignment": 0
+              }
+            },
+            {
+              "nodes": "557 771 o 621 845 o 625 941 c 546 941 l 542 914 o 518 888 o 497 888 cs 455 888 o 412 951 o 341 951 cs 269 951 o 204 877 o 200 781 c 280 781 l 284 808 o 306 834 o 329 834 cs 372 834 o 414 771 o 486 771 cs",
+              "closed": true
+            }
+          ],
+          "anchors": [
+            {
+              "x": 410.0,
+              "y": 0.0,
+              "name": "bottom"
+            },
+            {
+              "x": 410.0,
+              "y": 951.0,
+              "name": "top"
+            }
+          ],
+          "format_specific": {
+            "com.schriftgestalt.Glyphs.attr": {}
+          }
+        },
+        {
+          "width": 742.0,
+          "id": "UUID0",
+          "master": {
+            "type": "DefaultForMaster",
+            "master": "UUID0"
+          },
+          "shapes": [
+            {
+              "reference": "O",
+              "format_specific": {
+                "com.schriftgestalt.Glyphs.alignment": 0
+              }
+            },
+            {
+              "nodes": "508 771 o 538 828 o 542 889 c 497 889 l 493 862 o 487 836 o 448 836 cs 406 836 o 363 899 o 292 899 cs 220 899 o 190 842 o 186 781 c 231 781 l 235 808 o 240 834 o 280 834 cs 323 834 o 365 771 o 437 771 cs",
+              "closed": true
+            }
+          ],
+          "anchors": [
+            {
+              "x": 371.0,
+              "y": 0.0,
+              "name": "bottom"
+            },
+            {
+              "x": 371.0,
+              "y": 899.0,
+              "name": "top"
+            }
+          ],
+          "format_specific": {
+            "com.schriftgestalt.Glyphs.attr": {}
+          }
+        },
+        {
+          "width": 686.0,
+          "id": "1D4F67F9-897D-45AD-B7F0-CA61A6862C03",
+          "master": {
+            "type": "DefaultForMaster",
+            "master": "1D4F67F9-897D-45AD-B7F0-CA61A6862C03"
+          },
+          "shapes": [
+            {
+              "reference": "O"
+            },
+            {
+              "nodes": "463 784 o 478 824 o 482 863 c 460 863 l 456 836 o 447 810 o 410 810 cs 358 810 o 319 865 o 252 865 cs 197 865 o 180 816 o 176 781 c 198 781 l 202 808 o 210 839 o 250 839 cs 303 839 o 348 784 o 410 784 cs",
+              "closed": true
+            }
+          ],
+          "anchors": [
+            {
+              "x": 343.0,
+              "y": 0.0,
+              "name": "bottom"
+            },
+            {
+              "x": 343.0,
+              "y": 865.0,
+              "name": "top"
+            }
+          ],
+          "format_specific": {
+            "com.schriftgestalt.Glyphs.attr": {}
+          }
+        }
+      ],
+      "format_specific": {
+        "case": "",
+        "kern_left": "O",
+        "kern_right": "O",
+        "locked": false,
+        "note": "",
+        "script": "latin",
+        "subcategory": "Uppercase"
+      }
+    },
+    {
+      "name": "Otildeacute",
+      "category": {
+        "Custom": "Letter"
+      },
+      "codepoints": [
+        7756
+      ],
+      "layers": [
+        {
+          "width": 686.0,
+          "id": "1D4F67F9-897D-45AD-B7F0-CA61A6862C03",
+          "master": {
+            "type": "DefaultForMaster",
+            "master": "1D4F67F9-897D-45AD-B7F0-CA61A6862C03"
+          },
+          "shapes": [
+            {
+              "reference": "O"
+            },
+            {
+              "nodes": "480 784 o 495 824 o 499 863 c 477 863 l 473 836 o 464 810 o 427 810 cs 375 810 o 336 865 o 269 865 cs 214 865 o 197 816 o 193 781 c 215 781 l 219 808 o 227 839 o 267 839 cs 320 839 o 365 784 o 427 784 cs",
+              "closed": true
+            },
+            {
+              "nodes": "317 880 l 323 880 l 357 915 o 406 971 o 436 1008 c 436 1018 l 393 1018 l 372 973 o 344 928 o 317 890 c",
+              "closed": true
+            }
+          ],
+          "anchors": [
+            {
+              "x": 343.0,
+              "y": 0.0,
+              "name": "bottom"
+            },
+            {
+              "x": 343.0,
+              "y": 1018.0,
+              "name": "top"
+            }
+          ],
+          "format_specific": {
+            "com.schriftgestalt.Glyphs.attr": {}
+          }
+        },
+        {
+          "width": 742.0,
+          "id": "UUID0",
+          "master": {
+            "type": "DefaultForMaster",
+            "master": "UUID0"
+          },
+          "shapes": [
+            {
+              "reference": "O",
+              "format_specific": {
+                "com.schriftgestalt.Glyphs.alignment": 0
+              }
+            },
+            {
+              "nodes": "515 771 o 545 823 o 549 884 c 504 884 l 500 857 o 494 836 o 455 836 cs 413 836 o 370 884 o 299 884 cs 227 884 o 197 832 o 193 771 c 238 771 l 242 798 o 247 819 o 287 819 cs 330 819 o 372 771 o 444 771 cs",
+              "closed": true
+            },
+            {
+              "nodes": "310 901 l 348 901 l 401 937 o 464 991 o 489 1026 c 489 1036 l 382 1036 l 368 999 o 340 955 o 310 914 c",
+              "closed": true
+            }
+          ],
+          "anchors": [
+            {
+              "x": 371.0,
+              "y": 0.0,
+              "name": "bottom"
+            },
+            {
+              "x": 371.0,
+              "y": 1036.0,
+              "name": "top"
+            }
+          ],
+          "format_specific": {
+            "com.schriftgestalt.Glyphs.attr": {}
+          }
+        },
+        {
+          "width": 820.0,
+          "id": "E17BEC9D-CAAD-449F-91D9-03766E30097E",
+          "master": {
+            "type": "DefaultForMaster",
+            "master": "E17BEC9D-CAAD-449F-91D9-03766E30097E"
+          },
+          "shapes": [
+            {
+              "reference": "O",
+              "format_specific": {
+                "com.schriftgestalt.Glyphs.alignment": 0
+              }
+            },
+            {
+              "nodes": "544 772 o 589 820 o 593 913 c 517 913 l 515 886 o 501 859 o 476 859 cs 440 859 o 394 905 o 329 905 cs 253 905 o 203 854 o 199 764 c 274 764 l 274 787 o 288 816 o 314 816 cs 354 816 o 404 772 o 470 772 cs",
+              "closed": true
+            },
+            {
+              "nodes": "329 936 l 403 936 l 458 970 o 521 1025 o 541 1048 c 541 1060 l 384 1060 l 373 1025 o 349 978 o 329 947 c",
+              "closed": true
+            }
+          ],
+          "anchors": [
+            {
+              "x": 410.0,
+              "y": 0.0,
+              "name": "bottom"
+            },
+            {
+              "x": 410.0,
+              "y": 1060.0,
+              "name": "top"
+            }
+          ],
+          "format_specific": {
+            "com.schriftgestalt.Glyphs.attr": {}
+          }
+        }
+      ],
+      "format_specific": {
+        "case": "",
+        "locked": false,
+        "note": "",
+        "script": "latin",
+        "subcategory": "Uppercase"
+      }
+    },
+    {
+      "name": "acutecomb",
+      "category": "Mark",
+      "codepoints": [
+        769
+      ],
+      "layers": [
+        {
+          "width": 0.0,
+          "id": "E17BEC9D-CAAD-449F-91D9-03766E30097E",
+          "master": {
+            "type": "DefaultForMaster",
+            "master": "E17BEC9D-CAAD-449F-91D9-03766E30097E"
+          },
+          "shapes": [
+            {
+              "nodes": "-344 606 l -254 606 l -184 642 o -71 721 o -46 756 c -46 766 l -240 766 l -261 721 o -315 657 o -344 619 c",
+              "closed": true
+            }
+          ],
+          "anchors": [
+            {
+              "x": -245.0,
+              "y": 536.0,
+              "name": "_top"
+            },
+            {
+              "x": -245.0,
+              "y": 766.0,
+              "name": "top"
+            }
+          ],
+          "format_specific": {
+            "com.schriftgestalt.Glyphs.attr": {}
+          }
+        },
+        {
+          "width": 0.0,
+          "id": "UUID0",
+          "master": {
+            "type": "DefaultForMaster",
+            "master": "UUID0"
+          },
+          "shapes": [
+            {
+              "nodes": "-302 606 l -264 606 l -211 642 o -133 721 o -108 756 c -108 766 l -215 766 l -236 721 o -273 657 o -302 619 c",
+              "closed": true
+            }
+          ],
+          "anchors": [
+            {
+              "x": -245.0,
+              "y": 536.0,
+              "name": "_top"
+            },
+            {
+              "x": -245.0,
+              "y": 766.0,
+              "name": "top"
+            }
+          ],
+          "format_specific": {
+            "com.schriftgestalt.Glyphs.attr": {}
+          }
+        },
+        {
+          "width": 0.0,
+          "id": "1D4F67F9-897D-45AD-B7F0-CA61A6862C03",
+          "master": {
+            "type": "DefaultForMaster",
+            "master": "1D4F67F9-897D-45AD-B7F0-CA61A6862C03"
+          },
+          "shapes": [
+            {
+              "nodes": "-304 606 l -302 606 l -261 642 o -191 721 o -166 756 c -166 766 l -209 766 l -230 721 o -275 657 o -304 619 c",
+              "closed": true
+            }
+          ],
+          "anchors": [
+            {
+              "x": -255.0,
+              "y": 536.0,
+              "name": "_top"
+            },
+            {
+              "x": -255.0,
+              "y": 766.0,
+              "name": "top"
+            }
+          ],
+          "format_specific": {
+            "com.schriftgestalt.Glyphs.attr": {}
+          }
+        }
+      ],
+      "format_specific": {
+        "case": "",
+        "locked": false,
+        "note": "",
+        "script": "",
+        "subcategory": "Nonspacing"
+      }
+    },
+    {
+      "name": "tildecomb",
+      "category": "Mark",
+      "codepoints": [
+        771
+      ],
+      "layers": [
+        {
+          "width": 0.0,
+          "id": "E17BEC9D-CAAD-449F-91D9-03766E30097E",
+          "master": {
+            "type": "DefaultForMaster",
+            "master": "E17BEC9D-CAAD-449F-91D9-03766E30097E"
+          },
+          "shapes": [
+            {
+              "nodes": "-174 606 o -110 680 o -106 776 c -185 776 l -189 749 o -213 723 o -234 723 cs -276 723 o -319 786 o -390 786 cs -462 786 o -527 712 o -531 616 c -451 616 l -447 643 o -425 669 o -402 669 cs -359 669 o -317 606 o -245 606 cs",
+              "closed": true
+            }
+          ],
+          "anchors": [
+            {
+              "x": -319.0,
+              "y": 536.0,
+              "name": "_top"
+            },
+            {
+              "x": -319.0,
+              "y": 786.0,
+              "name": "top"
+            }
+          ],
+          "format_specific": {
+            "com.schriftgestalt.Glyphs.attr": {}
+          }
+        },
+        {
+          "width": 0.0,
+          "id": "UUID0",
+          "master": {
+            "type": "DefaultForMaster",
+            "master": "UUID0"
+          },
+          "shapes": [
+            {
+              "nodes": "-174 606 o -144 663 o -140 724 c -185 724 l -189 697 o -195 671 o -234 671 cs -276 671 o -319 734 o -390 734 cs -462 734 o -492 677 o -496 616 c -451 616 l -447 643 o -442 669 o -402 669 cs -359 669 o -317 606 o -245 606 cs",
+              "closed": true
+            }
+          ],
+          "anchors": [
+            {
+              "x": -318.0,
+              "y": 536.0,
+              "name": "_top"
+            },
+            {
+              "x": -318.0,
+              "y": 734.0,
+              "name": "top"
+            }
+          ],
+          "format_specific": {
+            "com.schriftgestalt.Glyphs.attr": {}
+          }
+        },
+        {
+          "width": 0.0,
+          "id": "1D4F67F9-897D-45AD-B7F0-CA61A6862C03",
+          "master": {
+            "type": "DefaultForMaster",
+            "master": "1D4F67F9-897D-45AD-B7F0-CA61A6862C03"
+          },
+          "shapes": [
+            {
+              "nodes": "-183 619 o -168 659 o -164 698 c -186 698 l -190 671 o -199 645 o -236 645 cs -288 645 o -327 700 o -394 700 cs -449 700 o -466 651 o -470 616 c -448 616 l -444 643 o -436 674 o -396 674 cs -343 674 o -298 619 o -236 619 cs",
+              "closed": true
+            }
+          ],
+          "anchors": [
+            {
+              "x": -317.0,
+              "y": 536.0,
+              "name": "_top"
+            },
+            {
+              "x": -317.0,
+              "y": 700.0,
+              "name": "top"
+            }
+          ],
+          "format_specific": {
+            "com.schriftgestalt.Glyphs.attr": {}
+          }
+        }
+      ],
+      "format_specific": {
+        "case": "",
+        "locked": false,
+        "note": "",
+        "script": "",
+        "subcategory": "Nonspacing"
+      }
+    }
+  ],
+  "note": "Cyrillic color coding\n\n1. Cyan – components done by Trifon & Botio\n2. Light Green – designed by Ksenya unchanged\n3. Orange – changed by Trifon & Botio\n4. Purple – improved after review\n5. No color – sill to be done after next assignment from Dave and Simon\n\n\n",
+  "date": "2025-02-06T10:00:06Z",
+  "names": {
+    "copyright": {
+      "dflt": "Copyright 2022 The Noto Project Authors (https://github.com/notofonts/latin-greek-cyrillic)"
+    },
+    "family_name": {
+      "dflt": "Noto Serif"
+    },
+    "trademark": {
+      "dflt": "Noto is a trademark of Google LLC."
+    },
+    "manufacturer": {
+      "dflt": "Monotype Imaging Inc."
+    },
+    "designer": {
+      "dflt": "Monotype Design Team"
+    },
+    "description": {
+      "dflt": "Designed by Monotype design team."
+    },
+    "manufacturer_url": {
+      "dflt": "http://www.google.com/get/noto/"
+    },
+    "designer_url": {
+      "dflt": "http://www.monotype.com/studio"
+    },
+    "license": {
+      "dflt": "This Font Software is licensed under the SIL Open Font License, Version 1.1. This license is available with a FAQ at: https://scripts.sil.org/OFL"
+    },
+    "license_url": {
+      "dflt": "https://scripts.sil.org/OFL"
+    },
+    "postscript_cid_name": {
+      "dflt": "NotoSerif"
+    }
+  },
+  "custom_ot_values": {
+    "os2_vendor_id": "GOOG",
+    "os2_fs_selection": 128
+  },
+  "features": {
+    "classes": {},
+    "prefixes": {
+      "anonymous": {
+        "code": "@Uppercase = [A O Aacute Oacute Otilde Otildeacute];\n# Prefix: Languagesystems\nlanguagesystem DFLT dflt;\nlanguagesystem latn dflt;\nlanguagesystem grek dflt;\nlanguagesystem grek IPPH;\nlanguagesystem grek APPH;\nlanguagesystem cyrl dflt;\nlanguagesystem latn CAT;\nlanguagesystem latn MOL;\nlanguagesystem latn ROM;\nlanguagesystem latn MAH;\nlanguagesystem latn NAV;\nlanguagesystem latn IPPH;\nlanguagesystem latn APPH;\nlanguagesystem cyrl SRB;\nlanguagesystem cyrl MKD;\nfeature ccmp {\n# zero.slash alternate\n        lookup latnSoftDot {\n        @CombiningTopAccents = [acutecomb tildecomb];\n        # Removed glyph class SoftDotted due to no glyphs remaining\n        # Removed glyph class SoftDottedDotless due to no glyphs remaining\n        lookupflag UseMarkFilteringSet @CombiningTopAccents;\n    } latnSoftDot;\n    # Removed lookup latnLigatures due to no statements remaining\n    script latn;\n    language dflt;\n    lookup latnSoftDot;\n    # Removed lookup reference to latnLigatures due to lookup being dropped\n    language CAT;\n    lookup latnSoftDot;\n    # Removed lookup reference to latnLigatures due to lookup being dropped\n    language MAH;\n    lookup latnSoftDot;\n    # Removed lookup reference to latnLigatures due to lookup being dropped\n    language MOL;\n    lookup latnSoftDot;\n    # Removed lookup reference to latnLigatures due to lookup being dropped\n    language NAV;\n    lookup latnSoftDot;\n    # Removed lookup reference to latnLigatures due to lookup being dropped\n    language ROM;\n    lookup latnSoftDot;\n    # Removed lookup reference to latnLigatures due to lookup being dropped\n    script grek;\n    # Greek\n    # sub alpha macroncomb commaabovecomb gravecomb by alpha_macroncomb_commaabovecomb_gravecomb;\n    # sub alpha macroncomb commaabovecomb acutecomb by alpha_macroncomb_commaabovecomb_acutecomb;\n    # sub alpha macroncomb commareversedabovecomb gravecomb by alpha_macroncomb_commareversedabovecomb_gravecomb;\n    # sub alpha macroncomb commareversedabovecomb acutecomb by alpha_macroncomb_commareversedabovecomb_acutecomb;\n    # sub alpha brevecomb commaabovecomb gravecomb by alpha_brevecomb_commaabovecomb_gravecomb;\n    # sub alpha brevecomb commaabovecomb acutecomb by alpha_brevecomb_commaabovecomb_acutecomb;\n    # sub alpha brevecomb commareversedabovecomb gravecomb by alpha_brevecomb_commareversedabovecomb_gravecomb;\n    # sub alpha brevecomb commareversedabovecomb acutecomb by alpha_brevecomb_commareversedabovecomb_acutecomb;\n    # sub iota macroncomb commaabovecomb gravecomb by iota_macroncomb_commaabovecomb_gravecomb;\n    # sub iota macroncomb commaabovecomb acutecomb by iota_macroncomb_commaabovecomb_acutecomb;\n    # sub iota macroncomb commareversedabovecomb gravecomb by iota_macroncomb_commareversedabovecomb_gravecomb;\n    # sub iota macroncomb commareversedabovecomb acutecomb by iota_macroncomb_commareversedabovecomb_acutecomb;\n    # sub iota brevecomb commaabovecomb gravecomb by iota_brevecomb_commaabovecomb_gravecomb;\n    # sub iota brevecomb commaabovecomb acutecomb by iota_brevecomb_commaabovecomb_acutecomb;\n    # sub iota brevecomb commareversedabovecomb gravecomb by iota_brevecomb_commareversedabovecomb_gravecomb;\n    # sub iota brevecomb commareversedabovecomb acutecomb by iota_brevecomb_commareversedabovecomb_acutecomb;\n    # sub upsilon macroncomb commaabovecomb gravecomb by upsilon_macroncomb_commaabovecomb_gravecomb;\n    # sub upsilon macroncomb commaabovecomb acutecomb by upsilon_macroncomb_commaabovecomb_acutecomb;\n    # sub upsilon macroncomb commareversedabovecomb gravecomb by upsilon_macroncomb_commareversedabovecomb_gravecomb;\n    # sub upsilon macroncomb commareversedabovecomb acutecomb by upsilon_macroncomb_commareversedabovecomb_acutecomb;\n    # sub upsilon brevecomb commaabovecomb gravecomb by upsilon_brevecomb_commaabovecomb_gravecomb;\n    # sub upsilon brevecomb commaabovecomb acutecomb by upsilon_brevecomb_commaabovecomb_acutecomb;\n    # sub upsilon brevecomb commareversedabovecomb gravecomb by upsilon_brevecomb_commareversedabovecomb_gravecomb;\n    # sub upsilon brevecomb commareversedabovecomb acutecomb by upsilon_brevecomb_commareversedabovecomb_acutecomb;\n    # sub iota dieresiscomb macroncomb gravecomb by iota_dieresiscomb_macroncomb_gravecomb;\n    # sub iota dieresiscomb macroncomb acutecomb by iota_dieresiscomb_macroncomb_acutecomb;\n    # sub iota dieresiscomb brevecomb gravecomb by iota_dieresiscomb_brevecomb_gravecomb;\n    # sub iota dieresiscomb brevecomb acutecomb by iota_dieresiscomb_brevecomb_acutecomb;\n    # sub upsilon dieresiscomb macroncomb gravecomb by upsilon_dieresiscomb_macroncomb_gravecomb;\n    # sub upsilon dieresiscomb macroncomb acutecomb by upsilon_dieresiscomb_macroncomb_acutecomb;\n    # sub upsilon dieresiscomb brevecomb gravecomb by upsilon_dieresiscomb_brevecomb_gravecomb;\n    # sub upsilon dieresiscomb brevecomb acutecomb by upsilon_dieresiscomb_brevecomb_acutecomb;\n    # script cyrl;\n    #sub afii10103 by afii10103dotless;\n    #sub afii10105 by afii10105dotless;\n} ccmp;\n# Removed feature aalt due to no statements remaining\n# Removed feature locl due to no statements remaining\n# Removed feature mgrk due to no statements remaining\n# Removed feature subs due to no statements remaining\n# Removed feature sinf due to no statements remaining\n# Removed feature sups due to no statements remaining\n# Removed feature numr due to no statements remaining\n# Removed feature dnom due to no statements remaining\n# Removed feature frac due to no statements remaining\n# Removed feature ordn due to no statements remaining\n# Removed feature lnum due to no statements remaining\n# Removed feature pnum due to no statements remaining\n# Removed feature tnum due to no statements remaining\n# Removed feature onum due to no statements remaining\n# Removed feature c2sc due to no statements remaining\n# Removed feature smcp due to no statements remaining\n# Removed feature case due to no statements remaining\n# Removed feature liga due to no statements remaining\n# Removed feature rtlm due to no statements remaining\n# Removed feature zero due to no statements remaining\n# Removed feature ss03 due to no statements remaining\n# Removed feature ss06 due to no statements remaining\n# Removed feature ss07 due to no statements remaining\n"
+      }
+    },
+    "features": []
+  },
+  "first_kern_groups": {
+    "A": [
+      "A",
+      "Aacute"
+    ],
+    "O": [
+      "O",
+      "Oacute",
+      "Otilde"
+    ]
+  },
+  "second_kern_groups": {
+    "A": [
+      "A",
+      "Aacute"
+    ],
+    "O": [
+      "O",
+      "Oacute",
+      "Otilde"
+    ]
+  },
+  "format_specific": {
+    "com.schriftgestalt.Glyphs.appVersion": "3217",
+    "com.schriftgestalt.Glyphs.displayStrings": [],
+    "com.schriftgestalt.Glyphs.customParameters.glyphOrder": {
+      "disabled": false,
+      "value": [
+        ".notdef",
+        "NULL",
+        "CR",
+        "space",
+        "exclam",
+        "quotedbl",
+        "numbersign",
+        "dollar",
+        "percent",
+        "ampersand",
+        "quotesingle",
+        "parenleft",
+        "parenright",
+        "asterisk",
+        "plus",
+        "comma",
+        "hyphen",
+        "period",
+        "slash",
+        "zero",
+        "one",
+        "two",
+        "three",
+        "four",
+        "five",
+        "six",
+        "seven",
+        "eight",
+        "nine",
+        "colon",
+        "semicolon",
+        "less",
+        "equal",
+        "greater",
+        "question",
+        "at",
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F",
+        "G",
+        "H",
+        "I",
+        "J",
+        "K",
+        "L",
+        "M",
+        "N",
+        "O",
+        "P",
+        "Q",
+        "R",
+        "S",
+        "T",
+        "U",
+        "V",
+        "W",
+        "X",
+        "Y",
+        "Z",
+        "bracketleft",
+        "backslash",
+        "bracketright",
+        "asciicircum",
+        "underscore",
+        "grave",
+        "a",
+        "b",
+        "c",
+        "d",
+        "e",
+        "f",
+        "g",
+        "h",
+        "i",
+        "j",
+        "k",
+        "l",
+        "m",
+        "n",
+        "o",
+        "p",
+        "q",
+        "r",
+        "s",
+        "t",
+        "u",
+        "v",
+        "w",
+        "x",
+        "y",
+        "z",
+        "braceleft",
+        "bar",
+        "braceright",
+        "asciitilde",
+        "nbspace",
+        "exclamdown",
+        "cent",
+        "sterling",
+        "currency",
+        "yen",
+        "brokenbar",
+        "section",
+        "dieresis",
+        "copyright",
+        "ordfeminine",
+        "guillemetleft",
+        "logicalnot",
+        "softhyphen",
+        "registered",
+        "overscore",
+        "degree",
+        "plusminus",
+        "twosuperior",
+        "threesuperior",
+        "acute",
+        "micro",
+        "paragraph",
+        "periodcentered",
+        "cedilla",
+        "onesuperior",
+        "ordmasculine",
+        "guillemetright",
+        "onequarter",
+        "onehalf",
+        "threequarters",
+        "questiondown",
+        "Agrave",
+        "Aacute",
+        "Acircumflex",
+        "Atilde",
+        "Adieresis",
+        "Aring",
+        "AE",
+        "Ccedilla",
+        "Egrave",
+        "Eacute",
+        "Ecircumflex",
+        "Edieresis",
+        "Igrave",
+        "Iacute",
+        "Icircumflex",
+        "Idieresis",
+        "Eth",
+        "Ntilde",
+        "Ograve",
+        "Oacute",
+        "Ocircumflex",
+        "Otilde",
+        "Odieresis",
+        "multiply",
+        "Oslash",
+        "Ugrave",
+        "Uacute",
+        "Ucircumflex",
+        "Udieresis",
+        "Yacute",
+        "Thorn",
+        "germandbls",
+        "agrave",
+        "aacute",
+        "acircumflex",
+        "atilde",
+        "adieresis",
+        "aring",
+        "ae",
+        "ccedilla",
+        "egrave",
+        "eacute",
+        "ecircumflex",
+        "edieresis",
+        "igrave",
+        "iacute",
+        "icircumflex",
+        "idieresis",
+        "eth",
+        "ntilde",
+        "ograve",
+        "oacute",
+        "ocircumflex",
+        "otilde",
+        "odieresis",
+        "divide",
+        "oslash",
+        "ugrave",
+        "uacute",
+        "ucircumflex",
+        "udieresis",
+        "yacute",
+        "thorn",
+        "ydieresis",
+        "Amacron",
+        "amacron",
+        "Abreve",
+        "abreve",
+        "Aogonek",
+        "aogonek",
+        "Cacute",
+        "cacute",
+        "Ccircumflex",
+        "ccircumflex",
+        "Cdotaccent",
+        "cdotaccent",
+        "Ccaron",
+        "ccaron",
+        "Dcaron",
+        "dcaron",
+        "Dcroat",
+        "dcroat",
+        "Emacron",
+        "emacron",
+        "Ebreve",
+        "ebreve",
+        "Edotaccent",
+        "edotaccent",
+        "Eogonek",
+        "eogonek",
+        "Ecaron",
+        "ecaron",
+        "Gcircumflex",
+        "gcircumflex",
+        "Gbreve",
+        "gbreve",
+        "Gdotaccent",
+        "gdotaccent",
+        "Gcommaaccent",
+        "gcommaaccent",
+        "Hcircumflex",
+        "hcircumflex",
+        "Hbar",
+        "hbar",
+        "Itilde",
+        "itilde",
+        "Imacron",
+        "imacron",
+        "Ibreve",
+        "ibreve",
+        "Iogonek",
+        "iogonek",
+        "Idotaccent",
+        "IJ",
+        "ij",
+        "Jcircumflex",
+        "jcircumflex",
+        "Kcommaaccent",
+        "kcommaaccent",
+        "kgreenlandic",
+        "Lacute",
+        "lacute",
+        "Lcommaaccent",
+        "lcommaaccent",
+        "Lcaron",
+        "lcaron",
+        "Ldot",
+        "ldot",
+        "Lslash",
+        "lslash",
+        "Nacute",
+        "nacute",
+        "Ncommaaccent",
+        "ncommaaccent",
+        "Ncaron",
+        "ncaron",
+        "napostrophe",
+        "Eng",
+        "eng",
+        "Omacron",
+        "omacron",
+        "Obreve",
+        "obreve",
+        "Ohungarumlaut",
+        "ohungarumlaut",
+        "OE",
+        "oe",
+        "Racute",
+        "racute",
+        "Rcommaaccent",
+        "rcommaaccent",
+        "Rcaron",
+        "rcaron",
+        "Sacute",
+        "sacute",
+        "Scircumflex",
+        "scircumflex",
+        "Scedilla",
+        "scedilla",
+        "Scaron",
+        "scaron",
+        "Tcommaaccent",
+        "tcommaaccent",
+        "Tcaron",
+        "tcaron",
+        "Tbar",
+        "tbar",
+        "Utilde",
+        "utilde",
+        "Umacron",
+        "umacron",
+        "Ubreve",
+        "ubreve",
+        "Uring",
+        "uring",
+        "Uhungarumlaut",
+        "uhungarumlaut",
+        "Uogonek",
+        "uogonek",
+        "Wcircumflex",
+        "wcircumflex",
+        "Ycircumflex",
+        "ycircumflex",
+        "Ydieresis",
+        "Zacute",
+        "zacute",
+        "Zdotaccent",
+        "zdotaccent",
+        "Zcaron",
+        "zcaron",
+        "longs",
+        "fhook",
+        "Aringacute",
+        "aringacute",
+        "AEacute",
+        "aeacute",
+        "Oslashacute",
+        "oslashacute",
+        "Scommaaccent",
+        "scommaaccent",
+        "circumflex",
+        "caron",
+        "macronmod",
+        "breve",
+        "dotaccent",
+        "ring",
+        "ogonek",
+        "tilde",
+        "hungarumlaut",
+        "tonos",
+        "dieresistonos",
+        "Alphatonos",
+        "anoteleia",
+        "Epsilontonos",
+        "Etatonos",
+        "Iotatonos",
+        "Omicrontonos",
+        "Upsilontonos",
+        "Omegatonos",
+        "iotadieresistonos",
+        "Alpha",
+        "Beta",
+        "Gamma",
+        "Delta",
+        "Epsilon",
+        "Zeta",
+        "Eta",
+        "Theta",
+        "Iota",
+        "Kappa",
+        "Lambda",
+        "Mu",
+        "Nu",
+        "Xi",
+        "Omicron",
+        "Pi",
+        "Rho",
+        "Sigma",
+        "Tau",
+        "Upsilon",
+        "Phi",
+        "Chi",
+        "Psi",
+        "Omega",
+        "Iotadieresis",
+        "Upsilondieresis",
+        "alphatonos",
+        "epsilontonos",
+        "etatonos",
+        "iotatonos",
+        "upsilondieresistonos",
+        "alpha",
+        "beta",
+        "gamma",
+        "delta",
+        "epsilon",
+        "zeta",
+        "eta",
+        "theta",
+        "iota",
+        "kappa",
+        "lambda",
+        "mu",
+        "nu",
+        "xi",
+        "omicron",
+        "pi",
+        "rho",
+        "sigmafinal",
+        "sigma",
+        "tau",
+        "upsilon",
+        "phi",
+        "chi",
+        "psi",
+        "omega",
+        "iotadieresis",
+        "upsilondieresis",
+        "omicrontonos",
+        "upsilontonos",
+        "omegatonos",
+        "Io-cy",
+        "Dje-cy",
+        "Gje-cy",
+        "E-cy",
+        "Dze-cy",
+        "I-cy",
+        "Yi-cy",
+        "Je-cy",
+        "Lje-cy",
+        "Nje-cy",
+        "Tshe-cy",
+        "Kje-cy",
+        "Ushort-cy",
+        "Dzhe-cy",
+        "A-cy",
+        "Be-cy",
+        "Ve-cy",
+        "Ge-cy",
+        "De-cy",
+        "Ie-cy",
+        "Zhe-cy",
+        "Ze-cy",
+        "Ii-cy",
+        "Iishort-cy",
+        "Ka-cy",
+        "El-cy",
+        "Em-cy",
+        "En-cy",
+        "O-cy",
+        "Pe-cy",
+        "Er-cy",
+        "Es-cy",
+        "Te-cy",
+        "U-cy",
+        "Ef-cy",
+        "Ha-cy",
+        "Tse-cy",
+        "Che-cy",
+        "Sha-cy",
+        "Shcha-cy",
+        "Hardsign-cy",
+        "Yeru-cy",
+        "Softsign-cy",
+        "Ereversed-cy",
+        "Iu-cy",
+        "Ia-cy",
+        "a-cy",
+        "be-cy",
+        "ve-cy",
+        "ge-cy",
+        "de-cy",
+        "ie-cy",
+        "zhe-cy",
+        "ze-cy",
+        "ii-cy",
+        "iishort-cy",
+        "ka-cy",
+        "el-cy",
+        "em-cy",
+        "en-cy",
+        "o-cy",
+        "pe-cy",
+        "er-cy",
+        "es-cy",
+        "te-cy",
+        "u-cy",
+        "ef-cy",
+        "ha-cy",
+        "tse-cy",
+        "che-cy",
+        "sha-cy",
+        "shcha-cy",
+        "hardsign-cy",
+        "yeru-cy",
+        "softsign-cy",
+        "ereversed-cy",
+        "iu-cy",
+        "ia-cy",
+        "io-cy",
+        "dje-cy",
+        "gje-cy",
+        "e-cy",
+        "dze-cy",
+        "i-cy",
+        "yi-cy",
+        "je-cy",
+        "lje-cy",
+        "nje-cy",
+        "tshe-cy",
+        "kje-cy",
+        "ushort-cy",
+        "dzhe-cy",
+        "Gheupturn-cy",
+        "gheupturn-cy",
+        "Wgrave",
+        "wgrave",
+        "Wacute",
+        "wacute",
+        "Wdieresis",
+        "wdieresis",
+        "Ygrave",
+        "ygrave",
+        "endash",
+        "emdash",
+        "horizontalbar",
+        "underscoredbl",
+        "quoteleft",
+        "quoteright",
+        "quotesinglbase",
+        "quotereversed",
+        "quotedblleft",
+        "quotedblright",
+        "quotedblbase",
+        "dagger",
+        "daggerdbl",
+        "bullet",
+        "ellipsis",
+        "perthousand",
+        "minute",
+        "second",
+        "guilsinglleft",
+        "guilsinglright",
+        "exclamdouble",
+        "fraction",
+        "nmod",
+        "franc",
+        "lira",
+        "peseta",
+        "euro",
+        "careof",
+        "literSign",
+        "numero",
+        "trademark",
+        "Ohm",
+        "estimated",
+        "oneeighth",
+        "threeeighths",
+        "fiveeighths",
+        "seveneighths",
+        "cyrillicbreve",
+        "caroncommaaccent",
+        "commaaccentcomb",
+        "commaaccentrotate",
+        "foursuperior",
+        "fivesuperior",
+        "sevensuperior",
+        "eightsuperior",
+        "enquad",
+        "emquad",
+        "enspace",
+        "emspace",
+        "threeperemspace",
+        "fourperemspace",
+        "sixperemspace",
+        "figurespace",
+        "punctuationspace",
+        "thinspace",
+        "hairspace",
+        "zerowidthspace",
+        "zeroWidthNoBreakSpace",
+        "objectReplacementCharacter",
+        "replacementCharacter",
+        "jcaron",
+        "apostrophemod",
+        "thetaSymbol",
+        "UpsilonhookSymbol",
+        "piSymbol",
+        "Macute",
+        "macute",
+        "Aringbelow",
+        "aringbelow",
+        "lowringmod",
+        "Ohorn",
+        "ohorn",
+        "Uhorn",
+        "uhorn",
+        "hook",
+        "Iegrave-cy",
+        "Iigrave-cy",
+        "iegrave-cy",
+        "iigrave-cy",
+        "Omega-cy",
+        "omega-cy",
+        "Yat-cy",
+        "yat-cy",
+        "Eiotified-cy",
+        "eiotified-cy",
+        "Yuslittle-cy",
+        "yuslittle-cy",
+        "Yuslittleiotified-cy",
+        "yuslittleiotified-cy",
+        "Yusbig-cy",
+        "yusbig-cy",
+        "Yusbigiotified-cy",
+        "yusbigiotified-cy",
+        "Ksi-cy",
+        "ksi-cy",
+        "Psi-cy",
+        "psi-cy",
+        "Fita-cy",
+        "fita-cy",
+        "Izhitsa-cy",
+        "izhitsa-cy",
+        "Izhitsadblgrave-cy",
+        "izhitsadblgrave-cy",
+        "Uk-cy",
+        "uk-cy",
+        "Omegaround-cy",
+        "omegaround-cy",
+        "Omegatitlo-cy",
+        "omegatitlo-cy",
+        "Ot-cy",
+        "ot-cy",
+        "Koppa-cy",
+        "koppa-cy",
+        "thousand-cy",
+        "hundredthousandssigncomb-cy",
+        "millionssigncomb-cy",
+        "Iishorttail-cy",
+        "iishorttail-cy",
+        "Semisoftsign-cy",
+        "semisoftsign-cy",
+        "Ertick-cy",
+        "ertick-cy",
+        "Ghestroke-cy",
+        "ghestroke-cy",
+        "Ghemiddlehook-cy",
+        "ghemiddlehook-cy",
+        "Zhedescender-cy",
+        "zhedescender-cy",
+        "Zedescender-cy",
+        "zedescender-cy",
+        "Kadescender-cy",
+        "kadescender-cy",
+        "Kaverticalstroke-cy",
+        "kaverticalstroke-cy",
+        "Kastroke-cy",
+        "kastroke-cy",
+        "Kabashkir-cy",
+        "kabashkir-cy",
+        "Endescender-cy",
+        "endescender-cy",
+        "Enghe-cy",
+        "enghe-cy",
+        "Pemiddlehook-cy",
+        "pemiddlehook-cy",
+        "Haabkhasian-cy",
+        "haabkhasian-cy",
+        "Esdescender-cy",
+        "esdescender-cy",
+        "Tedescender-cy",
+        "tedescender-cy",
+        "Ustraight-cy",
+        "ustraight-cy",
+        "Ustraightstroke-cy",
+        "ustraightstroke-cy",
+        "Hadescender-cy",
+        "hadescender-cy",
+        "Tetse-cy",
+        "tetse-cy",
+        "Chedescender-cy",
+        "chedescender-cy",
+        "Cheverticalstroke-cy",
+        "cheverticalstroke-cy",
+        "Shha-cy",
+        "shha-cy",
+        "Cheabkhasian-cy",
+        "cheabkhasian-cy",
+        "Chedescenderabkhasian-cy",
+        "chedescenderabkhasian-cy",
+        "Palochka-cy",
+        "Zhebreve-cy",
+        "zhebreve-cy",
+        "Kahook-cy",
+        "kahook-cy",
+        "Eltail-cy",
+        "eltail-cy",
+        "Enhook-cy",
+        "enhook-cy",
+        "Entail-cy",
+        "entail-cy",
+        "Chekhakassian-cy",
+        "chekhakassian-cy",
+        "Emtail-cy",
+        "emtail-cy",
+        "palochka-cy",
+        "Abreve-cy",
+        "abreve-cy",
+        "Adieresis-cy",
+        "adieresis-cy",
+        "Aie-cy",
+        "aie-cy",
+        "Iebreve-cy",
+        "iebreve-cy",
+        "Schwa-cy",
+        "schwa-cy",
+        "Schwadieresis-cy",
+        "schwadieresis-cy",
+        "Zhedieresis-cy",
+        "zhedieresis-cy",
+        "Zedieresis-cy",
+        "zedieresis-cy",
+        "Dzeabkhasian-cy",
+        "dzeabkhasian-cy",
+        "Imacron-cy",
+        "imacron-cy",
+        "Idieresis-cy",
+        "idieresis-cy",
+        "Odieresis-cy",
+        "odieresis-cy",
+        "Obarred-cy",
+        "obarred-cy",
+        "Obarreddieresis-cy",
+        "obarreddieresis-cy",
+        "Edieresis-cy",
+        "edieresis-cy",
+        "Umacron-cy",
+        "umacron-cy",
+        "Udieresis-cy",
+        "udieresis-cy",
+        "Uhungarumlaut-cy",
+        "uhungarumlaut-cy",
+        "Chedieresis-cy",
+        "chedieresis-cy",
+        "Gedescender-cy",
+        "gedescender-cy",
+        "Yerudieresis-cy",
+        "yerudieresis-cy",
+        "Gestrokehook-cy",
+        "gestrokehook-cy",
+        "Hahook-cy",
+        "hahook-cy",
+        "Hastroke-cy",
+        "hastroke-cy",
+        "Komide-cy",
+        "komide-cy",
+        "Komidje-cy",
+        "komidje-cy",
+        "Komizje-cy",
+        "komizje-cy",
+        "Komidzje-cy",
+        "komidzje-cy",
+        "Komilje-cy",
+        "komilje-cy",
+        "Kominje-cy",
+        "kominje-cy",
+        "Komisje-cy",
+        "komisje-cy",
+        "Komitje-cy",
+        "komitje-cy",
+        "Reversedze-cy",
+        "reversedze-cy",
+        "Elhook-cy",
+        "elhook-cy",
+        "Adotbelow",
+        "adotbelow",
+        "Ahookabove",
+        "ahookabove",
+        "Acircumflexacute",
+        "acircumflexacute",
+        "Acircumflexgrave",
+        "acircumflexgrave",
+        "Acircumflexhookabove",
+        "acircumflexhookabove",
+        "Acircumflextilde",
+        "acircumflextilde",
+        "Acircumflexdotbelow",
+        "acircumflexdotbelow",
+        "Abreveacute",
+        "abreveacute",
+        "Abrevegrave",
+        "abrevegrave",
+        "Abrevehookabove",
+        "abrevehookabove",
+        "Abrevetilde",
+        "abrevetilde",
+        "Abrevedotbelow",
+        "abrevedotbelow",
+        "Edotbelow",
+        "edotbelow",
+        "Ehookabove",
+        "ehookabove",
+        "Etilde",
+        "etilde",
+        "Ecircumflexacute",
+        "ecircumflexacute",
+        "Ecircumflexgrave",
+        "ecircumflexgrave",
+        "Ecircumflexhookabove",
+        "ecircumflexhookabove",
+        "Ecircumflextilde",
+        "ecircumflextilde",
+        "Ecircumflexdotbelow",
+        "ecircumflexdotbelow",
+        "Ihookabove",
+        "ihookabove",
+        "Idotbelow",
+        "idotbelow",
+        "Odotbelow",
+        "odotbelow",
+        "Ohookabove",
+        "ohookabove",
+        "Ocircumflexacute",
+        "ocircumflexacute",
+        "Ocircumflexgrave",
+        "ocircumflexgrave",
+        "Ocircumflexhookabove",
+        "ocircumflexhookabove",
+        "Ocircumflextilde",
+        "ocircumflextilde",
+        "Ocircumflexdotbelow",
+        "ocircumflexdotbelow",
+        "Ohornacute",
+        "ohornacute",
+        "Ohorngrave",
+        "ohorngrave",
+        "Ohornhookabove",
+        "ohornhookabove",
+        "Ohorntilde",
+        "ohorntilde",
+        "Ohorndotbelow",
+        "ohorndotbelow",
+        "Udotbelow",
+        "udotbelow",
+        "Uhookabove",
+        "uhookabove",
+        "Uhornacute",
+        "uhornacute",
+        "Uhorngrave",
+        "uhorngrave",
+        "Uhornhookabove",
+        "uhornhookabove",
+        "Uhorntilde",
+        "uhorntilde",
+        "Uhorndotbelow",
+        "uhorndotbelow",
+        "Ydotbelow",
+        "ydotbelow",
+        "Yhookabove",
+        "yhookabove",
+        "Ytilde",
+        "ytilde",
+        "dong",
+        "circumflexacutecomb",
+        "circumflexgravecomb",
+        "circumflexhookcomb",
+        "circumflextildecomb",
+        "breveacutecomb",
+        "brevegravecomb",
+        "brevehookcomb",
+        "brevetildecomb",
+        "cyrillichookleft",
+        "cyrillicbighookUC",
+        "Tcedilla",
+        "tcedilla",
+        "bstroke",
+        "Bhook",
+        "Btopbar",
+        "btopbar",
+        "Tonesix",
+        "tonesix",
+        "Oopen",
+        "Chook",
+        "chook",
+        "Dtail",
+        "Dhook",
+        "Dtopbar",
+        "dtopbar",
+        "deltaturned",
+        "Ereversed",
+        "Schwa",
+        "Eopen",
+        "Fhook",
+        "Ghook",
+        "Gamma-latin",
+        "hv",
+        "Iota-latin",
+        "Istroke",
+        "Khook",
+        "khook",
+        "lbar",
+        "lambdastroke",
+        "Mturned",
+        "Nhookleft",
+        "nlongrightleg",
+        "Ocenteredtilde",
+        "Oi",
+        "oi",
+        "Phook",
+        "phook",
+        "Yr",
+        "Tonetwo",
+        "tonetwo",
+        "Esh",
+        "eshreversedloop",
+        "tpalatalhook",
+        "Thook",
+        "thook",
+        "Tretroflexhook",
+        "Upsilon-latin",
+        "Vhook",
+        "Yhook",
+        "yhook",
+        "Zstroke",
+        "zstroke",
+        "Ezh",
+        "Ezhreversed",
+        "ezhreversed",
+        "ezhtail",
+        "twostroke",
+        "Tonefive",
+        "tonefive",
+        "glottalinvertedstroke",
+        "wynn",
+        "clickdental",
+        "clicklateral",
+        "clickalveolar",
+        "clickretroflex",
+        "DZcaron",
+        "Dzcaron",
+        "dzcaron",
+        "LJ",
+        "Lj",
+        "lj",
+        "NJ",
+        "Nj",
+        "nj",
+        "Acaron",
+        "acaron",
+        "Icaron",
+        "icaron",
+        "Ocaron",
+        "ocaron",
+        "Ucaron",
+        "ucaron",
+        "Udieresismacron",
+        "udieresismacron",
+        "Udieresisacute",
+        "udieresisacute",
+        "Udieresiscaron",
+        "udieresiscaron",
+        "Udieresisgrave",
+        "udieresisgrave",
+        "Adieresismacron",
+        "adieresismacron",
+        "Adotmacron",
+        "adotmacron",
+        "AEmacron",
+        "aemacron",
+        "Gstroke",
+        "gstroke",
+        "Gcaron",
+        "gcaron",
+        "Kcaron",
+        "kcaron",
+        "Oogonek",
+        "oogonek",
+        "Oogonekmacron",
+        "oogonekmacron",
+        "Ezhcaron",
+        "ezhcaron",
+        "DZ",
+        "Dz",
+        "dz",
+        "Gacute",
+        "gacute",
+        "Hwair",
+        "Wynn",
+        "Ngrave",
+        "ngrave",
+        "Adblgrave",
+        "adblgrave",
+        "Ainvertedbreve",
+        "ainvertedbreve",
+        "Edblgrave",
+        "edblgrave",
+        "Einvertedbreve",
+        "einvertedbreve",
+        "Idblgrave",
+        "idblgrave",
+        "Iinvertedbreve",
+        "iinvertedbreve",
+        "Odblgrave",
+        "odblgrave",
+        "Oinvertedbreve",
+        "oinvertedbreve",
+        "Rdblgrave",
+        "rdblgrave",
+        "Rinvertedbreve",
+        "rinvertedbreve",
+        "Udblgrave",
+        "udblgrave",
+        "Uinvertedbreve",
+        "uinvertedbreve",
+        "Yogh",
+        "yogh",
+        "Hcaron",
+        "hcaron",
+        "Nlongrightleg",
+        "dcurl",
+        "OU",
+        "ou",
+        "Zhook",
+        "zhook",
+        "Adotaccent",
+        "adotaccent",
+        "Ecedilla",
+        "ecedilla",
+        "Odieresismacron",
+        "odieresismacron",
+        "Otildemacron",
+        "otildemacron",
+        "Odotaccent",
+        "odotaccent",
+        "Odotaccentmacron",
+        "odotaccentmacron",
+        "Ymacron",
+        "ymacron",
+        "lcurl",
+        "ncurl",
+        "tcurl",
+        "dbdigraph",
+        "qpdigraph",
+        "Astroke",
+        "Cstroke",
+        "cstroke",
+        "Lbar",
+        "Tdiagonalstroke",
+        "sswashtail",
+        "zswashtail",
+        "Glottalstopcased",
+        "glottalstopcased",
+        "Bstroke",
+        "Ubar",
+        "Vturned",
+        "Estroke",
+        "estroke",
+        "Jstroke",
+        "jstroke",
+        "Qhooktail",
+        "qhooktail",
+        "Rstroke",
+        "rstroke",
+        "Ystroke",
+        "ystroke",
+        "aturned",
+        "alpha-latin",
+        "alphaturned-latin",
+        "bhook",
+        "oopen",
+        "ccurl",
+        "dtail",
+        "dhook",
+        "ereversed",
+        "schwa",
+        "eopen",
+        "eopenreversedclosed",
+        "jdotlessstroke",
+        "ghook",
+        "gsingle",
+        "Gsmall",
+        "gamma-latin",
+        "ramshorn",
+        "hturned",
+        "hhook",
+        "henghook",
+        "istroke",
+        "iota-latin",
+        "iotaserifed",
+        "lmiddletilde",
+        "lbelt",
+        "lhookretroflex",
+        "lezh",
+        "mturned",
+        "mlonglegturned",
+        "mhook",
+        "nhookleft",
+        "nhookretroflex",
+        "Nsmall",
+        "obarred",
+        "OEsmall",
+        "omegaclosed-latin",
+        "phi-latin",
+        "rturned",
+        "rlonglegturned",
+        "rhookturned",
+        "rlongleg",
+        "rhook",
+        "rfishhook",
+        "rfishhookreversed",
+        "Rsmall",
+        "Rsmallinverted",
+        "shook",
+        "esh",
+        "jdotlessstrokehook",
+        "eshsquatreversed",
+        "eshcurl",
+        "tturned",
+        "tretroflexhook",
+        "ubar",
+        "upsilon-latin",
+        "vhook",
+        "vturned",
+        "wturned",
+        "yturned",
+        "Ysmall",
+        "zretroflexhook",
+        "zcurl",
+        "ezh",
+        "ezhcurl",
+        "glottalstop",
+        "glottalstopreversed",
+        "glottalstopinverted",
+        "cstretched",
+        "bilabialclick",
+        "Bsmall",
+        "eopenclosed",
+        "Gsmallhook",
+        "Hsmall",
+        "jcrossedtail",
+        "kturned",
+        "Lsmall",
+        "qhook",
+        "glottalstopstroke",
+        "glottalstopstrokereversed",
+        "dzaltone",
+        "dezh",
+        "dzcurl",
+        "ts",
+        "tesh",
+        "tccurl",
+        "fengdigraph",
+        "lsdigraph",
+        "lzdigraph",
+        "bilabialpercussive",
+        "bidentalpercussive",
+        "hturnedfishhook",
+        "hturnedfishhookandtail",
+        "hmod",
+        "hhookmod",
+        "jmod",
+        "rmod",
+        "rturnedmod",
+        "rhookturnedmod",
+        "Rsmallinvertedmod",
+        "wmod",
+        "ymod",
+        "primemod",
+        "doubleprimemod",
+        "commaturnedmod",
+        "commareversedmod",
+        "ringhalfright",
+        "ringhalfleft",
+        "glottalstopmod",
+        "glottalstopreversedmod",
+        "arrowheadleftmod",
+        "arrowheadrightmod",
+        "arrowheadupmod",
+        "arrowheaddownmod",
+        "verticallinemod",
+        "acutemod",
+        "gravemod",
+        "verticallinelowmod",
+        "macronlowmod",
+        "gravelowmod",
+        "acutelowmod",
+        "colontriangularmod",
+        "colontriangularhalfmod",
+        "ringhalfrightcentered",
+        "ringhalfleftcentered",
+        "uptackmod",
+        "downtackmod",
+        "plusmod",
+        "minusmod",
+        "crossaccentmod",
+        "gammamod-latin",
+        "lmod",
+        "smod",
+        "xmod",
+        "glottalstopreversedsuperior",
+        "tonebarextrahighmod",
+        "tonebarhighmod",
+        "tonebarmidmod",
+        "tonebarlowmod",
+        "tonebarextralowmod",
+        "indepartingtonemod",
+        "yangdepartingtone",
+        "voicingmod",
+        "unaspiratedmod",
+        "doubleapostrophemod",
+        "lowdownarrowheadmod",
+        "lowuparrowheadmod",
+        "lowleftarrowheadmod",
+        "lowrightarrowheadmod",
+        "middlegraveaccentmod",
+        "middledoublegraveaccentmod",
+        "middledoubleacuteaccentmod",
+        "lowtildemod",
+        "raisedcolonmod",
+        "beginhightonemod",
+        "endhightonemod",
+        "beginlowtonemod",
+        "endlowtonemod",
+        "shelfmod",
+        "openshelfmod",
+        "lowleftarrowmod",
+        "hookabovecomb",
+        "numeral-greek",
+        "lowernumeral-greek",
+        "ypogegrammeni",
+        "sigmaLunateReversedSymbol",
+        "sigmaLunateDottedSymbol",
+        "sigmaLunateDottedReversedSymbol",
+        "questiongreek",
+        "betaSymbol",
+        "UpsilonacutehookSymbol",
+        "UpsilondieresishookSymbol",
+        "phiSymbol",
+        "kaiSymbol",
+        "KoppaArchaic",
+        "koppaArchaic",
+        "Stigma",
+        "stigma",
+        "Digamma",
+        "digamma",
+        "Koppa",
+        "koppa",
+        "Sampi",
+        "sampi",
+        "kappaSymbol",
+        "rhoSymbol",
+        "sigmaLunateSymbol",
+        "yot",
+        "ThetaSymbol",
+        "epsilonLunateSymbol",
+        "epsilonLunateReversedSymbol",
+        "Sho",
+        "sho",
+        "SigmaLunateSymbol",
+        "San",
+        "san",
+        "rhoStrokeSymbol",
+        "SigmaLunateReversedSymbol",
+        "SigmaLunateDottedSymbol",
+        "SigmaLunateDottedReversedSymbol",
+        "Qa-cy",
+        "qa-cy",
+        "We-cy",
+        "we-cy",
+        "Asmall",
+        "AEsmall",
+        "aeturned",
+        "Bbarredsmall",
+        "Csmall",
+        "Dsmall",
+        "Ethsmall",
+        "Esmall",
+        "eturnedopen",
+        "iturned",
+        "Jsmall",
+        "Ksmall",
+        "Lstrokesmall",
+        "Msmall",
+        "Nreversedsmall",
+        "Osmall",
+        "Oopensmall",
+        "osideways",
+        "osidewaysopen",
+        "oslashsideways",
+        "oeturned",
+        "OUsmall",
+        "otophalf",
+        "obottomhalf",
+        "Psmall",
+        "Rreversedsmall",
+        "Rturnedsmall",
+        "Tsmall",
+        "Usmall",
+        "usideways",
+        "udieresissideways",
+        "msidewaysturned",
+        "Vsmall",
+        "Wsmall",
+        "Zsmall",
+        "Ezhsmall",
+        "spirantvoicedlaryngeal",
+        "ain",
+        "Gammasmall",
+        "Lamdasmall",
+        "Pismall",
+        "Rhosmall",
+        "Psismall",
+        "Elsmall-cy",
+        "Amod",
+        "AEmod",
+        "Bmod",
+        "Bbarredmod",
+        "Dmod",
+        "Emod",
+        "Ereversedmod",
+        "Gmod",
+        "Hmod",
+        "Imod",
+        "Jmod",
+        "Kmod",
+        "Lmod",
+        "Mmod",
+        "Nmod",
+        "Nreversedmod",
+        "Omod",
+        "OUmod",
+        "Pmod",
+        "Rmod",
+        "Tmod",
+        "Umod",
+        "Wmod",
+        "amod",
+        "aturnedmod",
+        "alphamod-latin",
+        "aeturnedmod",
+        "bmod",
+        "dmod",
+        "emod",
+        "schwamod",
+        "eopenmod",
+        "eturnedopenmod",
+        "gmod",
+        "iturnedmod",
+        "kmod",
+        "mmod",
+        "engmod",
+        "omod",
+        "oopenmod",
+        "otophalfmod",
+        "obottomhalfmod",
+        "pmod",
+        "tmod",
+        "umod",
+        "usidewaysmod",
+        "mturnedmod",
+        "vmod",
+        "ainmod",
+        "betamod",
+        "gammamod",
+        "deltamod",
+        "phimod",
+        "chimod",
+        "isubscript",
+        "rsubscript",
+        "usubscript",
+        "vsubscript",
+        "betasubscript",
+        "gammasubscript",
+        "rhosubscript",
+        "phisubscript",
+        "chisubscript",
+        "ue",
+        "bmiddletilde",
+        "dmiddletilde",
+        "fmiddletilde",
+        "mmiddletilde",
+        "nmiddletilde",
+        "pmiddletilde",
+        "rmiddletilde",
+        "rfishhookmiddletilde",
+        "smiddletilde",
+        "tmiddletilde",
+        "zmiddletilde",
+        "gturned",
+        "enmod-cy",
+        "ginsular",
+        "thstrikethrough",
+        "iotaserifedstroke",
+        "iotastroke",
+        "pstroke",
+        "Usmallstroke",
+        "upsilonstroke",
+        "bpalatalhook",
+        "dpalatalhook",
+        "fpalatalhook",
+        "gpalatalhook",
+        "kpalatalhook",
+        "lpalatalhook",
+        "mpalatalhook",
+        "npalatalhook",
+        "ppalatalhook",
+        "rpalatalhook",
+        "spalatalhook",
+        "eshpalatalhook",
+        "vpalatalhook",
+        "xpalatalhook",
+        "zpalatalhook",
+        "aretroflexhook",
+        "alpharetroflexhook",
+        "dhookandtail",
+        "eretroflexhook",
+        "eopenretroflexhook",
+        "eopenreversedretroflexhook",
+        "schwaretroflexhook",
+        "iretroflexhook",
+        "oopenretroflexhook",
+        "eshretroflexhook",
+        "uretroflexhook",
+        "ezhretroflexhook",
+        "alphaturnedmod-latin",
+        "cmod",
+        "ccurlmod",
+        "ethmod",
+        "eopenreversedmod",
+        "fmod",
+        "jdotlessstrokemod",
+        "scriptgmod",
+        "hturnedmod",
+        "istrokemod",
+        "iotamod",
+        "iotaserifedmod",
+        "iotaserifedstrokemod",
+        "jcrossedtailmod",
+        "lretroflexhookmod",
+        "lpalatalhookmod",
+        "Lsmallmod",
+        "mhookmod",
+        "mlonglegturnedmod",
+        "nlefthookmod",
+        "nretroflexhookmod",
+        "Nsmallmodifier",
+        "barredomod",
+        "phimod-latin",
+        "shookmod",
+        "eshmod",
+        "tpalatalhookmod",
+        "ubarmod",
+        "upsilonmod",
+        "Usmallmod",
+        "vhookmod",
+        "vturnedmod",
+        "zmod",
+        "zretroflexhookmod",
+        "zcurlmod",
+        "ezhmod",
+        "thetamod",
+        "Bdotaccent",
+        "bdotaccent",
+        "Bdotbelow",
+        "bdotbelow",
+        "Blinebelow",
+        "blinebelow",
+        "Ccedillaacute",
+        "ccedillaacute",
+        "Ddotaccent",
+        "ddotaccent",
+        "Ddotbelow",
+        "ddotbelow",
+        "Dlinebelow",
+        "dlinebelow",
+        "Dcedilla",
+        "dcedilla",
+        "Dcircumflexbelow",
+        "dcircumflexbelow",
+        "Emacrongrave",
+        "emacrongrave",
+        "Emacronacute",
+        "emacronacute",
+        "Ecircumflexbelow",
+        "ecircumflexbelow",
+        "Etildebelow",
+        "etildebelow",
+        "Ecedillabreve",
+        "ecedillabreve",
+        "Fdotaccent",
+        "fdotaccent",
+        "Gmacron",
+        "gmacron",
+        "Hdotaccent",
+        "hdotaccent",
+        "Hdotbelow",
+        "hdotbelow",
+        "Hdieresis",
+        "hdieresis",
+        "Hcedilla",
+        "hcedilla",
+        "Hbrevebelow",
+        "hbrevebelow",
+        "Itildebelow",
+        "itildebelow",
+        "Idieresisacute",
+        "idieresisacute",
+        "Kacute",
+        "kacute",
+        "Kdotbelow",
+        "kdotbelow",
+        "Klinebelow",
+        "klinebelow",
+        "Ldotbelow",
+        "ldotbelow",
+        "Ldotbelowmacron",
+        "ldotbelowmacron",
+        "Llinebelow",
+        "llinebelow",
+        "Lcircumflexbelow",
+        "lcircumflexbelow",
+        "Mdotaccent",
+        "mdotaccent",
+        "Mdotbelow",
+        "mdotbelow",
+        "Ndotaccent",
+        "ndotaccent",
+        "Ndotbelow",
+        "ndotbelow",
+        "Nlinebelow",
+        "nlinebelow",
+        "Ncircumflexbelow",
+        "ncircumflexbelow",
+        "Otildeacute",
+        "otildeacute",
+        "Otildedieresis",
+        "otildedieresis",
+        "Omacrongrave",
+        "omacrongrave",
+        "Omacronacute",
+        "omacronacute",
+        "Pacute",
+        "pacute",
+        "Pdotaccent",
+        "pdotaccent",
+        "Rdotaccent",
+        "rdotaccent",
+        "Rdotbelow",
+        "rdotbelow",
+        "Rdotbelowmacron",
+        "rdotbelowmacron",
+        "Rlinebelow",
+        "rlinebelow",
+        "Sdotaccent",
+        "sdotaccent",
+        "Sdotbelow",
+        "sdotbelow",
+        "Sacutedotaccent",
+        "sacutedotaccent",
+        "Scarondotaccent",
+        "scarondotaccent",
+        "Sdotbelowdotaccent",
+        "sdotbelowdotaccent",
+        "Tdotaccent",
+        "tdotaccent",
+        "Tdotbelow",
+        "tdotbelow",
+        "Tlinebelow",
+        "tlinebelow",
+        "Tcircumflexbelow",
+        "tcircumflexbelow",
+        "Udieresisbelow",
+        "udieresisbelow",
+        "Utildebelow",
+        "utildebelow",
+        "Ucircumflexbelow",
+        "ucircumflexbelow",
+        "Utildeacute",
+        "utildeacute",
+        "Umacrondieresis",
+        "umacrondieresis",
+        "Vtilde",
+        "vtilde",
+        "Vdotbelow",
+        "vdotbelow",
+        "Wdotaccent",
+        "wdotaccent",
+        "Wdotbelow",
+        "wdotbelow",
+        "Xdotaccent",
+        "xdotaccent",
+        "Xdieresis",
+        "xdieresis",
+        "Ydotaccent",
+        "ydotaccent",
+        "Zcircumflex",
+        "zcircumflex",
+        "Zdotbelow",
+        "zdotbelow",
+        "Zlinebelow",
+        "zlinebelow",
+        "hlinebelow",
+        "tdieresis",
+        "wring",
+        "yring",
+        "arighthalfring",
+        "longsdotaccent",
+        "alphapsili",
+        "alphadasia",
+        "alphapsilivaria",
+        "alphadasiavaria",
+        "alphapsilioxia",
+        "alphadasiaoxia",
+        "alphapsiliperispomeni",
+        "alphadasiaperispomeni",
+        "Alphapsili",
+        "Alphadasia",
+        "Alphapsilivaria",
+        "Alphadasiavaria",
+        "Alphapsilioxia",
+        "Alphadasiaoxia",
+        "Alphapsiliperispomeni",
+        "Alphadasiaperispomeni",
+        "epsilonpsili",
+        "epsilondasia",
+        "epsilonpsilivaria",
+        "epsilondasiavaria",
+        "epsilonpsilioxia",
+        "epsilondasiaoxia",
+        "Epsilonpsili",
+        "Epsilondasia",
+        "Epsilonpsilivaria",
+        "Epsilondasiavaria",
+        "Epsilonpsilioxia",
+        "Epsilondasiaoxia",
+        "etapsili",
+        "etadasia",
+        "etapsilivaria",
+        "etadasiavaria",
+        "etapsilioxia",
+        "etadasiaoxia",
+        "etapsiliperispomeni",
+        "etadasiaperispomeni",
+        "Etapsili",
+        "Etadasia",
+        "Etapsilivaria",
+        "Etadasiavaria",
+        "Etapsilioxia",
+        "Etadasiaoxia",
+        "Etapsiliperispomeni",
+        "Etadasiaperispomeni",
+        "iotapsili",
+        "iotadasia",
+        "iotapsilivaria",
+        "iotadasiavaria",
+        "iotapsilioxia",
+        "iotadasiaoxia",
+        "iotapsiliperispomeni",
+        "iotadasiaperispomeni",
+        "Iotapsili",
+        "Iotadasia",
+        "Iotapsilivaria",
+        "Iotadasiavaria",
+        "Iotapsilioxia",
+        "Iotadasiaoxia",
+        "Iotapsiliperispomeni",
+        "Iotadasiaperispomeni",
+        "omicronpsili",
+        "omicrondasia",
+        "omicronpsilivaria",
+        "omicrondasiavaria",
+        "omicronpsilioxia",
+        "omicrondasiaoxia",
+        "Omicronpsili",
+        "Omicrondasia",
+        "Omicronpsilivaria",
+        "Omicrondasiavaria",
+        "Omicronpsilioxia",
+        "Omicrondasiaoxia",
+        "upsilonpsili",
+        "upsilondasia",
+        "upsilonpsilivaria",
+        "upsilondasiavaria",
+        "upsilonpsilioxia",
+        "upsilondasiaoxia",
+        "upsilonpsiliperispomeni",
+        "upsilondasiaperispomeni",
+        "Upsilondasia",
+        "Upsilondasiavaria",
+        "Upsilondasiaoxia",
+        "Upsilondasiaperispomeni",
+        "omegapsili",
+        "omegadasia",
+        "omegapsilivaria",
+        "omegadasiavaria",
+        "omegapsilioxia",
+        "omegadasiaoxia",
+        "omegapsiliperispomeni",
+        "omegadasiaperispomeni",
+        "Omegapsili",
+        "Omegadasia",
+        "Omegapsilivaria",
+        "Omegadasiavaria",
+        "Omegapsilioxia",
+        "Omegadasiaoxia",
+        "Omegapsiliperispomeni",
+        "Omegadasiaperispomeni",
+        "alphavaria",
+        "alphaoxia",
+        "epsilonvaria",
+        "epsilonoxia",
+        "etavaria",
+        "etaoxia",
+        "iotavaria",
+        "iotaoxia",
+        "omicronvaria",
+        "omicronoxia",
+        "upsilonvaria",
+        "upsilonoxia",
+        "omegavaria",
+        "omegaoxia",
+        "alphapsiliypogegrammeni",
+        "alphadasiaypogegrammeni",
+        "alphapsilivariaypogegrammeni",
+        "alphadasiavariaypogegrammeni",
+        "alphapsilioxiaypogegrammeni",
+        "alphadasiaoxiaypogegrammeni",
+        "alphapsiliperispomeniypogegrammeni",
+        "alphadasiaperispomeniypogegrammeni",
+        "Alphapsiliprosgegrammeni",
+        "Alphadasiaprosgegrammeni",
+        "Alphapsilivariaprosgegrammeni",
+        "Alphadasiavariaprosgegrammeni",
+        "Alphapsilioxiaprosgegrammeni",
+        "Alphadasiaoxiaprosgegrammeni",
+        "Alphapsiliperispomeniprosgegrammeni",
+        "Alphadasiaperispomeniprosgegrammeni",
+        "etapsiliypogegrammeni",
+        "etadasiaypogegrammeni",
+        "etapsilivariaypogegrammeni",
+        "etadasiavariaypogegrammeni",
+        "etapsilioxiaypogegrammeni",
+        "etadasiaoxiaypogegrammeni",
+        "etapsiliperispomeniypogegrammeni",
+        "etadasiaperispomeniypogegrammeni",
+        "Etapsiliprosgegrammeni",
+        "Etadasiaprosgegrammeni",
+        "Etapsilivariaprosgegrammeni",
+        "Etadasiavariaprosgegrammeni",
+        "Etapsilioxiaprosgegrammeni",
+        "Etadasiaoxiaprosgegrammeni",
+        "Etapsiliperispomeniprosgegrammeni",
+        "Etadasiaperispomeniprosgegrammeni",
+        "omegapsiliypogegrammeni",
+        "omegadasiaypogegrammeni",
+        "omegapsilivariaypogegrammeni",
+        "omegadasiavariaypogegrammeni",
+        "omegapsilioxiaypogegrammeni",
+        "omegadasiaoxiaypogegrammeni",
+        "omegapsiliperispomeniypogegrammeni",
+        "omegadasiaperispomeniypogegrammeni",
+        "Omegapsiliprosgegrammeni",
+        "Omegadasiaprosgegrammeni",
+        "Omegapsilivariaprosgegrammeni",
+        "Omegadasiavariaprosgegrammeni",
+        "Omegapsilioxiaprosgegrammeni",
+        "Omegadasiaoxiaprosgegrammeni",
+        "Omegapsiliperispomeniprosgegrammeni",
+        "Omegadasiaperispomeniprosgegrammeni",
+        "alphavrachy",
+        "alphamacron",
+        "alphavariaypogegrammeni",
+        "alphaypogegrammeni",
+        "alphaoxiaypogegrammeni",
+        "alphaperispomeni",
+        "alphaperispomeniypogegrammeni",
+        "Alphavrachy",
+        "Alphamacron",
+        "Alphavaria",
+        "Alphaoxia",
+        "Alphaprosgegrammeni",
+        "koronis",
+        "prosgegrammeni",
+        "psili",
+        "perispomeni",
+        "dialytikaperispomeni",
+        "etavariaypogegrammeni",
+        "etaypogegrammeni",
+        "etaoxiaypogegrammeni",
+        "etaperispomeni",
+        "etaperispomeniypogegrammeni",
+        "Epsilonvaria",
+        "Epsilonoxia",
+        "Etavaria",
+        "Etaoxia",
+        "Etaprosgegrammeni",
+        "psilivaria",
+        "psilioxia",
+        "psiliperispomeni",
+        "iotavrachy",
+        "iotamacron",
+        "iotadialytikavaria",
+        "iotadialytikaoxia",
+        "iotaperispomeni",
+        "iotadialytikaperispomeni",
+        "Iotavrachy",
+        "Iotamacron",
+        "Iotavaria",
+        "Iotaoxia",
+        "dasiavaria",
+        "dasiaoxia",
+        "dasiaperispomeni",
+        "upsilonvrachy",
+        "upsilonmacron",
+        "upsilondialytikavaria",
+        "upsilondialytikaoxia",
+        "rhopsili",
+        "rhodasia",
+        "upsilonperispomeni",
+        "upsilondialytikaperispomeni",
+        "Upsilonvrachy",
+        "Upsilonmacron",
+        "Upsilonvaria",
+        "Upsilonoxia",
+        "Rhodasia",
+        "dialytikavaria",
+        "dialytikaoxia",
+        "varia",
+        "omegavariaypogegrammeni",
+        "omegaypogegrammeni",
+        "omegaoxiaypogegrammeni",
+        "omegaperispomeni",
+        "omegaperispomeniypogegrammeni",
+        "Omicronvaria",
+        "Omicronoxia",
+        "Omegavaria",
+        "Omegaoxia",
+        "Omegaprosgegrammeni",
+        "oxia",
+        "dasia",
+        "zerowidthnonjoiner",
+        "zerowidthjoiner",
+        "lefttorightmark",
+        "righttoleftmark",
+        "figuredash",
+        "dblverticalbar",
+        "quotedblrightreversed",
+        "lefttorightembedding",
+        "righttoleftembedding",
+        "popdirectionalformatting",
+        "lefttorightoverride",
+        "righttoleftoverride",
+        "narrownbspace",
+        "tripleprime",
+        "overline",
+        "verticalfourdots",
+        "inhibitsymmetricswapping",
+        "activatesymmetricswapping",
+        "inhibitformshaping-ar",
+        "activateformshaping-ar",
+        "nationalshapes",
+        "nominalshapes",
+        "zerosuperior",
+        "sixsuperior",
+        "ninesuperior",
+        "ainferior",
+        "einferior",
+        "oinferior",
+        "xinferior",
+        "schwainferior",
+        "eurocurrency",
+        "colonsign",
+        "cruzeiro",
+        "mill",
+        "naira",
+        "rupee",
+        "won",
+        "kip",
+        "tugrik",
+        "drachma",
+        "germanpenny",
+        "peso",
+        "guarani",
+        "austral",
+        "hryvnia",
+        "cedi",
+        "rupeeIndian",
+        "asteriskabovecomb",
+        "published",
+        "aktieselskab",
+        "fturned",
+        "onethird",
+        "twothirds",
+        "Onehundredreversed-roman",
+        "creversed",
+        "dottedCircle",
+        "Ldoublebar",
+        "ldoublebar",
+        "Lmiddletilde",
+        "Pstroke",
+        "Rtail",
+        "astroke",
+        "tdiagonalstroke",
+        "Hdescender",
+        "hdescender",
+        "Kdescender",
+        "kdescender",
+        "Zdescender",
+        "zdescender",
+        "Alpha-latin",
+        "vrighthook",
+        "Whook",
+        "whook",
+        "vcurl",
+        "Halfh",
+        "halfh",
+        "taillessphi",
+        "doubleobliquehyphen",
+        "dotverticalbarmod",
+        "dotslashmod",
+        "dothorizontalbarmod",
+        "lowerrightcorneranglemod",
+        "raiseduparrowmod",
+        "raiseddownarrowmod",
+        "raisedexclamationmarkmod",
+        "raisedinvertedexclamationmarkmod",
+        "lowinvertedexclamationmarkmod",
+        "stressAndHighTonemod",
+        "stressAndLowTonemod",
+        "lowcircumflexmod",
+        "colonmod",
+        "shortequalmod",
+        "Saltillo",
+        "saltillo",
+        "dieresisacute",
+        "dieresisgrave",
+        "ligaturelefthalfcomb",
+        "ligaturerighthalfcomb",
+        "doubletildelefthalfcomb",
+        "doubletilderighthalfcomb",
+        "alpha_macroncomb_commaabovecomb_gravecomb",
+        "alpha_macroncomb_commaabovecomb_acutecomb",
+        "alpha_macroncomb_commareversedabovecomb_gravecomb",
+        "alpha_macroncomb_commareversedabovecomb_acutecomb",
+        "alpha_brevecomb_commaabovecomb_gravecomb",
+        "alpha_brevecomb_commaabovecomb_acutecomb",
+        "alpha_brevecomb_commareversedabovecomb_gravecomb",
+        "alpha_brevecomb_commareversedabovecomb_acutecomb",
+        "iota_macroncomb_commaabovecomb_gravecomb",
+        "iota_macroncomb_commaabovecomb_acutecomb",
+        "iota_macroncomb_commareversedabovecomb_gravecomb",
+        "iota_macroncomb_commareversedabovecomb_acutecomb",
+        "iota_brevecomb_commaabovecomb_gravecomb",
+        "iota_brevecomb_commaabovecomb_acutecomb",
+        "iota_brevecomb_commareversedabovecomb_gravecomb",
+        "iota_brevecomb_commareversedabovecomb_acutecomb",
+        "upsilon_macroncomb_commaabovecomb_gravecomb",
+        "upsilon_macroncomb_commaabovecomb_acutecomb",
+        "upsilon_macroncomb_commareversedabovecomb_gravecomb",
+        "upsilon_macroncomb_commareversedabovecomb_acutecomb",
+        "upsilon_brevecomb_commaabovecomb_gravecomb",
+        "upsilon_brevecomb_commaabovecomb_acutecomb",
+        "upsilon_brevecomb_commareversedabovecomb_gravecomb",
+        "upsilon_brevecomb_commareversedabovecomb_acutecomb",
+        "iota_dieresiscomb_macroncomb_gravecomb",
+        "iota_dieresiscomb_macroncomb_acutecomb",
+        "iota_dieresiscomb_brevecomb_gravecomb",
+        "iota_dieresiscomb_brevecomb_acutecomb",
+        "upsilon_dieresiscomb_macroncomb_gravecomb",
+        "upsilon_dieresiscomb_macroncomb_acutecomb",
+        "upsilon_dieresiscomb_brevecomb_gravecomb",
+        "upsilon_dieresiscomb_brevecomb_acutecomb",
+        "Eng.alt1",
+        "Eng.alt2",
+        "Eng.alt3",
+        "psilivaria_macronmod",
+        "psilioxia_macronmod",
+        "dasiavaria_macronmod",
+        "dasiaoxia_macronmod",
+        "dotacute",
+        "carondot",
+        "macrondieresis",
+        "tildedieresis",
+        "tildeacute",
+        "macrongrave",
+        "macronacute",
+        "dieresiscaron",
+        "dieresismacron",
+        "tildemacron",
+        "dotmacron",
+        "acutecomb_brevecomb_dieresiscomb",
+        "gravecomb_brevecomb_dieresiscomb",
+        "acutecomb_macroncomb_dieresiscomb",
+        "gravecomb_macroncomb_dieresiscomb",
+        "dasiaoxia_brevecomb",
+        "dasiavaria_brevecomb",
+        "psilioxia_brevecomb",
+        "psilivaria_brevecomb",
+        "Lha-cy",
+        "lha-cy",
+        "Rha-cy",
+        "rha-cy",
+        "Yae-cy",
+        "yae-cy",
+        "Aleutka-cy",
+        "aleutka-cy",
+        "Elmiddlehook-cy",
+        "elmiddlehook-cy",
+        "Enmiddlehook-cy",
+        "enmiddlehook-cy",
+        "Pedescender-cy",
+        "pedescender-cy",
+        "Shhadescender-cy",
+        "shhadescender-cy",
+        "cyrillic_otmark",
+        "liraTurkish",
+        "LL-middleWelsh",
+        "Mhook",
+        "Germandbls",
+        "Aturned",
+        "V-middleWelsh",
+        "Yloop",
+        "Alef-egyptological",
+        "Ain-egyptological",
+        "Heng",
+        "Tz",
+        "Tresillo",
+        "Cuatrillo",
+        "Cuatrillocomma",
+        "AA",
+        "Ao",
+        "Au",
+        "Av",
+        "AVhorizontalbar",
+        "AY",
+        "Creverseddot",
+        "Kstroke",
+        "Kdiagonalstroke",
+        "Kstrokediagonalstroke",
+        "Lbroken",
+        "Lhighstroke",
+        "Olongstroke",
+        "Oloop",
+        "OO",
+        "Pstrokethroughdescender",
+        "Pflourish",
+        "Psquirreltail",
+        "Qstrokethroughdescender",
+        "Qdiagonalstroke",
+        "Rrotunda",
+        "Rumrotunda",
+        "Vdiagonalstroke",
+        "VY",
+        "Thornstroke",
+        "Thornstrokethroughdescender",
+        "Vend",
+        "Et",
+        "Is",
+        "Con",
+        "Dinsular",
+        "Finsular",
+        "Ginsular",
+        "Gturnedinsular",
+        "Lturned",
+        "Rinsular",
+        "Sinsular",
+        "Tinsular",
+        "Hturned",
+        "Ndescender",
+        "Cbar",
+        "Gobliquestroke",
+        "Kobliquestroke",
+        "Nobliquestroke",
+        "Robliquestroke",
+        "Sobliquestroke",
+        "Hhook",
+        "Eopenreversed",
+        "Gscript",
+        "Lbelt",
+        "Kturned",
+        "Tturned",
+        "Aogonek.loclNAV",
+        "Eogonek.loclNAV",
+        "Iogonek.loclNAV",
+        "Uogonek.loclNAV",
+        "Esmallturned",
+        "idotless-cy",
+        "jedotless-cy",
+        "delta-latin",
+        "enotch",
+        "eopenreversed",
+        "eopenreversedhook",
+        "eturned",
+        "idotless",
+        "iogonekdotless",
+        "jdotless",
+        "ll-middleWelsh",
+        "longsdiagonalstroke",
+        "longshighstroke",
+        "olowringinside",
+        "schwahook",
+        "jsubscript",
+        "turnedrtail",
+        "jstrokedotless",
+        "jcrossedtaildotless",
+        "jmoddotless",
+        "yotdotless",
+        "isubscriptdotless",
+        "iretroflexhookdotless",
+        "istrokemoddotless",
+        "jcrossedtailmoddotless",
+        "itildebelowdotless",
+        "idotbelowdotless",
+        "alef-egyptological",
+        "ain-egyptological",
+        "heng",
+        "tz",
+        "tresillo",
+        "cuatrillo",
+        "cuatrillocomma",
+        "Fsmall",
+        "Ssmall",
+        "aa",
+        "ao",
+        "au",
+        "av",
+        "avhorizontalbar",
+        "ay",
+        "creverseddot",
+        "kstroke",
+        "kdiagonalstroke",
+        "kstrokediagonalstroke",
+        "lbroken",
+        "lhighstroke",
+        "olongstroke",
+        "oloop",
+        "oo",
+        "pstrokethroughdescender",
+        "pflourish",
+        "psquirreltail",
+        "qstrokethroughdescender",
+        "qdiagonalstroke",
+        "rrotunda",
+        "rumrotunda",
+        "vdiagonalstroke",
+        "vy",
+        "thornstroke",
+        "thornstrokethroughdescender",
+        "vend",
+        "et",
+        "is",
+        "_con",
+        "dum",
+        "lum",
+        "mum",
+        "num",
+        "rum",
+        "rumsmall",
+        "tum",
+        "um",
+        "dinsular",
+        "finsular",
+        "gturnedinsular",
+        "lturned",
+        "rinsular",
+        "sinsular",
+        "tinsular",
+        "lretroflexhookandbelt",
+        "ndescender",
+        "cbar",
+        "gobliquestroke",
+        "kobliquestroke",
+        "nobliquestroke",
+        "robliquestroke",
+        "sobliquestroke",
+        "Mturnedsmall",
+        "v-middleWelsh",
+        "yloop",
+        "aogonek.loclNAV",
+        "eogonek.loclNAV",
+        "uogonek.loclNAV",
+        "f_f",
+        "f_f_i",
+        "f_f_l",
+        "fi",
+        "fl",
+        "a.sc",
+        "aacute.sc",
+        "abreve.sc",
+        "acircumflex.sc",
+        "adieresis.sc",
+        "agrave.sc",
+        "amacron.sc",
+        "aogonek.sc",
+        "aring.sc",
+        "aringacute.sc",
+        "atilde.sc",
+        "ae.sc",
+        "aeacute.sc",
+        "b.sc",
+        "c.sc",
+        "cacute.sc",
+        "ccaron.sc",
+        "ccedilla.sc",
+        "ccircumflex.sc",
+        "cdotaccent.sc",
+        "d.sc",
+        "eth.sc",
+        "dcaron.sc",
+        "dcroat.sc",
+        "e.sc",
+        "eacute.sc",
+        "ebreve.sc",
+        "ecaron.sc",
+        "ecircumflex.sc",
+        "edieresis.sc",
+        "edotaccent.sc",
+        "egrave.sc",
+        "emacron.sc",
+        "eogonek.sc",
+        "f.sc",
+        "g.sc",
+        "gbreve.sc",
+        "gcircumflex.sc",
+        "gcommaaccent.sc",
+        "gdotaccent.sc",
+        "h.sc",
+        "hbar.sc",
+        "hcircumflex.sc",
+        "i.sc",
+        "iacute.sc",
+        "ibreve.sc",
+        "icircumflex.sc",
+        "idieresis.sc",
+        "idotaccent.sc",
+        "igrave.sc",
+        "ij.sc",
+        "imacron.sc",
+        "iogonek.sc",
+        "itilde.sc",
+        "j.sc",
+        "jcircumflex.sc",
+        "k.sc",
+        "kcommaaccent.sc",
+        "l.sc",
+        "lacute.sc",
+        "lcaron.sc",
+        "lcommaaccent.sc",
+        "ldot.sc",
+        "lslash.sc",
+        "m.sc",
+        "n.sc",
+        "nacute.sc",
+        "ncaron.sc",
+        "ncommaaccent.sc",
+        "eng.sc",
+        "ntilde.sc",
+        "o.sc",
+        "oacute.sc",
+        "obreve.sc",
+        "ocircumflex.sc",
+        "odieresis.sc",
+        "ograve.sc",
+        "ohungarumlaut.sc",
+        "omacron.sc",
+        "oslash.sc",
+        "oslashacute.sc",
+        "otilde.sc",
+        "oe.sc",
+        "p.sc",
+        "thorn.sc",
+        "q.sc",
+        "r.sc",
+        "racute.sc",
+        "rcaron.sc",
+        "rcommaaccent.sc",
+        "s.sc",
+        "sacute.sc",
+        "scaron.sc",
+        "scedilla.sc",
+        "scircumflex.sc",
+        "scommaaccent.sc",
+        "germandbls.sc",
+        "t.sc",
+        "tbar.sc",
+        "tcaron.sc",
+        "tcedilla.sc",
+        "tcommaaccent.sc",
+        "u.sc",
+        "uacute.sc",
+        "ubreve.sc",
+        "ucircumflex.sc",
+        "udieresis.sc",
+        "ugrave.sc",
+        "uhungarumlaut.sc",
+        "umacron.sc",
+        "uogonek.sc",
+        "uring.sc",
+        "utilde.sc",
+        "v.sc",
+        "w.sc",
+        "wacute.sc",
+        "wcircumflex.sc",
+        "wdieresis.sc",
+        "wgrave.sc",
+        "x.sc",
+        "y.sc",
+        "yacute.sc",
+        "ycircumflex.sc",
+        "ydieresis.sc",
+        "ygrave.sc",
+        "z.sc",
+        "zacute.sc",
+        "zcaron.sc",
+        "zdotaccent.sc",
+        "imod",
+        "Iepigraphicsideways",
+        "Fepigraphicreversed",
+        "Pepigraphicreversed",
+        "Mepigraphicinverted",
+        "Longaepigraphici",
+        "Mepigraphicarchaic",
+        "Enlefthook-cy",
+        "Dzzhe-cy",
+        "Dche-cy",
+        "Eldescender-cy",
+        "Zemlya-cy",
+        "Dzelo-cy",
+        "Dzereversed-cy",
+        "Iota-cy",
+        "Djerv-cy",
+        "Ukmonograph-cy",
+        "Omegabroad-cy",
+        "Yerneutral-cy",
+        "Yerubackyer-cy",
+        "Yatiotified-cy",
+        "Yureversed-cy",
+        "Iotifieda-cy",
+        "Yusclosedlittle-cy",
+        "Yusblended-cy",
+        "Yusiotifiedclosedlittle-cy",
+        "Yn-cy",
+        "Tsereversed-cy",
+        "Desoft-cy",
+        "Elsoft-cy",
+        "Emsoft-cy",
+        "Omonocular-cy",
+        "Obinocular-cy",
+        "Odoublemonocular-cy",
+        "Dwe-cy",
+        "Dzwe-cy",
+        "Zhwe-cy",
+        "Cche-cy",
+        "Dzze-cy",
+        "Tewithmiddlehook-cy",
+        "Twe-cy",
+        "Tswe-cy",
+        "Tsse-cy",
+        "Tche-cy",
+        "Hwe-cy",
+        "Shwe-cy",
+        "Odouble-cy",
+        "Ocrossed-cy",
+        "enlefthook-cy",
+        "dzzhe-cy",
+        "dche-cy",
+        "eldescender-cy",
+        "verounded-cy",
+        "delonglegged-cy",
+        "onarrow-cy",
+        "eswide-cy",
+        "tetall-cy",
+        "tethreelegged-cy",
+        "hardsigntall-cy",
+        "yattall-cy",
+        "ukunblended-cy",
+        "zemlya-cy",
+        "dzelo-cy",
+        "dzereversed-cy",
+        "iota-cy",
+        "djerv-cy",
+        "ukmonograph-cy",
+        "omegabroad-cy",
+        "yerneutral-cy",
+        "yerubackyer-cy",
+        "yatiotified-cy",
+        "yureversed-cy",
+        "iotifieda-cy",
+        "yusclosedlittle-cy",
+        "yusblended-cy",
+        "yusiotifiedclosedlittle-cy",
+        "yn-cy",
+        "tsereversed-cy",
+        "desoft-cy",
+        "elsoft-cy",
+        "emsoft-cy",
+        "omonocular-cy",
+        "obinocular-cy",
+        "odoublemonocular-cy",
+        "dwe-cy",
+        "dzwe-cy",
+        "zhwe-cy",
+        "cche-cy",
+        "dzze-cy",
+        "tewithmiddlehook-cy",
+        "twe-cy",
+        "tswe-cy",
+        "tsse-cy",
+        "tche-cy",
+        "hwe-cy",
+        "shwe-cy",
+        "odouble-cy",
+        "ocrossed-cy",
+        "be-cy.loclSRB",
+        "omultiocular-cy",
+        "payerok-cy",
+        "modifierhardsign-cy",
+        "modifiersoftsign-cy",
+        "Heta",
+        "Archaicsampi",
+        "Pamphyliandigamma",
+        "KaiSymbol",
+        "Yot",
+        "heta",
+        "archaicsampi",
+        "pamphyliandigamma",
+        "betaSymbol.alt",
+        "C-fraktur",
+        "H-fraktur",
+        "I-fraktur",
+        "R-fraktur",
+        "Z-fraktur",
+        "Zvisigothic",
+        "zvisigothic",
+        "Bscript",
+        "Hscript",
+        "Iscript",
+        "Lscript",
+        "PidoubleStruck",
+        "Rscript",
+        "Fturned",
+        "angstrom",
+        "CdoubleStruck",
+        "HdoubleStruck",
+        "NdoubleStruck",
+        "PdoubleStruck",
+        "QdoubleStruck",
+        "RdoubleStruck",
+        "ZdoubleStruck",
+        "DitalicDoubleStruck",
+        "GammadoubleStruck",
+        "eulerconstant",
+        "kelvin",
+        "Escript",
+        "Fscript",
+        "Mscript",
+        "Bflourish",
+        "Fstroke",
+        "Aevolapuk",
+        "Oevolapuk",
+        "Uevolapuk",
+        "ditalicDoubleStruck",
+        "eitalicDoubleStruck",
+        "iitalicDoubleStruck",
+        "jitalicDoubleStruck",
+        "gammadoubleStruck",
+        "pidoubleStruck",
+        "planckconstant",
+        "planckconstantovertwopi",
+        "escript",
+        "oscript",
+        "gscript",
+        "cpalatalhook",
+        "hpalatalhook",
+        "bflourish",
+        "fstroke",
+        "aevolapuk",
+        "oevolapuk",
+        "uevolapuk",
+        "alphabarred",
+        "aschwareversed",
+        "e-blackletter",
+        "ebarred",
+        "eflourish",
+        "flenis",
+        "gscriptcrossedtail",
+        "lsinvertedlazy",
+        "ldoublemiddletilde",
+        "lmiddlering",
+        "mcrossedtail",
+        "ncrossedtail",
+        "engcrossedtail",
+        "o-blackletter",
+        "ostroke-blackletter",
+        "oopenstroke-blackletter",
+        "oeinverted",
+        "oeturnedstroke",
+        "oeturnedwithhorizontalstroke",
+        "oopenoturned",
+        "ostrokeopenoturned",
+        "rstirrup",
+        "rrightleg",
+        "rnohandle",
+        "rdouble",
+        "rcrossedtail",
+        "rdoublecrossedtail",
+        "rscript",
+        "rscriptring",
+        "eshbaseline",
+        "ushortrightleg",
+        "ubarshortrightleg",
+        "ui",
+        "uiturned",
+        "ulefthook",
+        "chi-latin",
+        "chilowrightring",
+        "chilowleftserif",
+        "xlowrightring",
+        "xlongleftleg",
+        "xlongleftlegandlowrightring",
+        "xlongleftlegserif",
+        "yshortrightleg",
+        "alphainverted-latin",
+        "hinferior",
+        "kinferior",
+        "linferior",
+        "minferior",
+        "ninferior",
+        "pinferior",
+        "sinferior",
+        "tinferior",
+        "usmod",
+        "Hbarmod",
+        "oemod",
+        "hengmod",
+        "lsinvertedlazymod",
+        "lmiddletildemod",
+        "ulefthookmod",
+        "verticaltilde",
+        "zero.lf",
+        "one.lf",
+        "two.lf",
+        "three.lf",
+        "four.lf",
+        "five.lf",
+        "six.lf",
+        "seven.lf",
+        "eight.lf",
+        "nine.lf",
+        "zero.osf",
+        "one.osf",
+        "two.osf",
+        "three.osf",
+        "four.osf",
+        "five.osf",
+        "six.osf",
+        "seven.osf",
+        "eight.osf",
+        "nine.osf",
+        "zero.tosf",
+        "one.tosf",
+        "two.tosf",
+        "three.tosf",
+        "four.tosf",
+        "five.tosf",
+        "six.tosf",
+        "seven.tosf",
+        "eight.tosf",
+        "nine.tosf",
+        "zero.dnom",
+        "one.dnom",
+        "two.dnom",
+        "three.dnom",
+        "four.dnom",
+        "five.dnom",
+        "six.dnom",
+        "seven.dnom",
+        "eight.dnom",
+        "nine.dnom",
+        "zero.numr",
+        "one.numr",
+        "two.numr",
+        "three.numr",
+        "four.numr",
+        "five.numr",
+        "six.numr",
+        "seven.numr",
+        "eight.numr",
+        "nine.numr",
+        "zeroinferior",
+        "oneinferior",
+        "twoinferior",
+        "threeinferior",
+        "fourinferior",
+        "fiveinferior",
+        "sixinferior",
+        "seveninferior",
+        "eightinferior",
+        "nineinferior",
+        "asterism",
+        "blackleftbullet",
+        "blackrightbullet",
+        "bracketleftwithquill",
+        "bracketrightwithquill",
+        "caretSign",
+        "caretinsertionpoint",
+        "charactertie",
+        "closeup",
+        "daggerwithleftguard",
+        "daggerwithrightguard",
+        "dottedcross",
+        "dottedobelos",
+        "dottedrightpointingangle",
+        "dottedtranspositionmarker",
+        "downancora",
+        "editorialcoronis",
+        "exclamationquestion",
+        "fivedotmark",
+        "fivedotpunctuation",
+        "flowerpunctuationmark",
+        "forkedparagraphos",
+        "fourdotmark",
+        "fourdotpunctuation",
+        "hyphenationpoint",
+        "hyphenbullet",
+        "hypodiastole",
+        "invertedinterrobang",
+        "invertedundertie",
+        "leftdottedsubstitutionbracket",
+        "leftlowparaphrasebracket",
+        "leftraisedomissionbracket",
+        "leftsubstitutionbracket",
+        "lefttranspositionbracket",
+        "leftverticalbarwithquill",
+        "lowasterisk",
+        "onedotenleader",
+        "onedotovertwodots",
+        "palmbranch",
+        "paragraphos",
+        "doublequestion",
+        "questionexclamation",
+        "raisedcomma",
+        "raiseddot",
+        "raiseddottedinterpolationmarker",
+        "raisedinterpolationmarker",
+        "raisedsquare",
+        "referencemark",
+        "reversedforkedparagraphos",
+        "paragraphreversed",
+        "questionreversed",
+        "reversedsemicolon",
+        "rightangledottedsubstitutionmarker",
+        "rightanglesubstitutionmarker",
+        "rightdottedsubstitutionbracket",
+        "rightlowparaphrasebracket",
+        "rightraisedomissionbracket",
+        "rightsubstitutionbracket",
+        "righttranspositionbracket",
+        "rightverticalbarwithquill",
+        "ringpoint",
+        "squaredfourdot",
+        "swungdash",
+        "threedotpunctuation",
+        "tildedotabove",
+        "tildedotbelow",
+        "tilderingabove",
+        "tironiansignet",
+        "tophalfsectionsign",
+        "tricolon",
+        "turnedcomma",
+        "turneddagger",
+        "turnedsemicolon",
+        "twoasterisksvertical",
+        "twodotenleader",
+        "twodotpunctuation",
+        "twodotsoveronedot",
+        "undertie",
+        "triangularbullet",
+        "stenographicfullstop",
+        "verticalsixdots",
+        "wigglyverticalline",
+        "capitulum",
+        "commareversed",
+        "asterisk-cy",
+        "upancora",
+        "wordseparatormiddledot",
+        "parenleftinferior",
+        "parenrightinferior",
+        "bottomleftHalfBracket",
+        "bottomrightHalfBracket",
+        "topleftHalfBracket",
+        "toprightHalfBracket",
+        "leftDoubleParen",
+        "rightDoubleParen",
+        "leftsidewaysubracket",
+        "rightsidewaysubracket",
+        "parenleftsuperior",
+        "parenrightsuperior",
+        "hyphendieresis",
+        "hyphentwo",
+        "nonbreakinghyphen",
+        "threeemdash",
+        "twoemdash",
+        "hyphendouble",
+        "doubleprimeReversed",
+        "primeReversed",
+        "quadrupleprime",
+        "tripleprimeReversed",
+        "quotedblbasereversed",
+        "braceleft.sc",
+        "braceright.sc",
+        "bracketleft.sc",
+        "bracketright.sc",
+        "exclam.sc",
+        "exclamdouble.sc",
+        "exclamdown.sc",
+        "parenleft.sc",
+        "parenright.sc",
+        "question.sc",
+        "questiondown.sc",
+        "kavyka-cy",
+        "mediumspace-math",
+        "lineseparator",
+        "paragraphseparator",
+        "functionapplication",
+        "invisibleplus",
+        "invisibleseparator",
+        "invisibletimes",
+        "lefttorightisolate",
+        "righttoleftisolate",
+        "firststrongisolate",
+        "popdirectionalisolate",
+        "wordjoiner",
+        "livreTournois",
+        "manat",
+        "ruble",
+        "sheqel",
+        "spesmilo",
+        "tenge",
+        "nordicMark",
+        "lari",
+        "Ohminverted",
+        "alephsymbol",
+        "ampersandturned",
+        "betsymbol",
+        "commercialMinusSign",
+        "daletsymbol",
+        "equalinferior",
+        "equalsuperior",
+        "gimelsymbol",
+        "minusinferior",
+        "minussuperior",
+        "pertenthousand",
+        "plusinferior",
+        "plussuperior",
+        "LreversedSansSerif",
+        "summationdoubleStruck",
+        "GturnedSansSerif",
+        "LturnedSansSerif",
+        "YturnedSansSerif",
+        "Qrotated",
+        "accountof",
+        "addressedtothesubject",
+        "cadauna",
+        "centigrade",
+        "centrelinesymbol",
+        "facsimile",
+        "fahrenheit",
+        "informationsource",
+        "interrobang",
+        "lbbarsymbol",
+        "ounce",
+        "persign",
+        "prescription",
+        "propertyline",
+        "response",
+        "scruple",
+        "servicemark",
+        "samaritansource",
+        "telephone",
+        "versicle",
+        "weierstrass",
+        "rhotichookmod",
+        "tonebarextrahighmod_tonebarextrahighmod_tonebarextralowmod",
+        "tonebarextrahighmod_tonebarextrahighmod_tonebarhighmod",
+        "tonebarextrahighmod_tonebarextrahighmod_tonebarlowmod",
+        "tonebarextrahighmod_tonebarextrahighmod_tonebarmidmod",
+        "tonebarextrahighmod_tonebarextralowmod",
+        "tonebarextrahighmod_tonebarextralowmod_tonebarextrahighmod",
+        "tonebarextrahighmod_tonebarextralowmod_tonebarextralowmod",
+        "tonebarextrahighmod_tonebarextralowmod_tonebarhighmod",
+        "tonebarextrahighmod_tonebarextralowmod_tonebarlowmod",
+        "tonebarextrahighmod_tonebarextralowmod_tonebarmidmod",
+        "tonebarextrahighmod_tonebarhighmod",
+        "tonebarextrahighmod_tonebarhighmod_tonebarextrahighmod",
+        "tonebarextrahighmod_tonebarhighmod_tonebarextralowmod",
+        "tonebarextrahighmod_tonebarhighmod_tonebarhighmod",
+        "tonebarextrahighmod_tonebarhighmod_tonebarlowmod",
+        "tonebarextrahighmod_tonebarhighmod_tonebarmidmod",
+        "tonebarextrahighmod_tonebarlowmod",
+        "tonebarextrahighmod_tonebarlowmod_tonebarextrahighmod",
+        "tonebarextrahighmod_tonebarlowmod_tonebarextralowmod",
+        "tonebarextrahighmod_tonebarlowmod_tonebarhighmod",
+        "tonebarextrahighmod_tonebarlowmod_tonebarlowmod",
+        "tonebarextrahighmod_tonebarlowmod_tonebarmidmod",
+        "tonebarextrahighmod_tonebarmidmod",
+        "tonebarextrahighmod_tonebarmidmod_tonebarextrahighmod",
+        "tonebarextrahighmod_tonebarmidmod_tonebarextralowmod",
+        "tonebarextrahighmod_tonebarmidmod_tonebarhighmod",
+        "tonebarextrahighmod_tonebarmidmod_tonebarlowmod",
+        "tonebarextrahighmod_tonebarmidmod_tonebarmidmod",
+        "tonebarextralowmod_tonebarextrahighmod",
+        "tonebarextralowmod_tonebarextrahighmod_tonebarextrahighmod",
+        "tonebarextralowmod_tonebarextrahighmod_tonebarextralowmod",
+        "tonebarextralowmod_tonebarextrahighmod_tonebarhighmod",
+        "tonebarextralowmod_tonebarextrahighmod_tonebarlowmod",
+        "tonebarextralowmod_tonebarextrahighmod_tonebarmidmod",
+        "tonebarextralowmod_tonebarextralowmod_tonebarextrahighmod",
+        "tonebarextralowmod_tonebarextralowmod_tonebarhighmod",
+        "tonebarextralowmod_tonebarextralowmod_tonebarlowmod",
+        "tonebarextralowmod_tonebarextralowmod_tonebarmidmod",
+        "tonebarextralowmod_tonebarhighmod",
+        "tonebarextralowmod_tonebarhighmod_tonebarextrahighmod",
+        "tonebarextralowmod_tonebarhighmod_tonebarextralowmod",
+        "tonebarextralowmod_tonebarhighmod_tonebarhighmod",
+        "tonebarextralowmod_tonebarhighmod_tonebarlowmod",
+        "tonebarextralowmod_tonebarhighmod_tonebarmidmod",
+        "tonebarextralowmod_tonebarlowmod",
+        "tonebarextralowmod_tonebarlowmod_tonebarextrahighmod",
+        "tonebarextralowmod_tonebarlowmod_tonebarextralowmod",
+        "tonebarextralowmod_tonebarlowmod_tonebarhighmod",
+        "tonebarextralowmod_tonebarlowmod_tonebarlowmod",
+        "tonebarextralowmod_tonebarlowmod_tonebarmidmod",
+        "tonebarextralowmod_tonebarmidmod",
+        "tonebarextralowmod_tonebarmidmod_tonebarextrahighmod",
+        "tonebarextralowmod_tonebarmidmod_tonebarextralowmod",
+        "tonebarextralowmod_tonebarmidmod_tonebarhighmod",
+        "tonebarextralowmod_tonebarmidmod_tonebarlowmod",
+        "tonebarextralowmod_tonebarmidmod_tonebarmidmod",
+        "tonebarhighmod_tonebarextrahighmod",
+        "tonebarhighmod_tonebarextrahighmod_tonebarextrahighmod",
+        "tonebarhighmod_tonebarextrahighmod_tonebarextralowmod",
+        "tonebarhighmod_tonebarextrahighmod_tonebarhighmod",
+        "tonebarhighmod_tonebarextrahighmod_tonebarlowmod",
+        "tonebarhighmod_tonebarextrahighmod_tonebarmidmod",
+        "tonebarhighmod_tonebarextralowmod",
+        "tonebarhighmod_tonebarextralowmod_tonebarextrahighmod",
+        "tonebarhighmod_tonebarextralowmod_tonebarextralowmod",
+        "tonebarhighmod_tonebarextralowmod_tonebarhighmod",
+        "tonebarhighmod_tonebarextralowmod_tonebarlowmod",
+        "tonebarhighmod_tonebarextralowmod_tonebarmidmod",
+        "tonebarhighmod_tonebarhighmod_tonebarextrahighmod",
+        "tonebarhighmod_tonebarhighmod_tonebarextralowmod",
+        "tonebarhighmod_tonebarhighmod_tonebarlowmod",
+        "tonebarhighmod_tonebarhighmod_tonebarmidmod",
+        "tonebarhighmod_tonebarlowmod",
+        "tonebarhighmod_tonebarlowmod_tonebarextrahighmod",
+        "tonebarhighmod_tonebarlowmod_tonebarextralowmod",
+        "tonebarhighmod_tonebarlowmod_tonebarhighmod",
+        "tonebarhighmod_tonebarlowmod_tonebarlowmod",
+        "tonebarhighmod_tonebarlowmod_tonebarmidmod",
+        "tonebarhighmod_tonebarmidmod",
+        "tonebarhighmod_tonebarmidmod_tonebarextrahighmod",
+        "tonebarhighmod_tonebarmidmod_tonebarextralowmod",
+        "tonebarhighmod_tonebarmidmod_tonebarhighmod",
+        "tonebarhighmod_tonebarmidmod_tonebarlowmod",
+        "tonebarhighmod_tonebarmidmod_tonebarmidmod",
+        "tonebarlowmod_tonebarextrahighmod",
+        "tonebarlowmod_tonebarextrahighmod_tonebarextrahighmod",
+        "tonebarlowmod_tonebarextrahighmod_tonebarextralowmod",
+        "tonebarlowmod_tonebarextrahighmod_tonebarhighmod",
+        "tonebarlowmod_tonebarextrahighmod_tonebarlowmod",
+        "tonebarlowmod_tonebarextrahighmod_tonebarmidmod",
+        "tonebarlowmod_tonebarextralowmod",
+        "tonebarlowmod_tonebarextralowmod_tonebarextrahighmod",
+        "tonebarlowmod_tonebarextralowmod_tonebarextralowmod",
+        "tonebarlowmod_tonebarextralowmod_tonebarhighmod",
+        "tonebarlowmod_tonebarextralowmod_tonebarlowmod",
+        "tonebarlowmod_tonebarextralowmod_tonebarmidmod",
+        "tonebarlowmod_tonebarhighmod",
+        "tonebarlowmod_tonebarhighmod_tonebarextrahighmod",
+        "tonebarlowmod_tonebarhighmod_tonebarextralowmod",
+        "tonebarlowmod_tonebarhighmod_tonebarhighmod",
+        "tonebarlowmod_tonebarhighmod_tonebarlowmod",
+        "tonebarlowmod_tonebarhighmod_tonebarmidmod",
+        "tonebarlowmod_tonebarlowmod_tonebarextrahighmod",
+        "tonebarlowmod_tonebarlowmod_tonebarextralowmod",
+        "tonebarlowmod_tonebarlowmod_tonebarhighmod",
+        "tonebarlowmod_tonebarlowmod_tonebarmidmod",
+        "tonebarlowmod_tonebarmidmod",
+        "tonebarlowmod_tonebarmidmod_tonebarextrahighmod",
+        "tonebarlowmod_tonebarmidmod_tonebarextralowmod",
+        "tonebarlowmod_tonebarmidmod_tonebarhighmod",
+        "tonebarlowmod_tonebarmidmod_tonebarlowmod",
+        "tonebarlowmod_tonebarmidmod_tonebarmidmod",
+        "tonebarmidmod_tonebarextrahighmod",
+        "tonebarmidmod_tonebarextrahighmod_tonebarextrahighmod",
+        "tonebarmidmod_tonebarextrahighmod_tonebarextralowmod",
+        "tonebarmidmod_tonebarextrahighmod_tonebarhighmod",
+        "tonebarmidmod_tonebarextrahighmod_tonebarlowmod",
+        "tonebarmidmod_tonebarextrahighmod_tonebarmidmod",
+        "tonebarmidmod_tonebarextralowmod",
+        "tonebarmidmod_tonebarextralowmod_tonebarextrahighmod",
+        "tonebarmidmod_tonebarextralowmod_tonebarextralowmod",
+        "tonebarmidmod_tonebarextralowmod_tonebarhighmod",
+        "tonebarmidmod_tonebarextralowmod_tonebarlowmod",
+        "tonebarmidmod_tonebarextralowmod_tonebarmidmod",
+        "tonebarmidmod_tonebarhighmod",
+        "tonebarmidmod_tonebarhighmod_tonebarextrahighmod",
+        "tonebarmidmod_tonebarhighmod_tonebarextralowmod",
+        "tonebarmidmod_tonebarhighmod_tonebarhighmod",
+        "tonebarmidmod_tonebarhighmod_tonebarlowmod",
+        "tonebarmidmod_tonebarhighmod_tonebarmidmod",
+        "tonebarmidmod_tonebarlowmod",
+        "tonebarmidmod_tonebarlowmod_tonebarextrahighmod",
+        "tonebarmidmod_tonebarlowmod_tonebarextralowmod",
+        "tonebarmidmod_tonebarlowmod_tonebarhighmod",
+        "tonebarmidmod_tonebarlowmod_tonebarlowmod",
+        "tonebarmidmod_tonebarlowmod_tonebarmidmod",
+        "tonebarmidmod_tonebarmidmod_tonebarextrahighmod",
+        "tonebarmidmod_tonebarmidmod_tonebarextralowmod",
+        "tonebarmidmod_tonebarmidmod_tonebarhighmod",
+        "tonebarmidmod_tonebarmidmod_tonebarlowmod",
+        "breveinvertedbrevemod",
+        "ampersand.sc",
+        "turnediota",
+        "dieresiscomb",
+        "dotaccentcomb",
+        "gravecomb",
+        "acutecomb",
+        "hungarumlautcomb",
+        "circumflexcomb",
+        "caroncomb",
+        "brevecomb",
+        "ringcomb",
+        "tildecomb",
+        "macroncomb",
+        "overlinecomb",
+        "verticallineabovecomb",
+        "dblverticallineabovecomb",
+        "dblgravecomb",
+        "candraBinducomb",
+        "breveinvertedcomb",
+        "commaturnedabovecomb",
+        "commaabovecomb",
+        "commareversedabovecomb",
+        "commaaboverightcomb",
+        "gravebelowcomb",
+        "acutebelowcomb",
+        "lefttackbelowcomb",
+        "righttackbelowcomb",
+        "leftangleabovecomb",
+        "horncomb",
+        "ringhalfleftbelowcomb",
+        "uptackbelowcomb",
+        "downtackbelowcomb",
+        "plusbelowcomb",
+        "minusbelowcomb",
+        "palatalhookcomb",
+        "retroflexhookcomb",
+        "dotbelowcomb",
+        "dieresisbelowcomb",
+        "ringbelowcomb",
+        "cedillacomb",
+        "ogonekcomb",
+        "verticallinebelowcomb",
+        "bridgebelowcomb",
+        "dblarchinvertedbelowcomb",
+        "caronbelowcomb",
+        "circumflexbelowcomb",
+        "brevebelowcomb",
+        "breveinvertedbelowcomb",
+        "tildebelowcomb",
+        "macronbelowcomb",
+        "lowlinecomb",
+        "dbllowlinecomb",
+        "tildeoverlaycomb",
+        "strokeshortcomb",
+        "strokelongcomb",
+        "slashshortcomb",
+        "slashlongcomb",
+        "ringhalfrightbelowcomb",
+        "bridgeinvertedbelowcomb",
+        "squarebelowcomb",
+        "seagullbelowcomb",
+        "xabovecomb",
+        "tildeverticalcomb",
+        "dbloverlinecomb",
+        "gravetonecomb",
+        "acutetonecomb",
+        "gbridgeabovecomb",
+        "equalbelowcomb",
+        "doubleverticallinebelowcomb",
+        "leftanglebelowcomb",
+        "nottildeabovecomb",
+        "homotheticabovecomb",
+        "almostequaltoabovecomb",
+        "arrowleftrightbelowcomb",
+        "arrowupbelowcomb",
+        "graphemejoinercomb",
+        "arrowheadrightabovecomb",
+        "lefthalfringabovecomb",
+        "fermatacomb",
+        "xbelowcomb",
+        "arrowheadleftbelowcomb",
+        "arrowheadrightbelowcomb",
+        "arrowheadrightheadupbelowcomb",
+        "righthalfringabovecomb",
+        "dotaboverightcomb",
+        "asteriskbelowcomb",
+        "doubleringbelowcomb",
+        "zigzagabovecomb",
+        "doublebrevebelowcomb",
+        "doublebrevecomb",
+        "doublemacroncomb",
+        "doublemacronbelowcomb",
+        "tildedoublecomb",
+        "breveinverteddoublecomb",
+        "arrowdoublerightbelowcomb",
+        "acutegraveacutecomb",
+        "acutemacroncomb",
+        "arrowheadleftabovecomb",
+        "arrowheadrightheaddownbelow",
+        "brevemacroncomb",
+        "conjoiningmacroncomb",
+        "macronlefthalfcomb",
+        "macronrighthalfcomb",
+        "acutedottedcomb",
+        "gravedottedcomb",
+        "doublecircumflexcomb",
+        "graveacutegravecomb",
+        "gravemacroncomb",
+        "isbelowcomb",
+        "macronacutecomb",
+        "macronbrevecomb",
+        "macrongravecomb",
+        "ogonekabovecomb",
+        "snakebelowcomb",
+        "suspensioncomb",
+        "circumflexdblcomb",
+        "diaeresisringcomb",
+        "infinitycomb",
+        "arrowdowncomb",
+        "tripledotcomb",
+        "xxbelowcomb",
+        "wigglylinebelowcomb",
+        "openmarkbelowcomb",
+        "doubleopenmarkbelowcomb",
+        "lightcentralizationstrokebelowcomb",
+        "strongcentralizationstrokebelowcomb",
+        "parentabovecomb",
+        "doubleparentabovecomb",
+        "parentbelowcomb",
+        "alphalatincomb",
+        "bcomb",
+        "betalatincomb",
+        "schwacomb",
+        "fcomb",
+        "ldoublemiddletildecomb",
+        "olightcentralizationstrokecomb",
+        "pcomb",
+        "eshcomb",
+        "ulightcentralizationstrokecomb",
+        "wcomb",
+        "adiaeresiscomb",
+        "odiaeresiscomb",
+        "udiaeresiscomb",
+        "uptackabovecomb",
+        "deletionmarkcmb",
+        "tildelefthalfbelowcomb",
+        "tilderighthalfbelowcomb",
+        "macronlefthalfbelowcomb",
+        "macronrighthalfbelowcomb",
+        "conjoiningmacronbelowcomb",
+        "urabovecomb",
+        "usabovecomb",
+        "zigzagbelowcomb",
+        "parentoverlaycomb",
+        "ligaturelefthalfbelowcomb",
+        "ligaturerighthalfbelowcomb",
+        "dieresiscomb.sc",
+        "dotaccentcomb.sc",
+        "gravecomb.sc",
+        "acutecomb.sc",
+        "hungarumlautcomb.sc",
+        "circumflexcomb.sc",
+        "caroncomb.sc",
+        "brevecomb.sc",
+        "ringcomb.sc",
+        "tildecomb.sc",
+        "macroncomb.sc",
+        "ogonekcomb.sc",
+        "macron.sc",
+        "perispomenicomb",
+        "koroniscomb",
+        "dialytikatonoscomb",
+        "ypogegrammenicomb",
+        "titlocomb-cy",
+        "palatalizationcomb-cy",
+        "dasiapneumatacomb-cy",
+        "psilipneumatacomb-cy",
+        "pokrytiecomb-cy",
+        "vzmetcomb-cy",
+        "ieukrainiancomb-cy",
+        "icomb-cy",
+        "yicomb-cy",
+        "ucomb-cy",
+        "hardsigncomb-cy",
+        "yerucomb-cy",
+        "softsigncomb-cy",
+        "omegacomb-cy",
+        "kavykacomb-cy",
+        "payerokcomb-cy",
+        "iotifiedecomb-cy",
+        "tenmillionscomb-cy",
+        "hundredmillionscomb-cy",
+        "thousandmillionscomb-cy",
+        "Gcomb",
+        "Lcomb",
+        "Mcomb",
+        "Ncomb",
+        "Rcomb",
+        "acomb",
+        "aecomb",
+        "aocomb",
+        "avcomb",
+        "ccedillacomb",
+        "ccomb",
+        "dcomb",
+        "ecomb",
+        "ethcomb",
+        "flattenedopenaabovecomb",
+        "gcomb",
+        "hcomb",
+        "icomb",
+        "insulardcomb",
+        "kcomb",
+        "lcomb",
+        "longscomb",
+        "mcomb",
+        "ncomb",
+        "ocomb",
+        "rbelowcomb",
+        "rcomb",
+        "rrotundacomb",
+        "scomb",
+        "tcomb",
+        "ucomb",
+        "vcomb",
+        "xcomb",
+        "zcomb",
+        "Vmod",
+        "breveinverteddblbelowcomb",
+        "almostequaltobelowcomb",
+        "Alphaturned-latin",
+        "Sswashtail",
+        "Zswashtail",
+        "becomb-cy",
+        "vecomb-cy",
+        "ghecomb-cy",
+        "decomb-cy",
+        "zhecomb-cy",
+        "zecomb-cy",
+        "kacomb-cy",
+        "elcomb-cy",
+        "emcomb-cy",
+        "encomb-cy",
+        "ocomb-cy",
+        "pecomb-cy",
+        "ercomb-cy",
+        "escomb-cy",
+        "tecomb-cy",
+        "hacomb-cy",
+        "tsecomb-cy",
+        "checomb-cy",
+        "shacomb-cy",
+        "shchacomb-cy",
+        "fitacomb-cy",
+        "estecomb-cy",
+        "acomb-cy",
+        "iecomb-cy",
+        "djervcomb-cy",
+        "monographukcomb-cy",
+        "yatcomb-cy",
+        "yucomb-cy",
+        "iotifiedacomb-cy",
+        "littleyuscomb-cy",
+        "bigyuscomb-cy",
+        "iotifiedbigyuscomb-cy",
+        "Omegasmall",
+        "efcomb-cy",
+        "sinologicaldot",
+        "Iotaserifed",
+        "Jcrossedtail",
+        "Chi-latin",
+        "Beta-latin",
+        "beta-latin",
+        "Omega-latin",
+        "omega-latin",
+        "sakhayat",
+        "iotifiede",
+        "oeopen",
+        "uo",
+        "titlolefthalfcomb-cy",
+        "titlorighthalfcomb-cy",
+        "cwi-kayahli",
+        "summationDoubleStruck.mir",
+        "Qsmall",
+        "Lcommaaccent.loclMAH",
+        "Ncommaaccent.loclMAH",
+        "longs_t",
+        "s_t",
+        "lcommaaccent.loclMAH",
+        "ncommaaccent.loclMAH",
+        "iogonek.loclNAV",
+        "beta.alt1",
+        "zero.slash",
+        "onefraction",
+        "zerothird",
+        "onefifth",
+        "twofifths",
+        "threefifths",
+        "fourfifths",
+        "onesixth",
+        "fivesixths",
+        "oneseventh",
+        "oneninth",
+        "onetenth",
+        "dashwithupturnleft",
+        "suspensiondbl",
+        "kavykainvertedlow",
+        "kavykawithkavykaaboveinvertedlow",
+        "kavykalow",
+        "kavykawithdotlow",
+        "stackedcommadbl",
+        "solidusdotted",
+        "tripledagger",
+        "medievalcomma",
+        "paragraphus",
+        "punctuselevatus",
+        "cornishversedivider",
+        "bitcoin",
+        "fhook.ss03",
+        "chineseToneYinPingmod",
+        "chineseToneYangPingmod",
+        "chineseToneYinShangmod",
+        "chineseToneYangShangmod",
+        "chineseToneYinQumod",
+        "chineseToneYangQumod",
+        "chineseToneYinRumod",
+        "chineseToneYangRumod",
+        "extraHighDottedToneBarmod",
+        "highDottedToneBarmod",
+        "midDottedToneBarmod",
+        "lowDottedToneBarmod",
+        "extraLowDottedToneBarmod",
+        "extraHighDottedLeftStemToneBarmod",
+        "highDottedLeftStemToneBarmod",
+        "midDottedLeftStemToneBarmod",
+        "lowDottedLeftStemToneBarmod",
+        "extraLowDottedLeftStemToneBarmod",
+        "extraHighLeftStemToneBarmod",
+        "highLeftStemToneBarmod",
+        "midLeftStemToneBarmod",
+        "lowLeftStemToneBarmod",
+        "extraLowLeftStemToneBarmod",
+        "kavykaaboverightcmb",
+        "kavykaaboveleftcmb",
+        "dotaboveleftcmb",
+        "wideinvertedbridgebelowcmb",
+        "VS1",
+        "Ustroke",
+        "ustroke",
+        "Aglottal",
+        "aglottal",
+        "Iglottal",
+        "iglottal",
+        "Uglottal",
+        "uglottal",
+        "Wanglicana",
+        "wanglicana",
+        "Cpalatalhook",
+        "Shook",
+        "Zpalatalhook",
+        "dzdigraphretroflexhook",
+        "tsdigraphretroflexhook",
+        "istrokedotless",
+        "imoddotless",
+        "iitalicDoubleStruckdotless",
+        "jitalicDoubleStruckdotless",
+        "jsubscriptdotless",
+        "wbelowcomb",
+        "wturnedbelowcomb",
+        "crosspattyright",
+        "crosspattyleft",
+        "Tironiansignet",
+        "Dmiddlestroke",
+        "dmiddlestroke",
+        "Smiddlestroke",
+        "smiddlestroke",
+        "Halfhturned",
+        "halfhturned",
+        "rmiddletildeturned",
+        "wturnedmod",
+        "lefttackmod",
+        "righttackmod"
+      ]
+    },
+    "com.schriftgestalt.Glyphs.customParameters.fsType": {
+      "disabled": false,
+      "value": []
+    },
+    "com.schriftgestalt.Glyphs.customParameters.Has WWS Names": {
+      "disabled": false,
+      "value": 1
+    },
+    "com.schriftgestalt.Glyphs.customParameters.unicodeRanges": {
+      "disabled": false,
+      "value": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        9,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        45,
+        62,
+        64,
+        67,
+        69,
+        91,
+        116
+      ]
+    },
+    "com.schriftgestalt.Glyphs.customParameters.Use Extension Kerning": {
+      "disabled": false,
+      "value": 1
+    },
+    "com.schriftgestalt.Glyphs.customParameters.Enforce Compatibility Check": {
+      "disabled": false,
+      "value": 1
+    },
+    "com.schriftgestalt.Glyphs.customParameters.Write lastChange": {
+      "disabled": false,
+      "value": 0
+    },
+    "com.schriftgestalt.Glyphs.customParameters.Use Line Breaks": {
+      "disabled": false,
+      "value": 1
+    },
+    "com.schriftgestalt.Glyphs.customParameters.Use Typo Metrics": {
+      "disabled": false,
+      "value": 1
+    },
+    "com.schriftgestalt.Glyphs.numberNames": [],
+    "com.schriftgestalt.Glyphs.settings": {
+      "disablesAutomaticAlignment": true,
+      "disablesNiceNames": true
+    },
+    "com.schriftgestalt.Glyphs.stems": [
+      {
+        "horizontal": true,
+        "name": "hStem0"
+      },
+      {
+        "horizontal": true,
+        "name": "hStem1"
+      },
+      {
+        "name": "vStem0"
+      },
+      {
+        "name": "vStem1"
+      }
+    ],
+    "com.schriftgestalt.Glyphs.userData": {
+      "GSDimensionPlugin.Dimensions": {
+        "1D4F67F9-897D-45AD-B7F0-CA61A6862C03": {
+          "nV": "28",
+          "nd": "25",
+          "oH": "25",
+          "oV": "28"
+        },
+        "58AAA307-6DE9-4107-B80A-C255AE991657": {},
+        "75A83886-EED5-4C31-9670-660514D8A4F6": {
+          "HV": "168",
+          "OH": "68",
+          "OV": "176",
+          "nV": "164",
+          "nd": "90",
+          "oH": "67",
+          "oV": "166"
+        },
+        "A0CCC833-A561-4F2A-AF73-A35187C9FE5B": {
+          "HH": "49",
+          "HV": "93",
+          "OH": "53",
+          "OV": "100",
+          "nV": "86",
+          "nd": "61",
+          "oH": "52",
+          "oV": "89",
+          "tH": "46"
+        },
+        "A2F0CEA8-BF93-4D33-AFD3-D9B800443131": {},
+        "C91144B6-58F5-45F2-9CE4-7ED6CE127FD4": {
+          "nV": "28",
+          "nd": "25",
+          "oH": "25",
+          "oV": "28"
+        },
+        "E17BEC9D-CAAD-449F-91D9-03766E30097E": {
+          "HH": "69",
+          "HV": "200",
+          "OH": "73",
+          "OV": "210",
+          "nV": "195",
+          "nd": "86",
+          "oH": "72",
+          "oV": "198"
+        },
+        "UUID0": {
+          "HH": "50",
+          "HV": "101",
+          "OH": "54",
+          "OV": "111",
+          "cydeH": "53",
+          "nV": "94",
+          "nd": "64",
+          "oH": "53",
+          "oV": "97"
+        }
+      },
+      "GSDontShowVersionAlert": 1
+    },
+    "com.schriftgestalt.Glyphs.kerningVertical": {},
+    "com.schriftgestalt.Glyphs.kerningRTL": {}
+  },
+  "source": "/Users/simon/work/noto/latin-greek-cyrillic/sources/NotoSerif.glyphspackage"
+}
