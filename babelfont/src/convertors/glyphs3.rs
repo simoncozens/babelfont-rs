@@ -34,6 +34,7 @@ pub(crate) const KEY_COMPONENT_ANCHOR: &str = "com.schriftgestalt.Glyphs.compone
 pub(crate) const KEY_COMPONENT_LOCKED: &str = "com.schriftgestalt.Glyphs.componentLocked";
 pub(crate) const KEY_CUSTOM_PARAMETERS: &str = "com.schriftgestalt.Glyphs.customParameters.";
 pub(crate) const KEY_DISPLAY_STRINGS: &str = "com.schriftgestalt.Glyphs.displayStrings";
+pub(crate) const KEY_FORMAT_VERSION: &str = "com.schriftgestalt.Glyphs.formatVersion";
 pub(crate) const KEY_ICON_NAME: &str = "com.schriftgestalt.Glyphs.iconName";
 pub(crate) const KEY_INSTANCE_EXPORTS: &str = "com.schriftgestalt.Glyphs.exports";
 pub(crate) const KEY_IS_BOLD: &str = "com.schriftgestalt.Glyphs.isBold";
@@ -153,9 +154,18 @@ pub fn load_package_entries(
 
 fn _load(glyphs_font: &glyphslib::Font, path: PathBuf) -> Result<Font, BabelfontError> {
     let mut font = Font::new();
-    let glyphs_font = glyphs_font
-        .as_glyphs3()
-        .ok_or(BabelfontError::WrongConvertor { path })?;
+    let mut upgraded = glyphs_font.clone();
+    let glyphs_font = if glyphs_font.as_glyphs2().is_some() {
+        font.format_specific.insert(
+            KEY_FORMAT_VERSION.into(),
+            serde_json::Value::String("2".into()),
+        );
+        upgraded.upgrade_in_place();
+        upgraded.as_glyphs3()
+    } else {
+        glyphs_font.as_glyphs3()
+    }
+    .ok_or(BabelfontError::WrongConvertor { path })?;
     // App version
     font.format_specific.insert(
         KEY_APP_VERSION.into(),
@@ -1214,9 +1224,9 @@ fn save_master(master: &Master, axes: &[Axis], metrics: &[crate::MetricType]) ->
     }
 }
 
+#[allow(clippy::unwrap_used, clippy::indexing_slicing)]
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::unwrap_used)]
     use crate::{GlyphCategory, Shape};
     use fontdrasil::coords::Location;
     use pretty_assertions::assert_eq;

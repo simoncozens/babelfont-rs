@@ -20,7 +20,7 @@ pub enum NodeType {
     QCurve,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 #[typeshare]
 /// A node in a glyph outline
 pub struct Node {

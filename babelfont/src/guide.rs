@@ -1,7 +1,7 @@
 use crate::common::{Color, Position};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "types", typeshare::typeshare)]
 /// A guideline in the font, whether at master or layer level
 pub struct Guide {

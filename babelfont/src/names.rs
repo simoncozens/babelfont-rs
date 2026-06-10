@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
 #[allow(dead_code)]
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq, Hash, Copy)]
 #[typeshare]
 /// The style map style of a font
 pub enum StyleMapStyle {
@@ -18,7 +18,7 @@ pub enum StyleMapStyle {
     Italic,
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 #[typeshare]
 #[cfg_attr(feature = "reactive", derive(reactive_stores::Store))]
 /// Name table values for a font or individual master

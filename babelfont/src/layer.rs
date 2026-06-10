@@ -32,7 +32,7 @@ impl LayerType {
     }
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[typeshare]
 #[cfg_attr(feature = "reactive", derive(reactive_stores::Store))]
 /// A layer of a glyph in a font

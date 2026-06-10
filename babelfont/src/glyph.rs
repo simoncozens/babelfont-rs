@@ -9,7 +9,7 @@ use smol_str::SmolStr;
 use std::ops::{Deref, DerefMut, Index, IndexMut};
 use typeshare::typeshare;
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "reactive", derive(reactive_stores::Store))]
 /// A list of glyphs in the font
 pub struct GlyphList(pub Vec<Glyph>);
@@ -98,7 +98,7 @@ impl From<&GlyphCategory> for Option<String> {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 #[typeshare]
 #[cfg_attr(feature = "reactive", derive(reactive_stores::Store))]
 /// A glyph in the font

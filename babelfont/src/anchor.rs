@@ -3,7 +3,7 @@ use typeshare::typeshare;
 
 use crate::common::FormatSpecific;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 #[typeshare]
 /// An anchor point in a glyph
 pub struct Anchor {

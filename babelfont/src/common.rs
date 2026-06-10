@@ -29,7 +29,7 @@ pub(crate) fn tag_from_string(s: &str) -> Result<Tag, BabelfontError> {
         BabelfontError::General(format!("Bad tag: '{}'", s))
     })?))
 }
-#[derive(Debug, Copy, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[typeshare]
 /// A position in 2D space, with an optional angle
 pub struct Position {
@@ -54,7 +54,7 @@ impl Position {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Copy, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[typeshare]
 pub struct Color {
     pub r: i32,
@@ -90,7 +90,7 @@ mod ufo {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Copy)]
 #[typeshare]
 /// Direction of text flow
 pub enum Direction {
