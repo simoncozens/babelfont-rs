@@ -152,7 +152,12 @@ fn test_ufo_export_unifies_glyphs3_rtl_kerning() {
     let reh_side1 = norad::Name::new("public.kern1.reh").unwrap();
     let alef_side2 = norad::Name::new("public.kern2.alef").unwrap();
     let reh_side2 = norad::Name::new("public.kern2.reh").unwrap();
+    let a_side1 = norad::Name::new("public.kern1.A").unwrap();
+    let t_side1 = norad::Name::new("public.kern1.T").unwrap();
+    let a_side2 = norad::Name::new("public.kern2.A").unwrap();
+    let t_side2 = norad::Name::new("public.kern2.T").unwrap();
 
+    // RTL kerning (from glyphsLib convention: RTL pairs merged into LTR)
     assert_eq!(
         ufo.kerning
             .get(&reh_side1)
@@ -166,5 +171,21 @@ fn test_ufo_export_unifies_glyphs3_rtl_kerning() {
             .and_then(|pairs| pairs.get(&reh_side2))
             .copied(),
         Some(-40.0)
+    );
+
+    // LTR kerning (original pairs preserved)
+    assert_eq!(
+        ufo.kerning
+            .get(&a_side1)
+            .and_then(|pairs| pairs.get(&t_side2))
+            .copied(),
+        Some(-80.0)
+    );
+    assert_eq!(
+        ufo.kerning
+            .get(&t_side1)
+            .and_then(|pairs| pairs.get(&a_side2))
+            .copied(),
+        Some(-80.0)
     );
 }
