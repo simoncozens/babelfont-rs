@@ -3,7 +3,7 @@ use fontdrasil::coords::DesignLocation;
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[typeshare]
 #[cfg_attr(feature = "reactive", derive(reactive_stores::Store))]
 /// A font instance

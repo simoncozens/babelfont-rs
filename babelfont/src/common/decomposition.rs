@@ -14,7 +14,7 @@ pub enum TransformOrder {
 }
 
 /// A decomposed affine transformation with separate translation, rotation, scale, and skew components
-#[derive(Debug, Clone, Serialize, Deserialize, Copy)]
+#[derive(Debug, Clone, Serialize, Deserialize, Copy, PartialEq)]
 #[typeshare]
 pub struct DecomposedAffine {
     #[serde(default, skip_serializing_if = "crate::serde_helpers::is_default")]

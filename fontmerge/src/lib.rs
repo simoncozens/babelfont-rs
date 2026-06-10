@@ -85,7 +85,9 @@ pub fn fontmerge(
     .apply(&mut font2)
     .expect("Failed to retain selected glyphs in font 2");
 
-    sanity_check_features(&font2);
+    if layout_handling != LayoutHandling::Ignore {
+        sanity_check_features(&font2);
+    }
 
     let final_glyphset = glyphset_filter.final_glyphset();
 
@@ -241,7 +243,9 @@ pub fn fontmerge(
 
     // Handle dotted circle anchors
 
-    sanity_check_features(&font1);
+    if layout_handling != LayoutHandling::Ignore {
+        sanity_check_features(&font1);
+    }
     Ok(font1)
 }
 

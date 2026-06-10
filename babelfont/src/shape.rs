@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 use typeshare::typeshare;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[typeshare]
 /// A component in a glyph
 pub struct Component {
@@ -49,7 +49,7 @@ impl Component {
     // pos / angle / scale
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[typeshare]
 /// A path in a glyph
 pub struct Path {
@@ -247,7 +247,7 @@ impl From<kurbo::BezPath> for Path {
 }
 
 /// A shape in a glyph, either a component or a path
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[typeshare]
 #[serde(untagged)]
 pub enum Shape {

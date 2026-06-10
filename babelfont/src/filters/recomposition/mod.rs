@@ -1,7 +1,8 @@
 use crate::filters::FontFilter;
 mod encoded;
 
-/// Recomposition filter: recomposes decomposed components.
+/// A filter that recomposes decomposed components
+#[derive(Default)]
 pub struct Recompose;
 
 impl FontFilter for Recompose {
