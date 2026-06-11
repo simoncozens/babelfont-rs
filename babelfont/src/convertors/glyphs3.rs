@@ -327,14 +327,8 @@ fn load_instance(font: &Font, instance: &glyphs3::Instance) -> crate::Instance {
     let mut format_specific = FormatSpecific::default();
     copy_custom_parameters(&mut format_specific, &instance.custom_parameters);
     copy_user_data(&mut format_specific, &instance.user_data);
-    format_specific.insert_some_json(
-        KEY_WEIGHT_CLASS,
-        &instance.weight_class.as_ref().and_then(|x| x.as_i64()),
-    );
-    format_specific.insert_some_json(
-        KEY_WIDTH_CLASS,
-        &instance.width_class.as_ref().and_then(|x| x.as_i64()),
-    );
+    format_specific.insert_some_json(KEY_WEIGHT_CLASS, &instance.weight_class.as_ref());
+    format_specific.insert_some_json(KEY_WIDTH_CLASS, &instance.width_class.as_ref());
     format_specific.insert_if_ne_json(KEY_INSTANCE_EXPORTS, &instance.exports, &true);
     format_specific.insert_if_ne_json(KEY_IS_BOLD, &instance.is_bold, &false);
     format_specific.insert_if_ne_json(KEY_IS_ITALIC, &instance.is_italic, &false);
@@ -381,11 +375,11 @@ fn save_instance(instance: &crate::Instance, axes: &[Axis]) -> glyphs3::Instance
         weight_class: format_specific
             .get(KEY_WEIGHT_CLASS)
             .and_then(|x| x.as_i64())
-            .map(glyphslib::Plist::Integer),
+            .map(|x| x as i32),
         width_class: format_specific
             .get(KEY_WIDTH_CLASS)
             .and_then(|x| x.as_i64())
-            .map(glyphslib::Plist::Integer),
+            .map(|x| x as i32),
         exports: format_specific
             .get(KEY_INSTANCE_EXPORTS)
             .and_then(|x| x.as_bool())
