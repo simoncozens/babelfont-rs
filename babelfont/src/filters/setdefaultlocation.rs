@@ -35,6 +35,12 @@ pub(crate) fn adjust_axes(
             font_axis.max = Some(userspace_loc);
         }
         font_axis.default = Some(userspace_loc);
+        if let Some(map) = font_axis.map.as_mut() {
+            if !map.iter().any(|(loc, _)| *loc == userspace_loc) {
+                map.push((userspace_loc, *coord));
+                map.sort_by(|a, b| a.0.to_f64().total_cmp(&b.0.to_f64()));
+            }
+        }
     }
     Ok(())
 }
