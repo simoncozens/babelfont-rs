@@ -1,7 +1,7 @@
 use crate::filters::FontFilter;
 use fontdrasil::coords::{DesignLocation, UserCoord};
 
-/// A filter that sets the default location of a single-master font to the specified location
+/// A filter that sets the default location to the specified location
 pub struct SetDefaultLocation(DesignLocation);
 
 impl SetDefaultLocation {
@@ -34,21 +34,24 @@ pub(crate) fn adjust_axes(
         if font_axis.max.is_none_or(|max| max < userspace_loc) {
             font_axis.max = Some(userspace_loc);
         }
-        if font_axis.default.is_none() {
-            font_axis.default = Some(userspace_loc);
-        }
+        font_axis.default = Some(userspace_loc);
     }
     Ok(())
 }
 
 impl FontFilter for SetDefaultLocation {
     fn apply(&self, font: &mut crate::Font) -> Result<(), crate::BabelfontError> {
-        if font.masters.len() > 1 {
-            return Err(crate::BabelfontError::FilterError(
-                "SetDefaultLocation can only be applied to single-master fonts".into(),
-            ));
+        if font.masters.len() == 1 {
+            font.masters[0].location = self.0.clone();
+        } else {
+            // Ensure that one master is at the desired location
+            if !font.masters.iter().any(|m| m.location == self.0) {
+                return Err(crate::BabelfontError::FilterError(format!(
+                    "No master was present at location {:?}",
+                    self.0
+                )));
+            }
         }
-        font.masters[0].location = self.0.clone();
         adjust_axes(&mut font.axes, &self.0)?;
         Ok(())
     }
@@ -68,7 +71,7 @@ impl FontFilter for SetDefaultLocation {
     {
         clap::Arg::new("setdefaultlocation")
             .long("set-default-location")
-            .help("Set the default location of a single-master font")
+            .help("Set the default location (design space location)")
             .value_name("LOCATION")
     }
 }
