@@ -507,10 +507,22 @@ mod glyphs {
                 order: TransformOrder::Glyphs,
             };
             let mut format_specific = FormatSpecific::default();
-            format_specific.insert_if_ne_json(
+            // glyphslib 0.2.5+ uses a custom Deserialize that always defaults
+            // to -1 (component_alignment_disabled()) when alignment is absent
+            // from the source file, with an alignment_explicit flag.
+            //
+            // In Glyphs.app, components without explicit alignment participate
+            // in automatic composition by default (alignment = 0). The
+            // alignment_explicit flag lets us restore the pre-0.2.5 behavior
+            // where serde default (0) covered that case. Only skip storing
+            // when alignment was explicitly set to -1 (disabled).
+            format_specific.insert_json(
                 KEY_ALIGNMENT,
-                &val.alignment,
-                &-1, // default value
+                &(if val.alignment_explicit {
+                    val.alignment
+                } else {
+                    0i8 // not explicitly set → default to auto-aligned
+                }),
             );
             format_specific.insert_nonempty_json(KEY_ATTR, &val.attr);
             format_specific.insert_some_json(KEY_COMPONENT_ANCHOR, &val.anchor);
@@ -551,6 +563,7 @@ mod glyphs {
                     .and_then(|v| v.as_i64())
                     .map(|s| s as i8)
                     .unwrap_or(-1),
+                alignment_explicit: val.format_specific.contains_key(KEY_ALIGNMENT),
                 anchor: val.format_specific.get_optionstring(KEY_COMPONENT_ANCHOR),
                 attr: val.format_specific.get_json(KEY_ATTR),
                 smart_component_location: val
