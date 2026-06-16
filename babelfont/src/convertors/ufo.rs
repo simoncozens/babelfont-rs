@@ -532,7 +532,7 @@ pub(crate) fn save_info(info: &mut norad::FontInfo, font: &Font, master_ix: usiz
         .map(|x| x.to_string());
     info.open_type_name_preferred_subfamily_name = font
         .names
-        .wws_subfamily_name
+        .preferred_subfamily_name
         .get_default()
         .map(|x| x.to_string());
     info.open_type_name_sample_text = font.names.sample_text.get_default().map(|x| x.to_string());
@@ -858,7 +858,7 @@ pub(crate) fn load_font_info(
         font.names.wws_family_name = v.into(); // Is this the right place?
     }
     if let Some(v) = info.open_type_name_preferred_subfamily_name.as_ref() {
-        font.names.wws_subfamily_name = v.into();
+        font.names.preferred_subfamily_name = v.into();
     }
     if let Some(panose) = &info.open_type_os2_panose {
         font.custom_ot_values.os2_panose = Some([
