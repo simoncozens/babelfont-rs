@@ -707,6 +707,23 @@ impl SfdParser {
             }
         }
 
+        // FontForge SFD defines the em square as Ascent + Descent. The font model
+        // defaults `upm` to 1000, which is wrong for any SFD whose em != 1000 (e.g.
+        // 1024 / 2048): outline coordinates are read at the SFD's real em scale, so a
+        // stale upm=1000 would leave them unscaled and render the font at the wrong
+        // size. Derive upm from the parsed Ascender + Descender metrics (from the SFD
+        // Ascent/Descent lines). `desc.abs()` keeps this correct regardless of whether
+        // Descent is stored as the SFD's positive value or later negated.
+        if let (Some(&asc), Some(&desc)) = (
+            self.font.masters[0].metrics.get(&MetricType::Ascender),
+            self.font.masters[0].metrics.get(&MetricType::Descender),
+        ) {
+            let em = asc + desc.abs();
+            if em > 0 {
+                self.font.upm = em as u16;
+            }
+        }
+
         // Now parse glyphs if present
         if let Some(chars) = char_data {
             self.parse_chars(&chars, &master_id)?;
