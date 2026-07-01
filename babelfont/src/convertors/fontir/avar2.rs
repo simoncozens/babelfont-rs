@@ -183,6 +183,7 @@ mod tests {
                 description: None,
                 input: parse_location(input).unwrap(),
                 output: parse_location(output).unwrap(),
+                active: true,
             })
             .collect();
         // Compile it

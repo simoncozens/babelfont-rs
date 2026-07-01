@@ -105,7 +105,7 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
                     let source_map = glyph_data
                         .sources
                         .iter()
-                        .map(|s| (s.name.clone(), s.clone()))
+                        .map(|s| (s.name.clone(), s))
                         .collect::<HashMap<_, _>>();
                     glyph.component_axes = glyph_data.axes.iter().map(|a| a.into()).collect();
                     glyph.layers = glyph_data
@@ -711,16 +711,25 @@ pub struct Layer {
     pub custom_data: HashMap<String, Value>,
 }
 
-fn load_layer(layer: &Layer, glyph_source: Option<&GlyphSource>) -> crate::Layer {
+fn load_layer(layer: &Layer, glyph_source: Option<&&GlyphSource>) -> crate::Layer {
     let mut shapes = vec![];
     let source_name = glyph_source.map(|s| s.name.clone());
-    let source_location = glyph_source.map(|s| s.location.clone());
+    let source_location = glyph_source.map(|s| s.location.iter());
+
+    // If the glyph sources has a "location base" this refers to another master by ID. The layer is default for that master.
+    // Otherwise, they have an explicit location
+    let layer_type = if let Some(master_id) = glyph_source.and_then(|s| s.location_base.as_deref())
+    {
+        LayerType::DefaultForMaster(master_id.to_string())
+    } else {
+        LayerType::FreeFloating
+    };
 
     crate::Layer {
         width: layer.glyph.x_advance.unwrap_or_default() as f32,
         name: None,
-        id: Some(master_id.to_string()),
-        master: LayerType::DefaultForMaster(master_id.to_string()),
+        id: source_name,
+        master: layer_type,
         guides: layer.glyph.guides.iter().map(|g| g.into()).collect(),
         shapes,
         anchors: layer.glyph.anchors.iter().map(|a| a.into()).collect(),
