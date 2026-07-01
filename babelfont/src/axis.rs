@@ -297,8 +297,10 @@ pub(crate) mod fontra {
         }
     }
 
-    impl From<&fontra::FontAxis> for Axis {
-        fn from(value: &fontra::FontAxis) -> Self {
+    impl TryFrom<&fontra::FontAxis> for Axis {
+        type Error = BabelfontError;
+
+        fn try_from(value: &fontra::FontAxis) -> Result<Self, Self::Error> {
             let map = if value.mapping.is_empty() {
                 None
             } else {
@@ -310,9 +312,13 @@ pub(crate) mod fontra {
                         .collect(),
                 )
             };
-            Axis {
+            Ok(Axis {
                 name: value.name.clone().into(),
-                tag: Tag::new(value.tag.as_bytes()[0..4].try_into().unwrap()),
+                tag: Tag::new(
+                    value.tag.as_bytes()[0..4]
+                        .try_into()
+                        .map_err(|_| BabelfontError::General("tag must be 4 bytes".to_string()))?,
+                ),
                 min: Some(UserCoord::new(value.min_value)),
                 max: Some(UserCoord::new(value.max_value)),
                 default: Some(UserCoord::new(value.default_value)),
@@ -320,7 +326,7 @@ pub(crate) mod fontra {
                 map,
                 values: vec![],
                 format_specific: Default::default(),
-            }
+            })
         }
     }
 
@@ -333,18 +339,15 @@ pub(crate) mod fontra {
             .iter()
             .map(|ax| {
                 (
-                    ax.name
-                        .get_default()
-                        .map(|x| x.clone())
-                        .unwrap_or(ax.tag.to_string()),
-                    ax.tag.clone(),
+                    ax.name.get_default().cloned().unwrap_or(ax.tag.to_string()),
+                    ax.tag,
                 )
             })
             .collect::<HashMap<_, _>>();
         let mut input = Location::default();
         for (name, value) in &value.input_location {
             if let Some(tag) = name_tag_map.get(name) {
-                input.insert(tag.clone(), DesignCoord::new(*value));
+                input.insert(*tag, DesignCoord::new(*value));
             } else {
                 return Err(BabelfontError::AxisConversion(format!(
                     "Unknown axis: {}",
@@ -355,7 +358,7 @@ pub(crate) mod fontra {
         let mut output = Location::default();
         for (name, value) in &value.output_location {
             if let Some(tag) = name_tag_map.get(name) {
-                output.insert(tag.clone(), DesignCoord::new(*value));
+                output.insert(*tag, DesignCoord::new(*value));
             } else {
                 return Err(BabelfontError::AxisConversion(format!(
                     "Unknown axis: {}",
@@ -371,6 +374,7 @@ pub(crate) mod fontra {
         })
     }
 
+    #[allow(dead_code)] // We'll go back the other way one day
     fn cross_axis_mapping_to_fontra(
         mapping: &CrossAxisMapping,
         axes: &[Axis],
@@ -379,11 +383,8 @@ pub(crate) mod fontra {
             .iter()
             .map(|ax| {
                 (
-                    ax.tag.clone(),
-                    ax.name
-                        .get_default()
-                        .map(|n| n.clone())
-                        .unwrap_or(ax.tag.to_string()),
+                    ax.tag,
+                    ax.name.get_default().cloned().unwrap_or(ax.tag.to_string()),
                 )
             })
             .collect::<HashMap<_, _>>();

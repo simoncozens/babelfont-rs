@@ -12,7 +12,9 @@ pub(crate) fn axis_from_fontra(
     }
 }
 
-fn axis_from_continuous(fontra_axis: &crate::convertors::fontra::FontAxis) -> Result<Axis, BabelfontError> {
+fn axis_from_continuous(
+    fontra_axis: &crate::convertors::fontra::FontAxis,
+) -> Result<Axis, BabelfontError> {
     let tag = tag_from_string(&fontra_axis.tag)?;
     let mut axis = Axis::new(fontra_axis.name.clone(), tag);
 
@@ -38,18 +40,32 @@ fn axis_from_continuous(fontra_axis: &crate::convertors::fontra::FontAxis) -> Re
     Ok(axis)
 }
 
-fn axis_from_discrete(discrete_axis: &crate::convertors::fontra::DiscreteFontAxis) -> Result<Axis, BabelfontError> {
+fn axis_from_discrete(
+    discrete_axis: &crate::convertors::fontra::DiscreteFontAxis,
+) -> Result<Axis, BabelfontError> {
     let tag = tag_from_string(&discrete_axis.tag)?;
     let mut axis = Axis::new(discrete_axis.name.clone(), tag);
 
     if !discrete_axis.values.is_empty() {
         axis.min = Some(UserCoord::new(
-            *discrete_axis.values.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap_or(&0.0),
+            *discrete_axis
+                .values
+                .iter()
+                .min_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                .unwrap_or(&0.0),
         ));
         axis.max = Some(UserCoord::new(
-            *discrete_axis.values.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap_or(&0.0),
+            *discrete_axis
+                .values
+                .iter()
+                .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                .unwrap_or(&0.0),
         ));
-        axis.values = discrete_axis.values.iter().map(|&v| UserCoord::new(v)).collect();
+        axis.values = discrete_axis
+            .values
+            .iter()
+            .map(|&v| UserCoord::new(v))
+            .collect();
     }
     axis.default = Some(UserCoord::new(discrete_axis.default_value));
     axis.hidden = discrete_axis.hidden;

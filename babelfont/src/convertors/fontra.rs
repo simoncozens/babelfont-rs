@@ -1,3 +1,4 @@
+#![allow(missing_docs)] // Fontra structs aren't documented yet because we don't know what they mean
 use fontdrasil::coords::{DesignCoord, Location, UserCoord};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -5,8 +6,8 @@ use serde_json::Value;
 use std::{collections::HashMap, path::PathBuf};
 
 use crate::{
-    master, BabelfontError, CustomOTValues, Font, FormatSpecific, Glyph, GlyphList, I18NDictionary,
-    LayerType, Master, Position,
+    BabelfontError, CustomOTValues, Font, FormatSpecific, Glyph, GlyphList, LayerType, Master,
+    Position,
 };
 
 fn custom_data_to_format_specific(cd: &HashMap<String, Value>) -> FormatSpecific {
@@ -26,7 +27,8 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
     let mut our_font = Font::try_from(font_data)?;
 
     // Move kerning into master structures
-    for (_feature, kerning) in &kerning {
+    for kerning in kerning.values() {
+        // We don't use the feature name at this point
         for (left_glyph, map) in &kerning.values {
             for (right_glyph, values) in map {
                 for (master, value) in our_font.masters.iter_mut().zip(values) {
@@ -121,6 +123,7 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
     Ok(our_font)
 }
 
+#[allow(dead_code)]
 pub struct GlyphInfo {
     glyph_name: String,
     code_points: Vec<u32>,
@@ -309,7 +312,7 @@ impl TryInto<crate::Axis> for &AnyAxis {
 
     fn try_into(self) -> Result<crate::Axis, Self::Error> {
         Ok(match self {
-            AnyAxis::Continuous(font_axis) => font_axis.into(),
+            AnyAxis::Continuous(font_axis) => font_axis.try_into()?,
             AnyAxis::Discrete(discrete_font_axis) => {
                 let map: Vec<(UserCoord, DesignCoord)> = discrete_font_axis
                     .mapping
@@ -446,17 +449,17 @@ pub struct Guideline {
     pub custom_data: HashMap<String, Value>,
 }
 
-impl Into<crate::Guide> for &Guideline {
-    fn into(self) -> crate::Guide {
+impl From<&Guideline> for crate::Guide {
+    fn from(val: &Guideline) -> Self {
         crate::Guide {
             pos: Position {
-                x: self.x as f32,
-                y: self.y as f32,
-                angle: self.angle as f32,
+                x: val.x as f32,
+                y: val.y as f32,
+                angle: val.angle as f32,
             },
-            name: self.name.clone().into(),
+            name: val.name.clone(),
             color: None,
-            format_specific: custom_data_to_format_specific(&self.custom_data),
+            format_specific: custom_data_to_format_specific(&val.custom_data),
         }
     }
 }
@@ -643,18 +646,18 @@ pub struct GlyphAxis {
     pub custom_data: HashMap<String, Value>,
 }
 
-impl Into<crate::Axis> for &GlyphAxis {
-    fn into(self) -> crate::Axis {
+impl From<&GlyphAxis> for crate::Axis {
+    fn from(val: &GlyphAxis) -> Self {
         crate::Axis {
-            name: self.name.clone().into(),
+            name: val.name.clone().into(),
             tag: crate::Tag::new(b"VARC"),
-            min: Some(UserCoord::new(self.min_value)),
-            default: Some(UserCoord::new(self.default_value)),
-            max: Some(UserCoord::new(self.max_value)),
+            min: Some(UserCoord::new(val.min_value)),
+            default: Some(UserCoord::new(val.default_value)),
+            max: Some(UserCoord::new(val.max_value)),
             map: None,
             hidden: true,
             values: vec![],
-            format_specific: custom_data_to_format_specific(&self.custom_data),
+            format_specific: custom_data_to_format_specific(&val.custom_data),
         }
     }
 }
@@ -712,9 +715,9 @@ pub struct Layer {
 }
 
 fn load_layer(layer: &Layer, glyph_source: Option<&&GlyphSource>) -> crate::Layer {
-    let mut shapes = vec![];
+    let shapes = vec![];
     let source_name = glyph_source.map(|s| s.name.clone());
-    let source_location = glyph_source.map(|s| s.location.iter());
+    let _source_location = glyph_source.map(|s| s.location.iter());
 
     // If the glyph sources has a "location base" this refers to another master by ID. The layer is default for that master.
     // Otherwise, they have an explicit location

@@ -33,6 +33,8 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
     )];
     for entry in vfb.entries {
         match entry {
+            VfbEntry::FlVersion(_) => {}               // => todo!(),
+            VfbEntry::FontOptions(_) => {}             // => todo!(),
             VfbEntry::EncodingDefault(_encoding) => {} // => todo!(),
             VfbEntry::Encoding(_encoding) => {}        // => todo!(),
             VfbEntry::MMEncodingType(_) => {}          // => todo!(),
@@ -177,9 +179,9 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
             VfbEntry::GlobalGuides(_guides) => {} // => todo!(),
             VfbEntry::GlobalGuideProperties(_raw_data) => {} // => todo!(),
             VfbEntry::GlobalMask(_raw_data) => {} // => todo!(),
-            VfbEntry::OpenTypeExportOptions(_raw_data) => {} // => todo!(),
+            // VfbEntry::OpenTypeExportOptions(_raw_data) => {} // => todo!(),
             VfbEntry::ExportOptions(_export_options) => {} // => todo!(),
-            VfbEntry::MappingMode(_raw_data) => {} // => todo!(),
+            VfbEntry::MappingMode(_raw_data) => {}         // => todo!(),
             VfbEntry::BlockMMKerningStart(_raw_data) => {}
             VfbEntry::MMKernPair(_raw_data) => {} // => todo!(),
             VfbEntry::BlockMMKerningEnd(_raw_data) => {}
