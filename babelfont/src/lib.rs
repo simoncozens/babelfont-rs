@@ -212,6 +212,8 @@ pub fn load(filename: impl Into<PathBuf>) -> Result<Font, BabelfontError> {
         }
         #[cfg(feature = "ufo")]
         Some(ext) if ext == "designspace" => crate::convertors::designspace::load(pb),
+        #[cfg(feature = "fontra")]
+        Some(ext) if ext == "fontra" => crate::convertors::fontra::load(pb),
         #[cfg(feature = "fontlab")]
         Some(ext) if ext == "vfj" => crate::convertors::fontlab::load(pb),
         #[cfg(feature = "ufo")]

@@ -105,19 +105,15 @@ mod fontra {
         fn from(val: &Master) -> Self {
             fontra::Source {
                 name: val.id.clone(),
-                // name: val
-                //     .name
-                //     .get_default()
-                //     .map(|x| x.as_str())
-                //     .unwrap_or("Unnamed master")
-                //     .to_string(),
-                is_sparse: "False".to_string(),
+                is_sparse: false,
                 // Location really ought to use axis *name*
                 location: val
                     .location
                     .iter()
                     .map(|(k, v)| (k.to_string(), v.to_f64()))
                     .collect(),
+                line_metrics_horizontal_layout: HashMap::new(),
+                line_metrics_vertical_layout: HashMap::new(),
                 italic_angle: 0.0,
                 guidelines: val
                     .guides

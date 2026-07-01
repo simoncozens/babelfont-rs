@@ -82,6 +82,16 @@ impl From<&String> for I18NDictionary {
     }
 }
 
+impl From<Option<&String>> for I18NDictionary {
+    fn from(val: Option<&String>) -> Self {
+        let mut f = I18NDictionary::new();
+        if let Some(val) = val {
+            f.0.insert(DFLT.to_string(), val.to_string());
+        }
+        f
+    }
+}
+
 impl From<I18NDictionary> for IndexMap<String, String> {
     fn from(dict: I18NDictionary) -> Self {
         dict.0

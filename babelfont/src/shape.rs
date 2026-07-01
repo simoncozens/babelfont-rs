@@ -617,6 +617,7 @@ mod fontra {
                 name: val.reference.to_string(),
                 transformation: val.transform.into(),
                 location: HashMap::new(),
+                custom_data: HashMap::new(),
             }
         }
     }

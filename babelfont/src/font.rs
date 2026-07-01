@@ -553,21 +553,25 @@ mod fontra {
                 axes: self
                     .axes
                     .iter()
-                    .map(fontra::Axis::try_from)
+                    .map(|a| {
+                        Ok::<fontra::AnyAxis, BabelfontError>(fontra::AnyAxis::Continuous(fontra::FontAxis::try_from(a)?))
+                    })
                     .collect::<Result<Vec<_>, _>>()?,
                 mappings: vec![],
-                elided_fall_backname: "".to_string(),
+                elided_fall_backname: None,
+                custom_data: HashMap::new(),
             })
         }
 
-        /// Get a [fontra::Glyph] representation of a glyph by name
-        pub fn get_fontra_glyph(&self, glyphname: &str) -> Option<fontra::Glyph> {
+        /// Get a [fontra::VariableGlyph] representation of a glyph by name
+        pub fn get_fontra_glyph(&self, glyphname: &str) -> Option<fontra::VariableGlyph> {
             let our_glyph = self.glyphs.get(glyphname)?;
-            let mut glyph = fontra::Glyph {
+            let mut glyph = fontra::VariableGlyph {
                 name: our_glyph.name.to_string(),
                 axes: vec![],
                 sources: vec![],
                 layers: HashMap::new(),
+                custom_data: HashMap::new(),
             };
             let master_locations: HashMap<String, &DesignLocation> = self
                 .masters
@@ -588,6 +592,9 @@ mod fontra {
                                 .collect::<HashMap<String, f64>>()
                         })
                         .unwrap_or_default(),
+                    location_base: None,
+                    inactive: false,
+                    custom_data: HashMap::new(),
                 })
             }
             Some(glyph)

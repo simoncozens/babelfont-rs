@@ -61,6 +61,11 @@ pub struct Features {
     #[typeshare(python(type = "List[str]"))]
     #[typeshare(typescript(type = "string[]"))]
     pub include_paths: Vec<std::path::PathBuf>,
+    /// Format-specific data
+    #[serde(default, skip_serializing_if = "FormatSpecific::is_empty")]
+    #[typeshare(python(type = "Dict[str, Any]"))]
+    #[typeshare(typescript(type = "Record<string, any>"))]
+    pub format_specific: FormatSpecific,
 }
 
 impl Features {
@@ -288,6 +293,23 @@ mod glyphs {
                 tag: name.to_string(),
                 labels,
             }
+        }
+    }
+}
+
+#[cfg(feature = "fontra")]
+mod fontra {
+    use super::Features;
+    use crate::{convertors::fontra::OpenTypeFeatures, FormatSpecific};
+
+    impl From<OpenTypeFeatures> for Features {
+        fn from(features: OpenTypeFeatures) -> Self {
+            let mut o = Features::from_fea(&features.text);
+            o.format_specific = FormatSpecific::default();
+            for (k, v) in features.custom_data {
+                o.format_specific.insert(k, v);
+            }
+            o
         }
     }
 }

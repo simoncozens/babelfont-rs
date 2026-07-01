@@ -501,6 +501,8 @@ pub(crate) mod glyphs {
 
 #[cfg(feature = "fontra")]
 mod fontra {
+    use std::collections::HashMap;
+
     use super::*;
     use crate::convertors::fontra;
 
@@ -513,13 +515,17 @@ mod fontra {
 
             fontra::Layer {
                 glyph: fontra::StaticGlyph {
-                    path,
+                    path: fontra::AnyPath::Packed(path),
                     components: val.components().map(|c| c.into()).collect(),
-                    x_advance: val.width,
-                    y_advance: 0.0,
+                    x_advance: Some(val.width as f64),
+                    y_advance: Some(0.0),
+                    vertical_origin: None,
                     anchors: val.anchors.iter().map(|a| a.into()).collect(),
                     guides: vec![],
+                    background_image: None,
+                    custom_data: HashMap::new(),
                 },
+                custom_data: HashMap::new(),
             }
         }
     }

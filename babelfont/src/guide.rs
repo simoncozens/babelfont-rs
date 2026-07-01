@@ -212,6 +212,8 @@ mod glyphs {
 
 #[cfg(feature = "fontra")]
 mod fontra {
+    use std::collections::HashMap;
+
     use super::*;
     use crate::convertors::fontra::Guideline as FontraGuideline;
 
@@ -219,10 +221,11 @@ mod fontra {
         fn from(val: &Guide) -> Self {
             FontraGuideline {
                 name: val.name.clone(),
-                x: val.pos.x,
-                y: val.pos.y,
-                angle: val.pos.angle,
+                x: val.pos.x as f64,
+                y: val.pos.y as f64,
+                angle: val.pos.angle as f64,
                 locked: false,
+                custom_data: HashMap::new(),
             }
         }
     }

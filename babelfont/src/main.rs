@@ -11,6 +11,8 @@ static SUPPORTED_EXTENSIONS: std::sync::LazyLock<Vec<&'static str>> =
             "ufo",
             #[cfg(feature = "ufo")]
             "designspace",
+            #[cfg(feature = "fontra")]
+            "fontra",
             #[cfg(feature = "glyphs")]
             "glyphs",
             #[cfg(feature = "glyphs")]

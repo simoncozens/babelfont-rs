@@ -252,19 +252,29 @@ pub struct CrossAxisMapping {
         deserialize_with = "crate::serde_helpers::design_location_from_map"
     )]
     pub output: Location<DesignSpace>,
+    /// Whether the mapping is active
+    #[serde(
+        skip_serializing_if = "crate::serde_helpers::is_true",
+        default = "crate::serde_helpers::default_true"
+    )]
+    pub active: bool,
 }
 
 #[cfg(feature = "fontra")]
-mod fontra {
-    use super::Axis;
-    use crate::{convertors::fontra, BabelfontError};
+pub(crate) mod fontra {
+    use std::collections::HashMap;
 
-    impl TryFrom<&Axis> for fontra::Axis {
+    use fontdrasil::coords::Location;
+
+    use super::{Axis, DesignCoord, UserCoord};
+    use crate::{axis::CrossAxisMapping, convertors::fontra, BabelfontError, Tag};
+
+    impl TryFrom<&Axis> for fontra::FontAxis {
         type Error = BabelfontError;
 
         fn try_from(value: &Axis) -> Result<Self, Self::Error> {
             let converter = value._converter()?;
-            Ok(fontra::Axis {
+            Ok(fontra::FontAxis {
                 name: value.tag.to_string(), // XXX: This should be the name, but for expediency
                 label: "".to_string(),
                 tag: value.tag.to_string(),
@@ -277,12 +287,138 @@ mod fontra {
                     .as_ref()
                     .map(|map| {
                         map.iter()
-                            .map(|(u, d)| (*u, d.to_normalized(&converter)))
-                            .collect()
+                            .map(|(u, d)| [u.to_f64(), d.to_normalized(&converter).to_f64()])
+                            .collect::<Vec<[f64; 2]>>()
                     })
                     .unwrap_or_default(),
+                value_labels: vec![],
+                custom_data: HashMap::new(),
             })
         }
+    }
+
+    impl From<&fontra::FontAxis> for Axis {
+        fn from(value: &fontra::FontAxis) -> Self {
+            let map = if value.mapping.is_empty() {
+                None
+            } else {
+                Some(
+                    value
+                        .mapping
+                        .iter()
+                        .map(|[u, d]| (UserCoord::new(*u), DesignCoord::new(*d)))
+                        .collect(),
+                )
+            };
+            Axis {
+                name: value.name.clone().into(),
+                tag: Tag::new(value.tag.as_bytes()[0..4].try_into().unwrap()),
+                min: Some(UserCoord::new(value.min_value)),
+                max: Some(UserCoord::new(value.max_value)),
+                default: Some(UserCoord::new(value.default_value)),
+                hidden: value.hidden,
+                map,
+                values: vec![],
+                format_specific: Default::default(),
+            }
+        }
+    }
+
+    // We store cross-axis mappings using axis tags, Fontra uses names. So we need a mapping between the two when converting
+    pub(crate) fn cross_axis_mapping_from_fontra(
+        value: &fontra::CrossAxisMapping,
+        axes: &[Axis],
+    ) -> Result<CrossAxisMapping, BabelfontError> {
+        let name_tag_map = axes
+            .iter()
+            .map(|ax| {
+                (
+                    ax.name
+                        .get_default()
+                        .map(|x| x.clone())
+                        .unwrap_or(ax.tag.to_string()),
+                    ax.tag.clone(),
+                )
+            })
+            .collect::<HashMap<_, _>>();
+        let mut input = Location::default();
+        for (name, value) in &value.input_location {
+            if let Some(tag) = name_tag_map.get(name) {
+                input.insert(tag.clone(), DesignCoord::new(*value));
+            } else {
+                return Err(BabelfontError::AxisConversion(format!(
+                    "Unknown axis: {}",
+                    name
+                )));
+            }
+        }
+        let mut output = Location::default();
+        for (name, value) in &value.output_location {
+            if let Some(tag) = name_tag_map.get(name) {
+                output.insert(tag.clone(), DesignCoord::new(*value));
+            } else {
+                return Err(BabelfontError::AxisConversion(format!(
+                    "Unknown axis: {}",
+                    name
+                )));
+            }
+        }
+        Ok(CrossAxisMapping {
+            description: value.description.clone(),
+            input,
+            output,
+            active: !value.inactive,
+        })
+    }
+
+    fn cross_axis_mapping_to_fontra(
+        mapping: &CrossAxisMapping,
+        axes: &[Axis],
+    ) -> Result<fontra::CrossAxisMapping, BabelfontError> {
+        let tag_name_map = axes
+            .iter()
+            .map(|ax| {
+                (
+                    ax.tag.clone(),
+                    ax.name
+                        .get_default()
+                        .map(|n| n.clone())
+                        .unwrap_or(ax.tag.to_string()),
+                )
+            })
+            .collect::<HashMap<_, _>>();
+
+        let mut input_location = HashMap::new();
+        for (tag, value) in mapping.input.iter() {
+            if let Some(name) = tag_name_map.get(tag) {
+                input_location.insert(name.clone(), value.to_f64());
+            } else {
+                return Err(BabelfontError::AxisConversion(format!(
+                    "Unknown axis tag: {}",
+                    tag
+                )));
+            }
+        }
+
+        let mut output_location = HashMap::new();
+        for (tag, value) in mapping.output.iter() {
+            if let Some(name) = tag_name_map.get(tag) {
+                output_location.insert(name.clone(), value.to_f64());
+            } else {
+                return Err(BabelfontError::AxisConversion(format!(
+                    "Unknown axis tag: {}",
+                    tag
+                )));
+            }
+        }
+
+        Ok(fontra::CrossAxisMapping {
+            description: mapping.description.clone(),
+            group_description: None,
+            input_location,
+            output_location,
+            inactive: !mapping.active,
+        })
     }
 }
 

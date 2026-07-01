@@ -131,15 +131,17 @@ mod glyphs {
 
 #[cfg(feature = "fontra")]
 mod fontra {
+    use std::collections::HashMap;
+
     use super::*;
     use crate::convertors::fontra;
 
     impl From<&fontra::Anchor> for Anchor {
         fn from(val: &fontra::Anchor) -> Self {
             Anchor {
-                name: val.name.clone(),
-                x: val.x as f64,
-                y: val.y as f64,
+                name: val.name.clone().unwrap_or_default(),
+                x: val.x,
+                y: val.y,
                 format_specific: FormatSpecific::default(),
             }
         }
@@ -148,9 +150,10 @@ mod fontra {
     impl From<&Anchor> for fontra::Anchor {
         fn from(val: &Anchor) -> Self {
             fontra::Anchor {
-                name: val.name.clone(),
-                x: val.x as f32,
-                y: val.y as f32,
+                name: Some(val.name.clone()).filter(|n| !n.is_empty()),
+                x: val.x,
+                y: val.y,
+                custom_data: HashMap::new(),
             }
         }
     }

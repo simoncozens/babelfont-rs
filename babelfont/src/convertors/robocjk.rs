@@ -406,11 +406,14 @@ mod tests {
 
         // Check that we have axes
         assert_eq!(designspace.axes.axes.len(), 1);
-        assert_eq!(designspace.axes.axes[0].name, "wght");
-        assert_eq!(designspace.axes.axes[0].tag, "wght");
-        assert_eq!(designspace.axes.axes[0].min_value, 100.0);
-        assert_eq!(designspace.axes.axes[0].max_value, 900.0);
-        assert_eq!(designspace.axes.axes[0].default_value, 100.0);
+        if let crate::convertors::fontra::AnyAxis::Continuous(axis) = &designspace.axes.axes[0] {
+            assert_eq!(axis.tag, "wght");
+            assert_eq!(axis.min_value, 100.0);
+            assert_eq!(axis.max_value, 900.0);
+            assert_eq!(axis.default_value, 100.0);
+        } else {
+            panic!("Expected a continuous axis");
+        }
 
         // Check that we have sources
         assert_eq!(designspace.sources.len(), 2);
