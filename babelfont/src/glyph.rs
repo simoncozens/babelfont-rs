@@ -89,9 +89,14 @@ pub enum GlyphCategory {
 impl From<&GlyphCategory> for Option<String> {
     fn from(val: &GlyphCategory) -> Self {
         match val {
-            GlyphCategory::Base => Some("Base".to_string()),
+            // Neither "Base" nor "Ligature" is a valid Glyphs top-level category
+            // (valid: Letter/Mark/Number/Punctuation/Separator/Symbol). fontc
+            // warns "Unknown category 'Base'/'Ligature'" and falls back to its
+            // bundled GlyphData. Map both to "Letter"; ligature-ness is carried
+            // by subCategory = Ligature instead (set during SFD conversion).
+            GlyphCategory::Base => Some("Letter".to_string()),
             GlyphCategory::Mark => Some("Mark".to_string()),
-            GlyphCategory::Ligature => Some("Ligature".to_string()),
+            GlyphCategory::Ligature => Some("Letter".to_string()),
             GlyphCategory::Custom(s) => Some(s.to_string()),
             GlyphCategory::Unknown => None,
         }

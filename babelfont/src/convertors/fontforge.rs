@@ -46,7 +46,18 @@ struct SfdParser {
     gpos_lookups: GTable,
     feature_names: IndexMap<SmolStr, Vec<(u32, String)>>, // feature tag -> feature name
     sanitized_lookup_names: HashMap<String, usize>, // track sanitized names for de-duplication
-    content: Option<String>,                        // Optional pre-loaded content for load_str()
+    // SFD anchor-class name -> Glyphs base-anchor name (e.g. "top", "bottom").
+    // Populated from AnchorClass2/AnchorClass header lines and used to translate
+    // anchor names into the Glyphs mark-attachment convention so that fontc can
+    // split abvm (above) vs blwm (below) GPOS mark features.
+    anchor_class_names: HashMap<String, String>,
+    // Ordered (class-name, subtable-name) declarations recorded from the
+    // AnchorClass2/AnchorClass header lines (first occurrence of each class
+    // wins). Classification into above/below is deferred until after the glyphs
+    // (and their anchors) have been parsed, so that the anchor Y coordinate can
+    // serve as a final fallback signal.
+    anchor_class_decls: Vec<(String, String)>,
+    content: Option<String>, // Optional pre-loaded content for load_str()
 }
 
 #[derive(Debug, Clone, Default)]
@@ -90,6 +101,48 @@ fn remove_implicit_move_in_closed_path(p: &mut Path) {
     }
 }
 
+/// Classify a single anchor class as above (`true`) or below (`false`).
+///
+/// The signals are consulted in decreasing order of reliability:
+///   1. `feature`: the OpenType feature tag of the GPOS Lookup that owns this
+///      class's subtable (`abvm` -> above, `blwm` -> below). Language-independent
+///      and therefore the primary signal.
+///   2. a keyword heuristic on the (lowercased) subtable name.
+///   3. the median Y of the class's base anchors compared against `threshold`.
+///   4. above, as a last resort.
+fn classify_anchor_class(
+    subtable: &str,
+    feature: Option<&str>,
+    base_ys: Option<&[f64]>,
+    threshold: f64,
+) -> bool {
+    // 1. Reliable feature-tag signal.
+    match feature {
+        Some("abvm") => return true,
+        Some("blwm") => return false,
+        _ => {}
+    }
+    // 2. Subtable-name keyword heuristic (English only).
+    if subtable.contains("abvm") || subtable.contains("above") {
+        return true;
+    }
+    if subtable.contains("blwm") || subtable.contains("below") || subtable.contains("nukta") {
+        return false;
+    }
+    // 3. Anchor Y-coordinate fallback: above anchors sit high, below anchors sit
+    //    near the baseline or negative.
+    if let Some(ys) = base_ys {
+        if !ys.is_empty() {
+            let mut sorted: Vec<f64> = ys.to_vec();
+            sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            let median = sorted[sorted.len() / 2];
+            return median >= threshold;
+        }
+    }
+    // 4. Last resort.
+    true
+}
+
 type SplineSegment = (Vec<(f64, f64)>, char, String);
 
 fn layer_is_quadratic(layer: &Layer) -> bool {
@@ -112,6 +165,8 @@ impl SfdParser {
             gpos_lookups: GTable(IndexMap::new()),
             feature_names: IndexMap::new(),
             sanitized_lookup_names: HashMap::new(),
+            anchor_class_names: HashMap::new(),
+            anchor_class_decls: Vec::new(),
             content: None,
         }
     }
@@ -127,6 +182,8 @@ impl SfdParser {
             gpos_lookups: GTable(IndexMap::new()),
             feature_names: IndexMap::new(),
             sanitized_lookup_names: HashMap::new(),
+            anchor_class_names: HashMap::new(),
+            anchor_class_decls: Vec::new(),
             content: Some(content),
         }
     }
@@ -351,13 +408,16 @@ impl SfdParser {
                     }
                     i = next_i;
                 }
-                "Lookup" | "AnchorClass2" | "MarkAttachClasses" | "MarkAttachSets"
-                | "KernPairs" => {
+                "Lookup" | "AnchorClass" | "AnchorClass2" | "MarkAttachClasses"
+                | "MarkAttachSets" | "KernPairs" => {
                     if key == "Lookup" {
                         if let Some(v) = &value {
                             self.parse_lookup(v);
                         }
                     } else if let Some(v) = &value {
+                        if key == "AnchorClass" || key == "AnchorClass2" {
+                            self.register_anchor_classes(v);
+                        }
                         self.font
                             .format_specific
                             .insert(key.clone(), serde_json::Value::String(v.clone()));
@@ -729,6 +789,13 @@ impl SfdParser {
             self.parse_chars(&chars, &master_id)?;
         }
 
+        // With every Lookup and glyph anchor now available, classify each
+        // anchor class as above/below (feature tag -> subtable-name keyword ->
+        // anchor Y coordinate) and rewrite the anchor names accordingly.
+        self.classify_anchor_classes();
+        self.rename_anchors();
+        self.infer_mark_categories_from_anchors();
+
         Ok(())
     }
 
@@ -966,6 +1033,33 @@ impl SfdParser {
                             4 => GlyphCategory::Mark,
                             _ => GlyphCategory::Unknown,
                         };
+                        // fontc classifies a glyph as a GDEF mark only when both
+                        // category == Mark and subCategory is Nonspacing (or
+                        // SpacingCombining). SFD only records the coarse
+                        // GlyphClass, so emit an explicit Nonspacing subCategory
+                        // for marks; without it no mark2base lookups (and thus no
+                        // abvm/blwm) are generated.
+                        //
+                        // Ligatures need subCategory = Ligature so fontc assigns
+                        // them GDEF class 2; otherwise the bare "Ligature"
+                        // category is unknown to fontc and its bundled GlyphData
+                        // may reclassify some conjuncts as marks, dropping them
+                        // from mark2base base coverage.
+                        match v {
+                            3 => {
+                                glyph.format_specific.insert(
+                                    "subcategory".to_string(),
+                                    serde_json::Value::String("Ligature".to_string()),
+                                );
+                            }
+                            4 => {
+                                glyph.format_specific.insert(
+                                    "subcategory".to_string(),
+                                    serde_json::Value::String("Nonspacing".to_string()),
+                                );
+                            }
+                            _ => {}
+                        }
                     }
                 }
                 "Back" | "Fore" | "Layer" => {
@@ -1091,14 +1185,26 @@ impl SfdParser {
                 }
                 "AnchorPoint" => {
                     if let Some(v) = value {
-                        if let Some(layer_idx) = current_layer_idx {
-                            if let Some(layer_pos) = layer_map.get(&layer_idx) {
-                                let layer = &mut glyph.layers[*layer_pos];
-                                layer.anchors.push(self.parse_anchor(v).ok_or(
-                                    BabelfontError::General("Couldn't parse anchor".to_string()),
-                                )?);
-                            }
-                        }
+                        let anchor = self
+                            .parse_anchor(v)
+                            .ok_or(BabelfontError::General("Couldn't parse anchor".to_string()))?;
+                        // In SFD, AnchorPoint lines usually appear before the
+                        // "Fore"/"Layer" markers, so current_layer_idx is still
+                        // None. The anchor belongs to the glyph's foreground
+                        // outline, so fall back to the default foreground layer
+                        // instead of silently dropping the anchor.
+                        let layer_pos = current_layer_idx
+                            .and_then(|layer_idx| layer_map.get(&layer_idx).copied())
+                            .unwrap_or_else(|| {
+                                Self::ensure_default_foreground_layer(
+                                    &mut glyph,
+                                    &mut layer_map,
+                                    width.unwrap_or(0.0),
+                                    self.layer_defs.get(1).and_then(|d| d.as_ref()),
+                                    master_id,
+                                )
+                            });
+                        glyph.layers[layer_pos].anchors.push(anchor);
                     }
                 }
                 "LayerCount" => {
@@ -2365,13 +2471,254 @@ impl SfdParser {
         Ok(Some(component))
     }
 
+    /// Register the anchor classes declared in an `AnchorClass2` (or legacy
+    /// `AnchorClass`) header line and remember, for each class, the Glyphs
+    /// base-anchor name it should map to.
+    ///
+    /// The line lists quoted PAIRS of `"className" "subtableName"`. The subtable
+    /// name is only sometimes descriptive; depending on how the source was
+    /// authored it may embed the feature and position in English, e.g.
+    ///   `"'abvm' Above Base Mark lookup 2 subtable"`
+    ///   `"'blwm' Below Base Mark lookup 1 subtable"`
+    /// or it may be an opaque / non-English identifier such as `"arriba-1"`
+    /// (Spanish for "above") or `"abajo-1"` ("below"). Because the subtable name
+    /// alone is an unreliable, language-dependent signal, we only *record* the
+    /// declarations here (first occurrence of each class wins) and defer the
+    /// above/below classification to [`Self::classify_anchor_classes`], which
+    /// runs once every Lookup and glyph anchor is available.
+    fn register_anchor_classes(&mut self, v: &str) {
+        let tokens = Self::tokenize_preserving_quotes(v);
+        let mut i = 0;
+        while i + 1 < tokens.len() {
+            let class_name = decode_utf7(tokens[i].trim_matches('"'));
+            let subtable = tokens[i + 1].trim_matches('"').to_lowercase();
+            i += 2;
+            if class_name.is_empty()
+                || self
+                    .anchor_class_decls
+                    .iter()
+                    .any(|(c, _)| c == &class_name)
+            {
+                continue;
+            }
+            self.anchor_class_decls.push((class_name, subtable));
+        }
+    }
+
+    /// Build a `subtable-name (lowercased) -> feature tag` map from the parsed
+    /// GPOS mark Lookups. FontForge writes each mark Lookup with its OpenType
+    /// feature tag (`'abvm'`, `'blwm'`, ...) and lists the subtable(s) it owns in
+    /// `{ ... }`, so this feature tag is a reliable, language-independent signal
+    /// for classifying the anchor classes that reference those subtables.
+    fn build_subtable_feature_map(&self) -> HashMap<String, SmolStr> {
+        let mut map: HashMap<String, SmolStr> = HashMap::new();
+        for info in self.gpos_lookups.0.values() {
+            // Prefer an above/below mark feature when the Lookup carries one;
+            // otherwise fall back to the first feature tag it declares.
+            let mut chosen: Option<SmolStr> = None;
+            for f in &info.features {
+                if f.feature == "abvm" || f.feature == "blwm" {
+                    chosen = Some(f.feature.clone());
+                    break;
+                }
+                if chosen.is_none() {
+                    chosen = Some(f.feature.clone());
+                }
+            }
+            if let Some(tag) = chosen {
+                for sub in info.subtables.keys() {
+                    map.insert(sub.as_str().to_lowercase(), tag.clone());
+                }
+            }
+        }
+        map
+    }
+
+    /// A vertical split point separating above-base anchors (which sit high, near
+    /// or above the x-height) from below-base anchors (near the baseline or
+    /// negative). Used only as the final classification fallback.
+    fn above_below_threshold(&self) -> f64 {
+        if let Some(master) = self.font.masters.first() {
+            if let Some(&xh) = master.metrics.get(&MetricType::XHeight) {
+                if xh > 0 {
+                    return xh as f64 * 0.5;
+                }
+            }
+            if let Some(&asc) = master.metrics.get(&MetricType::Ascender) {
+                if asc > 0 {
+                    return asc as f64 * 0.25;
+                }
+            }
+        }
+        (self.font.upm as f64) * 0.2
+    }
+
+    /// Classify every recorded anchor class as above (base name `top`) or below
+    /// (base name `bottom`) and assign its base-anchor name. The classification
+    /// is, in priority order:
+    ///   1. the feature tag of the GPOS Lookup that owns the class's subtable
+    ///      (`abvm` -> above, `blwm` -> below) — language independent;
+    ///   2. a keyword heuristic on the subtable name (`abvm`/`above` -> above;
+    ///      `blwm`/`below`/`nukta` -> below);
+    ///   3. the median Y of the class's *base* anchors (high -> above,
+    ///      low/negative -> below);
+    ///   4. as a last resort, above.
+    ///
+    /// Additional classes on the same side receive a numeric suffix on the *base*
+    /// name only (`top_1`, `bottom_1`, ...); mark anchors are never numbered (see
+    /// [`Self::rename_anchors`]).
+    fn classify_anchor_classes(&mut self) {
+        if self.anchor_class_decls.is_empty() {
+            return;
+        }
+        let feature_map = self.build_subtable_feature_map();
+        let threshold = self.above_below_threshold();
+
+        // Collect base-anchor Y coordinates per anchor class for the fallback.
+        let mut base_y: HashMap<String, Vec<f64>> = HashMap::new();
+        for glyph in self.font.glyphs.0.iter() {
+            for layer in glyph.layers.iter() {
+                for anchor in layer.anchors.iter() {
+                    let kind = anchor
+                        .format_specific
+                        .get("sfd.kind")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    if kind == "mark" {
+                        continue;
+                    }
+                    if let Some(class) = anchor
+                        .format_specific
+                        .get("sfd.anchor_class")
+                        .and_then(|v| v.as_str())
+                    {
+                        base_y.entry(class.to_string()).or_default().push(anchor.y);
+                    }
+                }
+            }
+        }
+
+        let decls = std::mem::take(&mut self.anchor_class_decls);
+        let mut above_count = 0usize;
+        let mut below_count = 0usize;
+        for (class_name, subtable) in decls {
+            let is_above = classify_anchor_class(
+                &subtable,
+                feature_map.get(&subtable).map(SmolStr::as_str),
+                base_y.get(&class_name).map(Vec::as_slice),
+                threshold,
+            );
+            let base_name = if is_above {
+                let name = if above_count == 0 {
+                    "top".to_string()
+                } else {
+                    format!("top_{}", above_count)
+                };
+                above_count += 1;
+                name
+            } else {
+                let name = if below_count == 0 {
+                    "bottom".to_string()
+                } else {
+                    format!("bottom_{}", below_count)
+                };
+                below_count += 1;
+                name
+            };
+            self.anchor_class_names.insert(class_name, base_name);
+        }
+    }
+
+    /// Rewrite every parsed anchor's name from its recorded SFD anchor class and
+    /// kind. Base anchors take the (possibly numbered) base name; mark anchors
+    /// take the *unnumbered* mark-side name (`_top`/`_bottom`), because fontc
+    /// rejects numbered mark anchors ("mark anchors cannot be numbered").
+    fn rename_anchors(&mut self) {
+        if self.anchor_class_names.is_empty() {
+            return;
+        }
+        for glyph in self.font.glyphs.0.iter_mut() {
+            for layer in glyph.layers.iter_mut() {
+                for anchor in layer.anchors.iter_mut() {
+                    let class = anchor
+                        .format_specific
+                        .get("sfd.anchor_class")
+                        .and_then(|v| v.as_str())
+                        .map(str::to_string);
+                    let is_mark = anchor
+                        .format_specific
+                        .get("sfd.kind")
+                        .and_then(|v| v.as_str())
+                        == Some("mark");
+                    let Some(class) = class else { continue };
+                    let Some(base_name) = self.anchor_class_names.get(&class) else {
+                        continue;
+                    };
+                    anchor.name = if is_mark {
+                        // Mark anchors are never numbered: derive the side from
+                        // the (possibly numbered) base name.
+                        if base_name.starts_with("bottom") {
+                            "_bottom".to_string()
+                        } else {
+                            "_top".to_string()
+                        }
+                    } else {
+                        base_name.clone()
+                    };
+                }
+            }
+        }
+    }
+
+    /// Classify GlyphClass-less glyphs that carry only mark-side anchors as
+    /// Nonspacing marks.
+    ///
+    /// SFD records a glyph's role in two ways: the coarse `GlyphClass` line and,
+    /// per anchor, the attachment `kind` (`mark` = the glyph attaches AS a mark,
+    /// `basechar`/`baselig`/... = base side). Some sources (e.g. Glegoo Bold)
+    /// omit `GlyphClass` on conjunct marks, leaving their category Unknown. Such
+    /// a glyph then exports without a category, and fontc — seeing an
+    /// underscore-joined name — treats it as a ligature and drops it from the
+    /// abvm/blwm mark coverage. The anchor `kind` is the authoritative signal:
+    /// a glyph whose anchors are exclusively mark-side is a mark, so mirror the
+    /// `GlyphClass: 4` path (category = Mark, subCategory = Nonspacing).
+    fn infer_mark_categories_from_anchors(&mut self) {
+        for glyph in self.font.glyphs.0.iter_mut() {
+            if glyph.category != GlyphCategory::Unknown {
+                continue;
+            }
+            let mut has_mark_anchor = false;
+            let mut has_base_anchor = false;
+            for layer in glyph.layers.iter() {
+                for anchor in layer.anchors.iter() {
+                    match anchor
+                        .format_specific
+                        .get("sfd.kind")
+                        .and_then(|v| v.as_str())
+                    {
+                        Some("mark") => has_mark_anchor = true,
+                        Some(_) => has_base_anchor = true,
+                        None => {}
+                    }
+                }
+            }
+            if has_mark_anchor && !has_base_anchor {
+                glyph.category = GlyphCategory::Mark;
+                glyph.format_specific.insert(
+                    "subcategory".to_string(),
+                    serde_json::Value::String("Nonspacing".to_string()),
+                );
+            }
+        }
+    }
+
     fn parse_anchor(&self, v: &str) -> Option<crate::Anchor> {
         // Quoted name, x, y, kind, index
         let parts: Vec<&str> = v.split_whitespace().collect();
         if parts.len() < 5 {
             return None;
         }
-        let name = decode_utf7(parts[0].trim_matches('"'));
+        let class_name = decode_utf7(parts[0].trim_matches('"'));
         let x = parts[1].parse::<f64>().ok()?;
         let y = parts[2].parse::<f64>().ok()?;
         let kind = parts[3];
@@ -2385,6 +2732,28 @@ impl SfdParser {
             "sfd.index".to_string(),
             serde_json::Value::Number(index.into()),
         );
+        // Preserve the original SFD anchor-class name for round-tripping.
+        format_specific.insert(
+            "sfd.anchor_class".to_string(),
+            serde_json::Value::String(class_name.clone()),
+        );
+        // Translate the SFD anchor-class name into the Glyphs mark-attachment
+        // convention. fontc splits abvm (above) vs blwm (below) by anchor name:
+        // base anchors are top/bottom, mark anchors are _top/_bottom. The
+        // above/below classification comes from the AnchorClass2 subtable name
+        // (registered in register_anchor_classes). The anchor's SFD kind tells
+        // us which side it sits on: "mark" is the mark side (underscore prefix),
+        // everything else (basechar, basemark, ligature, ...) is the base side.
+        let base_name = self
+            .anchor_class_names
+            .get(&class_name)
+            .cloned()
+            .unwrap_or_else(|| "top".to_string());
+        let name = if kind == "mark" {
+            format!("_{}", base_name)
+        } else {
+            base_name
+        };
         Some(crate::Anchor {
             name,
             x,
@@ -2475,6 +2844,25 @@ impl SfdParser {
             .iter_mut()
             .chain(self.gpos_lookups.0.iter_mut())
         {
+            // Anchor-based GPOS mark/cursive lookups (mark-to-base,
+            // mark-to-mark, mark-to-ligature, cursive) carry no FEA rules in
+            // FontForge: their attachment data lives entirely in the glyph
+            // AnchorClass/AnchorPoint entries (now converted to Glyphs anchors).
+            // Emitting them here would produce EMPTY `feature abvm/blwm/mark/...`
+            // blocks in the exported source, and fontc skips auto-generating any
+            // feature that is already declared in the FEA (without an insertion
+            // marker) — which would suppress the anchor-driven mark features
+            // entirely. Skip them so fontc rebuilds abvm/blwm/mark/mkmk/curs
+            // from the anchors.
+            if matches!(
+                lookup.lookup_type,
+                layout::LookupType::MarkToBasePosition
+                    | layout::LookupType::MarkToMarkPosition
+                    | layout::LookupType::MarkToLigaturePosition
+                    | layout::LookupType::CursivePosition
+            ) {
+                continue;
+            }
             // Populate the block with code from the subtables
             lookup.block.statements.extend(
                 lookup
@@ -4238,5 +4626,104 @@ mod tests {
         assert!(prefixes.contains("sub a grave by agrave;"));
         assert!(prefixes.contains("pos agrave <0 -900 0 0>;"));
         assert!(prefixes.contains("pos agrave <0 0 0 0> B <-10 0 0 0>;"));
+    }
+
+    #[test]
+    fn test_indic_mark_anchors_and_subcategory() {
+        // AnchorPoint lines appear before the "Fore" marker in SFD and use
+        // FontForge anchor-class names. The convertor must (a) keep the anchors
+        // by attaching them to the foreground layer, (b) translate the class
+        // names into the Glyphs top/bottom (base) and _top/_bottom (mark)
+        // convention using the AnchorClass2 above/below classification, and
+        // (c) mark GlyphClass-4 glyphs as Nonspacing marks.
+        let data = concat!(
+            "SplineFontDB: 3.0\n",
+            // Two mark-to-base (kind 0x104 = 260) GPOS lookups, one per feature.
+            // These are anchor-based and must be skipped on export.
+            "Lookup: 260 0 0 \"abvm mark\" {\"abvm-1\"} [ 'abvm' ('deva' <'dflt' > ) ]\n",
+            "Lookup: 260 0 0 \"blwm mark\" {\"blwm-1\"} [ 'blwm' ('deva' <'dflt' > ) ]\n",
+            "AnchorClass2: \"Above\" \"'abvm' Above Base Mark lookup 1 subtable\" ",
+            "\"Below\" \"'blwm' Below Base Mark lookup 2 subtable\"\n",
+            "BeginChars: 3 3\n",
+            "StartChar: ka\n",
+            "Encoding: 0 -1 0\n",
+            "Width: 600\n",
+            "GlyphClass: 2\n",
+            "AnchorPoint: \"Above\" 300 700 basechar 0\n",
+            "AnchorPoint: \"Below\" 300 -50 basechar 0\n",
+            "Fore\n",
+            "EndChar\n",
+            "StartChar: anusvara\n",
+            "Encoding: 1 -1 1\n",
+            "Width: 0\n",
+            "GlyphClass: 4\n",
+            "AnchorPoint: \"Above\" 0 500 mark 0\n",
+            "Fore\n",
+            "EndChar\n",
+            "StartChar: k_ka\n",
+            "Encoding: 2 -1 2\n",
+            "Width: 1000\n",
+            "GlyphClass: 3\n",
+            "Fore\n",
+            "EndChar\n",
+            "EndChars\n",
+            "EndSplineFont\n"
+        );
+        let font = load_str(data).expect("Failed to parse Indic-mark SFD");
+        let default_master_id = font.masters[0].id.clone();
+
+        // Base glyph: still a Base; anchors translated to top / bottom and
+        // attached to the (implicit) foreground layer even though they appear
+        // before the "Fore" marker.
+        let ka = font.glyphs.get("ka").expect("missing base glyph 'ka'");
+        assert_eq!(ka.category, GlyphCategory::Base);
+        let ka_layer = glyph_foreground_layer(ka, &default_master_id).expect("ka foreground layer");
+        let mut ka_names: Vec<&str> = ka_layer.anchors.iter().map(|a| a.name.as_str()).collect();
+        ka_names.sort();
+        assert_eq!(ka_names, vec!["bottom", "top"], "base anchor names");
+
+        // Mark glyph: category Mark + subCategory Nonspacing, anchor "_top".
+        let mark = font
+            .glyphs
+            .get("anusvara")
+            .expect("missing mark glyph 'anusvara'");
+        assert_eq!(mark.category, GlyphCategory::Mark);
+        assert_eq!(
+            mark.format_specific
+                .get("subcategory")
+                .and_then(|v| v.as_str()),
+            Some("Nonspacing"),
+            "mark glyph must carry Nonspacing subCategory"
+        );
+        let mark_layer =
+            glyph_foreground_layer(mark, &default_master_id).expect("mark foreground layer");
+        let mark_names: Vec<&str> = mark_layer.anchors.iter().map(|a| a.name.as_str()).collect();
+        assert_eq!(mark_names, vec!["_top"], "mark anchor name");
+
+        // Ligature glyph (GlyphClass 3): category Ligature + subCategory
+        // Ligature, so the exported category becomes a valid Glyphs "Letter".
+        let lig = font
+            .glyphs
+            .get("k_ka")
+            .expect("missing ligature glyph 'k_ka'");
+        assert_eq!(lig.category, GlyphCategory::Ligature);
+        assert_eq!(
+            lig.format_specific
+                .get("subcategory")
+                .and_then(|v| v.as_str()),
+            Some("Ligature"),
+            "ligature glyph must carry Ligature subCategory"
+        );
+
+        // Anchor-based mark GPOS lookups must NOT be emitted as (empty) feature
+        // blocks, otherwise fontc would skip generating abvm/blwm from anchors.
+        assert!(
+            !font
+                .features
+                .features
+                .iter()
+                .any(|(tag, _)| tag == "abvm" || tag == "blwm"),
+            "empty anchor-based mark features must not be exported"
+        );
     }
 }
