@@ -1078,12 +1078,32 @@ impl SfdParser {
                 }
                 "AltUni2" => {
                     if let Some(v) = value {
-                        // Fix these up later - these are period-separated hex sequences
-                        // but I'm not totally sure how they relate to Unicode codepoints
                         glyph.format_specific.insert(
                             "sfd.altuni".to_string(),
                             serde_json::Value::String(v.into()),
                         );
+                        // FontForge records a glyph's additional Unicode mappings here as
+                        // space-separated `uni.vs.reserved` hex triples. When the variation
+                        // selector `vs` is 0xffffffff ("none"), the entry is a plain
+                        // alternate encoding — the glyph is also mapped at `uni` in the cmap
+                        // — so add it to the glyph's codepoints. A real `vs` describes a
+                        // Unicode Variation Sequence (cmap format 14), which is not a plain
+                        // codepoint, so skip it.
+                        for entry in v.split_whitespace() {
+                            let mut fields = entry.split('.');
+                            let Some(cp) =
+                                fields.next().and_then(|s| u32::from_str_radix(s, 16).ok())
+                            else {
+                                continue;
+                            };
+                            let is_variation_sequence = fields
+                                .next()
+                                .and_then(|s| u32::from_str_radix(s, 16).ok())
+                                .is_some_and(|vs| vs != 0xffff_ffff);
+                            if !is_variation_sequence && !codepoints.contains(&cp) {
+                                codepoints.push(cp);
+                            }
+                        }
                     }
                 }
                 "UnlinkRmOvrlpSave" => {
@@ -4248,6 +4268,41 @@ mod tests {
         let emitted = to_str(&font).expect("Failed to emit quadratic SFD");
         assert!(emitted.contains("Layer: 1 1 \"Fore\" 0"));
         assert!(emitted.contains(" 336 610 336 610 386.5 585.5 c 0x400,-1,2"));
+    }
+
+    #[test]
+    fn test_altuni_adds_alternate_codepoints() {
+        // FontForge records a glyph's extra Unicode mappings in AltUni2 as
+        // space-separated `uni.vs.reserved` hex triples. Plain alternates
+        // (variation selector 0xffffffff) must become additional codepoints so
+        // the cmap matches; a real variation selector is skipped, and repeats
+        // are de-duplicated.
+        let data = concat!(
+            "SplineFontDB: 3.0\n",
+            "LayerCount: 2\n",
+            "Layer: 0 1 \"Back\" 1\n",
+            "Layer: 1 1 \"Fore\" 0\n",
+            "BeginChars: 2 2\n",
+            "StartChar: space\n",
+            "Encoding: 32 32 0\n",
+            "Width: 250\n",
+            "AltUni2: 0000a0.ffffffff.0\n",
+            "EndChar\n",
+            "StartChar: mu\n",
+            "Encoding: 181 181 1\n",
+            "Width: 500\n",
+            "AltUni2: 0003bc.ffffffff.0 0003bc.ffffffff.0 000041.0000fe00.0\n",
+            "EndChar\n",
+            "EndChars\n",
+            "EndSplineFont\n"
+        );
+
+        let font = load_str(data).expect("Failed to parse SFD with AltUni2");
+        // space: primary U+0020 plus the plain alternate U+00A0.
+        assert_eq!(font.glyphs[0].codepoints, vec![0x0020, 0x00A0]);
+        // mu: primary U+00B5 plus U+03BC (the duplicate is collapsed). The U+0041
+        // entry has a real variation selector (0xfe00), so it is NOT a codepoint.
+        assert_eq!(font.glyphs[1].codepoints, vec![0x00B5, 0x03BC]);
     }
 
     #[test]
