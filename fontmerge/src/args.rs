@@ -152,7 +152,8 @@ fn parse_codepoint(input: &str) -> Result<char, String> {
         return Ok(input.chars().next().unwrap());
     }
 
-    let input = input.trim_start_matches("U+").trim_start_matches("u+");
+    let input = input.to_lowercase();
+    let input = input.trim_start_matches("u+").trim_start_matches("0x");
     let cp = u32::from_str_radix(input, 16).map_err(|_| format!("Invalid codepoint: {}", input))?;
 
     char::from_u32(cp).ok_or_else(|| format!("Invalid Unicode codepoint: U+{:04X}", cp))
