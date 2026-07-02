@@ -554,7 +554,9 @@ mod fontra {
                     .axes
                     .iter()
                     .map(|a| {
-                        Ok::<fontra::AnyAxis, BabelfontError>(fontra::AnyAxis::Continuous(fontra::FontAxis::try_from(a)?))
+                        Ok::<fontra::AnyAxis, BabelfontError>(fontra::AnyAxis::Continuous(
+                            fontra::FontAxis::try_from(a)?,
+                        ))
                     })
                     .collect::<Result<Vec<_>, _>>()?,
                 mappings: vec![],
