@@ -964,6 +964,11 @@ pub(crate) fn as_glyphs3(font: &Font) -> Result<glyphs3::Glyphs3, BabelfontError
             if key.as_str().ends_with(" overshoot") {
                 continue;
             }
+            // OS/2 + hhea vertical metrics are emitted as font-level custom
+            // parameters (export_vertical_metrics), not as metric slots.
+            if customparameters::is_vertical_metric_cp(key) {
+                continue;
+            }
             if !our_metrics.contains(key) {
                 our_metrics.push(key.clone());
             }

@@ -1,6 +1,6 @@
-use glyphslib::common::CustomParameter;
+use glyphslib::{common::CustomParameter, Plist};
 
-use crate::{convertors::glyphs3::get_cp, BabelfontError, Font};
+use crate::{convertors::glyphs3::get_cp, BabelfontError, Font, MetricType};
 
 /// A set of paired functions to interpret/export font-level custom parameters
 pub(crate) fn interpret_custom_parameters(font: &mut Font) -> Result<(), BabelfontError> {
@@ -15,6 +15,62 @@ pub(crate) fn export_font_level_cps(
 ) -> Result<(), BabelfontError> {
     export_variable_font_origin(custom_parameters, font)?;
     export_use_typo_metrics(custom_parameters, font)?;
+    export_vertical_metrics(custom_parameters, font)?;
+    Ok(())
+}
+
+/// The OS/2 and `hhea` vertical metrics that Glyphs stores as font-level custom
+/// parameters, not as entries in the `metrics` array. fontc (and Glyphs) read
+/// these as custom parameters, so emitting them as metric slots — which the
+/// generic metric export otherwise does — leaves them ignored and the font
+/// falls back to computed bbox defaults (wrong line height).
+pub(crate) fn is_vertical_metric_cp(metric: &MetricType) -> bool {
+    matches!(
+        metric,
+        MetricType::TypoAscender
+            | MetricType::TypoDescender
+            | MetricType::TypoLineGap
+            | MetricType::WinAscent
+            | MetricType::WinDescent
+            | MetricType::HheaAscender
+            | MetricType::HheaDescender
+            | MetricType::HheaLineGap
+    )
+}
+
+/// Emit the OS/2 + hhea vertical metrics (parsed into the first master's metric
+/// map, e.g. from a FontForge SFD's `OS2TypoAscent`/`OS2WinAscent`/`HheadAscent`
+/// fields) as font-level custom parameters with values.
+fn export_vertical_metrics(
+    custom_parameters: &mut Vec<CustomParameter>,
+    font: &Font,
+) -> Result<(), BabelfontError> {
+    let Some(master) = font.masters.first() else {
+        return Ok(());
+    };
+    // Fixed order so the emitted .glyphs is reproducible.
+    let order = [
+        MetricType::TypoAscender,
+        MetricType::TypoDescender,
+        MetricType::TypoLineGap,
+        MetricType::WinAscent,
+        MetricType::WinDescent,
+        MetricType::HheaAscender,
+        MetricType::HheaDescender,
+        MetricType::HheaLineGap,
+    ];
+    for metric in order {
+        if let Some(&value) = master.metrics.get(&metric) {
+            find_or_insert(
+                custom_parameters,
+                CustomParameter {
+                    name: metric.as_str().to_string(),
+                    value: Plist::Integer(value as i64),
+                    disabled: false,
+                },
+            );
+        }
+    }
     Ok(())
 }
 
@@ -147,5 +203,38 @@ mod tests {
             .custom_parameters
             .iter()
             .any(|cp| cp.name == "Use Typo Metrics"));
+    }
+
+    #[test]
+    fn test_export_vertical_metrics_from_master_metrics() {
+        use crate::{Font, Master, MetricType};
+        use glyphslib::Plist;
+
+        let mut font = Font::default();
+        let mut master = Master::default();
+        for (m, v) in [
+            (MetricType::TypoAscender, 1928),
+            (MetricType::TypoDescender, -412),
+            (MetricType::WinAscent, 1928),
+            (MetricType::WinDescent, 412),
+            (MetricType::HheaAscender, 1928),
+            (MetricType::HheaDescender, -412),
+        ] {
+            master.metrics.insert(m, v);
+        }
+        font.masters.push(master);
+
+        let mut cps = vec![];
+        super::export_vertical_metrics(&mut cps, &font).unwrap();
+        let value = |name: &str| cps.iter().find(|c| c.name == name).map(|c| c.value.clone());
+        // OS/2 + hhea metrics are emitted as custom parameters with values.
+        assert_eq!(value("typoAscender"), Some(Plist::Integer(1928)));
+        assert_eq!(value("typoDescender"), Some(Plist::Integer(-412)));
+        assert_eq!(value("winAscent"), Some(Plist::Integer(1928)));
+        assert_eq!(value("winDescent"), Some(Plist::Integer(412)));
+        assert_eq!(value("hheaAscender"), Some(Plist::Integer(1928)));
+        assert_eq!(value("hheaDescender"), Some(Plist::Integer(-412)));
+        // A metric that was not set is not emitted.
+        assert!(value("typoLineGap").is_none());
     }
 }
