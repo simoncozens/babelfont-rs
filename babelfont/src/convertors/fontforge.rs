@@ -1091,14 +1091,26 @@ impl SfdParser {
                 }
                 "AnchorPoint" => {
                     if let Some(v) = value {
-                        if let Some(layer_idx) = current_layer_idx {
-                            if let Some(layer_pos) = layer_map.get(&layer_idx) {
-                                let layer = &mut glyph.layers[*layer_pos];
-                                layer.anchors.push(self.parse_anchor(v).ok_or(
-                                    BabelfontError::General("Couldn't parse anchor".to_string()),
-                                )?);
-                            }
-                        }
+                        let anchor = self
+                            .parse_anchor(v)
+                            .ok_or(BabelfontError::General("Couldn't parse anchor".to_string()))?;
+                        // In SFD, AnchorPoint lines usually appear before the
+                        // "Fore"/"Layer" markers, so current_layer_idx is still
+                        // None. The anchor belongs to the glyph's foreground
+                        // outline, so fall back to the default foreground layer
+                        // instead of silently dropping the anchor.
+                        let layer_pos = current_layer_idx
+                            .and_then(|layer_idx| layer_map.get(&layer_idx).copied())
+                            .unwrap_or_else(|| {
+                                Self::ensure_default_foreground_layer(
+                                    &mut glyph,
+                                    &mut layer_map,
+                                    width.unwrap_or(0.0),
+                                    self.layer_defs.get(1).and_then(|d| d.as_ref()),
+                                    master_id,
+                                )
+                            });
+                        glyph.layers[layer_pos].anchors.push(anchor);
                     }
                 }
                 "LayerCount" => {
@@ -4238,5 +4250,56 @@ mod tests {
         assert!(prefixes.contains("sub a grave by agrave;"));
         assert!(prefixes.contains("pos agrave <0 -900 0 0>;"));
         assert!(prefixes.contains("pos agrave <0 0 0 0> B <-10 0 0 0>;"));
+    }
+
+    #[test]
+    fn test_anchors_before_fore_markers() {
+        // AnchorPoint lines appear before the "Fore" marker in SFD and use
+        // FontForge anchor-class names. The convertor must keep the anchors
+        // by attaching them to the foreground layer.
+        let data = concat!(
+            "SplineFontDB: 3.0\n",
+            // Two mark-to-base (kind 0x104 = 260) GPOS lookups, one per feature.
+            // These are anchor-based and must be skipped on export.
+            "Lookup: 260 0 0 \"abvm mark\" {\"abvm-1\"} [ 'abvm' ('deva' <'dflt' > ) ]\n",
+            "Lookup: 260 0 0 \"blwm mark\" {\"blwm-1\"} [ 'blwm' ('deva' <'dflt' > ) ]\n",
+            "AnchorClass2: \"Above\" \"'abvm' Above Base Mark lookup 1 subtable\" ",
+            "\"Below\" \"'blwm' Below Base Mark lookup 2 subtable\"\n",
+            "BeginChars: 3 3\n",
+            "StartChar: ka\n",
+            "Encoding: 0 -1 0\n",
+            "Width: 600\n",
+            "GlyphClass: 2\n",
+            "AnchorPoint: \"Above\" 300 700 basechar 0\n",
+            "AnchorPoint: \"Below\" 300 -50 basechar 0\n",
+            "Fore\n",
+            "EndChar\n",
+            "StartChar: anusvara\n",
+            "Encoding: 1 -1 1\n",
+            "Width: 0\n",
+            "GlyphClass: 4\n",
+            "AnchorPoint: \"Above\" 0 500 mark 0\n",
+            "Fore\n",
+            "EndChar\n",
+            "StartChar: k_ka\n",
+            "Encoding: 2 -1 2\n",
+            "Width: 1000\n",
+            "GlyphClass: 3\n",
+            "Fore\n",
+            "EndChar\n",
+            "EndChars\n",
+            "EndSplineFont\n"
+        );
+        let font = load_str(data).expect("Failed to parse Indic-mark SFD");
+        let default_master_id = font.masters[0].id.clone();
+
+        // Base glyph: still a Base; anchors attached to the (implicit) foreground
+        // layer even though they appear before the "Fore" marker.
+        let ka = font.glyphs.get("ka").expect("missing base glyph 'ka'");
+        assert_eq!(ka.category, GlyphCategory::Base);
+        let ka_layer = glyph_foreground_layer(ka, &default_master_id).expect("ka foreground layer");
+        let mut ka_names: Vec<&str> = ka_layer.anchors.iter().map(|a| a.name.as_str()).collect();
+        ka_names.sort();
+        assert_eq!(ka_names, vec!["Above", "Below"], "base anchor names");
     }
 }
