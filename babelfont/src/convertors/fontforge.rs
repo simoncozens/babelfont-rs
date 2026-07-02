@@ -46,7 +46,13 @@ struct SfdParser {
     gpos_lookups: GTable,
     feature_names: IndexMap<SmolStr, Vec<(u32, String)>>, // feature tag -> feature name
     sanitized_lookup_names: HashMap<String, usize>, // track sanitized names for de-duplication
-    content: Option<String>,                        // Optional pre-loaded content for load_str()
+    // Ordered (class-name, subtable-name) declarations recorded from the
+    // AnchorClass2/AnchorClass header lines (first occurrence of each class
+    // wins). Classification into above/below is deferred until after the glyphs
+    // (and their anchors) have been parsed, so that the anchor Y coordinate can
+    // serve as a final fallback signal.
+    anchor_class_decls: Vec<(String, String)>,
+    content: Option<String>, // Optional pre-loaded content for load_str()
 }
 
 #[derive(Debug, Clone, Default)]
@@ -112,6 +118,7 @@ impl SfdParser {
             gpos_lookups: GTable(IndexMap::new()),
             feature_names: IndexMap::new(),
             sanitized_lookup_names: HashMap::new(),
+            anchor_class_decls: Vec::new(),
             content: None,
         }
     }
@@ -127,6 +134,7 @@ impl SfdParser {
             gpos_lookups: GTable(IndexMap::new()),
             feature_names: IndexMap::new(),
             sanitized_lookup_names: HashMap::new(),
+            anchor_class_decls: Vec::new(),
             content: Some(content),
         }
     }
@@ -351,13 +359,16 @@ impl SfdParser {
                     }
                     i = next_i;
                 }
-                "Lookup" | "AnchorClass2" | "MarkAttachClasses" | "MarkAttachSets"
-                | "KernPairs" => {
+                "Lookup" | "AnchorClass" | "AnchorClass2" | "MarkAttachClasses"
+                | "MarkAttachSets" | "KernPairs" => {
                     if key == "Lookup" {
                         if let Some(v) = &value {
                             self.parse_lookup(v);
                         }
                     } else if let Some(v) = &value {
+                        if key == "AnchorClass" || key == "AnchorClass2" {
+                            self.register_anchor_classes(v);
+                        }
                         self.font
                             .format_specific
                             .insert(key.clone(), serde_json::Value::String(v.clone()));
@@ -1091,7 +1102,7 @@ impl SfdParser {
                 }
                 "AnchorPoint" => {
                     if let Some(v) = value {
-                        let anchor = self
+                        let mut anchor = self
                             .parse_anchor(v)
                             .ok_or(BabelfontError::General("Couldn't parse anchor".to_string()))?;
                         // In SFD, AnchorPoint lines usually appear before the
@@ -1110,6 +1121,17 @@ impl SfdParser {
                                     master_id,
                                 )
                             });
+                        // Copy the registered class into format_specific
+                        if let Some(decl) = self
+                            .anchor_class_decls
+                            .iter()
+                            .find(|(c, _)| c == &anchor.name)
+                        {
+                            anchor.format_specific.insert(
+                                "sfd.associatedLookup".to_string(),
+                                serde_json::Value::String(decl.1.clone()),
+                            );
+                        }
                         glyph.layers[layer_pos].anchors.push(anchor);
                     }
                 }
@@ -1723,6 +1745,25 @@ impl SfdParser {
             i += 3;
         }
         out
+    }
+
+    fn register_anchor_classes(&mut self, v: &str) {
+        let tokens = Self::tokenize_preserving_quotes(v);
+        let mut i = 0;
+        while i + 1 < tokens.len() {
+            let class_name = decode_utf7(tokens[i].trim_matches('"'));
+            let subtable = tokens[i + 1].trim_matches('"').to_lowercase();
+            i += 2;
+            if class_name.is_empty()
+                || self
+                    .anchor_class_decls
+                    .iter()
+                    .any(|(c, _)| c == &class_name)
+            {
+                continue;
+            }
+            self.anchor_class_decls.push((class_name, subtable));
+        }
     }
 
     fn tokenize_preserving_quotes(s: &str) -> Vec<String> {
