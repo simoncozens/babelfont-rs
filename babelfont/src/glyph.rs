@@ -89,9 +89,9 @@ pub enum GlyphCategory {
 impl From<&GlyphCategory> for Option<String> {
     fn from(val: &GlyphCategory) -> Self {
         match val {
-            GlyphCategory::Base => Some("Base".to_string()),
+            GlyphCategory::Base => Some("Letter".to_string()),
             GlyphCategory::Mark => Some("Mark".to_string()),
-            GlyphCategory::Ligature => Some("Ligature".to_string()),
+            GlyphCategory::Ligature => Some("Letter".to_string()), // Needs subcategory
             GlyphCategory::Custom(s) => Some(s.to_string()),
             GlyphCategory::Unknown => None,
         }
