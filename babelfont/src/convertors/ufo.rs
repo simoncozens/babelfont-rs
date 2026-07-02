@@ -819,7 +819,7 @@ pub(crate) fn load_font_info(
     if let Some(p) = &info.postscript_font_name {
         font.names.postscript_name = p.into();
     }
-    if let Some(p) = &info.style_map_family_name {
+    if let Some(p) = &info.open_type_name_preferred_subfamily_name {
         font.names.preferred_subfamily_name = p.into();
     }
     copy_name!(font, info, description);
