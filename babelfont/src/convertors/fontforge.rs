@@ -9,7 +9,7 @@ use crate::{
         layout::{make_langsys, GTable},
         utf7::decode_utf7,
     },
-    names::ot_lang_id_to_iso_tag,
+    names::ot_lang_id_to_layout_tag,
     BabelfontError, Component, Font, FormatSpecific, Glyph, GlyphCategory, Guide, Layer, LayerType,
     MetricType, NameId, Path, Shape,
 };
@@ -486,7 +486,16 @@ impl SfdParser {
                 "UnderlinePosition" => parse_metric!(self, value, UnderlinePosition),
                 "UnderlineWidth" => parse_metric!(self, value, UnderlineThickness),
                 "Ascent" => parse_metric!(self, value, Ascender),
-                "Descent" => parse_metric!(self, value, Descender), // We might need to negate this?
+                "Descent" => {
+                    // Negate
+                    if let Some(v) = &value {
+                        if let Ok(val) = v.parse::<i32>() {
+                            self.font.masters[0]
+                                .metrics
+                                .insert(MetricType::Descender, -val);
+                        }
+                    }
+                }
                 "LineGap" => parse_metric!(self, value, HheaLineGap),
                 "HheadAscent" => parse_metric!(self, value, HheaAscender),
                 "HheadDescent" => parse_metric!(self, value, HheaDescender),
@@ -1396,6 +1405,7 @@ impl SfdParser {
         layer.master = if is_foreground {
             LayerType::DefaultForMaster(master_id.to_string())
         } else {
+            layer.id = Some(uuid::Uuid::new_v4().to_string()); // assign a unique ID for non-foreground layers
             LayerType::AssociatedWithMaster(master_id.to_string())
         };
 
@@ -1438,8 +1448,8 @@ impl SfdParser {
             Err(_) => return,
         };
 
-        // Convert OpenType language ID to ISO tag
-        let Some(iso_tag) = ot_lang_id_to_iso_tag(lang_id) else {
+        // Convert OpenType language ID to OT layout tag
+        let Some(otl_tag) = ot_lang_id_to_layout_tag(lang_id) else {
             log::warn!("Unknown OpenType language ID: {}", lang_id);
             return;
         };
@@ -1461,7 +1471,7 @@ impl SfdParser {
 
             // Get the appropriate name field by OpenType Name ID (index)
             if let Some(name_dict) = self.font.names.get_mut(NameId::new(ix as u16)) {
-                name_dict.insert(iso_tag.to_string(), decoded);
+                name_dict.insert(otl_tag.to_string(), decoded);
             }
         }
     }
@@ -2444,7 +2454,7 @@ impl SfdParser {
         if parts.len() < 5 {
             return None;
         }
-        let name = decode_utf7(parts[0].trim_matches('"'));
+        let mut name = decode_utf7(parts[0].trim_matches('"'));
         let x = parts[1].parse::<f64>().ok()?;
         let y = parts[2].parse::<f64>().ok()?;
         let kind = parts[3];
@@ -2458,6 +2468,9 @@ impl SfdParser {
             "sfd.index".to_string(),
             serde_json::Value::Number(index.into()),
         );
+        if kind == "mark" {
+            name = "_".to_string() + &name;
+        }
         Some(crate::Anchor {
             name,
             x,
@@ -3421,7 +3434,11 @@ fn read_file_lossy(path: &std::path::Path) -> Result<String, BabelfontError> {
 
 fn emit_metric(out: &mut Vec<String>, master: &crate::Master, metric: MetricType, key: &str) {
     if let Some(v) = master.metrics.get(&metric) {
-        out.push(format!("{}: {}", key, v));
+        if metric == MetricType::Descender {
+            out.push(format!("{}: {}", key, -v));
+        } else {
+            out.push(format!("{}: {}", key, v));
+        }
     }
 }
 
@@ -3776,10 +3793,15 @@ fn emit_layer_anchors(out: &mut Vec<String>, layer: &Layer) {
             .get("sfd.index")
             .and_then(|v| v.as_u64())
             .unwrap_or(0);
+        let name = if kind == "mark" && anchor.name.starts_with('_') {
+            anchor.name[1..].to_string()
+        } else {
+            anchor.name.clone()
+        };
 
         out.push(format!(
             "AnchorPoint: \"{}\" {} {} {} {}",
-            escape_quoted(&anchor.name),
+            escape_quoted(&name),
             fmt_num(anchor.x),
             fmt_num(anchor.y),
             kind,
