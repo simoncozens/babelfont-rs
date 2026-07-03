@@ -1,7 +1,13 @@
-use std::{collections::HashMap, fs, path::PathBuf, sync::LazyLock};
+use std::{
+    collections::{HashMap, HashSet},
+    fs,
+    path::PathBuf,
+    sync::LazyLock,
+};
 
 use chrono::DateTime;
 use fea_rs_ast::AsFea;
+use itertools::Itertools as _;
 
 use crate::{
     common::{decomposition::DecomposedAffine, tag_from_string, Color, Node, NodeType},
@@ -9,6 +15,7 @@ use crate::{
         layout::{make_langsys, GTable},
         utf7::decode_utf7,
     },
+    features::PossiblyAutomaticCode,
     names::ot_lang_id_to_layout_tag,
     BabelfontError, Component, Font, FormatSpecific, Glyph, GlyphCategory, Guide, Layer, LayerType,
     MetricType, NameId, Path, Shape,
@@ -20,6 +27,10 @@ mod layout;
 mod utf7;
 
 use regex::Regex;
+static CHAIN_POSSUB_RE: LazyLock<Regex> = LazyLock::new(|| {
+    // Matches: (coverage|class|glyph) "<subtable name>" <n1> <n2> <n3> <nRules>
+    Regex::new(r#"(coverage|class|glyph)\s+"([^"]*)"\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)"#).unwrap()
+});
 static FEATURE_NAME_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     // Expected format: '<feature tag>' <language code> "<feature name>"
     #[allow(clippy::unwrap_used)] // Safe because the regex is valid
@@ -46,6 +57,8 @@ struct SfdParser {
     gpos_lookups: GTable,
     feature_names: IndexMap<SmolStr, Vec<(u32, String)>>, // feature tag -> feature name
     sanitized_lookup_names: HashMap<String, usize>, // track sanitized names for de-duplication
+    // Chain/context substitution and positioning data: subtable name -> entry
+    chain_pos_sub: IndexMap<String, layout::ChainPosSubEntry>,
     // Ordered (class-name, subtable-name) declarations recorded from the
     // AnchorClass2/AnchorClass header lines (first occurrence of each class
     // wins). Classification into above/below is deferred until after the glyphs
@@ -118,6 +131,7 @@ impl SfdParser {
             gpos_lookups: GTable(IndexMap::new()),
             feature_names: IndexMap::new(),
             sanitized_lookup_names: HashMap::new(),
+            chain_pos_sub: IndexMap::new(),
             anchor_class_decls: Vec::new(),
             content: None,
         }
@@ -134,6 +148,7 @@ impl SfdParser {
             gpos_lookups: GTable(IndexMap::new()),
             feature_names: IndexMap::new(),
             sanitized_lookup_names: HashMap::new(),
+            chain_pos_sub: IndexMap::new(),
             anchor_class_decls: Vec::new(),
             content: Some(content),
         }
@@ -323,14 +338,8 @@ impl SfdParser {
                     }
                 }
                 "ContextPos2" | "ContextSub2" | "ChainPos2" | "ChainSub2" | "ReverseChain2" => {
-                    let (_section, next_i) =
-                        self.get_section(&data, i, "EndFPST", value.as_deref());
-                    // println!(
-                    //     "{}: captured {} lines (end marker EndFPST)",
-                    //     key,
-                    //     section.len()
-                    // );
-                    // Self::print_section(&key, &section);
+                    let (section, next_i) = self.get_section(&data, i, "EndFPST", value.as_deref());
+                    self.parse_chain_pos_sub(&key, &section);
                     i = next_i;
                 }
                 "Grid" => {
@@ -2498,6 +2507,133 @@ impl SfdParser {
         }
     }
 
+    fn parse_chain_pos_sub(&mut self, lkey: &str, data: &[String]) {
+        // Python _parseChainPosSub equivalent
+        let possub: Vec<&str> = data.iter().map(|l| l.trim()).collect();
+        if possub.is_empty() {
+            return;
+        }
+
+        let Some(caps) = CHAIN_POSSUB_RE.captures(possub[0]) else {
+            log::error!("Failed to parse ChainPosSub header: {}", possub[0]);
+            return;
+        };
+
+        let kind = caps.get(1).map(|m| m.as_str()).unwrap_or("");
+        let subtable = caps.get(2).map(|m| m.as_str()).unwrap_or("");
+        // let _n1: usize = caps.get(3).unwrap().as_str().parse().unwrap_or(0);
+        // let _n2: usize = caps.get(4).unwrap().as_str().parse().unwrap_or(0);
+        // let _n3: usize = caps.get(5).unwrap().as_str().parse().unwrap_or(0);
+        let _n_rules: usize = caps.get(6).unwrap().as_str().parse().unwrap_or(0);
+
+        let subtable = decode_utf7(subtable);
+
+        // Only handle "coverage" and "glyph" kinds for ChainSub2 / ChainPos2 / etc.
+        if kind != "coverage" && kind != "glyph" {
+            return;
+        }
+
+        let mut matches: Vec<Vec<String>> = Vec::new();
+        let mut backtracks: Vec<Vec<String>> = Vec::new();
+        let mut lookaheads: Vec<Vec<String>> = Vec::new();
+        let mut lookups: IndexMap<usize, Vec<String>> = IndexMap::new();
+
+        for line in possub[1..].iter() {
+            if !line.contains(": ") {
+                continue;
+            }
+            let colon_pos = line.find(": ").unwrap();
+            let key_part = &line[..colon_pos];
+            let val_part = &line[colon_pos + 2..];
+
+            match key_part {
+                "Coverage" => {
+                    // Format: "Coverage: <count> <glyph1> <glyph2> ..."
+                    let glyphs: Vec<String> = val_part
+                        .split_whitespace()
+                        .skip(1) // skip the count
+                        .map(|s| s.to_string())
+                        .collect();
+                    matches.push(glyphs);
+                }
+                "BCoverage" => {
+                    let glyphs: Vec<String> = val_part
+                        .split_whitespace()
+                        .skip(1)
+                        .map(|s| s.to_string())
+                        .collect();
+                    backtracks.push(glyphs);
+                }
+                "FCoverage" => {
+                    let glyphs: Vec<String> = val_part
+                        .split_whitespace()
+                        .skip(1)
+                        .map(|s| s.to_string())
+                        .collect();
+                    lookaheads.push(glyphs);
+                }
+                "String" => {
+                    // Format: "String: <count> <glyph1> <glyph2> ..."
+                    let glyphs: Vec<String> = val_part
+                        .split_whitespace()
+                        .skip(1)
+                        .map(|s| s.to_string())
+                        .collect();
+                    matches.push(glyphs);
+                }
+                "BString" => {
+                    let glyphs: Vec<String> = val_part
+                        .split_whitespace()
+                        .skip(1)
+                        .map(|s| s.to_string())
+                        .collect();
+                    backtracks.push(glyphs);
+                }
+                "FString" => {
+                    let glyphs: Vec<String> = val_part
+                        .split_whitespace()
+                        .skip(1)
+                        .map(|s| s.to_string())
+                        .collect();
+                    lookaheads.push(glyphs);
+                }
+                "SeqLookup" => {
+                    // Format: "SeqLookup: <index> "<lookup name>""
+                    let trimmed = val_part.trim();
+                    if let Some(space) = trimmed.find(' ') {
+                        let index_str = &trimmed[..space];
+                        let lookup_name = trimmed[space + 1..].trim().trim_matches('"');
+                        if let Ok(index) = index_str.parse::<usize>() {
+                            let decoded = decode_utf7(lookup_name);
+                            lookups.entry(index).or_default().push(decoded);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        // Determine the kind string ("sub" or "pos") based on the SFD key
+        let kind_str = match lkey {
+            "ChainSub2" | "ContextSub2" => "sub".to_string(),
+            "ChainPos2" | "ContextPos2" => "pos".to_string(),
+            "ReverseChain2" => "sub".to_string(),
+            _ => return,
+        };
+
+        self.chain_pos_sub.insert(
+            subtable.to_string(),
+            layout::ChainPosSubEntry {
+                kind: kind_str,
+                sfd_kind: kind.to_string(),
+                matches,
+                backtracks,
+                lookaheads,
+                lookups,
+            },
+        );
+    }
+
     fn glyph_container(name: impl AsRef<str>) -> fea_rs_ast::GlyphContainer {
         fea_rs_ast::GlyphContainer::GlyphName(fea_rs_ast::GlyphName::new(name.as_ref()))
     }
@@ -2552,36 +2688,232 @@ impl SfdParser {
             && !trimmed.contains(':')
     }
 
+    /// Convert lookup flags into AFDKO flag names.
+    fn make_lookup_flags(flag: u16) -> Vec<String> {
+        let mut flags = Vec::new();
+        if flag & 0x01 != 0 {
+            flags.push("RightToLeft".to_string());
+        }
+        if flag & 0x02 != 0 {
+            flags.push("IgnoreBaseGlyphs".to_string());
+        }
+        if flag & 0x04 != 0 {
+            flags.push("IgnoreLigatures".to_string());
+        }
+        if flag & 0x08 != 0 {
+            flags.push("IgnoreMarks".to_string());
+        }
+        flags
+    }
+
+    /// Generate a single feature rule line for a chain/context subtable entry.
+    /// Produces something like:
+    ///   sub [match]' lookup LookupName [backtrack] [lookahead];
+    fn make_chain_context_line(
+        entry: &layout::ChainPosSubEntry,
+        sanitized_lookup_names: &HashMap<String, usize>,
+    ) -> String {
+        let mut line = entry.kind.clone();
+
+        // Backtrack glyphs (before the matching sequence)
+        for glyphs in &entry.backtracks {
+            if glyphs.is_empty() {
+                continue;
+            }
+            line.push(' ');
+            line.push_str(&Self::glyphs_to_group(glyphs));
+        }
+
+        // Match glyphs with optional lookup references.
+        // For "coverage" kind: all glyphs form a group (class) with a single ' marker.
+        // For "glyph" kind: each glyph in the sequence gets its own ' marker and lookup.
+        if entry.sfd_kind == "coverage" {
+            // Coverage kind: all match glyphs in a group with a single ' marker
+            for (i, glyphs) in entry.matches.iter().enumerate() {
+                if !glyphs.is_empty() {
+                    line.push(' ');
+                    line.push_str(&Self::glyphs_to_group(glyphs));
+                    line.push('\'');
+                    if let Some(lookup_names) = entry.lookups.get(&i) {
+                        for lookup_name in lookup_names {
+                            let sanitized =
+                                Self::sanitize_name_from_map(lookup_name, sanitized_lookup_names);
+                            line.push_str(&format!(" lookup {}", sanitized));
+                        }
+                    }
+                }
+            }
+        } else {
+            // Glyph kind: each individual glyph gets its own ' marker and lookup
+            for (i, glyphs) in entry.matches.iter().enumerate() {
+                for glyph in glyphs {
+                    line.push(' ');
+                    line.push_str(glyph);
+                    line.push('\'');
+                    if let Some(lookup_names) = entry.lookups.get(&i) {
+                        for lookup_name in lookup_names {
+                            let sanitized =
+                                Self::sanitize_name_from_map(lookup_name, sanitized_lookup_names);
+                            line.push_str(&format!(" lookup {}", sanitized));
+                        }
+                    }
+                }
+            }
+        }
+
+        // Lookahead glyphs
+        for glyphs in &entry.lookaheads {
+            if glyphs.is_empty() {
+                continue;
+            }
+            line.push(' ');
+            line.push_str(&Self::glyphs_to_group(glyphs));
+        }
+
+        line.push_str(";");
+        line
+    }
+
+    /// Format a list of glyph names as a feature file glyph group.
+    /// Single glyph -> just the glyph name; multiple -> [glyph1 glyph2 ...]
+    fn glyphs_to_group(glyphs: &[String]) -> String {
+        if glyphs.len() == 1 {
+            glyphs[0].clone()
+        } else {
+            format!("[{}]", glyphs.join(" "))
+        }
+    }
+
+    /// Look up a sanitized name from a map, or generate one.
+    fn sanitize_name_from_map(lookup_name: &str, _seen: &HashMap<String, usize>) -> String {
+        // Replicate the sanitization logic without modifying the seen map
+        lookup_name
+            .chars()
+            .map(|c| {
+                if c.is_alphanumeric() || c == '_' {
+                    c
+                } else {
+                    '_'
+                }
+            })
+            .collect::<String>()
+    }
+
     fn insert_gtables(&mut self) {
+        // Collect all lookup names referenced by chain/context entries.
+        // These must be emitted before the chain/context lookups that reference them.
+        let all_deps: std::collections::HashSet<String> = self
+            .chain_pos_sub
+            .values()
+            .flat_map(|entry| {
+                entry.lookups.values().flat_map(|names| {
+                    names
+                        .iter()
+                        .map(|n| Self::sanitize_name_from_map(n, &self.sanitized_lookup_names))
+                })
+            })
+            .collect();
+
+        // Build an ordered list of lookup names: dependencies first,
+        // then non-chain lookups, then chain/context lookups last.
+        let mut is_chain: HashMap<String, bool> = HashMap::new();
+        for (name, lookup) in self.gsub_lookups.0.iter().chain(self.gpos_lookups.0.iter()) {
+            let has_chain = lookup
+                .subtables
+                .keys()
+                .any(|s| self.chain_pos_sub.contains_key(s.as_str()));
+            is_chain.insert(name.clone(), has_chain);
+        }
+
+        let mut ordered_names: Vec<String> = is_chain.keys().cloned().collect();
+        ordered_names.sort_by_key(|name| {
+            let ch = is_chain.get(name).copied().unwrap_or(false);
+            let is_dep = all_deps.contains(name.as_str());
+            if is_dep && !ch {
+                0 // Dependencies first
+            } else if ch {
+                2 // Chain/context lookups last
+            } else {
+                1 // Everything else in the middle
+            }
+        });
+
         let mut feature_map: HashMap<SmolStr, Vec<(layout::FeatureLangSys, SmolStr)>> =
             HashMap::new();
-        for (name, lookup) in self
-            .gsub_lookups
-            .0
-            .iter_mut()
-            .chain(self.gpos_lookups.0.iter_mut())
-        {
+        let mut used_script_language_pairs = HashSet::new();
+
+        for name in &ordered_names {
+            // Look up in GSUB first, then GPOS
+            let lookup = if let Some(l) = self.gsub_lookups.0.get_mut(name) {
+                l
+            } else if let Some(l) = self.gpos_lookups.0.get_mut(name) {
+                l
+            } else {
+                continue;
+            };
+
             // Populate the block with code from the subtables
             lookup.block.statements.extend(
                 lookup
                     .subtables
                     .iter()
-                    .flat_map(|(_name, st)| st.iter())
+                    .flat_map(|(_sub_name, st)| st.iter())
                     .cloned(),
             );
-            self.font.features.prefixes.insert(
-                name.into(),
-                crate::features::PossiblyAutomaticCode {
-                    code: lookup.block.as_fea(""),
-                    ..Default::default()
-                },
-            );
+
+            let has_chain = is_chain.get(name).copied().unwrap_or(false);
+
+            if has_chain {
+                // Generate chain context rules from the parsed data
+                let chain_lines: Vec<String> = lookup
+                    .subtables
+                    .keys()
+                    .filter_map(|sub_name| {
+                        self.chain_pos_sub.get(sub_name.as_str()).map(|entry| {
+                            Self::make_chain_context_line(entry, &self.sanitized_lookup_names)
+                        })
+                    })
+                    .collect();
+                // Build a custom prefix with the lookup wrapper
+                if !chain_lines.is_empty() {
+                    let mut fea_code = format!("lookup {} {{\n", lookup.block.name);
+                    // Add lookupflag if present
+                    if lookup.flag != 0 {
+                        let flags = Self::make_lookup_flags(lookup.flag);
+                        if !flags.is_empty() {
+                            fea_code.push_str(&format!("    lookupflag {};\n", flags.join(" ")));
+                        }
+                    }
+                    for line in &chain_lines {
+                        fea_code.push_str(&format!("    {}\n", line));
+                    }
+                    fea_code.push_str(&format!("}} {};\n", lookup.block.name));
+                    self.font.features.prefixes.insert(
+                        SmolStr::from(name.as_str()),
+                        crate::features::PossiblyAutomaticCode {
+                            code: fea_code,
+                            ..Default::default()
+                        },
+                    );
+                }
+            } else {
+                // Normal lookup: use the auto-generated block code
+                self.font.features.prefixes.insert(
+                    SmolStr::from(name.as_str()),
+                    crate::features::PossiblyAutomaticCode {
+                        code: lookup.block.as_fea(""),
+                        ..Default::default()
+                    },
+                );
+            }
+
             // Rearrange lookup.features as feature: Vec<FeatureLangSys>
             for fls in &lookup.features {
                 feature_map
                     .entry(fls.feature.clone())
                     .or_default()
                     .push((fls.clone(), lookup.block.name.clone()));
+                used_script_language_pairs.insert((fls.script.clone(), fls.language.clone()));
             }
         }
         // Now insert a feature reference for each feature
@@ -2612,6 +2944,38 @@ impl SfdParser {
                     ..Default::default()
                 },
             ));
+        }
+        if !used_script_language_pairs.is_empty() {
+            // These must be arranged DFLT/dflt first if it exists, then <script>/dflt before <script>/<language>
+            let mut pairs: Vec<(SmolStr, SmolStr)> =
+                used_script_language_pairs.into_iter().collect();
+            pairs.sort_by(|(a_script, a_lang), (b_script, b_lang)| {
+                if a_script == "DFLT" && a_lang == "dflt" {
+                    std::cmp::Ordering::Less
+                } else if a_lang == "dflt" && b_script == a_script {
+                    std::cmp::Ordering::Less
+                } else if b_lang == "dflt" && a_script == b_script {
+                    std::cmp::Ordering::Greater
+                } else {
+                    (a_script, a_lang).cmp(&(b_script, b_lang))
+                }
+            });
+            self.font.features.prefixes.insert_before(
+                0,
+                "LanguageSystems".into(),
+                PossiblyAutomaticCode::new(
+                    pairs
+                        .iter()
+                        .map(|(script, language)| {
+                            fea_rs_ast::LanguageSystemStatement::new(
+                                script.to_string(),
+                                language.to_string(),
+                            )
+                            .as_fea("")
+                        })
+                        .join("\n"),
+                ),
+            );
         }
         for (tag, names) in self.feature_names.iter() {
             // Find the feature by name
@@ -4419,5 +4783,104 @@ mod tests {
         let mut ka_names: Vec<&str> = ka_layer.anchors.iter().map(|a| a.name.as_str()).collect();
         ka_names.sort();
         assert_eq!(ka_names, vec!["Above", "Below"], "base anchor names");
+    }
+
+    #[test]
+    fn test_chain_pos_sub_parsing() {
+        // Test with the Glegoo font, which has ChainSub2 lookups
+        let sfd_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("resources/fontforge/Glegoo-Regular.sfd");
+        let data = String::from_utf8_lossy(&fs::read(&sfd_path).expect("Missing SFD")).into_owned();
+        let font = load_str(&data).expect("Failed to parse Glegoo SFD");
+
+        let fea = font.features.to_fea();
+
+        assert!(
+            fea.contains("isign_ra_virama.alt2"),
+            "Should contain the coverage match glyphs"
+        );
+        assert!(
+            fea.contains("Single_Substitution_lookup_34"),
+            "Should reference the chained lookup"
+        );
+        assert!(
+            fea.contains("rradeva"),
+            "Should contain the String match glyphs"
+        );
+        assert!(
+            fea.contains("zerowidthjoiner"),
+            "Should contain the second String match glyph"
+        );
+        // Verify the 'glyph' kind emits individual glyphs with ' markers
+        assert!(
+            fea.contains("rradeva' lookup Ligature_Substitution_lookup_31 viramadeva'"),
+            "Should emit each glyph position with its own lookup"
+        );
+
+        // Verify emission ordering: referenced lookups must come before
+        // the chain/context lookup that references them.
+        let prefixes: Vec<&str> = font
+            .features
+            .prefixes
+            .values()
+            .map(|p| p.code.as_str())
+            .collect();
+        let glegoo_fea = prefixes.join("\n");
+
+        // Find positions of key lookups in the emitted output
+        let dep_pos = glegoo_fea
+            .find("lookup Ligature_Substitution_lookup_31")
+            .expect("Referenced lookup Ligature_Substitution_lookup_31 should exist");
+        let chain_pos = glegoo_fea
+            .find("lookup _psts__Post_Base_Substitutions_lookup_32")
+            .expect("Chain lookup _psts__Post_Base_Substitutions_lookup_32 should exist");
+        assert!(
+            dep_pos < chain_pos,
+            "Referenced lookup must be emitted before the chain lookup that references it"
+        );
+
+        let dep2_pos = glegoo_fea
+            .find("lookup Single_Substitution_lookup_34")
+            .expect("Referenced lookup Single_Substitution_lookup_34 should exist");
+        let chain2_pos = glegoo_fea
+            .find("lookup _psts__Post_Base_Substitutions_lookup_33")
+            .expect("Chain lookup _psts__Post_Base_Substitutions_lookup_33 should exist");
+        assert!(
+            dep2_pos < chain2_pos,
+            "Referenced lookup Single_Substitution_lookup_34 must be emitted before \
+             the chain lookup _psts__Post_Base_Substitutions_lookup_33"
+        );
+    }
+
+    #[test]
+    fn test_chain_context_emission() {
+        // Minimal inline test
+        let data = concat!(
+            "SplineFontDB: 3.0\n",
+            "Lookup: 6 0 0 \"Chain Lookup\" {\"chain-sub-1\"} [\n",
+            "ChainSub2: coverage \"chain-sub-1\"  0 0 0 1\n",
+            " 1 0 1\n",
+            "  Coverage: 2 glyph_a glyph_b\n",
+            "  FCoverage: 1 glyph_c\n",
+            " 1\n",
+            "  SeqLookup: 0 \"Other Lookup\"\n",
+            "EndFPST\n",
+            "Lookup: 1 0 0 \"Other Lookup\" {\"other-sub\"} [ ]\n",
+            "BeginChars: 1 1\n",
+            "StartChar: space\n",
+            "Encoding: 32 32 0\n",
+            "Width: 250\n",
+            "EndChar\n",
+            "EndChars\n",
+            "EndSplineFont\n"
+        );
+
+        let font = load_str(data).expect("Failed to parse chain context SFD");
+        let fea = font.features.to_fea();
+
+        assert!(fea.contains("glyph_a"), "Should reference matching glyph");
+        assert!(fea.contains("glyph_b"), "Should reference matching glyph");
+        assert!(fea.contains("glyph_c"), "Should reference lookahead glyph");
+        assert!(fea.contains("sub"), "Should output 'sub' for ChainSub2");
     }
 }

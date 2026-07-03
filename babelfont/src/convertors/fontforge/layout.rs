@@ -71,6 +71,24 @@ pub(crate) fn make_ligature_statement(
     )
 }
 
+/// Parsed data from a FontForge ChainSub2/ChainPos2 section.
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub(crate) struct ChainPosSubEntry {
+    /// "sub" or "pos"
+    pub(crate) kind: String,
+    /// The SFD kind: "coverage" or "glyph"
+    pub(crate) sfd_kind: String,
+    /// The input sequence glyph groups (each Vec is a coverage group or glyph list)
+    pub(crate) matches: Vec<Vec<String>>,
+    /// Backtrack glyph groups
+    pub(crate) backtracks: Vec<Vec<String>>,
+    /// Lookahead glyph groups
+    pub(crate) lookaheads: Vec<Vec<String>>,
+    /// Lookups to apply at each input position: position -> [lookup names]
+    pub(crate) lookups: IndexMap<usize, Vec<String>>,
+}
+
 pub(crate) fn make_langsys(script: SmolStr, language: SmolStr) -> Vec<fea_rs_ast::Statement> {
     vec![
         fea_rs_ast::Statement::Script(fea_rs_ast::ScriptStatement::new(script.into())),
