@@ -834,9 +834,14 @@ fn interpret_axis_mappings(font: &mut Font) -> Result<(), BabelfontError> {
     if let Some(mappings) =
         get_cp(&font.format_specific, "Axis Mappings").and_then(|x| x.as_object())
     {
+        let mappings = mappings
+            .get("value")
+            .and_then(|x| x.as_object())
+            .unwrap_or(mappings);
         for (tagstr, map) in mappings {
             if let Ok(tag) = Tag::from_str(tagstr) {
                 if let Some(axis) = font.axes.iter_mut().find(|a| a.tag == tag) {
+                    // Sometimes they're an array, sometimes they're a dictionary!
                     if let Some(map) = map.as_array() {
                         let mut axis_map: Vec<(UserCoord, DesignCoord)> = vec![];
                         for pair in map {
@@ -849,6 +854,15 @@ fn interpret_axis_mappings(font: &mut Font) -> Result<(), BabelfontError> {
                                             .push((UserCoord::new(user), DesignCoord::new(design)));
                                     }
                                 }
+                            }
+                        }
+                        axis.map = Some(axis_map);
+                    } else if let Some(map) = map.as_object() {
+                        let mut axis_map: Vec<(UserCoord, DesignCoord)> = vec![];
+                        for (user, design) in map {
+                            if let (Ok(user), Some(design)) = (user.parse::<f64>(), design.as_f64())
+                            {
+                                axis_map.push((UserCoord::new(user), DesignCoord::new(design)));
                             }
                         }
                         axis.map = Some(axis_map);
