@@ -169,6 +169,7 @@ impl Names {
 /// Borrowed from Skrifa, which in turn borrowed it from
 /// Skia: <https://skia.googlesource.com/skia/+/refs/heads/main/src/sfnt/SkOTTable_name.cpp#98>
 /// but which didn't make it pub, because who could possibly find such a thing useful?
+#[allow(dead_code)]
 pub const LANGUAGE_ID_TO_BCP47: &[(u16, &str)] = &[
     /* A mapping from Mac Language Designators to BCP 47 codes.
      *  The following list was constructed more or less manually.
@@ -522,6 +523,7 @@ pub const LANGUAGE_ID_TO_BCP47: &[(u16, &str)] = &[
 ];
 
 /// Convert an OpenType language ID to a BCP-47 language tag string, if known.
+#[allow(dead_code)]
 pub fn ot_lang_id_to_iso_tag(lang_id: u16) -> Option<&'static str> {
     LANGUAGE_ID_TO_BCP47
         .binary_search_by_key(&lang_id, |&(id, _)| id)
