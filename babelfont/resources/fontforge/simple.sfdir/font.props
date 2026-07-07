@@ -1,0 +1,11 @@
+SplineFontDB: 3.2
+FontName: SimpleDir
+FullName: Simple Dir
+FamilyName: Simple Dir
+Weight: Regular
+Ascent: 800
+Descent: 200
+LayerCount: 2
+Layer: 0 0 "Back" 1
+Layer: 1 0 "Fore" 0
+EndSplineFont
