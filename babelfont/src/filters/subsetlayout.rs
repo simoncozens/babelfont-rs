@@ -4,8 +4,10 @@ use fea_rs_ast::{
     Statement, SubOrPos,
 };
 use smol_str::SmolStr;
-use std::collections::{HashMap, HashSet};
-use std::sync::LazyLock;
+use std::{
+    collections::{HashMap, HashSet},
+    sync::LazyLock,
+};
 
 use crate::filters::FontFilter;
 
@@ -668,7 +670,7 @@ impl<'a> SubsetVisitor<'a> {
                     return true;
                 }
                 // try interpreting as range
-                todo!()
+                todo!();
             }
         }
     }
