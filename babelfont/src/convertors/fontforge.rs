@@ -21,6 +21,7 @@ use crate::{
     MetricType, NameId, Path, Shape,
 };
 use indexmap::IndexMap;
+use kurbo::Shape as KurboShape;
 use smol_str::SmolStr;
 
 mod layout;
@@ -814,7 +815,174 @@ impl SfdParser {
             self.parse_chars(&chars, &master_id)?;
         }
 
+        self.resolve_offset_metrics();
+
         Ok(())
+    }
+
+    /// Resolve FontForge offset-mode OS/2 and hhea vertical metrics.
+    ///
+    /// When the companion flag is nonzero (`OS2TypoAOffset`, `OS2TypoDOffset`,
+    /// `OS2WinAOffset`, `OS2WinDOffset`, `HheadAOffset`, `HheadDOffset`), the
+    /// stored metric is a DELTA from FontForge's computed default -- the em
+    /// ascent/descent for the typo metrics, the font bounding box for the
+    /// win/hhea metrics -- not an absolute value. Left unresolved, the raw
+    /// deltas (typically 0 or 1) become absolute metrics and the built font
+    /// gets a degenerate line height. This runs after all glyphs are parsed so
+    /// the bounding box is available.
+    fn resolve_offset_metrics(&mut self) {
+        let flag = |k: &str| {
+            self.font
+                .format_specific
+                .get(k)
+                .and_then(|v| v.as_str())
+                .and_then(|s| s.trim().parse::<i32>().ok())
+                .unwrap_or(0)
+                != 0
+        };
+        let needs_bbox = flag("OS2WinAOffset")
+            || flag("OS2WinDOffset")
+            || flag("HheadAOffset")
+            || flag("HheadDOffset");
+        let (ymin, ymax) = if needs_bbox {
+            self.font_bbox_y()
+        } else {
+            (0.0, 0.0)
+        };
+        let ascender = self.font.masters[0]
+            .metrics
+            .get(&MetricType::Ascender)
+            .copied()
+            .unwrap_or(0);
+        // The Descender metric is already negated at parse time, matching the
+        // sign FontForge uses as the typo-descent base.
+        let descender = self.font.masters[0]
+            .metrics
+            .get(&MetricType::Descender)
+            .copied()
+            .unwrap_or(0);
+        let bases = [
+            (
+                "OS2TypoAOffset",
+                "OS2TypoAscent",
+                MetricType::TypoAscender,
+                ascender,
+            ),
+            (
+                "OS2TypoDOffset",
+                "OS2TypoDescent",
+                MetricType::TypoDescender,
+                descender,
+            ),
+            (
+                "OS2WinAOffset",
+                "OS2WinAscent",
+                MetricType::WinAscent,
+                ymax.round() as i32,
+            ),
+            (
+                "OS2WinDOffset",
+                "OS2WinDescent",
+                MetricType::WinDescent,
+                -ymin.round() as i32,
+            ),
+            (
+                "HheadAOffset",
+                "HheadAscent",
+                MetricType::HheaAscender,
+                ymax.round() as i32,
+            ),
+            (
+                "HheadDOffset",
+                "HheadDescent",
+                MetricType::HheaDescender,
+                ymin.round() as i32,
+            ),
+        ];
+        let mut raw_stash: Vec<(String, i32)> = Vec::new();
+        for (flag_key, sfd_key, metric, base) in bases {
+            if flag(flag_key) {
+                if let Some(v) = self.font.masters[0].metrics.get_mut(&metric) {
+                    // Keep the raw delta so the SFD round-trip re-emits the
+                    // file exactly as it was written.
+                    raw_stash.push((format!("sfd.raw.{}", sfd_key), *v));
+                    *v += base;
+                }
+            }
+        }
+        for (key, raw) in raw_stash {
+            self.font
+                .format_specific
+                .insert(key, serde_json::Value::Number(raw.into()));
+        }
+    }
+
+    /// The font-wide y extremes over every master-default layer, with
+    /// component references resolved (true bezier bounds; beziers are affine
+    /// invariant, so transforming control points then taking curve bounds is
+    /// exact).
+    fn font_bbox_y(&self) -> (f64, f64) {
+        let mut ymin = f64::INFINITY;
+        let mut ymax = f64::NEG_INFINITY;
+        for glyph in self.font.glyphs.iter() {
+            for layer in glyph.layers.iter() {
+                if matches!(layer.master, LayerType::DefaultForMaster(_)) {
+                    self.accumulate_layer_bbox_y(
+                        layer,
+                        kurbo::Affine::IDENTITY,
+                        0,
+                        &mut ymin,
+                        &mut ymax,
+                    );
+                }
+            }
+        }
+        if ymin > ymax {
+            (0.0, 0.0)
+        } else {
+            (ymin, ymax)
+        }
+    }
+
+    fn accumulate_layer_bbox_y(
+        &self,
+        layer: &Layer,
+        transform: kurbo::Affine,
+        depth: usize,
+        ymin: &mut f64,
+        ymax: &mut f64,
+    ) {
+        for path in layer.paths() {
+            if let Ok(mut bez) = path.to_kurbo() {
+                bez.apply_affine(transform);
+                if bez.elements().is_empty() {
+                    continue;
+                }
+                let bb = bez.bounding_box();
+                *ymin = ymin.min(bb.min_y());
+                *ymax = ymax.max(bb.max_y());
+            }
+        }
+        if depth >= 8 {
+            return;
+        }
+        for component in layer.components() {
+            if let Some(referenced) = self.font.glyphs.get(&component.reference) {
+                if let Some(ref_layer) = referenced
+                    .layers
+                    .iter()
+                    .find(|l| matches!(l.master, LayerType::DefaultForMaster(_)))
+                {
+                    self.accumulate_layer_bbox_y(
+                        ref_layer,
+                        transform * component.transform.as_affine(),
+                        depth + 1,
+                        ymin,
+                        ymax,
+                    );
+                }
+            }
+        }
     }
 
     fn parse_layer_def(&mut self, value: &str) {
@@ -3732,7 +3900,17 @@ fn emit_metric_key(
         _ => return false,
     };
     if master.metrics.contains_key(&metric) {
-        emit_metric(out, master, metric, key);
+        // Offset-mode metrics were resolved to absolutes at parse time; the
+        // original raw delta is stashed so the SFD round-trips byte-exactly.
+        if let Some(raw) = font
+            .format_specific
+            .get(&format!("sfd.raw.{}", key))
+            .and_then(|v| v.as_i64())
+        {
+            out.push(format!("{}: {}", key, raw));
+        } else {
+            emit_metric(out, master, metric, key);
+        }
         state.mark_emitted(key);
     }
     true
@@ -4682,6 +4860,56 @@ mod tests {
             println!("{}", diff);
             panic!("Roundtrip SFD did not match original");
         }
+    }
+
+    #[test]
+    fn test_offset_mode_vertical_metrics() {
+        // The *AOffset/*DOffset flags mean the stored metric is a delta from
+        // FontForge's computed default: em ascent/descent for typo, the font
+        // bbox for win/hhea. The box glyph below spans y = -50 .. 780.
+        let data = concat!(
+            "SplineFontDB: 3.0\n",
+            "Ascent: 800\n",
+            "Descent: 200\n",
+            "OS2TypoAscent: 0\n",
+            "OS2TypoAOffset: 1\n",
+            "OS2TypoDescent: 1\n",
+            "OS2TypoDOffset: 1\n",
+            "OS2WinAscent: 1\n",
+            "OS2WinAOffset: 1\n",
+            "OS2WinDescent: 0\n",
+            "OS2WinDOffset: 1\n",
+            "HheadAscent: 0\n",
+            "HheadAOffset: 1\n",
+            "HheadDescent: 1\n",
+            "HheadDOffset: 1\n",
+            "LayerCount: 2\n",
+            "Layer: 0 0 \"Back\" 1\n",
+            "Layer: 1 0 \"Fore\" 0\n",
+            "BeginChars: 1 1\n",
+            "StartChar: box\n",
+            "Encoding: 65 65 0\n",
+            "Width: 600\n",
+            "Fore\n",
+            "SplineSet\n",
+            "100 -50 m 1\n",
+            " 100 780 l 1\n",
+            " 500 780 l 1\n",
+            " 500 -50 l 1\n",
+            " 100 -50 l 1\n",
+            "EndSplineSet\n",
+            "EndChar\n",
+            "EndChars\n",
+            "EndSplineFont\n"
+        );
+        let font = load_str(data).expect("Failed to parse offset-mode SFD");
+        let m = |mt: MetricType| font.masters[0].metrics.get(&mt).copied();
+        assert_eq!(m(MetricType::TypoAscender), Some(800)); // Ascent + 0
+        assert_eq!(m(MetricType::TypoDescender), Some(-199)); // -Descent + 1
+        assert_eq!(m(MetricType::WinAscent), Some(781)); // yMax + 1
+        assert_eq!(m(MetricType::WinDescent), Some(50)); // -yMin + 0
+        assert_eq!(m(MetricType::HheaAscender), Some(780)); // yMax + 0
+        assert_eq!(m(MetricType::HheaDescender), Some(-49)); // yMin + 1
     }
 
     #[test]
