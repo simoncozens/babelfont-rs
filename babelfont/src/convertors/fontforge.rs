@@ -27,6 +27,7 @@ mod layout;
 mod utf7;
 
 use regex::Regex;
+#[allow(clippy::unwrap_used)] // Safe because the regex is valid
 static CHAIN_POSSUB_RE: LazyLock<Regex> = LazyLock::new(|| {
     // Matches: (coverage|class|glyph) "<subtable name>" <n1> <n2> <n3> <nRules>
     Regex::new(r#"(coverage|class|glyph)\s+"([^"]*)"\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)"#).unwrap()
@@ -2524,7 +2525,7 @@ impl SfdParser {
         // let _n1: usize = caps.get(3).unwrap().as_str().parse().unwrap_or(0);
         // let _n2: usize = caps.get(4).unwrap().as_str().parse().unwrap_or(0);
         // let _n3: usize = caps.get(5).unwrap().as_str().parse().unwrap_or(0);
-        let _n_rules: usize = caps.get(6).unwrap().as_str().parse().unwrap_or(0);
+        // let _n_rules: usize = caps.get(6).unwrap().as_str().parse().unwrap_or(0);
 
         let subtable = decode_utf7(subtable);
 
@@ -2539,10 +2540,9 @@ impl SfdParser {
         let mut lookups: IndexMap<usize, Vec<String>> = IndexMap::new();
 
         for line in possub[1..].iter() {
-            if !line.contains(": ") {
+            let Some(colon_pos) = line.find(": ") else {
                 continue;
-            }
-            let colon_pos = line.find(": ").unwrap();
+            };
             let key_part = &line[..colon_pos];
             let val_part = &line[colon_pos + 2..];
 
@@ -2770,7 +2770,7 @@ impl SfdParser {
             line.push_str(&Self::glyphs_to_group(glyphs));
         }
 
-        line.push_str(";");
+        line.push(';');
         line
     }
 
@@ -2950,9 +2950,9 @@ impl SfdParser {
             let mut pairs: Vec<(SmolStr, SmolStr)> =
                 used_script_language_pairs.into_iter().collect();
             pairs.sort_by(|(a_script, a_lang), (b_script, b_lang)| {
-                if a_script == "DFLT" && a_lang == "dflt" {
-                    std::cmp::Ordering::Less
-                } else if a_lang == "dflt" && b_script == a_script {
+                if (a_script == "DFLT" && a_lang == "dflt")
+                    || (a_lang == "dflt" && b_script == a_script)
+                {
                     std::cmp::Ordering::Less
                 } else if b_lang == "dflt" && a_script == b_script {
                     std::cmp::Ordering::Greater
