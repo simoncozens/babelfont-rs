@@ -1,0 +1,12 @@
+StartChar: b
+Encoding: 98 98 1
+Width: 600
+Fore
+SplineSet
+100 0 m 1
+ 100 700 l 1
+ 500 700 l 1
+ 500 0 l 1
+ 100 0 l 1
+EndSplineSet
+EndChar

@@ -155,7 +155,15 @@ impl SfdParser {
         }
     }
 
-    /// Read the SFD file or SFDir `font.props` into a vector of lines.
+    /// Read the SFD file (or SFDir directory) into a vector of lines.
+    ///
+    /// An SFDir is an "exploded" SFD: `font.props` holds the header (the same
+    /// syntax as an SFD, ending with `EndSplineFont` and without a
+    /// `BeginChars` section), and each glyph lives in its own `*.glyph` file
+    /// as a complete `StartChar: ... EndChar` block. Reassemble the stream
+    /// FontForge would have written as a single `.sfd`: header (minus the
+    /// trailing `EndSplineFont`), a synthesized `BeginChars` line, the glyph
+    /// blocks in original-GID order, then `EndChars`/`EndSplineFont`.
     fn read_data(&self) -> Result<Vec<String>, BabelfontError> {
         // If content was pre-loaded (from load_str), use that
         if let Some(content) = &self.content {
@@ -170,7 +178,54 @@ impl SfdParser {
                 ));
             }
             let content = read_file_lossy(&props)?;
-            return Ok(content.lines().map(|l| l.to_string()).collect());
+            let mut lines: Vec<String> = content.lines().map(|l| l.to_string()).collect();
+            while lines.last().is_some_and(|l| l.trim().is_empty()) {
+                lines.pop();
+            }
+            if lines.last().is_some_and(|l| l.trim() == "EndSplineFont") {
+                lines.pop();
+            }
+
+            // Each glyph file carries `Encoding: <slot> <unicode> <orig-gid>`;
+            // sort by (orig-gid, filename) to reproduce FontForge's glyph
+            // order deterministically.
+            let mut glyphs: Vec<(i64, String, Vec<String>)> = Vec::new();
+            let mut max_slot: i64 = 0;
+            for entry in std::fs::read_dir(&self.path)? {
+                let entry = entry?;
+                let name = entry.file_name().to_string_lossy().to_string();
+                if !name.ends_with(".glyph") || !entry.path().is_file() {
+                    continue;
+                }
+                let glyph_content = read_file_lossy(&entry.path())?;
+                let glyph_lines: Vec<String> =
+                    glyph_content.lines().map(|l| l.to_string()).collect();
+                let mut gid = i64::MAX;
+                for l in &glyph_lines {
+                    if let Some(rest) = l.strip_prefix("Encoding: ") {
+                        let fields: Vec<&str> = rest.split_whitespace().collect();
+                        if let Some(Ok(slot)) = fields.first().map(|s| s.parse::<i64>()) {
+                            max_slot = max_slot.max(slot + 1);
+                        }
+                        if let Some(Ok(g)) = fields.get(2).map(|s| s.parse::<i64>()) {
+                            gid = g;
+                        }
+                        break;
+                    }
+                }
+                glyphs.push((gid, name, glyph_lines));
+            }
+            glyphs.sort_by(|a, b| (a.0, &a.1).cmp(&(b.0, &b.1)));
+
+            lines.push(format!("BeginChars: {} {}", max_slot, glyphs.len()));
+            lines.push(String::new());
+            for (_, _, glyph_lines) in glyphs {
+                lines.extend(glyph_lines);
+                lines.push(String::new());
+            }
+            lines.push("EndChars".to_string());
+            lines.push("EndSplineFont".to_string());
+            return Ok(lines);
         }
 
         let content = read_file_lossy(&self.path)?;
@@ -4627,6 +4682,31 @@ mod tests {
             println!("{}", diff);
             panic!("Roundtrip SFD did not match original");
         }
+    }
+
+    #[test]
+    fn test_load_sfdir() {
+        // An SFDir is an exploded SFD: font.props holds the header and each
+        // glyph is a standalone StartChar block in its own *.glyph file
+        // (including dot-files such as .notdef.glyph). Glyphs must come out
+        // in original-GID order, not directory or filename order: in the
+        // fixture, b.glyph has GID 1 and a.glyph has GID 2.
+        let font =
+            load(PathBuf::from("resources/fontforge/simple.sfdir")).expect("Failed to load SFDir");
+        let names: Vec<&str> = font.glyphs.0.iter().map(|g| g.name.as_str()).collect();
+        assert_eq!(names, vec![".notdef", "b", "a"]);
+        assert_eq!(font.upm, 1000); // Ascent 800 + Descent 200
+        assert_eq!(
+            font.glyphs.get("a").and_then(|g| g.codepoints.first()),
+            Some(&0x61)
+        );
+        assert_eq!(
+            font.glyphs.get("b").and_then(|g| g.codepoints.first()),
+            Some(&0x62)
+        );
+        // Outlines from the glyph files are parsed, not just names
+        let b = font.glyphs.get("b").expect("missing glyph b");
+        assert!(b.layers.iter().any(|l| l.paths().next().is_some()));
     }
 
     #[test]

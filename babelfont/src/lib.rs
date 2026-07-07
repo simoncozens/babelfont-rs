@@ -219,7 +219,7 @@ pub fn load(filename: impl Into<PathBuf>) -> Result<Font, BabelfontError> {
         #[cfg(feature = "ufo")]
         Some(ext) if ext == "ufo" => crate::convertors::ufo::load(pb),
         #[cfg(feature = "fontforge")]
-        Some(ext) if ext == "sfd" => crate::convertors::fontforge::load(pb),
+        Some(ext) if ext == "sfd" || ext == "sfdir" => crate::convertors::fontforge::load(pb),
         #[cfg(feature = "vfb")]
         Some(ext) if ext == "vfb" => crate::convertors::vfb::load(pb),
         #[cfg(feature = "robocjk")]
