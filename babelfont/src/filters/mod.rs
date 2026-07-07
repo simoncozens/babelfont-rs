@@ -95,11 +95,13 @@ declare_filters! {
         Recompose(recomposition) => "recompose",
     }
     group "Filters for Glyphs font sources" {
+        CorrectConjunctCategory(correctconjunctcategory) => "correctconjunctcategory",
         #[cfg(feature = "glyphs")]
         GlyphsData(glyphsdata) => "glyphsdata",
         GlyphsNumberValue(glyphsnumbervalue) => "glyphsnumbervalue",
         GlyphsStylisticSetLabel(glyphsstylisticsetlabel) => "glyphsstylisticsetlabel",
         GlyphsBracketLayers(glyphsbracketlayers) => "glyphsbracketlayers",
+        SetSubcategory(setsubcategory) => "setsubcategory",
     }
     group "Filters for manipulating feature code" {
         ResolveIncludes(resolveincludes) => "resolveincludes",
