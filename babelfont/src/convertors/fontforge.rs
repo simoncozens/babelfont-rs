@@ -2897,6 +2897,10 @@ impl SfdParser {
                     );
                 }
             } else {
+                if lookup.block.statements.is_empty() {
+                    // No statements: skip this lookup
+                    continue;
+                }
                 // Normal lookup: use the auto-generated block code
                 self.font.features.prefixes.insert(
                     SmolStr::from(name.as_str()),
@@ -2932,11 +2936,21 @@ impl SfdParser {
             }
             // And now pop the featureblock into the feature
             // minus its wrapper
-            let statements: Vec<String> = featureblock
+            let mut statements: Vec<String> = featureblock
                 .statements
                 .iter()
                 .map(|x| x.as_fea(""))
                 .collect();
+            // Add automatic code markers for anything which would have feature writers
+            if feature == "abvm"
+                || feature == "blwm"
+                || feature == "kern"
+                || feature == "dist"
+                || feature == "mark"
+                || feature == "mkmk"
+            {
+                statements.insert(0, "# Automatic code start".to_string());
+            }
             self.font.features.features.push((
                 feature,
                 crate::features::PossiblyAutomaticCode {
@@ -2950,6 +2964,7 @@ impl SfdParser {
             let mut pairs: Vec<(SmolStr, SmolStr)> =
                 used_script_language_pairs.into_iter().collect();
             pairs.sort_by(|(a_script, a_lang), (b_script, b_lang)| {
+                #[allow(clippy::nonminimal_bool)] // Easier to follow
                 if (a_script == "DFLT" && a_lang == "dflt")
                     || (a_lang == "dflt" && b_script == a_script)
                 {
