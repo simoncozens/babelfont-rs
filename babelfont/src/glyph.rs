@@ -327,7 +327,7 @@ pub(crate) mod glyphs {
 
         let subcategory = val.format_specific.get_optionstring("subcategory");
         let category = match subcategory {
-            Some(s) if s != "Nonspacing" && val.category == GlyphCategory::Base => {
+            Some(s) if s == "Spacing" && val.category == GlyphCategory::Base => {
                 &GlyphCategory::Mark
             }
             _ => &val.category,
