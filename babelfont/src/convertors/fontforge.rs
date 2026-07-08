@@ -7,7 +7,9 @@ use std::{
 
 use chrono::DateTime;
 use fea_rs_ast::AsFea;
+use fontdrasil::coords::DesignLocation;
 use itertools::Itertools as _;
+use uuid::Uuid;
 
 use crate::{
     common::{decomposition::DecomposedAffine, tag_from_string, Color, Node, NodeType},
@@ -298,10 +300,11 @@ impl SfdParser {
 
         // Ensure we have a default master
         if self.font.masters.is_empty() {
-            let mut master: crate::Master = Default::default();
-            if master.id.is_empty() {
-                master.id = "default".to_string();
-            }
+            let master: crate::Master = crate::Master::new(
+                "Regular",
+                Uuid::new_v4().to_string(),
+                DesignLocation::default(),
+            );
             self.font.masters.push(master);
         }
         let master_id = self.font.masters[0].id.clone();
@@ -824,6 +827,34 @@ impl SfdParser {
         // Now parse glyphs if present
         if let Some(chars) = char_data {
             self.parse_chars(&chars, &master_id)?;
+        }
+
+        // Set master name based on width/weight
+        if let Some(master) = self.font.masters.get_mut(0) {
+            if let Some(weight) = self.font.custom_ot_values.os2_us_weight_class {
+                let weight_name = crate::constants::OS2_WEIGHT_TO_NAME_MAP
+                    .iter()
+                    .find(|(w, _)| *w == weight)
+                    .map(|(_, s)| s.to_string())
+                    .unwrap_or_else(|| "Regular".to_string());
+                master.name = weight_name.into();
+            }
+            if let Some(width) = self.font.custom_ot_values.os2_us_width_class {
+                if width != 5 {
+                    if let Some(width_name) = crate::constants::OS2_WIDTH_TO_NAME_MAP
+                        .iter()
+                        .find(|(w, _)| *w == width)
+                        .map(|(_, s)| s.to_string())
+                    {
+                        master.name = format!(
+                            "{} {}",
+                            width_name,
+                            master.name.get_default().unwrap_or(&"Regular".to_string())
+                        )
+                        .into();
+                    }
+                }
+            }
         }
 
         Ok(())

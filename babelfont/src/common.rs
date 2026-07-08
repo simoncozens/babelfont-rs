@@ -4,6 +4,8 @@ use crate::axis::Tag;
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
+/// Useful font-related constants
+pub mod constants;
 pub(crate) mod decomposition;
 pub(crate) mod formatspecific;
 mod node;

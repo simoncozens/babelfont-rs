@@ -116,6 +116,7 @@ declare_filters! {
         SetDefaultLocation(setdefaultlocation) => "setdefaultlocation",
         AddMaster(addmaster) => "addmaster",
         RemoveExtraneousLayers(removeextraneouslayers) => "removeextraneouslayers",
+        AddInstancePerMaster(addinstancepermaster) => "addinstancepermaster",
     }
 }
 
