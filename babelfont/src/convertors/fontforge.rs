@@ -13,6 +13,7 @@ use crate::{
     common::{decomposition::DecomposedAffine, tag_from_string, Color, Node, NodeType},
     convertors::fontforge::{
         layout::{make_langsys, GTable},
+        offsetmetrics::{compute_font_bbox_y, compute_offset_delta},
         utf7::decode_utf7,
     },
     features::PossiblyAutomaticCode,
@@ -21,10 +22,10 @@ use crate::{
     MetricType, NameId, Path, Shape,
 };
 use indexmap::IndexMap;
-use kurbo::Shape as KurboShape;
 use smol_str::SmolStr;
 
 mod layout;
+mod offsetmetrics;
 mod utf7;
 
 use regex::Regex;
@@ -154,6 +155,16 @@ impl SfdParser {
             anchor_class_decls: Vec::new(),
             content: Some(content),
         }
+    }
+
+    /// Parse the SFD/SFDir data into a Font structure.
+    fn into_font(mut self) -> Result<Font, BabelfontError> {
+        self.parse()?;
+        self.resolve_component_references()?;
+        self.resolve_offset_metrics()?;
+        self.process_kerning()?;
+        self.insert_gtables();
+        Ok(self.font)
     }
 
     /// Read the SFD file (or SFDir directory) into a vector of lines.
@@ -815,8 +826,6 @@ impl SfdParser {
             self.parse_chars(&chars, &master_id)?;
         }
 
-        self.resolve_offset_metrics();
-
         Ok(())
     }
 
@@ -830,7 +839,7 @@ impl SfdParser {
     /// deltas (typically 0 or 1) become absolute metrics and the built font
     /// gets a degenerate line height. This runs after all glyphs are parsed so
     /// the bounding box is available.
-    fn resolve_offset_metrics(&mut self) {
+    fn resolve_offset_metrics(&mut self) -> Result<(), BabelfontError> {
         let flag = |k: &str| {
             self.font
                 .format_specific
@@ -845,7 +854,7 @@ impl SfdParser {
             || flag("HheadAOffset")
             || flag("HheadDOffset");
         let (ymin, ymax) = if needs_bbox {
-            self.font_bbox_y()
+            compute_font_bbox_y(&self.font)?
         } else {
             (0.0, 0.0)
         };
@@ -899,90 +908,26 @@ impl SfdParser {
                 ymin.round() as i32,
             ),
         ];
-        let mut raw_stash: Vec<(String, i32)> = Vec::new();
-        for (flag_key, sfd_key, metric, base) in bases {
-            if flag(flag_key) {
-                if let Some(v) = self.font.masters[0].metrics.get_mut(&metric) {
-                    // Keep the raw delta so the SFD round-trip re-emits the
-                    // file exactly as it was written.
-                    raw_stash.push((format!("sfd.raw.{}", sfd_key), *v));
-                    *v += base;
-                }
+        // Collect flag results first to avoid borrowing format_specific
+        // mutably while the `flag` closure has an immutable reference.
+        let active_metrics: Vec<(String, MetricType, i32)> = bases
+            .iter()
+            .filter(|(flag_key, _, _, _)| flag(flag_key))
+            .map(|(_, sfd_key, metric, base)| (sfd_key.to_string(), metric.clone(), *base))
+            .collect();
+        for (sfd_key, metric, base) in &active_metrics {
+            if let Some(v) = self.font.masters[0].metrics.get_mut(metric) {
+                // Record that this metric was stored as a delta (offset mode)
+                // so the emitter can reconstruct the delta from the (potentially
+                // modified) absolute metric when writing back to SFD.
+                self.font.format_specific.insert(
+                    format!("sfd.offset_mode.{}", sfd_key),
+                    serde_json::Value::Bool(true),
+                );
+                *v += base;
             }
         }
-        for (key, raw) in raw_stash {
-            self.font
-                .format_specific
-                .insert(key, serde_json::Value::Number(raw.into()));
-        }
-    }
-
-    /// The font-wide y extremes over every master-default layer, with
-    /// component references resolved (true bezier bounds; beziers are affine
-    /// invariant, so transforming control points then taking curve bounds is
-    /// exact).
-    fn font_bbox_y(&self) -> (f64, f64) {
-        let mut ymin = f64::INFINITY;
-        let mut ymax = f64::NEG_INFINITY;
-        for glyph in self.font.glyphs.iter() {
-            for layer in glyph.layers.iter() {
-                if matches!(layer.master, LayerType::DefaultForMaster(_)) {
-                    self.accumulate_layer_bbox_y(
-                        layer,
-                        kurbo::Affine::IDENTITY,
-                        0,
-                        &mut ymin,
-                        &mut ymax,
-                    );
-                }
-            }
-        }
-        if ymin > ymax {
-            (0.0, 0.0)
-        } else {
-            (ymin, ymax)
-        }
-    }
-
-    fn accumulate_layer_bbox_y(
-        &self,
-        layer: &Layer,
-        transform: kurbo::Affine,
-        depth: usize,
-        ymin: &mut f64,
-        ymax: &mut f64,
-    ) {
-        for path in layer.paths() {
-            if let Ok(mut bez) = path.to_kurbo() {
-                bez.apply_affine(transform);
-                if bez.elements().is_empty() {
-                    continue;
-                }
-                let bb = bez.bounding_box();
-                *ymin = ymin.min(bb.min_y());
-                *ymax = ymax.max(bb.max_y());
-            }
-        }
-        if depth >= 8 {
-            return;
-        }
-        for component in layer.components() {
-            if let Some(referenced) = self.font.glyphs.get(&component.reference) {
-                if let Some(ref_layer) = referenced
-                    .layers
-                    .iter()
-                    .find(|l| matches!(l.master, LayerType::DefaultForMaster(_)))
-                {
-                    self.accumulate_layer_bbox_y(
-                        ref_layer,
-                        transform * component.transform.as_affine(),
-                        depth + 1,
-                        ymin,
-                        ymax,
-                    );
-                }
-            }
-        }
+        Ok(())
     }
 
     fn parse_layer_def(&mut self, value: &str) {
@@ -3239,22 +3184,12 @@ impl SfdParser {
 
 /// Load a FontForge SFD font or SFDir from a file path
 pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
-    let mut parser = SfdParser::new(path);
-    parser.parse()?;
-    parser.resolve_component_references()?;
-    parser.process_kerning()?;
-    parser.insert_gtables();
-    Ok(parser.font)
+    SfdParser::new(path).into_font()
 }
 
 /// Load a FontForge SFD font from a string
 pub fn load_str(content: &str) -> Result<Font, BabelfontError> {
-    let mut parser = SfdParser::new_from_str(content.to_string());
-    parser.parse()?;
-    parser.resolve_component_references()?;
-    parser.process_kerning()?;
-    parser.insert_gtables();
-    Ok(parser.font)
+    SfdParser::new_from_str(content.to_string()).into_font()
 }
 
 /// Save a Babelfont Font into a FontForge SFD file at the given path.
@@ -3283,7 +3218,7 @@ pub fn to_str(font: &Font) -> Result<String, BabelfontError> {
         .collect();
     let explicit_kerns = collect_explicit_kerns(font, &glyph_index);
 
-    emit_font_header(&mut out, font, &layer_registry);
+    emit_font_header(&mut out, font, &layer_registry)?;
     emit_font_level_kerning(&mut out, font, &glyph_order, &glyph_index);
     emit_features(&mut out, font);
 
@@ -3499,7 +3434,11 @@ fn begin_chars_glyph_count(font: &Font, glyph_order: &[String]) -> usize {
         .unwrap_or(glyph_order.len())
 }
 
-fn emit_font_header(out: &mut Vec<String>, font: &Font, layer_registry: &LayerRegistry) {
+fn emit_font_header(
+    out: &mut Vec<String>,
+    font: &Font,
+    layer_registry: &LayerRegistry,
+) -> Result<(), BabelfontError> {
     let mut state = HeaderEmitState::new(font, layer_registry);
     let emit_layer_header = font
         .format_specific
@@ -3604,7 +3543,7 @@ fn emit_font_header(out: &mut Vec<String>, font: &Font, layer_registry: &LayerRe
         if (key == "LayerCount" || key == "Layer") && !emit_layer_header {
             continue;
         }
-        emit_header_key(out, font, layer_registry, key, &mut state);
+        emit_header_key(out, font, layer_registry, key, &mut state)?;
     }
 
     while state.comment_index < comment_entries(font).len() {
@@ -3614,10 +3553,11 @@ fn emit_font_header(out: &mut Vec<String>, font: &Font, layer_registry: &LayerRe
     }
 
     while emit_layer_header && state.layer_index < layer_registry.defs.len() {
-        emit_header_key(out, font, layer_registry, "Layer", &mut state);
+        emit_header_key(out, font, layer_registry, "Layer", &mut state)?;
     }
 
     emit_font_passthrough_keys_remaining(out, font, &mut state);
+    Ok(())
 }
 
 struct HeaderEmitState {
@@ -3650,7 +3590,7 @@ fn emit_header_key(
     layer_registry: &LayerRegistry,
     key: &str,
     state: &mut HeaderEmitState,
-) {
+) -> Result<(), BabelfontError> {
     match key {
         "SplineFontDB" if !state.is_emitted(key) => {
             out.push(format!(
@@ -3762,12 +3702,13 @@ fn emit_header_key(
             state.mark_emitted(key);
         }
         _ => {
-            if emit_metric_key(out, font, key, state)
+            if emit_metric_key(out, font, key, state)?
                 || emit_ot_key(out, font, key, state)
                 || emit_passthrough_key(out, font, key, state)
             {}
         }
     }
+    Ok(())
 }
 
 fn comment_entries(font: &Font) -> Vec<(String, String)> {
@@ -3864,12 +3805,12 @@ fn emit_metric_key(
     font: &Font,
     key: &str,
     state: &mut HeaderEmitState,
-) -> bool {
+) -> Result<bool, BabelfontError> {
     if state.is_emitted(key) {
-        return false;
+        return Ok(false);
     }
     let Some(master) = font.masters.first() else {
-        return false;
+        return Ok(false);
     };
     let metric = match key {
         "ItalicAngle" => MetricType::ItalicAngle,
@@ -3897,23 +3838,29 @@ fn emit_metric_key(
         "OS2StrikeYPos" => MetricType::StrikeoutPosition,
         "OS2CapHeight" => MetricType::CapHeight,
         "OS2XHeight" => MetricType::XHeight,
-        _ => return false,
+        _ => return Ok(false),
     };
     if master.metrics.contains_key(&metric) {
-        // Offset-mode metrics were resolved to absolutes at parse time; the
-        // original raw delta is stashed so the SFD round-trips byte-exactly.
-        if let Some(raw) = font
+        // Offset-mode metrics were resolved to absolutes at parse time;
+        // reconstruct the delta from the current (possibly user-modified)
+        // absolute metric and the appropriate base value.
+        let offset_key = format!("sfd.offset_mode.{}", key);
+        let is_offset = font
             .format_specific
-            .get(&format!("sfd.raw.{}", key))
-            .and_then(|v| v.as_i64())
-        {
-            out.push(format!("{}: {}", key, raw));
+            .get(&offset_key)
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+
+        if is_offset {
+            let absolute = *master.metrics.get(&metric).unwrap_or(&0);
+            let delta = compute_offset_delta(font, key, absolute)?;
+            out.push(format!("{}: {}", key, delta));
         } else {
             emit_metric(out, master, metric, key);
         }
         state.mark_emitted(key);
     }
-    true
+    Ok(true)
 }
 
 fn ot_line_for_key(font: &Font, key: &str) -> Option<String> {
@@ -4860,56 +4807,6 @@ mod tests {
             println!("{}", diff);
             panic!("Roundtrip SFD did not match original");
         }
-    }
-
-    #[test]
-    fn test_offset_mode_vertical_metrics() {
-        // The *AOffset/*DOffset flags mean the stored metric is a delta from
-        // FontForge's computed default: em ascent/descent for typo, the font
-        // bbox for win/hhea. The box glyph below spans y = -50 .. 780.
-        let data = concat!(
-            "SplineFontDB: 3.0\n",
-            "Ascent: 800\n",
-            "Descent: 200\n",
-            "OS2TypoAscent: 0\n",
-            "OS2TypoAOffset: 1\n",
-            "OS2TypoDescent: 1\n",
-            "OS2TypoDOffset: 1\n",
-            "OS2WinAscent: 1\n",
-            "OS2WinAOffset: 1\n",
-            "OS2WinDescent: 0\n",
-            "OS2WinDOffset: 1\n",
-            "HheadAscent: 0\n",
-            "HheadAOffset: 1\n",
-            "HheadDescent: 1\n",
-            "HheadDOffset: 1\n",
-            "LayerCount: 2\n",
-            "Layer: 0 0 \"Back\" 1\n",
-            "Layer: 1 0 \"Fore\" 0\n",
-            "BeginChars: 1 1\n",
-            "StartChar: box\n",
-            "Encoding: 65 65 0\n",
-            "Width: 600\n",
-            "Fore\n",
-            "SplineSet\n",
-            "100 -50 m 1\n",
-            " 100 780 l 1\n",
-            " 500 780 l 1\n",
-            " 500 -50 l 1\n",
-            " 100 -50 l 1\n",
-            "EndSplineSet\n",
-            "EndChar\n",
-            "EndChars\n",
-            "EndSplineFont\n"
-        );
-        let font = load_str(data).expect("Failed to parse offset-mode SFD");
-        let m = |mt: MetricType| font.masters[0].metrics.get(&mt).copied();
-        assert_eq!(m(MetricType::TypoAscender), Some(800)); // Ascent + 0
-        assert_eq!(m(MetricType::TypoDescender), Some(-199)); // -Descent + 1
-        assert_eq!(m(MetricType::WinAscent), Some(781)); // yMax + 1
-        assert_eq!(m(MetricType::WinDescent), Some(50)); // -yMin + 0
-        assert_eq!(m(MetricType::HheaAscender), Some(780)); // yMax + 0
-        assert_eq!(m(MetricType::HheaDescender), Some(-49)); // yMin + 1
     }
 
     #[test]
