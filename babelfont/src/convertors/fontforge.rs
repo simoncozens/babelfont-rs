@@ -1820,6 +1820,23 @@ impl SfdParser {
                                                     let l_after = &lb[l_start + 1..];
                                                     if let Some(l_end_rel) = l_after.find('\'') {
                                                         let language = &l_after[..l_end_rel];
+                                                        // FontForge writes a
+                                                        // blank script tag for
+                                                        // lookups with no
+                                                        // script; treat it as
+                                                        // DFLT/dflt so the FEA
+                                                        // stays valid.
+                                                        let script = if script.trim().is_empty() {
+                                                            "DFLT"
+                                                        } else {
+                                                            script
+                                                        };
+                                                        let language = if language.trim().is_empty()
+                                                        {
+                                                            "dflt"
+                                                        } else {
+                                                            language
+                                                        };
                                                         out.push(layout::FeatureLangSys {
                                                             feature: SmolStr::from(feature),
                                                             script: SmolStr::from(script),
@@ -4838,6 +4855,40 @@ mod tests {
             println!("{}", diff);
             panic!("Roundtrip SFD did not match original");
         }
+    }
+
+    #[test]
+    fn test_blank_script_tag_becomes_dflt() {
+        // FontForge writes a blank script tag for lookups with no script;
+        // it must become DFLT/dflt or the emitted languagesystem/script
+        // FEA statements are invalid.
+        let data = concat!(
+            "SplineFontDB: 3.0\n",
+            "Ascent: 800\n",
+            "Descent: 200\n",
+            "LayerCount: 2\n",
+            "Layer: 0 0 \"Back\" 1\n",
+            "Layer: 1 0 \"Fore\" 0\n",
+            "Lookup: 1 0 0 \"t\" {\"t-1\"} [ 'titl' ('    ' <'dflt' > ) ]\n",
+            "BeginChars: 2 2\n",
+            "StartChar: A\n",
+            "Encoding: 65 65 0\n",
+            "Width: 600\n",
+            "Substitution2: \"t-1\" A.titl\n",
+            "Fore\n",
+            "EndChar\n",
+            "StartChar: A.titl\n",
+            "Encoding: -1 -1 1\n",
+            "Width: 600\n",
+            "Fore\n",
+            "EndChar\n",
+            "EndChars\n",
+            "EndSplineFont\n"
+        );
+        let font = load_str(data).expect("Failed to parse blank-script SFD");
+        let fea = font.features.to_fea();
+        assert!(fea.contains("languagesystem DFLT dflt"), "{}", fea);
+        assert!(!fea.contains("languagesystem  "), "{}", fea);
     }
 
     #[test]
