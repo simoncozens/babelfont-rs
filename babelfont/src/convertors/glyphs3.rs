@@ -978,8 +978,8 @@ pub(crate) fn as_glyphs3(font: &Font) -> Result<glyphs3::Glyphs3, BabelfontError
             if key.as_str().ends_with(" overshoot") {
                 continue;
             }
-            // OS/2 + hhea vertical metrics are emitted as font-level custom
-            // parameters (export_vertical_metrics), not as metric slots.
+            // OS/2 + hhea vertical metrics are emitted as custom parameters
+            // (append_master_vertical_metrics), not as metric slots.
             if customparameters::is_vertical_metric_cp(key) {
                 continue;
             }
@@ -1031,7 +1031,7 @@ pub(crate) fn as_glyphs3(font: &Font) -> Result<glyphs3::Glyphs3, BabelfontError
     let masters: Vec<glyphs3::Master> = font
         .masters
         .iter()
-        .map(|x| save_master(x, &font.axes, &our_metrics))
+        .map(|x| save_master(x, &font.axes, &our_metrics, &font.format_specific))
         .collect();
 
     let settings: glyphs3::Settings = font
@@ -1161,7 +1161,12 @@ pub(crate) fn as_glyphs3(font: &Font) -> Result<glyphs3::Glyphs3, BabelfontError
     Ok(glyphs_font)
 }
 
-fn save_master(master: &Master, axes: &[Axis], metrics: &[crate::MetricType]) -> glyphs3::Master {
+fn save_master(
+    master: &Master,
+    axes: &[Axis],
+    metrics: &[crate::MetricType],
+    font_format_specific: &FormatSpecific,
+) -> glyphs3::Master {
     let mut axes_values = vec![];
     for axis in axes {
         axes_values.push(
@@ -1193,7 +1198,11 @@ fn save_master(master: &Master, axes: &[Axis], metrics: &[crate::MetricType]) ->
 
     let mut custom_parameters = serialize_custom_parameters(&master.format_specific);
     // OS/2 + hhea vertical metrics live in master-level custom parameters.
-    customparameters::append_master_vertical_metrics(&mut custom_parameters, master);
+    customparameters::append_master_vertical_metrics(
+        &mut custom_parameters,
+        master,
+        font_format_specific,
+    );
 
     glyphs3::Master {
         id: master.id.clone(),
