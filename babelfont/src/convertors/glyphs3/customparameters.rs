@@ -1,11 +1,14 @@
 use glyphslib::{common::CustomParameter, Plist};
 
-use crate::{convertors::glyphs3::get_cp, BabelfontError, Font, MetricType};
+use crate::{
+    common::FormatSpecific, convertors::glyphs3::get_cp, BabelfontError, Font, MetricType,
+};
 
 /// A set of paired functions to interpret/export font-level custom parameters
 pub(crate) fn interpret_custom_parameters(font: &mut Font) -> Result<(), BabelfontError> {
     interpret_variable_font_origin(font)?;
     interpret_use_typo_metrics(font)?;
+    interpret_vertical_metrics(font)?;
     Ok(())
 }
 
@@ -18,24 +21,85 @@ pub(crate) fn export_font_level_cps(
     Ok(())
 }
 
-/// The OS/2 and `hhea` vertical metrics that Glyphs stores as *master-level*
-/// custom parameters, not as entries in the `metrics` array. fontc (and Glyphs)
-/// read these as custom parameters (master first, then font as a fallback), so
-/// emitting them as metric slots — which the generic metric export otherwise
-/// does — leaves them ignored and the built font falls back to computed bbox
-/// defaults (wrong line height).
+/// The OS/2 and `hhea` vertical metrics that Glyphs stores as custom
+/// parameters (master-level, falling back to font-level), not as entries in
+/// the `metrics` array. fontc (and Glyphs) read these as custom parameters,
+/// so emitting them as metric slots — which the generic metric export
+/// otherwise does — leaves them ignored and the built font falls back to
+/// computed bbox defaults (wrong line height).
+///
+/// Fixed order so the emitted .glyphs is reproducible.
+pub(crate) const VERTICAL_METRIC_TYPES: [MetricType; 8] = [
+    MetricType::TypoAscender,
+    MetricType::TypoDescender,
+    MetricType::TypoLineGap,
+    MetricType::WinAscent,
+    MetricType::WinDescent,
+    MetricType::HheaAscender,
+    MetricType::HheaDescender,
+    MetricType::HheaLineGap,
+];
+
 pub(crate) fn is_vertical_metric_cp(metric: &MetricType) -> bool {
-    matches!(
-        metric,
-        MetricType::TypoAscender
-            | MetricType::TypoDescender
-            | MetricType::TypoLineGap
-            | MetricType::WinAscent
-            | MetricType::WinDescent
-            | MetricType::HheaAscender
-            | MetricType::HheaDescender
-            | MetricType::HheaLineGap
-    )
+    VERTICAL_METRIC_TYPES.contains(metric)
+}
+
+/// The enabled value of a custom parameter, unwrapped from the
+/// `{value, disabled}` shape `copy_custom_parameters` stores it in; `None`
+/// when the parameter is absent or disabled.
+fn enabled_cp_value<'a>(
+    format_specific: &'a FormatSpecific,
+    name: &str,
+) -> Option<&'a serde_json::Value> {
+    let wrapper = get_cp(format_specific, name)?.as_object()?;
+    if wrapper
+        .get("disabled")
+        .and_then(|d| d.as_bool())
+        .unwrap_or(false)
+    {
+        return None;
+    }
+    wrapper.get("value")
+}
+
+/// A vertical-metric custom parameter's numeric value, or `None` when absent,
+/// disabled, or non-numeric.
+fn cp_metric_value(format_specific: &FormatSpecific, metric: &MetricType) -> Option<i32> {
+    let value = enabled_cp_value(format_specific, metric.as_str())?;
+    value
+        .as_i64()
+        .or_else(|| value.as_f64().map(|v| v.round() as i64))
+        .map(|v| v as i32)
+}
+
+/// The load-side twin of [`append_master_vertical_metrics`]: read the OS/2 +
+/// hhea vertical metrics a Glyphs source declares as custom parameters into
+/// each master's metric map, a master-level parameter overriding a font-level
+/// one (the resolution order Glyphs itself uses).
+fn interpret_vertical_metrics(font: &mut Font) -> Result<(), BabelfontError> {
+    let font_level: Vec<(MetricType, i32)> = VERTICAL_METRIC_TYPES
+        .iter()
+        .filter_map(|metric| {
+            cp_metric_value(&font.format_specific, metric).map(|v| (metric.clone(), v))
+        })
+        .collect();
+    for master in font.masters.iter_mut() {
+        for metric in VERTICAL_METRIC_TYPES.iter() {
+            if master.metrics.contains_key(metric) {
+                continue;
+            }
+            let value = cp_metric_value(&master.format_specific, metric).or_else(|| {
+                font_level
+                    .iter()
+                    .find(|(m, _)| m == metric)
+                    .map(|(_, v)| *v)
+            });
+            if let Some(value) = value {
+                master.metrics.insert(metric.clone(), value);
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Emit a master's OS/2 + hhea vertical metrics (parsed into its metric map,
@@ -43,34 +107,30 @@ pub(crate) fn is_vertical_metric_cp(metric: &MetricType) -> bool {
 /// fields) as *master-level* custom parameters with values.
 ///
 /// Parameters already present (typically restored verbatim from the master's
-/// `format_specific` on a Glyphs→Glyphs round-trip) are left untouched.
+/// `format_specific` on a Glyphs→Glyphs round-trip) are left untouched, as is
+/// any metric whose value a *font-level* parameter already carries — echoing
+/// it onto every master would churn round-tripped files.
 pub(crate) fn append_master_vertical_metrics(
     custom_parameters: &mut Vec<CustomParameter>,
     master: &crate::Master,
+    font_format_specific: &FormatSpecific,
 ) {
-    // Fixed order so the emitted .glyphs is reproducible.
-    let order = [
-        MetricType::TypoAscender,
-        MetricType::TypoDescender,
-        MetricType::TypoLineGap,
-        MetricType::WinAscent,
-        MetricType::WinDescent,
-        MetricType::HheaAscender,
-        MetricType::HheaDescender,
-        MetricType::HheaLineGap,
-    ];
-    for metric in order {
+    for metric in VERTICAL_METRIC_TYPES {
         if let Some(&value) = master.metrics.get(&metric) {
-            if !custom_parameters
+            if custom_parameters
                 .iter()
                 .any(|cp| cp.name == metric.as_str())
             {
-                custom_parameters.push(CustomParameter {
-                    name: metric.as_str().to_string(),
-                    value: Plist::Integer(value as i64),
-                    disabled: false,
-                });
+                continue;
             }
+            if cp_metric_value(font_format_specific, &metric) == Some(value) {
+                continue;
+            }
+            custom_parameters.push(CustomParameter {
+                name: metric.as_str().to_string(),
+                value: Plist::Integer(value as i64),
+                disabled: false,
+            });
         }
     }
 }
@@ -230,7 +290,7 @@ mod tests {
         };
 
         let mut light_cps = vec![];
-        super::append_master_vertical_metrics(&mut light_cps, &light);
+        super::append_master_vertical_metrics(&mut light_cps, &light, &Default::default());
         assert_eq!(
             value(&light_cps, "typoAscender"),
             Some(Plist::Integer(1928))
@@ -244,7 +304,7 @@ mod tests {
         assert!(value(&light_cps, "typoLineGap").is_none());
 
         let mut bold_cps = vec![];
-        super::append_master_vertical_metrics(&mut bold_cps, &bold);
+        super::append_master_vertical_metrics(&mut bold_cps, &bold, &Default::default());
         assert_eq!(value(&bold_cps, "typoAscender"), Some(Plist::Integer(1836)));
         assert_eq!(
             value(&bold_cps, "typoDescender"),
@@ -258,11 +318,136 @@ mod tests {
             value: Plist::Integer(999),
             disabled: false,
         }];
-        super::append_master_vertical_metrics(&mut preexisting, &light);
+        super::append_master_vertical_metrics(&mut preexisting, &light, &Default::default());
         assert_eq!(
             value(&preexisting, "typoAscender"),
             Some(Plist::Integer(999))
         );
         assert_eq!(value(&preexisting, "winAscent"), Some(Plist::Integer(1928)));
+
+        // A metric whose value a font-level parameter already carries is not
+        // echoed onto the master; one that differs is.
+        let mut font_fs = crate::common::FormatSpecific::default();
+        font_fs.insert(
+            format!(
+                "{}typoAscender",
+                crate::convertors::glyphs3::KEY_CUSTOM_PARAMETERS
+            ),
+            serde_json::json!({"value": 1928, "disabled": false}),
+        );
+        font_fs.insert(
+            format!(
+                "{}winAscent",
+                crate::convertors::glyphs3::KEY_CUSTOM_PARAMETERS
+            ),
+            serde_json::json!({"value": 1000, "disabled": false}),
+        );
+        let mut covered = vec![];
+        super::append_master_vertical_metrics(&mut covered, &light, &font_fs);
+        assert!(value(&covered, "typoAscender").is_none());
+        assert_eq!(value(&covered, "winAscent"), Some(Plist::Integer(1928)));
+    }
+
+    #[test]
+    fn test_interpret_font_level_vertical_metrics() {
+        use crate::MetricType;
+
+        // Fustat declares typoAscender/hheaAscender/winAscent (and friends)
+        // as *font-level* custom parameters.
+        let font = crate::load("resources/Fustat.glyphs").unwrap();
+        assert!(!font.masters.is_empty());
+        for master in &font.masters {
+            assert_eq!(master.metrics.get(&MetricType::TypoAscender), Some(&1000));
+            assert_eq!(master.metrics.get(&MetricType::TypoDescender), Some(&-420));
+            assert_eq!(master.metrics.get(&MetricType::HheaAscender), Some(&1000));
+        }
+
+        // On export the values stay covered by the font-level parameters:
+        // no master-level copies appear, and no metric slots are added.
+        let glyphs = as_glyphs3(&font).unwrap();
+        assert!(glyphs
+            .custom_parameters
+            .iter()
+            .any(|cp| cp.name == "typoAscender"));
+        for master in &glyphs.masters {
+            assert!(!master
+                .custom_parameters
+                .iter()
+                .any(|cp| cp.name == "typoAscender"));
+        }
+        assert!(!glyphs.metrics.iter().any(|m| m.name == "typoAscender"));
+    }
+
+    #[test]
+    fn test_interpret_master_level_vertical_metrics() {
+        use crate::MetricType;
+
+        // RadioCanadaDisplay declares its vertical metrics per master.
+        let font = crate::load("resources/RadioCanadaDisplay.glyphs").unwrap();
+        assert!(!font.masters.is_empty());
+        for master in &font.masters {
+            assert_eq!(master.metrics.get(&MetricType::TypoAscender), Some(&950));
+            assert_eq!(master.metrics.get(&MetricType::HheaAscender), Some(&950));
+        }
+
+        // On export each master keeps exactly one copy (restored verbatim
+        // from format_specific, not duplicated by the metric-map export).
+        let glyphs = as_glyphs3(&font).unwrap();
+        for master in &glyphs.masters {
+            assert_eq!(
+                master
+                    .custom_parameters
+                    .iter()
+                    .filter(|cp| cp.name == "typoAscender")
+                    .count(),
+                1
+            );
+        }
+    }
+
+    #[test]
+    fn test_disabled_vertical_metric_cp_not_interpreted() {
+        use crate::MetricType;
+
+        let mut fs = crate::common::FormatSpecific::default();
+        fs.insert(
+            format!(
+                "{}typoAscender",
+                crate::convertors::glyphs3::KEY_CUSTOM_PARAMETERS
+            ),
+            serde_json::json!({"value": 900, "disabled": true}),
+        );
+        assert_eq!(super::cp_metric_value(&fs, &MetricType::TypoAscender), None);
+    }
+
+    #[test]
+    fn test_master_level_vertical_metric_overrides_font_level() {
+        use crate::{Master, MetricType};
+
+        let key = format!(
+            "{}typoAscender",
+            crate::convertors::glyphs3::KEY_CUSTOM_PARAMETERS
+        );
+        let mut font = crate::Font::default();
+        font.format_specific.insert(
+            key.clone(),
+            serde_json::json!({"value": 1000, "disabled": false}),
+        );
+        let mut master = Master::default();
+        master
+            .format_specific
+            .insert(key, serde_json::json!({"value": 950, "disabled": false}));
+        font.masters.push(master);
+        font.masters.push(Master::default());
+
+        super::interpret_vertical_metrics(&mut font).unwrap();
+        assert_eq!(
+            font.masters[0].metrics.get(&MetricType::TypoAscender),
+            Some(&950)
+        );
+        assert_eq!(
+            font.masters[1].metrics.get(&MetricType::TypoAscender),
+            Some(&1000)
+        );
     }
 }
