@@ -151,6 +151,7 @@ dependencies = [
  "num-traits",
  "ordered-float",
  "paste",
+ "plist",
  "pretty_assertions",
  "reactive_stores",
  "regex",

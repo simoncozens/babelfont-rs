@@ -3,7 +3,7 @@ use crate::{
     glyph::{self, glyphs::glyph_to_glyphs},
     i18ndictionary::I18NDictionary,
     names::Names,
-    Axis, BabelfontError, CustomOTValues, Font, GlyphList, Master, Tag,
+    Axis, BabelfontError, CustomOTValues, Font, GlyphList, LoadOptions, Master, Tag,
 };
 use fontdrasil::coords::{DesignCoord, DesignLocation, UserCoord};
 use glyphslib::glyphs3::{self, Property};
@@ -124,21 +124,39 @@ pub(crate) fn copy_user_data(
 
 /// Load a Glyphs font from a file path
 pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
+    load_with_options(path, &LoadOptions::default())
+}
+
+/// Like [`load`], but convert only the parts of the font requested by
+/// `options`. The file still has to be parsed in full; the savings come from
+/// skipping the conversion of parts that were not requested.
+pub fn load_with_options(path: PathBuf, options: &LoadOptions) -> Result<Font, BabelfontError> {
     if path.extension().and_then(|x| x.to_str()) == Some("glyphspackage") {
         return _load(
             &glyphslib::Font::load(&path).map_err(|x| BabelfontError::PlistParse(x.to_string()))?,
             path,
+            options,
         );
     }
     let s = fs::read_to_string(&path)?;
-    load_str(&s, path.clone())
+    load_str_with_options(&s, path.clone(), options)
 }
 
 /// Load a Glyphs font from a string
 pub fn load_str(s: &str, path: PathBuf) -> Result<Font, BabelfontError> {
+    load_str_with_options(s, path, &LoadOptions::default())
+}
+
+/// Like [`load_str`], but convert only the parts of the font requested by
+/// `options`.
+pub fn load_str_with_options(
+    s: &str,
+    path: PathBuf,
+    options: &LoadOptions,
+) -> Result<Font, BabelfontError> {
     let glyphs_font =
         glyphslib::Font::load_str(s).map_err(|x| BabelfontError::PlistParse(x.to_string()))?;
-    _load(&glyphs_font, path)
+    _load(&glyphs_font, path, options)
 }
 
 /// Load a Glyphs package font from in-memory package entries
@@ -146,12 +164,26 @@ pub fn load_package_entries(
     path: PathBuf,
     entries: &HashMap<String, String>,
 ) -> Result<Font, BabelfontError> {
-    let glyphs_font = glyphslib::Font::load_package_entries(entries)
-        .map_err(|x| BabelfontError::PlistParse(x.to_string()))?;
-    _load(&glyphs_font, path)
+    load_package_entries_with_options(path, entries, &LoadOptions::default())
 }
 
-fn _load(glyphs_font: &glyphslib::Font, path: PathBuf) -> Result<Font, BabelfontError> {
+/// Like [`load_package_entries`], but convert only the parts of the font
+/// requested by `options`.
+pub fn load_package_entries_with_options(
+    path: PathBuf,
+    entries: &HashMap<String, String>,
+    options: &LoadOptions,
+) -> Result<Font, BabelfontError> {
+    let glyphs_font = glyphslib::Font::load_package_entries(entries)
+        .map_err(|x| BabelfontError::PlistParse(x.to_string()))?;
+    _load(&glyphs_font, path, options)
+}
+
+fn _load(
+    glyphs_font: &glyphslib::Font,
+    path: PathBuf,
+    options: &LoadOptions,
+) -> Result<Font, BabelfontError> {
     let mut font = Font::new();
     let mut upgraded = glyphs_font.clone();
     let glyphs_font = if glyphs_font.as_glyphs2().is_some() {
@@ -221,13 +253,15 @@ fn _load(glyphs_font: &glyphslib::Font, path: PathBuf) -> Result<Font, Babelfont
         .map(|master| load_master(master, glyphs_font, &font))
         .collect();
     // Glyphs
-    font.glyphs = GlyphList(
-        glyphs_font
-            .glyphs
-            .iter()
-            .map(|g| glyph::glyphs::from_glyphs(g, &axes_order))
-            .collect::<Result<Vec<_>, BabelfontError>>()?,
-    );
+    if options.load_glyphs {
+        font.glyphs = GlyphList(
+            glyphs_font
+                .glyphs
+                .iter()
+                .map(|g| glyph::glyphs::from_glyphs(g, &axes_order, options.load_layers))
+                .collect::<Result<Vec<_>, BabelfontError>>()?,
+        );
+    }
     // Instances
     font.instances = glyphs_font
         .instances
@@ -312,6 +346,10 @@ fn _load(glyphs_font: &glyphslib::Font, path: PathBuf) -> Result<Font, Babelfont
 
     // Bake in Glyphs data ??? When is best to do this?
     // GlyphsData.apply(&mut font)?;
+
+    // Masters and axes are always converted, because interpreting the axes
+    // needs the master locations; drop whatever was not requested.
+    options.filter_loaded_font(&mut font);
 
     Ok(font)
 }
@@ -1481,5 +1519,64 @@ mod tests {
             DesignLocation::from(vec![(Tag::new(b"wght"), DesignCoord::new(400.0))])
         );
         assert_eq!(font.axes[0].min, Some(UserCoord::new(400.0)));
+    }
+
+    #[test]
+    fn load_with_options_partial() {
+        let path = PathBuf::from("resources/RadioCanadaDisplay.glyphs");
+        let full = load(path.clone()).unwrap();
+
+        // Skipping layers keeps glyph-level data: names, codepoints, and the
+        // kerning-group membership Glyphs stores on its glyphs
+        let no_layers = load_with_options(
+            path.clone(),
+            &LoadOptions {
+                load_layers: false,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(full.glyphs.len(), no_layers.glyphs.len());
+        assert!(no_layers.glyphs.iter().all(|g| g.layers.is_empty()));
+        assert_eq!(
+            full.glyphs.get("A").unwrap().codepoints,
+            no_layers.glyphs.get("A").unwrap().codepoints
+        );
+        assert!(!full.first_kern_groups.is_empty());
+        assert_eq!(full.first_kern_groups, no_layers.first_kern_groups);
+
+        // Skipping glyphs keeps masters and axes
+        let no_glyphs = load_with_options(
+            path.clone(),
+            &LoadOptions {
+                load_glyphs: false,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert!(no_glyphs.glyphs.is_empty());
+        assert_eq!(full.masters.len(), no_glyphs.masters.len());
+
+        // Axis interpretation needs the master locations, so it still works
+        // when masters are reduced to bare records
+        let bare = load_with_options(
+            path,
+            &LoadOptions {
+                load_masters: false,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let axis_ranges = |font: &Font| {
+            font.axes
+                .iter()
+                .map(|a| (a.tag, a.min, a.max, a.default))
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(axis_ranges(&full), axis_ranges(&bare));
+        assert_eq!(full.masters.len(), bare.masters.len());
+        assert!(bare.masters[0].metrics.is_empty());
+        // Layers belong to masters, so they are dropped too
+        assert!(bare.glyphs.iter().all(|g| g.layers.is_empty()));
     }
 }

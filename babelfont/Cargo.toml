@@ -34,7 +34,7 @@ default = [
 ]
 vfb = ["dep:vfbreader"]
 glyphs = ["dep:glyphslib"]
-ufo = ["dep:norad"]
+ufo = ["dep:norad", "dep:plist"]
 fontra = []
 robocjk = []
 fontlab = []
@@ -55,6 +55,7 @@ reactive = ["dep:reactive_stores"]
 chrono = { version = "0.4.3", features = ["serde"] }
 glyphslib = { version = "0.2.6", optional = true }
 norad = { version = "0.17.0", features = ["kurbo"], optional = true }
+plist = { version = "1", optional = true }
 log = { workspace = true }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }

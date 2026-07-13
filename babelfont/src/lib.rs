@@ -50,6 +50,35 @@
 //! # }
 //! ```
 //!
+//! ## Partial loading
+//!
+//! [`load_with_options`] gives finer control over how much of a font is
+//! loaded. Every [`LoadOptions`] flag defaults to `true`; switching flags off
+//! skips the corresponding ingestion work. For example, skipping glyph layers
+//! avoids parsing any `.glif` file in a designspace's sources, which can turn
+//! loading a large multi-master font from seconds into milliseconds while
+//! still providing names, axes, masters, metrics, kerning, features, and a
+//! stub glyph list:
+//!
+//! ```no_run
+//! # use babelfont::{load_with_options, LoadOptions, BabelfontError};
+//! # fn main() -> Result<(), BabelfontError> {
+//! let result = load_with_options(
+//!     "MyFont.designspace",
+//!     &LoadOptions {
+//!         load_layers: false,
+//!         ..Default::default()
+//!     },
+//! )?;
+//! println!("Loaded {} glyph stubs", result.font.glyphs.len());
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! [`load_with_options`] also reports designspace sources that failed to
+//! load, instead of silently dropping them as [`load`] does (see
+//! [`LoadResult::source_failures`]).
+//!
 //! ## Font Filters
 //!
 //! Babelfont includes a set of filters for manipulating fonts. Filters implement the
@@ -153,6 +182,7 @@ mod instance;
 mod interpolate;
 mod layer;
 mod layout;
+mod load;
 mod master;
 mod metrics;
 mod names;
@@ -172,6 +202,7 @@ pub use crate::{
     instance::Instance,
     layer::{Layer, LayerType},
     layout::closure::close_layout,
+    load::{LoadOptions, LoadResult, SourceLoadFailure},
     master::Master,
     metrics::MetricType,
     names::Names,
@@ -202,36 +233,69 @@ pub use write_fonts::read::tables::name::NameId;
 /// - "glyphs": Glyphs files
 /// - "fontlab": FontLab VFJ files
 pub fn load(filename: impl Into<PathBuf>) -> Result<Font, BabelfontError> {
+    load_with_options(filename, &LoadOptions::default()).map(|result| result.font)
+}
+
+/// Like [`load`], but load only the parts of the font requested by `options`,
+/// and report sources that failed to load rather than silently dropping them.
+///
+/// See [`LoadOptions`] for what can be skipped and [`LoadResult`] for what is
+/// returned. The UFO, designspace, and Glyphs convertors skip the ingestion
+/// work for parts that are not requested; the remaining formats are loaded in
+/// full and then filtered, so the result has the same shape for every format.
+pub fn load_with_options(
+    filename: impl Into<PathBuf>,
+    options: &LoadOptions,
+) -> Result<LoadResult, BabelfontError> {
     let pb = filename.into();
     let pb_clone = pb.clone();
 
-    let mut font: Font = match pb.extension() {
+    let mut result: LoadResult = match pb.extension() {
         Some(ext) if ext == "babelfont" => {
             let buffered = std::io::BufReader::new(std::fs::File::open(&pb)?);
-            Ok(serde_json::from_reader(buffered)?)
+            let font: Font = serde_json::from_reader(buffered)?;
+            filtered(Ok(font), options)
         }
         #[cfg(feature = "ufo")]
-        Some(ext) if ext == "designspace" => crate::convertors::designspace::load(pb),
+        Some(ext) if ext == "designspace" => {
+            crate::convertors::designspace::load_with_options(pb, options)
+        }
         #[cfg(feature = "fontra")]
-        Some(ext) if ext == "fontra" => crate::convertors::fontra::load(pb),
+        Some(ext) if ext == "fontra" => filtered(crate::convertors::fontra::load(pb), options),
         #[cfg(feature = "fontlab")]
-        Some(ext) if ext == "vfj" => crate::convertors::fontlab::load(pb),
+        Some(ext) if ext == "vfj" => filtered(crate::convertors::fontlab::load(pb), options),
         #[cfg(feature = "ufo")]
-        Some(ext) if ext == "ufo" => crate::convertors::ufo::load(pb),
+        Some(ext) if ext == "ufo" => {
+            crate::convertors::ufo::load_with_options(pb, options).map(LoadResult::from)
+        }
         #[cfg(feature = "fontforge")]
-        Some(ext) if ext == "sfd" || ext == "sfdir" => crate::convertors::fontforge::load(pb),
+        Some(ext) if ext == "sfd" || ext == "sfdir" => {
+            filtered(crate::convertors::fontforge::load(pb), options)
+        }
         #[cfg(feature = "vfb")]
-        Some(ext) if ext == "vfb" => crate::convertors::vfb::load(pb),
+        Some(ext) if ext == "vfb" => filtered(crate::convertors::vfb::load(pb), options),
         #[cfg(feature = "robocjk")]
-        Some(ext) if ext == "rcjk" => crate::convertors::robocjk::load(pb),
+        Some(ext) if ext == "rcjk" => filtered(crate::convertors::robocjk::load(pb), options),
         #[cfg(feature = "glyphs")]
         Some(ext) if ext == "glyphs" || ext == "glyphspackage" => {
-            crate::convertors::glyphs3::load(pb)
+            crate::convertors::glyphs3::load_with_options(pb, options).map(LoadResult::from)
         }
         #[cfg(feature = "ttf")]
-        Some(ext) if ext == "ttf" => crate::convertors::ttf::load(pb),
+        Some(ext) if ext == "ttf" => filtered(crate::convertors::ttf::load(pb), options),
         _ => Err(BabelfontError::UnknownFileType { path: pb }),
     }?;
-    font.source = Some(pb_clone);
-    Ok(font)
+    result.font.source = Some(pb_clone);
+    Ok(result)
+}
+
+/// Load in full, then drop the parts `options` excludes — for formats whose
+/// convertors cannot skip the work at load time.
+fn filtered(
+    font: Result<Font, BabelfontError>,
+    options: &LoadOptions,
+) -> Result<LoadResult, BabelfontError> {
+    font.map(|mut font| {
+        options.filter_loaded_font(&mut font);
+        LoadResult::from(font)
+    })
 }

@@ -24,11 +24,28 @@ pub const STYLENAME_KEY: &str = "norad.designspace.style";
 
 use crate::{
     convertors::ufo::{load_master_info, norad_glyph_to_babelfont_layer},
-    Axis, BabelfontError, Font, Master,
+    Axis, BabelfontError, Font, LoadOptions, LoadResult, Master, SourceLoadFailure,
 };
 
 /// Load a DesignSpace document and all referenced UFOs into a Babelfont Font
 pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
+    load_with_options(path, &LoadOptions::default()).map(|result| result.font)
+}
+
+/// Like [`load`], but load only the parts of the font requested by `options`,
+/// and report the `<source>` elements that failed to load instead of silently
+/// dropping them: each failure leaves the returned font without the
+/// corresponding master.
+///
+/// Font-level data (names, features, lib, kerning groups) and the glyph list
+/// live in the default source, so it must always load — unless neither
+/// masters nor glyphs are requested, in which case no source UFO is opened at
+/// all and the returned font holds only what the designspace document itself
+/// declares: axes, instances, and bare master records.
+pub fn load_with_options(
+    path: PathBuf,
+    options: &LoadOptions,
+) -> Result<LoadResult, BabelfontError> {
     let ds: DesignSpaceDocument = norad::designspace::DesignSpaceDocument::load(path.clone())?;
     let relative = path.parent();
     let axes: Vec<Axis> = ds
@@ -42,30 +59,62 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
         .map(|ax| (ax.name.get_default().unwrap().clone(), ax.tag))
         .collect();
     let default_master = default_master(&ds, &axes).ok_or(BabelfontError::NoDefaultMaster)?;
-    let relative_path_to_default_master = if let Some(r) = relative {
-        r.join(default_master.filename.clone())
+    let mut font = if options.load_masters || options.load_glyphs {
+        let relative_path_to_default_master = if let Some(r) = relative {
+            r.join(default_master.filename.clone())
+        } else {
+            default_master.filename.clone().into()
+        };
+        crate::convertors::ufo::load_with_options(relative_path_to_default_master, options)?
     } else {
-        default_master.filename.clone().into()
+        Font::new()
     };
-    let mut font = crate::convertors::ufo::load(relative_path_to_default_master)?;
-    font.axes = axes;
+    if options.load_axes {
+        font.axes = axes;
+    }
 
     load_instances(&mut font, &axis_name_tag_map, &ds.instances);
-    let res: Vec<(Master, Vec<Vec<Layer>>)> = ds
-        .sources
-        .iter()
-        .filter_map(|source| load_master(&font.glyphs, source, relative, &axis_name_tag_map).ok())
-        .collect();
-    // Drop the default master loaded from the UFO above
+    // Drop the master loaded from the default UFO above, and its layers;
+    // both are rebuilt from the designspace's sources.
     font.masters.clear();
-    // Clear all layers
     for g in font.glyphs.iter_mut() {
         g.layers.clear();
     }
-    for (master, mut layerset) in res {
-        font.masters.push(master);
-        for (g, l) in font.glyphs.iter_mut().zip(layerset.iter_mut()) {
-            g.layers.append(l);
+    let mut failures: Vec<SourceLoadFailure> = Vec::new();
+    if options.load_masters {
+        let load_layers = options.load_layers && options.load_glyphs;
+        let res: Vec<(Master, Vec<Vec<Layer>>)> = ds
+            .sources
+            .iter()
+            .filter_map(|source| {
+                match load_master(
+                    &font.glyphs,
+                    source,
+                    relative,
+                    &axis_name_tag_map,
+                    load_layers,
+                ) {
+                    Ok(master) => Some(master),
+                    Err(e) => {
+                        failures.push(SourceLoadFailure {
+                            filename: source.filename.clone(),
+                            error: e.to_string(),
+                        });
+                        None
+                    }
+                }
+            })
+            .collect();
+        for (master, mut layerset) in res {
+            font.masters.push(master);
+            for (g, l) in font.glyphs.iter_mut().zip(layerset.iter_mut()) {
+                g.layers.append(l);
+            }
+        }
+    } else {
+        // Bare records of what the document declares; no source UFO is opened
+        for source in ds.sources.iter() {
+            font.masters.push(master_record(source, &axis_name_tag_map));
         }
     }
     // Stash DS format
@@ -74,7 +123,10 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
         FORMAT_KEY.to_string(),
         serde_json::Value::Number(serde_json::Number::from_f64(ds.format as f64).unwrap()),
     );
-    Ok(font)
+    Ok(LoadResult {
+        font,
+        source_failures: failures,
+    })
 }
 
 pub(crate) fn load_instances(
@@ -142,12 +194,10 @@ pub(crate) fn load_instances(
     }
 }
 
-fn load_master(
-    glyphs: &GlyphList,
-    source: &Source,
-    relative: Option<&std::path::Path>,
-    axis_name_tag_map: &HashMap<String, Tag>,
-) -> Result<(Master, Vec<Vec<Layer>>), BabelfontError> {
+/// Build a [`Master`] from what the designspace document itself declares
+/// about a `<source>` — its name, location, filename and style name —
+/// without opening the source UFO.
+fn master_record(source: &Source, axis_name_tag_map: &HashMap<String, Tag>) -> Master {
     let location = DesignLocation::from(
         source
             .location
@@ -163,7 +213,6 @@ fn load_master(
             })
             .collect::<Vec<_>>(),
     );
-    let required_layer = &source.layer;
     let uuid = Uuid::new_v4().to_string();
 
     let mut master = Master::new(
@@ -182,6 +231,18 @@ fn load_master(
         FILENAME_KEY.to_string(),
         serde_json::Value::String(source.filename.clone()),
     );
+    master
+}
+
+fn load_master(
+    glyphs: &GlyphList,
+    source: &Source,
+    relative: Option<&std::path::Path>,
+    axis_name_tag_map: &HashMap<String, Tag>,
+    load_layers: bool,
+) -> Result<(Master, Vec<Vec<Layer>>), BabelfontError> {
+    let mut master = master_record(source, axis_name_tag_map);
+    let required_layer = &source.layer;
 
     let relative_path_to_master = if let Some(r) = relative {
         r.join(source.filename.clone())
@@ -189,10 +250,19 @@ fn load_master(
         source.filename.clone().into()
     };
 
-    let source_font = norad::Font::load(relative_path_to_master)?;
+    let request = if load_layers {
+        norad::DataRequest::all()
+    } else {
+        // Everything except the glyph layers, so no .glif file is parsed
+        norad::DataRequest::default().layers(false)
+    };
+    let source_font = norad::Font::load_requested_data(relative_path_to_master, request)?;
     let info = &source_font.font_info;
     load_master_info(&mut master, info);
     load_kerning(&mut master, &source_font.kerning);
+    if !load_layers {
+        return Ok((master, vec![]));
+    }
     let ufo_layer = if let Some(source_layer) = required_layer {
         source_font
             .layers
@@ -524,5 +594,218 @@ mod tests {
         let ufo = as_norad(&font, 0).unwrap();
         // Check it has two layers
         assert_eq!(ufo.layers.len(), 2);
+    }
+
+    const PLIST_HEADER: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+"#;
+
+    /// A minimal single-glyph UFO, enough for the designspace loader.
+    fn write_minimal_ufo(dir: &std::path::Path, name: &str) {
+        let ufo = dir.join(name);
+        let glyphs = ufo.join("glyphs");
+        std::fs::create_dir_all(&glyphs).unwrap();
+        std::fs::write(
+            ufo.join("metainfo.plist"),
+            format!("{PLIST_HEADER}<dict><key>creator</key><string>test</string><key>formatVersion</key><integer>3</integer></dict>\n</plist>\n"),
+        )
+        .unwrap();
+        std::fs::write(
+            ufo.join("fontinfo.plist"),
+            format!("{PLIST_HEADER}<dict><key>familyName</key><string>Test</string><key>styleName</key><string>Regular</string><key>unitsPerEm</key><integer>1000</integer><key>ascender</key><integer>800</integer></dict>\n</plist>\n"),
+        )
+        .unwrap();
+        std::fs::write(
+            ufo.join("layercontents.plist"),
+            format!("{PLIST_HEADER}<array><array><string>public.default</string><string>glyphs</string></array></array>\n</plist>\n"),
+        )
+        .unwrap();
+        std::fs::write(
+            glyphs.join("contents.plist"),
+            format!("{PLIST_HEADER}<dict><key>A</key><string>A_.glif</string></dict>\n</plist>\n"),
+        )
+        .unwrap();
+        std::fs::write(
+            glyphs.join("A_.glif"),
+            r#"<?xml version="1.0"?>
+<glyph name="A" format="2"><advance width="500"/><unicode hex="0041"/><outline><contour><point x="0" y="0" type="line"/><point x="400" y="0" type="line"/><point x="400" y="700" type="line"/><point x="0" y="700" type="line"/></contour></outline></glyph>
+"#,
+        )
+        .unwrap();
+    }
+
+    fn write_test_designspace(dir: &std::path::Path, sources: &[&str]) -> PathBuf {
+        let source_elements: String = sources
+            .iter()
+            .enumerate()
+            .map(|(i, filename)| {
+                format!(
+                    r#"<source filename="{filename}"><location><dimension name="Weight" xvalue="{}"/></location></source>"#,
+                    100 + i * 100
+                )
+            })
+            .collect();
+        let ds = dir.join("Test.designspace");
+        std::fs::write(
+            &ds,
+            format!(
+                r#"<?xml version="1.0" encoding="UTF-8"?>
+<designspace format="4.1">
+  <axes><axis tag="wght" name="Weight" minimum="100" maximum="900" default="100"/></axes>
+  <sources>{source_elements}</sources>
+</designspace>
+"#
+            ),
+        )
+        .unwrap();
+        ds
+    }
+
+    #[test]
+    fn reports_unloadable_sources() {
+        let tempdir = tempfile::tempdir().unwrap();
+        write_minimal_ufo(tempdir.path(), "Regular.ufo");
+        write_minimal_ufo(tempdir.path(), "Bold.ufo");
+        // Corrupt the non-default source so it cannot load.
+        std::fs::write(
+            tempdir.path().join("Bold.ufo/metainfo.plist"),
+            "not a plist",
+        )
+        .unwrap();
+        let ds_path = write_test_designspace(tempdir.path(), &["Regular.ufo", "Bold.ufo"]);
+
+        let result = load_with_options(ds_path.clone(), &LoadOptions::default()).unwrap();
+        assert_eq!(result.font.masters.len(), 1);
+        assert_eq!(result.source_failures.len(), 1);
+        assert_eq!(result.source_failures[0].filename, "Bold.ufo");
+        assert!(!result.source_failures[0].error.is_empty());
+
+        // `load` keeps its existing behavior: the loadable master, no error.
+        let font = load(ds_path).unwrap();
+        assert_eq!(font.masters.len(), 1);
+    }
+
+    #[test]
+    fn report_is_empty_when_all_sources_load() {
+        let tempdir = tempfile::tempdir().unwrap();
+        write_minimal_ufo(tempdir.path(), "Regular.ufo");
+        write_minimal_ufo(tempdir.path(), "Bold.ufo");
+        let ds_path = write_test_designspace(tempdir.path(), &["Regular.ufo", "Bold.ufo"]);
+
+        let result = load_with_options(ds_path, &LoadOptions::default()).unwrap();
+        assert_eq!(result.font.masters.len(), 2);
+        assert!(result.source_failures.is_empty());
+    }
+
+    #[test]
+    fn skip_layers_keeps_masters_and_glyph_stubs() {
+        let tempdir = tempfile::tempdir().unwrap();
+        write_minimal_ufo(tempdir.path(), "Regular.ufo");
+        write_minimal_ufo(tempdir.path(), "Bold.ufo");
+        let ds_path = write_test_designspace(tempdir.path(), &["Regular.ufo", "Bold.ufo"]);
+
+        let result = load_with_options(
+            ds_path,
+            &LoadOptions {
+                load_layers: false,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert!(result.source_failures.is_empty());
+        let font = result.font;
+        assert_eq!(font.masters.len(), 2);
+        // Master content is loaded from the source UFOs
+        assert!(!font.masters[0].metrics.is_empty());
+        // Font-level data is loaded from the default source
+        assert_eq!(
+            font.names.family_name.get_default(),
+            Some(&"Test".to_string())
+        );
+        // The glyph list holds layer-less stubs
+        let glyph = font.glyphs.get("A").unwrap();
+        assert!(glyph.layers.is_empty());
+    }
+
+    #[test]
+    fn skip_glyphs_keeps_font_and_master_data() {
+        let tempdir = tempfile::tempdir().unwrap();
+        write_minimal_ufo(tempdir.path(), "Regular.ufo");
+        write_minimal_ufo(tempdir.path(), "Bold.ufo");
+        let ds_path = write_test_designspace(tempdir.path(), &["Regular.ufo", "Bold.ufo"]);
+
+        let result = load_with_options(
+            ds_path,
+            &LoadOptions {
+                load_glyphs: false,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let font = result.font;
+        assert!(font.glyphs.is_empty());
+        assert_eq!(font.masters.len(), 2);
+        assert_eq!(
+            font.names.family_name.get_default(),
+            Some(&"Test".to_string())
+        );
+    }
+
+    #[test]
+    fn skip_masters_does_not_open_sources() {
+        let tempdir = tempfile::tempdir().unwrap();
+        // The source UFOs are never written: a partial parse of the document
+        // alone must not try to open them.
+        let ds_path = write_test_designspace(tempdir.path(), &["Regular.ufo", "Bold.ufo"]);
+
+        let result = load_with_options(
+            ds_path,
+            &LoadOptions {
+                load_masters: false,
+                load_glyphs: false,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert!(result.source_failures.is_empty());
+        let font = result.font;
+        assert_eq!(font.axes.len(), 1);
+        assert!(font.glyphs.is_empty());
+        // Bare master records, straight from the document
+        assert_eq!(font.masters.len(), 2);
+        assert_eq!(
+            font.masters[1]
+                .location
+                .get(Tag::new(b"wght"))
+                .map(|x| x.to_f64()),
+            Some(200.0)
+        );
+        assert_eq!(
+            font.masters[1]
+                .format_specific
+                .get(FILENAME_KEY)
+                .and_then(|v| v.as_str()),
+            Some("Bold.ufo")
+        );
+        assert!(font.masters[1].metrics.is_empty());
+    }
+
+    #[test]
+    fn skip_axes() {
+        let tempdir = tempfile::tempdir().unwrap();
+        write_minimal_ufo(tempdir.path(), "Regular.ufo");
+        let ds_path = write_test_designspace(tempdir.path(), &["Regular.ufo"]);
+
+        let result = load_with_options(
+            ds_path,
+            &LoadOptions {
+                load_axes: false,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert!(result.font.axes.is_empty());
+        assert_eq!(result.font.masters.len(), 1);
     }
 }

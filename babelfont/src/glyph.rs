@@ -182,7 +182,11 @@ pub(crate) mod glyphs {
     use glyphslib::glyphs3::Glyph as G3Glyph;
     use indexmap::IndexMap;
 
-    pub(crate) fn from_glyphs(val: &G3Glyph, axes_order: &[Tag]) -> Result<Glyph, BabelfontError> {
+    pub(crate) fn from_glyphs(
+        val: &G3Glyph,
+        axes_order: &[Tag],
+        load_layers: bool,
+    ) -> Result<Glyph, BabelfontError> {
         let mut format_specific = FormatSpecific::default();
         format_specific.insert_json_non_null("case", &val.case);
         format_specific.insert_json_non_null("color", &val.color);
@@ -229,20 +233,22 @@ pub(crate) mod glyphs {
             .collect();
         // Now pre-chew them for easy layer generation
         let sc_axes = glyph_specific_axes(&component_axes);
-        for layer in &val.layers {
-            let mut bf_layer = layer_from_glyphs(layer, axes_order, &sc_axes)?;
-            if let Some(bg_layer) = &layer.background {
-                let mut background = layer_from_glyphs(bg_layer.deref(), axes_order, &sc_axes)?;
-                background.is_background = true;
-                if background.id.is_none() || background.id == Some("".to_string()) {
-                    background.id =
-                        Some(format!("{}.bg", bf_layer.id.as_deref().unwrap_or("layer")));
+        if load_layers {
+            for layer in &val.layers {
+                let mut bf_layer = layer_from_glyphs(layer, axes_order, &sc_axes)?;
+                if let Some(bg_layer) = &layer.background {
+                    let mut background = layer_from_glyphs(bg_layer.deref(), axes_order, &sc_axes)?;
+                    background.is_background = true;
+                    if background.id.is_none() || background.id == Some("".to_string()) {
+                        background.id =
+                            Some(format!("{}.bg", bf_layer.id.as_deref().unwrap_or("layer")));
+                    }
+                    bf_layer.background_layer_id = background.id.clone();
+                    layers.push(bf_layer);
+                    layers.push(background);
+                } else {
+                    layers.push(bf_layer);
                 }
-                bf_layer.background_layer_id = background.id.clone();
-                layers.push(bf_layer);
-                layers.push(background);
-            } else {
-                layers.push(bf_layer);
             }
         }
         let sc_locations = layers

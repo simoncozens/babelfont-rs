@@ -1,7 +1,7 @@
 use crate::{
     common::decomposition::DecomposedAffine, features::Features, glyph::GlyphCategory,
-    BabelfontError, Component, Font, Glyph, Layer, LayerType, Master, MetricType, Node, Path,
-    Shape,
+    BabelfontError, Component, Font, Glyph, Layer, LayerType, LoadOptions, Master, MetricType,
+    Node, Path, Shape,
 };
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use fontdrasil::{coords::Location, types::Tag};
@@ -69,11 +69,36 @@ pub(crate) fn stat(path: &std::path::Path) -> Option<DateTime<chrono::Local>> {
 
 /// Load a UFO font from a file path
 pub fn load<T: AsRef<std::path::Path>>(path: T) -> Result<Font, BabelfontError> {
+    load_with_options(path, &LoadOptions::default())
+}
+
+/// Like [`load`], but load only the parts of the font requested by `options`.
+///
+/// Glyph layers can only be attached to a loaded master, so layers are
+/// skipped — and no `.glif` file is parsed — unless `load_masters`,
+/// `load_glyphs` and `load_layers` are all `true`. Without layers, glyphs
+/// are stubs named after the default layer's `contents.plist` entries.
+pub fn load_with_options<T: AsRef<std::path::Path>>(
+    path: T,
+    options: &LoadOptions,
+) -> Result<Font, BabelfontError> {
     let mut font = Font::new();
     let created_time: Option<DateTime<Utc>> = stat(path.as_ref()).map(DateTime::<Utc>::from);
-    let ufo = norad::Font::load(&path)?;
+    let load_layers = options.load_layers && options.load_masters && options.load_glyphs;
+    let request = if load_layers {
+        norad::DataRequest::all()
+    } else {
+        // Everything except the glyph layers, so no .glif file is parsed
+        norad::DataRequest::default().layers(false)
+    };
+    let ufo = norad::Font::load_requested_data(&path, request)?;
     font.format_specific = stash_lib(Some(&ufo.lib));
-    load_glyphs(&mut font, &ufo);
+    if load_layers {
+        load_glyphs(&mut font, &ufo);
+    } else if options.load_glyphs {
+        let names = default_layer_glyph_names(path.as_ref())?;
+        load_glyph_stubs(&mut font, &ufo, names);
+    }
     let info = &ufo.font_info;
     load_font_info(&mut font, info, created_time);
     let mut master = Master::new(
@@ -83,8 +108,10 @@ pub fn load<T: AsRef<std::path::Path>>(path: T) -> Result<Font, BabelfontError> 
         uuid::Uuid::new_v4().to_string(),
         Location::new(),
     );
-    load_master_info(&mut master, info);
-    load_kerning(&mut master, &ufo.kerning);
+    if options.load_masters {
+        load_master_info(&mut master, info);
+        load_kerning(&mut master, &ufo.kerning);
+    }
     (font.first_kern_groups, font.second_kern_groups) = load_kern_groups(&ufo.groups);
 
     for layer in ufo.iter_layers() {
@@ -949,6 +976,38 @@ pub(crate) fn load_kern_groups(
 }
 
 pub(crate) fn load_glyphs(font: &mut Font, ufo: &norad::Font) {
+    let names = ufo.iter_names().map(|x| x.to_string()).collect();
+    load_glyphs_from_names(font, ufo, names, true);
+}
+
+/// Populate the font's glyph list with layer-less stubs for the given names.
+///
+/// Glyph-level data from the UFO lib (categories, production names, export
+/// flags) is applied, but codepoints — which live in the unparsed `.glif`
+/// files — are not available.
+pub(crate) fn load_glyph_stubs(font: &mut Font, ufo: &norad::Font, names: Vec<String>) {
+    load_glyphs_from_names(font, ufo, names, false);
+}
+
+/// Read the glyph names of the default layer without parsing any `.glif`
+/// file. The UFO specification requires the default layer to be stored in
+/// the `glyphs` directory.
+fn default_layer_glyph_names(path: &std::path::Path) -> Result<Vec<String>, BabelfontError> {
+    let contents = path.join("glyphs").join("contents.plist");
+    let value = plist::Value::from_file(&contents)
+        .map_err(|e| BabelfontError::UfoLoad(format!("{}: {}", contents.display(), e)))?;
+    let dict = value.as_dictionary().ok_or_else(|| {
+        BabelfontError::UfoLoad(format!("{}: expected a dictionary", contents.display()))
+    })?;
+    Ok(dict.keys().cloned().collect())
+}
+
+fn load_glyphs_from_names(
+    font: &mut Font,
+    ufo: &norad::Font,
+    mut ufo_names: Vec<String>,
+    require_glyph_data: bool,
+) {
     let categories = ufo.lib.get(KEY_CATEGORIES).and_then(|x| x.as_dictionary());
     let psnames = ufo.lib.get(KEY_PSNAMES).and_then(|x| x.as_dictionary());
     let skipped: HashSet<String> = ufo
@@ -971,7 +1030,6 @@ pub(crate) fn load_glyphs(font: &mut Font, ufo: &norad::Font) {
         .map(|x| x.to_string())
         .collect();
     let mut order: Vec<String> = vec![];
-    let mut ufo_names: Vec<String> = ufo.iter_names().map(|x| x.to_string()).collect();
     // We don't do .notdef reordering. We should move it to glyph 0 on TTF build, not at source level.
     // if ufo_names.contains(&".notdef".to_string()) {
     //     order.push(".notdef".to_string());
@@ -987,33 +1045,37 @@ pub(crate) fn load_glyphs(font: &mut Font, ufo: &norad::Font) {
     order.append(&mut ufo_names);
 
     for glyphname in order {
-        if let Some(glyph) = ufo.get_glyph(glyphname.as_str()) {
-            let cat = if let Some(cats) = categories {
-                match cats.get(&glyphname).and_then(|x| x.as_string()) {
-                    Some("base") => GlyphCategory::Base,
-                    Some("mark") => GlyphCategory::Mark,
-                    Some("ligature") => GlyphCategory::Ligature,
-                    _ => GlyphCategory::Base,
-                }
-            } else {
-                GlyphCategory::Base
-            };
-            let production_name = psnames
-                .and_then(|x| x.get(&glyphname))
-                .and_then(|x| x.as_string())
-                .map(|x| x.into());
-            font.glyphs.push(Glyph {
-                name: SmolStr::from(glyphname.as_str()),
-                category: cat,
-                production_name,
-                codepoints: glyph.codepoints.iter().map(|x| x as u32).collect(),
-                layers: vec![],
-                exported: !skipped.contains(&glyphname),
-                direction: None,
-                format_specific: Default::default(),
-                component_axes: Default::default(),
-            })
+        let norad_glyph = ufo.get_glyph(glyphname.as_str());
+        if require_glyph_data && norad_glyph.is_none() {
+            continue;
         }
+        let cat = if let Some(cats) = categories {
+            match cats.get(&glyphname).and_then(|x| x.as_string()) {
+                Some("base") => GlyphCategory::Base,
+                Some("mark") => GlyphCategory::Mark,
+                Some("ligature") => GlyphCategory::Ligature,
+                _ => GlyphCategory::Base,
+            }
+        } else {
+            GlyphCategory::Base
+        };
+        let production_name = psnames
+            .and_then(|x| x.get(&glyphname))
+            .and_then(|x| x.as_string())
+            .map(|x| x.into());
+        font.glyphs.push(Glyph {
+            name: SmolStr::from(glyphname.as_str()),
+            category: cat,
+            production_name,
+            codepoints: norad_glyph
+                .map(|glyph| glyph.codepoints.iter().map(|x| x as u32).collect())
+                .unwrap_or_default(),
+            layers: vec![],
+            exported: !skipped.contains(&glyphname),
+            direction: None,
+            format_specific: Default::default(),
+            component_axes: Default::default(),
+        })
     }
     add_uvs_sequences(font, ufo);
 }
@@ -1051,6 +1113,53 @@ pub(crate) mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
     use rstest::rstest;
+
+    #[test]
+    fn load_without_layers_stubs_glyphs() {
+        let full = load("resources/IbarraRealNova-Regular.ufo").unwrap();
+        let partial = load_with_options(
+            "resources/IbarraRealNova-Regular.ufo",
+            &LoadOptions {
+                load_layers: false,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        // Same glyph inventory, but as layer-less stubs
+        let names = |font: &Font| -> std::collections::BTreeSet<SmolStr> {
+            font.glyphs.iter().map(|g| g.name.clone()).collect()
+        };
+        assert_eq!(names(&full), names(&partial));
+        assert!(partial.glyphs.iter().all(|g| g.layers.is_empty()));
+        // Master and font-level data are unaffected
+        assert_eq!(
+            full.masters[0].kerning.len(),
+            partial.masters[0].kerning.len()
+        );
+        assert!(!partial.masters[0].kerning.is_empty());
+        assert_eq!(full.masters[0].metrics, partial.masters[0].metrics);
+        assert_eq!(
+            full.names.family_name.get_default(),
+            partial.names.family_name.get_default()
+        );
+        assert_eq!(full.first_kern_groups, partial.first_kern_groups);
+    }
+
+    #[test]
+    fn load_without_glyphs() {
+        let font = load_with_options(
+            "resources/IbarraRealNova-Regular.ufo",
+            &LoadOptions {
+                load_glyphs: false,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert!(font.glyphs.is_empty());
+        assert_eq!(font.masters.len(), 1);
+        assert!(!font.masters[0].kerning.is_empty());
+        assert!(font.names.family_name.get_default().is_some());
+    }
 
     pub(crate) fn ufo_semantic_test(ufo1: &norad::Font, ufo2: &norad::Font, do_metadata: bool) {
         assert_eq!(
