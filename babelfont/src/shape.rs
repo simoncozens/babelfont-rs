@@ -286,7 +286,7 @@ impl Shape {
         }
     }
 
-    pub(crate) fn as_path_mut(&mut self) -> Option<&mut Path> {
+    pub fn as_path_mut(&mut self) -> Option<&mut Path> {
         match self {
             Shape::Component(_) => None,
             Shape::Path(p) => Some(p),
