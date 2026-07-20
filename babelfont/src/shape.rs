@@ -763,6 +763,37 @@ mod tests {
     }
 
     #[test]
+    fn test_path_serde_roundtrip_with_whitespace_in_node_format_specific() {
+        let mut format_specific = FormatSpecific::default();
+        format_specific.insert_json(
+            "metadata",
+            &serde_json::json!({
+                "label": "name with spaces, braces { }, and \"quotes\"",
+                "nested": ["one two", { "three": "four five" }]
+            }),
+        );
+        let path = Path {
+            nodes: vec![
+                Node {
+                    x: 0.0,
+                    y: 0.0,
+                    nodetype: NodeType::Move,
+                    smooth: false,
+                    format_specific,
+                },
+                Node::new_line(100.0, 0.0),
+            ],
+            closed: false,
+            format_specific: FormatSpecific::default(),
+        };
+
+        let serialized = serde_json::to_string(&path).unwrap();
+        let deserialized: Path = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(deserialized, path);
+    }
+
+    #[test]
     fn test_to_kurbo() {
         let path: Path = serde_json::from_str(r#"
             {
