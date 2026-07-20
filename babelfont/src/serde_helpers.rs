@@ -165,15 +165,12 @@ where
 {
     let s: String = serde::Deserialize::deserialize(deserializer)?;
     let mut nodes = Vec::new();
-    let mut tokens = s.split_whitespace();
-    while let Some(token) = tokens.next() {
-        let x_str = token;
-        let y_str = tokens
-            .next()
+    let mut remaining = s.as_str();
+    while let Some((x_str, next)) = take_node_token(remaining) {
+        let (y_str, next) = take_node_token(next)
             .ok_or_else(|| serde::de::Error::custom("Expected y coordinate"))?;
-        let type_str = tokens
-            .next()
-            .ok_or_else(|| serde::de::Error::custom("Expected node type"))?;
+        let (type_str, next) =
+            take_node_token(next).ok_or_else(|| serde::de::Error::custom("Expected node type"))?;
         let x: f64 = x_str
             .parse()
             .map_err(|_| serde::de::Error::custom(format!("Invalid x coordinate: {}", x_str)))?;
@@ -198,19 +195,17 @@ where
                 )))
             }
         };
-        let format_specific = if let Some(next_token) = tokens.clone().next() {
-            if next_token.starts_with('{') {
-                let fs_str = tokens
-                    .next()
-                    .ok_or_else(|| serde::de::Error::custom("Expected format specific JSON"))?;
-                serde_json::from_str(fs_str).map_err(|e| {
-                    serde::de::Error::custom(format!("Invalid format specific JSON: {}", e))
-                })?
-            } else {
-                FormatSpecific::default()
-            }
+        let (format_specific, next) = if next.trim_start().starts_with('{') {
+            let json = next.trim_start();
+            let mut values = serde_json::Deserializer::from_str(json).into_iter::<FormatSpecific>();
+            let format_specific = values
+                .next()
+                .transpose()
+                .map_err(serde::de::Error::custom)?
+                .ok_or_else(|| serde::de::Error::custom("Expected format specific JSON"))?;
+            (format_specific, &json[values.byte_offset()..])
         } else {
-            FormatSpecific::default()
+            (FormatSpecific::default(), next)
         };
         nodes.push(crate::common::Node {
             x,
@@ -219,8 +214,18 @@ where
             smooth,
             format_specific,
         });
+        remaining = next;
     }
     Ok(nodes)
+}
+
+fn take_node_token(input: &str) -> Option<(&str, &str)> {
+    let input = input.trim_start();
+    if input.is_empty() {
+        return None;
+    }
+    let end = input.find(char::is_whitespace).unwrap_or(input.len());
+    Some((&input[..end], &input[end..]))
 }
 
 pub(crate) fn is_zero<T>(f: &T) -> bool
