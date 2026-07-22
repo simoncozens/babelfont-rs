@@ -12,11 +12,12 @@ use fontdrasil::coords::{
     DesignCoord, DesignLocation, DesignSpace, Location, NormalizedLocation, NormalizedSpace,
     UserCoord,
 };
+use fontdrasil::variations::VariationModel;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     path::PathBuf,
 };
 use typeshare::typeshare;
@@ -499,6 +500,149 @@ impl Font {
             extrapolate,
         )
     }
+
+    /// Expand a (possibly partial) design location to span EVERY font axis, filling omitted axes from
+    /// their axis default. A master's location must name every axis or it will never compare equal to
+    /// `default_location()` (and `DropVariations` would then fail to find the new default).
+    fn full_design_location(&self, partial: &DesignLocation) -> Result<DesignLocation, BabelfontError> {
+        let mut full = DesignLocation::new();
+        for axis in &self.axes {
+            let coord = if let Some(c) = partial.get(axis.tag) {
+                c
+            } else {
+                let default = axis.default.ok_or_else(|| BabelfontError::IllDefinedAxis {
+                    axis_name: axis.name(),
+                    reason: "axis has no default; cannot complete instance location".to_string(),
+                })?;
+                axis.userspace_to_designspace(default)?
+            };
+            full.insert(axis.tag, coord);
+        }
+        Ok(full)
+    }
+
+    /// Interpolate a brand-new master at `location` (design space) and append it to the font, returning
+    /// its id. This is what makes *source instantiation* work for a named instance whose location does
+    /// not coincide with any existing master: every glyph layer is interpolated (via
+    /// [`Self::interpolate_glyph_with_extrapolation`]), and the master-level metrics and kerning are
+    /// interpolated with the same fontdrasil `VariationModel` the glyph interpolation uses. The font is
+    /// left multi-master (the new master is one more); callers that want a static then collapse to the
+    /// default with `DropVariations`.
+    ///
+    /// `extrapolate` allows a target outside the masters' design range; when false (the default for
+    /// static instantiation), a target outside the range clamps to the default master rather than
+    /// extrapolating wildly.
+    pub(crate) fn add_interpolated_master(
+        &mut self,
+        location: &DesignLocation,
+        extrapolate: bool,
+    ) -> Result<String, BabelfontError> {
+        if self.masters.is_empty() {
+            return Err(BabelfontError::FilterError(
+                "cannot interpolate a master: the font has no masters".into(),
+            ));
+        }
+        // The new master must name every axis (see full_design_location) — use the completed location
+        // everywhere: normalisation, the model target, and each glyph interpolation.
+        let full_location = self.full_design_location(location)?;
+        let axes = self.fontdrasil_axes()?;
+        let target: Location<NormalizedSpace> = full_location.to_normalized(&axes)?;
+
+        // Normalised location of each existing master, in master order, plus the model over them.
+        let master_locs: Vec<Location<NormalizedSpace>> = self
+            .masters
+            .iter()
+            .map(|m| m.location.to_normalized(&axes).map_err(|e| e.into()))
+            .collect::<Result<Vec<_>, BabelfontError>>()?;
+        let loc_set: HashSet<NormalizedLocation> = master_locs.iter().cloned().collect();
+        let model = if extrapolate {
+            VariationModel::new_extrapolating(loc_set, axes.axis_order())
+        } else {
+            VariationModel::new(loc_set, axes.axis_order())
+        };
+
+        // Interpolate one scalar (given its per-master values, in master order) at the target.
+        let interp = |per_master: &[f64]| -> Result<f64, BabelfontError> {
+            let mut positions: HashMap<NormalizedLocation, Vec<f64>> = HashMap::new();
+            for (loc, v) in master_locs.iter().zip(per_master.iter()) {
+                positions.insert(loc.clone(), vec![*v]);
+            }
+            let deltas = model.deltas(&positions)?;
+            Ok(model.interpolate_from_deltas(&target, &deltas)[0])
+        };
+
+        // Build the new master from the default master as a template (keeps custom OT values etc.).
+        let template_idx = self.default_master_index().unwrap_or(0);
+        let template = self.masters[template_idx].clone();
+        let mut new_master = template.clone();
+        let new_id = uuid::Uuid::new_v4().to_string();
+        new_master.id = new_id.clone();
+        new_master.name = format!("Interpolated {:?}", full_location).into();
+        new_master.location = full_location.clone();
+        new_master.guides = Vec::new();
+
+        // Interpolated metrics. Only the metric types the DEFAULT master defines (so the model always
+        // has its origin value); a master that omits one INHERITS the default's value rather than 0 —
+        // for vertical metrics "absent" means inherit, not zero (unlike kerning).
+        let mut metrics: IndexMap<MetricType, i32> = IndexMap::new();
+        for mt in template.metrics.keys() {
+            let default_val = template.metrics.get(mt).copied().unwrap_or(0);
+            let per_master: Vec<f64> = self
+                .masters
+                .iter()
+                .map(|m| m.metrics.get(mt).copied().unwrap_or(default_val) as f64)
+                .collect();
+            metrics.insert(mt.clone(), interp(&per_master)?.round() as i32);
+        }
+        new_master.metrics = metrics;
+
+        // Interpolated kerning (union of pairs across all masters; absent = 0, as varLib does).
+        let pairs: HashSet<(SmolStr, SmolStr)> =
+            self.masters.iter().flat_map(|m| m.kerning.keys().cloned()).collect();
+        let mut kerning: IndexMap<(SmolStr, SmolStr), i16> = IndexMap::new();
+        for pair in pairs {
+            let per_master: Vec<f64> = self
+                .masters
+                .iter()
+                .map(|m| m.kerning.get(&pair).copied().unwrap_or(0) as f64)
+                .collect();
+            kerning.insert(pair, interp(&per_master)?.round() as i16);
+        }
+        new_master.kerning = kerning;
+
+        // Interpolate every glyph's layer FIRST (interpolate_glyph borrows &self), then attach. A glyph
+        // with no usable layers (empty/placeholder/non-exported) is NOT fatal — fall back to the
+        // template master's layer so the static keeps the glyph, matching fontmake/varLib tolerance.
+        // Genuine incompatibility (mismatched contours) still propagates as an error.
+        let glyph_names: Vec<SmolStr> = self.glyphs.iter().map(|g| g.name.clone()).collect();
+        let mut new_layers: Vec<(SmolStr, Layer)> = Vec::with_capacity(glyph_names.len());
+        for name in &glyph_names {
+            let layer = match self.interpolate_glyph_with_extrapolation(name, &full_location, extrapolate) {
+                Ok(l) => Some(l),
+                Err(BabelfontError::GlyphNotInterpolatable { reason, .. })
+                    if reason.contains("No layers found") =>
+                {
+                    // empty/placeholder glyph: carry the template master's layer forward if it has one,
+                    // otherwise leave the glyph without a layer at this master.
+                    self.master_layer_for(name, &template).cloned()
+                }
+                Err(e) => return Err(e),
+            };
+            if let Some(mut layer) = layer {
+                layer.master = LayerType::DefaultForMaster(new_id.clone());
+                layer.id = Some(new_id.clone());
+                new_layers.push((name.clone(), layer));
+            }
+        }
+        for (name, layer) in new_layers {
+            if let Some(glyph) = self.glyphs.iter_mut().find(|g| g.name == name) {
+                glyph.layers.push(layer);
+            }
+        }
+
+        self.masters.push(new_master);
+        Ok(new_id)
+    }
 }
 
 #[cfg(feature = "glyphs")]
@@ -601,5 +745,77 @@ mod fontra {
             }
             Some(glyph)
         }
+    }
+}
+
+#[cfg(test)]
+mod interp_master_tests {
+    use super::*;
+    use crate::axis::Axis;
+    use crate::master::Master;
+    use fontdrasil::coords::DesignCoord;
+
+    fn axis(tag: &[u8; 4], min: f64, def: f64, max: f64) -> Axis {
+        let mut a = Axis::new("Axis".to_string(), Tag::from_be_bytes(*tag));
+        a.min = Some(UserCoord::new(min));
+        a.default = Some(UserCoord::new(def));
+        a.max = Some(UserCoord::new(max));
+        a
+    }
+    fn master(id: &str, pairs: &[(&[u8; 4], f64)]) -> Master {
+        let mut m = Master::default();
+        m.id = id.into();
+        let mut loc = DesignLocation::new();
+        for (tag, v) in pairs {
+            loc.insert(Tag::from_be_bytes(**tag), DesignCoord::new(*v));
+        }
+        m.location = loc;
+        m
+    }
+
+    /// A new master interpolated at the midpoint of two masters carries the linearly-interpolated
+    /// master-level metrics — the scalar VariationModel path source instantiation relies on. Empty
+    /// glyph list isolates the master/metric interpolation.
+    #[test]
+    fn add_interpolated_master_interpolates_metrics_linearly() {
+        let mut font = Font::default();
+        font.axes = vec![axis(b"wght", 100.0, 100.0, 900.0)];
+        let mut light = master("light", &[(b"wght", 100.0)]);
+        light.metrics.insert(MetricType::Ascender, 800);
+        light.metrics.insert(MetricType::Descender, -200);
+        let mut bold = master("bold", &[(b"wght", 900.0)]);
+        bold.metrics.insert(MetricType::Ascender, 1000);
+        bold.metrics.insert(MetricType::Descender, -300);
+        font.masters = vec![light, bold];
+
+        let mut loc = DesignLocation::new();
+        loc.insert(Tag::from_be_bytes(*b"wght"), DesignCoord::new(500.0));
+        let new_id = font.add_interpolated_master(&loc, false).unwrap();
+        assert_eq!(font.masters.len(), 3);
+        let nm = font.masters.iter().find(|m| m.id == new_id).unwrap();
+        assert!((*nm.metrics.get(&MetricType::Ascender).unwrap() - 900).abs() <= 1);
+        assert!((*nm.metrics.get(&MetricType::Descender).unwrap() + 250).abs() <= 1);
+    }
+
+    /// Regression for the default_master_index bug: an instance location that OMITS an axis must still
+    /// produce a master whose location spans every axis, so default_master_index (and DropVariations)
+    /// find it. Here a 2-axis font gets a wght-only instance location; the wdth axis must be filled
+    /// from its default.
+    #[test]
+    fn add_interpolated_master_completes_partial_location() {
+        let mut font = Font::default();
+        font.axes = vec![axis(b"wght", 100.0, 100.0, 900.0), axis(b"wdth", 75.0, 100.0, 100.0)];
+        font.masters = vec![
+            master("a", &[(b"wght", 100.0), (b"wdth", 100.0)]),
+            master("b", &[(b"wght", 900.0), (b"wdth", 100.0)]),
+        ];
+        // wght-only target (wdth omitted -> must be filled with its default, 100)
+        let mut partial = DesignLocation::new();
+        partial.insert(Tag::from_be_bytes(*b"wght"), DesignCoord::new(500.0));
+        let new_id = font.add_interpolated_master(&partial, false).unwrap();
+        let nm = font.masters.iter().find(|m| m.id == new_id).unwrap();
+        assert!(nm.location.contains(Tag::from_be_bytes(*b"wdth")), "wdth axis filled in");
+        assert_eq!(nm.location.get(Tag::from_be_bytes(*b"wdth")).unwrap(), DesignCoord::new(100.0));
+        assert_eq!(nm.location.get(Tag::from_be_bytes(*b"wght")).unwrap(), DesignCoord::new(500.0));
     }
 }

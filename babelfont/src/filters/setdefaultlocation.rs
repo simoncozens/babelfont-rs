@@ -49,14 +49,14 @@ impl FontFilter for SetDefaultLocation {
     fn apply(&self, font: &mut crate::Font) -> Result<(), crate::BabelfontError> {
         if font.masters.len() == 1 {
             font.masters[0].location = self.0.clone();
-        } else {
-            // Ensure that one master is at the desired location
-            if !font.masters.iter().any(|m| m.location == self.0) {
-                return Err(crate::BabelfontError::FilterError(format!(
-                    "No master was present at location {:?}",
-                    self.0
-                )));
-            }
+        } else if !font.masters.iter().any(|m| m.location == self.0) {
+            // No master at the desired location — interpolate one so source instantiation works for a
+            // named instance that does not coincide with a master (rather than failing outright). The
+            // font stays multi-master; a following DropVariations collapses to this new default.
+            // extrapolate=false: a target outside the masters' range clamps to the default master
+            // instead of extrapolating, which on an unmapped axis with min==default would distort the
+            // geometry by a huge factor (e.g. an instance well below the lightest master).
+            font.add_interpolated_master(&self.0, false)?;
         }
         adjust_axes(&mut font.axes, &self.0)?;
         Ok(())
