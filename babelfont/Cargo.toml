@@ -2,7 +2,7 @@
 name = "babelfont"
 version = "0.2.0-pre"
 edition = "2021"
-authors = ["Simon Cozens <simon@simon-cozens.org>"]
+# authors = ["Simon Cozens <simon@simon-cozens.org>"]
 license = "MIT OR Apache-2.0"
 description = "A universal font format converter and processor"
 repository = "https://github.com/simoncozens/babelfont-rs"

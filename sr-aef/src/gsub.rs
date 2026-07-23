@@ -94,6 +94,10 @@ impl<'a> UncompileContext<'a> {
                     }
                     lookupblock
                 }
+
+                SubstitutionSubtables::EmptyExtension => {
+                    self.create_next_lookup_block("gsub_extension", i as u16, Subst)
+                }
             };
             self.add_lookup_flags(
                 &mut lookupblock,

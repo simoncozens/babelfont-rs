@@ -52,7 +52,6 @@ struct FontlabContour {
     nodes: Vec<String>,
 }
 #[allow(clippy::unwrap_used)]
-#[allow(clippy::unwrap_used)]
 static NODE_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(-?[\d\.]+) (-?[\d\.]+)( [osc])?").unwrap());
 
@@ -158,7 +157,7 @@ fn parse_node_string(
 impl From<FontlabContour> for Shape {
     fn from(val: FontlabContour) -> Self {
         let is_cubic = val.nodes.iter().any(|s| s.contains("  "));
-        let ends_with_c = val.nodes.last().map_or(false, |s| s.trim().ends_with(" c"));
+        let ends_with_c = val.nodes.last().is_some_and(|s| s.trim().ends_with(" c"));
 
         let mut path = Path {
             nodes: val
@@ -176,6 +175,7 @@ impl From<FontlabContour> for Shape {
         // as a close marker. Remove it so we don't produce a duplicate node.
         if path.nodes.len() > 1 {
             let first = &path.nodes[0];
+            #[allow(clippy::unwrap_used)] // Checked above
             let last = path.nodes.last().unwrap();
             let is_oncurve = |n: &Node| {
                 matches!(
@@ -200,7 +200,7 @@ impl From<FontlabContour> for Shape {
                 && path
                     .nodes
                     .last()
-                    .map_or(false, |n| n.nodetype == NodeType::OffCurve)
+                    .is_some_and(|n| n.nodetype == NodeType::OffCurve)
             {
                 // Quadratic VFJ contour wraps: the last entry is an off-curve whose
                 // implied endpoint is the first point. Rotate so the start point
@@ -571,10 +571,8 @@ impl FontlabMaster {
             self.otherData.get(key).and_then(|v| {
                 if let Some(n) = v.as_i64() {
                     Some(n as i32)
-                } else if let Some(n) = v.as_f64() {
-                    Some(n as i32)
                 } else {
-                    None
+                    v.as_f64().map(|n| n as i32)
                 }
             })
         };
@@ -715,6 +713,7 @@ pub fn load_str(contents: &str) -> Result<Font, BabelfontError> {
     Ok(font)
 }
 
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 #[cfg(test)]
 mod tests {
     use super::*;

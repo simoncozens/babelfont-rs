@@ -113,6 +113,9 @@ impl<'a> UncompileContext<'a> {
                     }
                     lookupblock
                 }
+                PositionSubtables::EmptyExtension => {
+                    self.create_next_lookup_block("gpos_extension", i as u16, Pos)
+                }
             };
             self.add_lookup_flags(
                 &mut lookupblock,

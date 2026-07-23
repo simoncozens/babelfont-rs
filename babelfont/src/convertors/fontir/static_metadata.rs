@@ -34,7 +34,6 @@ fn make_glyph_categories(font: &Font) -> PreliminaryGdefCategories {
         .collect();
     PreliminaryGdefCategories {
         categories,
-        prefer_gdef_categories_in_fea: false,
         infer_from_anchors: false,
         mark_category_glyphs: Default::default(),
     }

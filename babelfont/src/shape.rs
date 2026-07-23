@@ -286,6 +286,7 @@ impl Shape {
         }
     }
 
+    /// If this shape is a path, return a mutable reference to it. Otherwise, return None.
     pub fn as_path_mut(&mut self) -> Option<&mut Path> {
         match self {
             Shape::Component(_) => None,

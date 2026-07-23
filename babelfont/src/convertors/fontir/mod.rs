@@ -15,7 +15,7 @@ use fontdrasil::{
 };
 use fontir::{
     error::Error,
-    ir::KerningGroups,
+    ir::KerningLocations,
     orchestration::{Context, IrWork, WorkId},
     source::Source,
 };
@@ -220,12 +220,12 @@ impl Source for BabelfontIrSource {
         }))
     }
 
-    fn create_kerning_group_ir_work(&self) -> Result<Box<IrWork>, Error> {
+    fn create_kerning_locations_ir_work(&self) -> Result<Box<IrWork>, Error> {
         if self.options.skip_kerning {
-            return Ok(Box::new(DummyWork((WorkId::KerningGroups, self.font.upm))));
+            return Ok(Box::new(DummyWork((WorkId::KerningLocations, self.font.upm))));
         }
 
-        Ok(Box::new(kerning::KerningGroupWork(self.font.clone())))
+        Ok(Box::new(kerning::KerningLocationsWork(self.font.clone())))
     }
 
     fn create_kerning_instance_ir_work(
@@ -288,7 +288,9 @@ impl Work<Context, WorkId, Error> for DummyWork {
                 fea_content: String::new(),
                 include_dir: None,
             }),
-            WorkId::KerningGroups => context.kerning_groups.set(KerningGroups::default()),
+            WorkId::KerningLocations => {
+                context.kerning_locations.set(KerningLocations::default())
+            }
             WorkId::KernInstance(location) => context.kerning_at.set(fontir::ir::KerningInstance {
                 location: location.clone(),
                 ..Default::default()
