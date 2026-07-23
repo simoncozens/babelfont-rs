@@ -19,6 +19,8 @@ static SUPPORTED_EXTENSIONS: std::sync::LazyLock<Vec<&'static str>> =
             "glyphspackage",
             #[cfg(feature = "fontir")]
             "ttf",
+            #[cfg(feature = "fontlab")]
+            "vfj",
             #[cfg(feature = "vfb")]
             "vfb",
             #[cfg(feature = "robocjk")]
