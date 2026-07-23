@@ -269,8 +269,7 @@ mod tests {
     #[test]
     fn test_export_vertical_metrics_as_master_level_cps() {
         use crate::{Master, MetricType};
-        use glyphslib::common::CustomParameter;
-        use glyphslib::Plist;
+        use glyphslib::{common::CustomParameter, Plist};
 
         // Two masters with different vertical metrics: each master's values
         // must land on that master, not at the font level.
