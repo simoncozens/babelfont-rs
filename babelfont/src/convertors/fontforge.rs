@@ -600,7 +600,32 @@ impl SfdParser {
                     }
                 }
                 // Metrics
-                "ItalicAngle" => parse_metric!(self, value, ItalicAngle),
+                "ItalicAngle" => {
+                    // FontForge writes the angle in the OpenType `post`
+                    // convention: counter-clockwise, so a right-leaning italic
+                    // is NEGATIVE. Glyphs uses the opposite (clockwise), and
+                    // the compiler negates on the way back out --
+                    // glyphs2fontir: `master.italic_angle().map(|v| -v)`,
+                    // "negate the italic angle because it's clockwise in
+                    // Glyphs.app whereas it's counter-clockwise in
+                    // UFO/OpenType".
+                    //
+                    // Copying the SFD value verbatim skips that conversion, so
+                    // the two negations never cancel and every converted italic
+                    // comes out back-slanted: almendra's `ItalicAngle: -12`
+                    // built as `post.italicAngle = +12` against a shipped -12.
+                    //
+                    // Parsed as f64 because the field is not restricted to
+                    // whole degrees; the old integer parse dropped a fractional
+                    // angle silently.
+                    if let Some(v) = &value {
+                        if let Ok(angle) = v.trim().parse::<f64>() {
+                            self.font.masters[0]
+                                .metrics
+                                .insert(MetricType::ItalicAngle, (-angle).round() as i32);
+                        }
+                    }
+                }
                 "UnderlinePosition" => parse_metric!(self, value, UnderlinePosition),
                 "UnderlineWidth" => parse_metric!(self, value, UnderlineThickness),
                 "Ascent" => parse_metric!(self, value, Ascender),
@@ -3996,6 +4021,14 @@ fn emit_metric_key(
             let absolute = *master.metrics.get(&metric).unwrap_or(&0);
             let delta = compute_offset_delta(font, key, absolute)?;
             out.push(format!("{}: {}", key, delta));
+        } else if metric == MetricType::ItalicAngle {
+            // The reader negates this (FontForge writes the OpenType
+            // convention, Glyphs uses the opposite), so negate back or an
+            // SFD -> SFD round trip silently flips the sign of every italic.
+            // The round-trip test re-parses rather than comparing text, so it
+            // would not catch that on its own.
+            let value = *master.metrics.get(&metric).unwrap_or(&0);
+            out.push(format!("{}: {}", key, -value));
         } else {
             emit_metric(out, master, metric, key);
         }
@@ -4943,6 +4976,72 @@ mod tests {
         let a = load_str(sfd).expect("load");
         let b = load_str(sfd).expect("load");
         assert_eq!(a.masters[0].id, b.masters[0].id, "master id must be stable");
+    }
+
+    #[test]
+    fn test_italic_angle_sign_is_converted() {
+        // FontForge uses the OpenType convention (negative = right-leaning);
+        // Glyphs uses the opposite, and the compiler negates on the way out.
+        // Without the conversion here the two negations never cancel and every
+        // converted italic is back-slanted.
+        let sfd = |angle: &str| {
+            format!(
+                "SplineFontDB: 3.0\nFontName: T\nAscent: 800\nDescent: 200\n\
+                 ItalicAngle: {angle}\nBeginChars: 1 1\nStartChar: .notdef\n\
+                 Encoding: 0 -1 0\nWidth: 500\nEndChar\nEndChars\nEndSplineFont\n"
+            )
+        };
+        let angle_of = |src: String| {
+            load_str(&src).expect("SFD should load").masters[0]
+                .metrics
+                .get(&MetricType::ItalicAngle)
+                .copied()
+        };
+
+        // A right-leaning italic: -12 in the SFD becomes +12 for Glyphs.
+        assert_eq!(angle_of(sfd("-12")), Some(12));
+        // And back the other way.
+        assert_eq!(angle_of(sfd("12")), Some(-12));
+        // Upright stays upright, with no negative zero.
+        assert_eq!(angle_of(sfd("0")), Some(0));
+        // A fractional angle used to be dropped entirely by an integer parse.
+        assert_eq!(angle_of(sfd("-12.4")), Some(12));
+        assert_eq!(angle_of(sfd("-12.6")), Some(13));
+    }
+
+    #[test]
+    fn test_italic_angle_survives_an_sfd_roundtrip_as_text() {
+        // The generic round-trip test re-parses the emitted SFD and compares
+        // model fields, so a sign flip on BOTH sides cancels out and goes
+        // unnoticed. Compare the emitted text instead.
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("resources/fontforge/AmbrosiaItalic.sfd");
+        let data = String::from_utf8_lossy(&fs::read(&path).expect("Missing SFD")).into_owned();
+        let original = data
+            .lines()
+            .find(|l| l.starts_with("ItalicAngle:"))
+            .expect("this fixture must declare an ItalicAngle");
+        assert_eq!(original, "ItalicAngle: -10", "fixture changed");
+
+        let font = load_str(&data).expect("Failed to load SFD");
+        // Stored in the Glyphs convention, i.e. negated.
+        assert_eq!(
+            font.masters[0]
+                .metrics
+                .get(&MetricType::ItalicAngle)
+                .copied(),
+            Some(10)
+        );
+
+        let emitted = to_str(&font).expect("Failed to emit SFD");
+        let emitted_line = emitted
+            .lines()
+            .find(|l| l.starts_with("ItalicAngle:"))
+            .expect("emitted SFD lost its ItalicAngle");
+        assert_eq!(
+            emitted_line, original,
+            "an SFD -> SFD round trip must not flip the italic angle"
+        );
     }
 
     #[rstest]
