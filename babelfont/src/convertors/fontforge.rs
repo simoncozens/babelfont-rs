@@ -610,14 +610,13 @@ impl SfdParser {
                     // Glyphs.app whereas it's counter-clockwise in
                     // UFO/OpenType".
                     //
-                    // Copying the SFD value verbatim skips that conversion, so
-                    // the two negations never cancel and every converted italic
-                    // comes out back-slanted: almendra's `ItalicAngle: -12`
-                    // built as `post.italicAngle = +12` against a shipped -12.
+                    // Copying the SFD value verbatim skips that conversion,
+                    // so the two negations never cancel and every converted
+                    // italic comes out back-slanted.
                     //
                     // Parsed as f64 because the field is not restricted to
-                    // whole degrees; the old integer parse dropped a fractional
-                    // angle silently.
+                    // whole degrees; an integer parse silently drops a
+                    // fractional angle.
                     if let Some(v) = &value {
                         if let Ok(angle) = v.trim().parse::<f64>() {
                             self.font.masters[0]
@@ -5004,7 +5003,7 @@ mod tests {
         assert_eq!(angle_of(sfd("12")), Some(-12));
         // Upright stays upright, with no negative zero.
         assert_eq!(angle_of(sfd("0")), Some(0));
-        // A fractional angle used to be dropped entirely by an integer parse.
+        // A fractional angle must survive: an integer parse would drop it.
         assert_eq!(angle_of(sfd("-12.4")), Some(12));
         assert_eq!(angle_of(sfd("-12.6")), Some(13));
     }
