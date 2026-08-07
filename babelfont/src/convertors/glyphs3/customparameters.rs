@@ -18,6 +18,7 @@ pub(crate) fn export_font_level_cps(
 ) -> Result<(), BabelfontError> {
     export_variable_font_origin(custom_parameters, font)?;
     export_use_typo_metrics(custom_parameters, font)?;
+    export_os2_values(custom_parameters, font)?;
     Ok(())
 }
 
@@ -196,6 +197,77 @@ fn interpret_use_typo_metrics(font: &mut Font) -> Result<(), BabelfontError> {
         let value = if use_typo_metrics != 0 { 1 << 7 } else { 0 };
         let current_value = font.custom_ot_values.os2_fs_selection.unwrap_or(0);
         font.custom_ot_values.os2_fs_selection = Some(current_value | value);
+    }
+    Ok(())
+}
+
+/// Expand an `fsType` bitfield into the list of set bit indices.
+///
+/// Glyphs stores `fsType` as the bits that are on, not as the packed integer,
+/// and it is read back as `sum(1 << bit)`. Passing the integer straight through
+/// would square the value.
+fn fs_type_bits(value: u16) -> Vec<i64> {
+    (0..16)
+        .filter(|b| value & (1 << b) != 0)
+        .map(i64::from)
+        .collect()
+}
+
+/// Write the OS/2 and `head` values a source recorded (FontForge SFD:
+/// `FSType`, `Panose`, `OS2Vendor`, ...) out as custom parameters, so they
+/// reach the compiler instead of its defaults.
+///
+/// Fields deliberately not exported here:
+///
+///   * `os2_fs_selection` is handled by `export_use_typo_metrics`, which reads
+///     the one bit that is meaningful to carry across.
+///   * `os2_us_weight_class` and `os2_us_width_class` have no font-level custom
+///     parameter at all. Writing one only produces "unknown custom parameter"
+///     on every build. The instance definitions are not a usable substitute on
+///     a single-master static font either: the compiler reads them only to
+///     build the `wght`/`wdth` axis mapping, and one master leaves no axis to
+///     map onto. They have to travel as FEA.
+fn export_os2_values(
+    custom_parameters: &mut Vec<CustomParameter>,
+    font: &Font,
+) -> Result<(), BabelfontError> {
+    let ot = &font.custom_ot_values;
+
+    let mut set = |name: &str, value: Plist| {
+        find_or_insert(
+            custom_parameters,
+            CustomParameter {
+                name: name.to_string(),
+                value,
+                disabled: false,
+            },
+        );
+    };
+
+    if let Some(fs_type) = ot.os2_fs_type {
+        set(
+            "fsType",
+            Plist::Array(
+                fs_type_bits(fs_type)
+                    .into_iter()
+                    .map(Plist::Integer)
+                    .collect(),
+            ),
+        );
+    }
+    if let Some(ppem) = ot.head_lowest_rec_ppem {
+        set("openTypeHeadLowestRecPPEM", Plist::Integer(i64::from(ppem)));
+    }
+    if let Some(panose) = ot.os2_panose {
+        set(
+            "panose",
+            Plist::Array(
+                panose
+                    .iter()
+                    .map(|b| Plist::Integer(i64::from(*b)))
+                    .collect(),
+            ),
+        );
     }
     Ok(())
 }
@@ -448,5 +520,56 @@ mod tests {
             font.masters[1].metrics.get(&MetricType::TypoAscender),
             Some(&1000)
         );
+    }
+}
+
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[cfg(test)]
+mod os2_export_tests {
+    use super::*;
+
+    /// Goes through the public entry point, so this also covers the wiring --
+    /// a correct export_os2_values that nothing calls would still fail here.
+    fn params(font: &Font) -> Vec<CustomParameter> {
+        let mut cps = vec![];
+        let mut font = font.clone();
+        export_font_level_cps(&mut cps, &mut font).unwrap();
+        cps
+    }
+
+    #[test]
+    fn fs_type_is_written_as_bit_indices() {
+        // Glyphs stores the bits that are on; reading is sum(1 << bit), so the
+        // packed integer must not be passed straight through.
+        assert_eq!(fs_type_bits(0), Vec::<i64>::new());
+        assert_eq!(fs_type_bits(4), vec![2]);
+        assert_eq!(fs_type_bits(8), vec![3]);
+        for packed in [0u16, 2, 4, 8, 0x0C] {
+            let back: u16 = fs_type_bits(packed).iter().map(|b| 1u16 << b).sum();
+            assert_eq!(back, packed, "fsType {packed} did not round-trip");
+        }
+    }
+
+    #[test]
+    fn os2_values_reach_the_custom_parameters() {
+        let mut font = Font::new();
+        font.custom_ot_values.os2_fs_type = Some(0);
+        font.custom_ot_values.head_lowest_rec_ppem = Some(9);
+
+        let cps = params(&font);
+        let names: Vec<&str> = cps.iter().map(|c| c.name.as_str()).collect();
+        assert!(names.contains(&"fsType"));
+        assert!(names.contains(&"openTypeHeadLowestRecPPEM"));
+
+        // fsType 0 must still be written -- "installable" is a real value, and
+        // omitting it leaves the compiler's default in place.
+        let fs = cps.iter().find(|c| c.name == "fsType").unwrap();
+        assert!(matches!(&fs.value, Plist::Array(a) if a.is_empty()));
+    }
+
+    #[test]
+    fn nothing_is_written_when_the_source_said_nothing() {
+        let font = Font::new();
+        assert!(params(&font).is_empty());
     }
 }

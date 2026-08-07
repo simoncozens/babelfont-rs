@@ -159,6 +159,27 @@ fn is_single_or_alternate_sub(line: &str) -> bool {
     one_glyph(from) && one_glyph(to)
 }
 
+/// Write a run-together italic style the way the Glyphs convention spells it.
+///
+/// A PostScript name concatenates the style ("Almendra-BoldItalic"), but a
+/// style name is expected to separate the slope from the weight ("Bold
+/// Italic"). Left run together it is not recognised as one of the four
+/// standard styles, and the family name absorbs it: the built font declares
+/// family "Almendra BoldItalic" / subfamily "Italic" where the shipped binary
+/// says "Almendra" / "Bold Italic".
+///
+/// Only the slope is separated. Weight names stay as they are -- "SemiBold" is
+/// spelled without a space by the same convention, so a general split on
+/// capitals would be wrong.
+fn space_before_italic(style: &str) -> String {
+    match style.strip_suffix("Italic") {
+        Some(prefix) if !prefix.is_empty() && !prefix.ends_with(' ') => {
+            format!("{prefix} Italic")
+        }
+        _ => style.to_string(),
+    }
+}
+
 impl SfdParser {
     fn new(path: PathBuf) -> Self {
         Self {
@@ -909,9 +930,53 @@ impl SfdParser {
             self.parse_chars(&chars, &master_id)?;
         }
 
+        // Prefer the style the PostScript name states, when it states one.
+        //
+        // Deriving the master name from the weight class alone loses the
+        // slope: an italic SFD may state Weight "Book", so the weight-derived
+        // name is "Regular". ItalicAngle, OS2StyleMap and MacStyle are
+        // commonly zero or empty in such sources, so the PostScript name
+        // ("CreteRound-Italic") is the only field that distinguishes the
+        // italic from its regular sibling.
+        let style_from_font_name = self
+            .font
+            .names
+            .postscript_name
+            .get_default()
+            .or_else(|| self.font.names.family_name.get_default())
+            .and_then(|n| n.split_once('-').map(|(_, style)| style.to_string()))
+            .filter(|style| !style.is_empty())
+            .map(|style| space_before_italic(&style));
+
+        // A family named after its own weight is one family, not two.
+        //
+        // A source may be authored as FamilyName "Elsie Black" / FontName
+        // "ElsieBlack-Regular" / Weight "Black" -- taken at face value that
+        // declares usWeightClass 900 with subfamily Regular, which is
+        // internally inconsistent.
+        //
+        // Splitting the weight off gives family "Elsie" with style "Black",
+        // which is how the same design is modelled in a Glyphs source, and
+        // yields the typographic family and subfamily (name IDs 16 and 17)
+        // that a non-standard style needs.
+        let split_weight_from_family = style_from_font_name
+            .as_deref()
+            .is_none_or(|style| style == "Regular")
+            .then(|| self.weight_suffix_of_family_name())
+            .flatten();
+        let style_from_font_name = match split_weight_from_family {
+            Some((family, weight)) => {
+                self.font.names.family_name = family.into();
+                Some(weight)
+            }
+            None => style_from_font_name,
+        };
+
         // Set master name based on width/weight
         if let Some(master) = self.font.masters.get_mut(0) {
-            if let Some(weight) = self.font.custom_ot_values.os2_us_weight_class {
+            if let Some(style) = style_from_font_name {
+                master.name = style.into();
+            } else if let Some(weight) = self.font.custom_ot_values.os2_us_weight_class {
                 let weight_name = crate::constants::OS2_WEIGHT_TO_NAME_MAP
                     .iter()
                     .find(|(w, _)| *w == weight)
@@ -919,22 +984,14 @@ impl SfdParser {
                     .unwrap_or_else(|| "Regular".to_string());
                 master.name = weight_name.into();
             }
-            if let Some(width) = self.font.custom_ot_values.os2_us_width_class {
-                if width != 5 {
-                    if let Some(width_name) = crate::constants::OS2_WIDTH_TO_NAME_MAP
-                        .iter()
-                        .find(|(w, _)| *w == width)
-                        .map(|(_, s)| s.to_string())
-                    {
-                        master.name = format!(
-                            "{} {}",
-                            width_name,
-                            master.name.get_default().unwrap_or(&"Regular".to_string())
-                        )
-                        .into();
-                    }
-                }
-            }
+            // The width class is NOT folded into the style name. A source that
+            // states "TTFWidth: 1" and leaves its style as Regular means the
+            // width belongs in usWidthClass, and that is where it now goes.
+            // Prepending it produced "UltraCondensed Regular", which the
+            // compiler reads as a non-standard style and pushes into the family
+            // name -- bowlbyonesc built as family "Bowlby One SC
+            // UltraCondensed" against a shipped "Bowlby One SC" that carries
+            // the same usWidthClass 1.
         }
 
         Ok(())
@@ -1764,6 +1821,50 @@ impl SfdParser {
                 name_dict.insert(otl_tag.to_string(), decoded);
             }
         }
+    }
+
+    /// Split a family name that ends in its own weight, as (family, weight).
+    ///
+    /// `None` unless the file states a weight, that weight is a real one
+    /// rather than a synonym for Regular, and the family name ends with it
+    /// with something left over -- so "Elsie Black"/Black splits and
+    /// "Black"/Black does not. The comparison ignores spacing, because the
+    /// family name spaces the weight ("Elsie Swash Caps Black") where the
+    /// PostScript name does not.
+    fn weight_suffix_of_family_name(&self) -> Option<(String, String)> {
+        let weight = self
+            .font
+            .format_specific
+            .get("postscript_weight_name")
+            .and_then(|v| v.as_str())?
+            .trim();
+        if weight.is_empty()
+            || weight.eq_ignore_ascii_case("Book")
+            || weight.eq_ignore_ascii_case("Regular")
+            || weight.eq_ignore_ascii_case("Normal")
+            || weight.eq_ignore_ascii_case("Medium")
+        {
+            return None;
+        }
+        let family = self.font.names.family_name.get_default()?.trim();
+        let unspaced = |s: &str| s.replace(' ', "");
+        // The shortest suffix that spells the weight; whatever precedes it is
+        // the family. Cutting on a character boundary keeps this sound for
+        // non-ASCII family names.
+        let stem = family
+            .char_indices()
+            .map(|(ix, _)| ix)
+            .find(|&ix| {
+                family
+                    .get(ix..)
+                    .is_some_and(|tail| unspaced(tail).eq_ignore_ascii_case(weight))
+            })
+            .and_then(|ix| family.get(..ix))?
+            .trim_end();
+        if stem.is_empty() {
+            return None;
+        }
+        Some((stem.to_string(), weight.to_string()))
     }
 
     fn parse_lookup(&mut self, data: &str) {
@@ -5041,6 +5142,70 @@ mod tests {
             emitted_line, original,
             "an SFD -> SFD round trip must not flip the italic angle"
         );
+    }
+
+    #[test]
+    fn test_weight_suffix_of_family_name() {
+        let split = |family: &str, weight: &str| {
+            let mut parser = SfdParser::new(PathBuf::from("test.sfd"));
+            parser.font.names.family_name = family.into();
+            if !weight.is_empty() {
+                parser.font.format_specific.insert(
+                    "postscript_weight_name".to_string(),
+                    serde_json::Value::String(weight.to_string()),
+                );
+            }
+            parser.weight_suffix_of_family_name()
+        };
+
+        // The case this exists for.
+        assert_eq!(
+            split("Elsie Black", "Black"),
+            Some(("Elsie".to_string(), "Black".to_string()))
+        );
+        // The family name spaces the weight, the weight itself does not.
+        assert_eq!(
+            split("Elsie Swash Caps Black", "Black"),
+            Some(("Elsie Swash Caps".to_string(), "Black".to_string()))
+        );
+
+        // Weights that mean Regular are not a suffix worth splitting; almost
+        // every file in a FontForge corpus says "Book".
+        assert_eq!(split("Fjord One", "Book"), None);
+        assert_eq!(split("Anything", "Regular"), None);
+        assert_eq!(split("Anything", "Medium"), None);
+        assert_eq!(split("Anything", ""), None);
+
+        // The weight must actually end the family name.
+        assert_eq!(split("Elsie", "Black"), None);
+        assert_eq!(split("Black Ops One", "Black"), None);
+
+        // Nothing left over is not a split -- a family really called "Black"
+        // keeps its name.
+        assert_eq!(split("Black", "Black"), None);
+        assert_eq!(split("  Black  ", "Black"), None);
+    }
+
+    #[test]
+    fn test_space_before_italic() {
+        // The case this exists for: a run-together compound style.
+        assert_eq!(space_before_italic("BoldItalic"), "Bold Italic");
+        assert_eq!(space_before_italic("LightItalic"), "Light Italic");
+
+        // A bare slope has no weight to separate it from.
+        assert_eq!(space_before_italic("Italic"), "Italic");
+
+        // Already spelled correctly -- must not gain a second space.
+        assert_eq!(space_before_italic("Bold Italic"), "Bold Italic");
+
+        // Weight names are spelled without a space by the same convention, so
+        // nothing that is not a slope gets split.
+        assert_eq!(space_before_italic("SemiBold"), "SemiBold");
+        assert_eq!(space_before_italic("Regular"), "Regular");
+        assert_eq!(space_before_italic("Bold"), "Bold");
+
+        // "Italic" inside a word is not a suffix and is left alone.
+        assert_eq!(space_before_italic("Italiano"), "Italiano");
     }
 
     #[rstest]

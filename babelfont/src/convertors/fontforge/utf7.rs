@@ -25,9 +25,12 @@ pub fn decode_utf7(s: &str) -> String {
                 chars.next(); // consume base64 char
             }
             if !b64.is_empty() {
-                let decoded_bytes = base64_decode(&b64);
-                if let Ok(decoded_str) = String::from_utf8(decoded_bytes) {
-                    result.push_str(&decoded_str);
+                // The base64 payload is UTF-16BE, not UTF-8. Decoding it as
+                // UTF-8 happens to "work" for ASCII -- "This" encodes to
+                // 00 54 00 68 00 69 00 73, which IS valid UTF-8 -- but every
+                // character arrives preceded by a NUL.
+                for unit in char::decode_utf16(decode_modified_base64(&b64)) {
+                    result.push(unit.unwrap_or(char::REPLACEMENT_CHARACTER));
                 }
             }
         } else {
@@ -115,34 +118,90 @@ const INVERSE_LOOKUP: [u8; 256] = {
     table
 };
 
-fn base64_decode(input: &str) -> Vec<u8> {
-    let bytes = input.as_bytes();
-    let mut v: Vec<u8> = Vec::new();
+/// Decode modified-base64 into the UTF-16 code units it actually carries.
+///
+/// This is a BIT STREAM, not a stream of 4-character groups. A run encodes a
+/// whole number of 16-bit code units padded up to a multiple of 6 bits, so the
+/// group count is 3, 6, 8, 11 ... and a "short" trailing group is normal
+/// rather than something to discard: `+AA0A-` is four characters, 24 bits,
+/// carrying one code unit (U+000D) plus 8 bits of zero padding. Reading it in
+/// fixed 4-character chunks and skipping the remainder loses real characters.
+///
+/// Leftover bits that cannot complete a code unit are padding and are dropped.
+fn decode_modified_base64(input: &str) -> Vec<u16> {
+    let mut units = Vec::new();
+    let mut acc: u32 = 0;
+    let mut bits: u32 = 0;
 
-    // Process in chunks of 4 characters
-    for chunk in bytes.chunks(4) {
-        if chunk.len() < 4 {
-            // Incomplete chunk, skip it
-            continue;
+    for byte in input.bytes() {
+        let value = INVERSE_LOOKUP[byte as usize];
+        if value == 255 {
+            continue; // not a base64 character; ignore it
         }
-
-        // Look up each character's value
-        let n0 = INVERSE_LOOKUP[chunk[0] as usize];
-        let n1 = INVERSE_LOOKUP[chunk[1] as usize];
-        let n2 = INVERSE_LOOKUP[chunk[2] as usize];
-        let n3 = INVERSE_LOOKUP[chunk[3] as usize];
-
-        // Skip chunk if any character is invalid
-        if n0 == 255 || n1 == 255 || n2 == 255 || n3 == 255 {
-            continue;
+        acc = (acc << 6) | u32::from(value);
+        bits += 6;
+        if bits >= 16 {
+            bits -= 16;
+            units.push(((acc >> bits) & 0xFFFF) as u16);
         }
-
-        // Combine the 4 6-bit values into 3 8-bit values
-        let n = ((n0 as u32) << 18) | ((n1 as u32) << 12) | ((n2 as u32) << 6) | (n3 as u32);
-
-        v.push(((n >> 16) & 0xFF) as u8);
-        v.push(((n >> 8) & 0xFF) as u8);
-        v.push((n & 0xFF) as u8);
     }
-    v
+    units
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn plain_text_passes_through() {
+        assert_eq!(decode_utf7("Hello"), "Hello");
+        assert_eq!(decode_utf7(""), "");
+    }
+
+    #[test]
+    fn plus_minus_is_a_literal_plus() {
+        assert_eq!(decode_utf7("a+-b"), "a+b");
+    }
+
+    #[test]
+    fn payload_is_utf16_not_utf8() {
+        // "This" as UTF-16BE is 00 54 00 68 00 69 00 73, which is *valid
+        // UTF-8* -- a UTF-8 decode yields "\0T\0h\0i\0s".
+        let decoded = decode_utf7("+AFQAaABpAHM-");
+        assert_eq!(decoded, "This");
+        assert!(
+            !decoded.contains('\u{0}'),
+            "no NUL may survive: got {decoded:?}"
+        );
+    }
+
+    #[test]
+    fn short_trailing_group_is_not_discarded() {
+        // Four base64 characters = 24 bits = one code unit plus 8 bits of
+        // padding. Reading in fixed 4-character chunks and skipping the
+        // remainder would lose these.
+        assert_eq!(decode_utf7("+AA0A-"), "\r");
+        // Three characters = 18 bits = one code unit plus 2 bits of padding.
+        assert_eq!(decode_utf7("+AGE-"), "a");
+    }
+
+    #[test]
+    fn real_corpus_strings() {
+        // librefonts/corben's LangName.
+        assert_eq!(decode_utf7("Corben.+AAoACgAA-This"), "Corben.\n\n\u{0}This");
+        // librefonts/aguafinascript's OFL description, CR-separated.
+        assert_eq!(decode_utf7("License,+AA0A-Version"), "License,\rVersion");
+    }
+
+    #[test]
+    fn astral_plane_survives_as_a_surrogate_pair() {
+        // U+1D11E MUSICAL SYMBOL G CLEF = D834 DD1E in UTF-16.
+        assert_eq!(decode_utf7("+2DTdHg-"), "\u{1D11E}");
+    }
+
+    #[test]
+    fn lone_surrogate_becomes_the_replacement_character() {
+        // A high surrogate with no low surrogate must not panic.
+        assert_eq!(decode_utf7("+2DQ-"), "\u{FFFD}");
+    }
 }
