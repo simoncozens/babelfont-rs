@@ -624,20 +624,8 @@ impl SfdParser {
                 "ItalicAngle" => {
                     // FontForge writes the angle in the OpenType `post`
                     // convention: counter-clockwise, so a right-leaning italic
-                    // is NEGATIVE. Glyphs uses the opposite (clockwise), and
-                    // the compiler negates on the way back out --
-                    // glyphs2fontir: `master.italic_angle().map(|v| -v)`,
-                    // "negate the italic angle because it's clockwise in
-                    // Glyphs.app whereas it's counter-clockwise in
-                    // UFO/OpenType".
-                    //
-                    // Copying the SFD value verbatim skips that conversion,
-                    // so the two negations never cancel and every converted
-                    // italic comes out back-slanted.
-                    //
-                    // Parsed as f64 because the field is not restricted to
-                    // whole degrees; an integer parse silently drops a
-                    // fractional angle.
+                    // is NEGATIVE. We use the opposite (clockwise), so negate
+                    // on reading.
                     if let Some(v) = &value {
                         if let Ok(angle) = v.trim().parse::<f64>() {
                             self.font.masters[0]
@@ -4122,11 +4110,8 @@ fn emit_metric_key(
             let delta = compute_offset_delta(font, key, absolute)?;
             out.push(format!("{}: {}", key, delta));
         } else if metric == MetricType::ItalicAngle {
-            // The reader negates this (FontForge writes the OpenType
-            // convention, Glyphs uses the opposite), so negate back or an
-            // SFD -> SFD round trip silently flips the sign of every italic.
-            // The round-trip test re-parses rather than comparing text, so it
-            // would not catch that on its own.
+            // ItalicAngle is stored as a counter-clockwise value in FontForge;
+            // we store as clockwise, so negate when writing out.
             let value = *master.metrics.get(&metric).unwrap_or(&0);
             out.push(format!("{}: {}", key, -value));
         } else {
