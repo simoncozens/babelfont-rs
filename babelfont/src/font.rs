@@ -187,11 +187,36 @@ impl Font {
 
     /// Find the layer for a given glyph and master, if it exists
     pub fn master_layer_for(&self, glyphname: &str, master: &Master) -> Option<&Layer> {
+        self.master_layer_for_glyph_by_id(glyphname, &master.id)
+    }
+
+    /// Find the layer for a given glyph and master mutably, if it exists
+    pub fn master_layer_for_mut(&mut self, glyphname: &str, master: &Master) -> Option<&mut Layer> {
+        self.master_layer_for_glyph_by_id_mut(glyphname, &master.id)
+    }
+
+    /// Find the layer for a given glyph and master ID, if it exists
+    pub fn master_layer_for_glyph_by_id(&self, glyphname: &str, master_id: &str) -> Option<&Layer> {
         if let Some(glyph) = self.glyphs.get(glyphname) {
             return glyph
                 .layers
                 .iter()
-                .find(|layer| layer.master == LayerType::DefaultForMaster(master.id.clone()));
+                .find(|layer| layer.master == LayerType::DefaultForMaster(master_id.to_string()));
+        }
+        None
+    }
+
+    /// Find the layer for a given glyph and master ID mutably, if it exists
+    pub fn master_layer_for_glyph_by_id_mut(
+        &mut self,
+        glyphname: &str,
+        master_id: &str,
+    ) -> Option<&mut Layer> {
+        if let Some(glyph) = self.glyphs.get_mut(glyphname) {
+            return glyph
+                .layers
+                .iter_mut()
+                .find(|layer| layer.master == LayerType::DefaultForMaster(master_id.to_string()));
         }
         None
     }
