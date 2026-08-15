@@ -31,7 +31,7 @@ fn to_point(s: String) -> Result<(f64, f64), BabelfontError> {
 }
 
 #[allow(non_snake_case)]
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 struct FontlabComponent {
     glyphName: String,
 }
@@ -48,7 +48,7 @@ impl From<FontlabComponent> for Shape {
     }
 }
 #[allow(non_snake_case)]
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 struct FontlabContour {
     nodes: Vec<String>,
 }
@@ -241,9 +241,11 @@ impl From<FontlabContour> for Shape {
 }
 
 #[allow(non_snake_case)]
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 struct FontlabPath {
     contours: Vec<FontlabContour>,
+    #[serde(default)]
+    id: Option<String>,
 }
 
 impl From<FontlabPath> for Vec<Shape> {
@@ -253,19 +255,74 @@ impl From<FontlabPath> for Vec<Shape> {
 }
 
 #[allow(non_snake_case)]
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(untagged)]
 enum FontlabShape {
-    Component { component: FontlabComponent },
+    Component {
+        component: FontlabComponent,
+    },
+    Composite {
+        composite: FontlabComposite,
+    },
     Path(FontlabPath),
-    Image { image: serde_json::Value },
+    Image {
+        image: serde_json::Value,
+    },
+    /// The id of an element defined on another glyph.
+    Reference(String),
+    /// Stickers and anything else carrying no geometry.
+    Other(serde_json::Value),
 }
-impl From<FontlabShape> for Vec<Shape> {
-    fn from(val: FontlabShape) -> Self {
-        match val {
-            FontlabShape::Component { component } => vec![component.into()],
-            FontlabShape::Path(p) => p.into(),
-            FontlabShape::Image { image: _ } => vec![], // XXX
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+struct FontlabComposite {
+    #[serde(default)]
+    includes: Vec<FontlabElement>,
+    #[serde(default)]
+    id: Option<String>,
+}
+
+/// Element ids, which references point at. Ids are unique font-wide.
+type ElementTable = HashMap<String, FontlabShape>;
+
+impl FontlabShape {
+    fn id(&self) -> Option<&str> {
+        match self {
+            FontlabShape::Path(p) => p.id.as_deref(),
+            FontlabShape::Composite { composite } => composite.id.as_deref(),
+            _ => None,
+        }
+    }
+
+    fn to_shapes(&self, elements: &ElementTable) -> Vec<Shape> {
+        match self {
+            FontlabShape::Component { component } => vec![component.clone().into()],
+            FontlabShape::Path(p) => p.clone().into(),
+            FontlabShape::Composite { composite } => composite
+                .includes
+                .iter()
+                .flat_map(|e| e.to_shapes(elements))
+                .collect(),
+            FontlabShape::Reference(id) => match elements.get(id) {
+                Some(shape) => shape.to_shapes(elements),
+                None => {
+                    log::warn!("VFJ element reference {:?} is not defined", id);
+                    vec![]
+                }
+            },
+            FontlabShape::Image { image: _ } | FontlabShape::Other(_) => vec![], // XXX images
+        }
+    }
+
+    /// Record this shape's id, and any id nested inside a composite.
+    fn collect_ids(&self, into: &mut ElementTable) {
+        if let Some(id) = self.id() {
+            into.insert(id.to_string(), self.clone());
+        }
+        if let FontlabShape::Composite { composite } = self {
+            for element in &composite.includes {
+                element.collect_ids(into);
+            }
         }
     }
 }
@@ -274,9 +331,9 @@ impl From<FontlabShape> for Vec<Shape> {
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 struct FontlabComponentTransform {
     #[serde(default)]
-    xOffset: i32,
+    xOffset: f64,
     #[serde(default)]
-    yOffset: i32,
+    yOffset: f64,
     #[serde(default)]
     xScale: Option<f64>,
     #[serde(default)]
@@ -286,7 +343,7 @@ struct FontlabComponentTransform {
 impl From<FontlabComponentTransform> for crate::common::decomposition::DecomposedAffine {
     fn from(val: FontlabComponentTransform) -> Self {
         crate::common::decomposition::DecomposedAffine {
-            translation: (val.xOffset as f64, val.yOffset as f64),
+            translation: (val.xOffset, val.yOffset),
             scale: (val.xScale.unwrap_or(1.0), val.yScale.unwrap_or(1.0)),
             order: TransformOrder::Glyphs,
             ..Default::default()
@@ -295,7 +352,7 @@ impl From<FontlabComponentTransform> for crate::common::decomposition::Decompose
 }
 
 #[allow(non_snake_case)]
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(untagged)]
 enum FontlabElement {
     TaggedShape {
@@ -318,14 +375,14 @@ fn apply_transform(shape: &mut Shape, transform: Option<FontlabComponentTransfor
     }
 }
 
-impl From<FontlabElement> for Vec<Shape> {
-    fn from(val: FontlabElement) -> Self {
-        match val {
+impl FontlabElement {
+    fn to_shapes(&self, elements: &ElementTable) -> Vec<Shape> {
+        match self {
             FontlabElement::TaggedShape {
                 elementData,
                 transform,
             } => {
-                let mut shapes: Vec<Shape> = elementData.into();
+                let mut shapes = elementData.to_shapes(elements);
                 for shape in shapes.iter_mut() {
                     apply_transform(shape, transform.clone());
                 }
@@ -335,10 +392,18 @@ impl From<FontlabElement> for Vec<Shape> {
                 component,
                 transform,
             } => {
-                let mut shape: Shape = component.into();
-                apply_transform(&mut shape, transform);
-                vec![shape]
+                let mut shapes = vec![component.clone().into()];
+                for shape in shapes.iter_mut() {
+                    apply_transform(shape, transform.clone());
+                }
+                shapes
             }
+        }
+    }
+
+    fn collect_ids(&self, into: &mut ElementTable) {
+        if let FontlabElement::TaggedShape { elementData, .. } = self {
+            elementData.collect_ids(into);
         }
     }
 }
@@ -472,7 +537,7 @@ struct FontlabLayer {
 }
 
 impl FontlabLayer {
-    fn try_into_babel(self, font: &Font) -> Result<Layer, BabelfontError> {
+    fn try_into_babel(self, font: &Font, elements: &ElementTable) -> Result<Layer, BabelfontError> {
         let anchors: Result<Vec<Option<Anchor>>, BabelfontError> =
             self.anchors.into_iter().map(|x| x.try_into()).collect();
         // FontLab names each non-background layer after a master.
@@ -497,11 +562,8 @@ impl FontlabLayer {
             guides: self.guidelines.iter().map(Guide::from).collect(),
             shapes: self
                 .elements
-                .into_iter()
-                .flat_map(|x| {
-                    let v: Vec<Shape> = x.into();
-                    v
-                })
+                .iter()
+                .flat_map(|x| x.to_shapes(elements))
                 .collect(),
             anchors: anchors?.into_iter().flatten().collect(),
             color: self.color.as_deref().and_then(parse_color),
@@ -519,11 +581,13 @@ impl FontlabLayer {
 struct FontlabGlyph {
     name: String,
     unicode: Option<String>,
+    /// Absent for glyphs that are never drawn, e.g. .notdef in many sources.
+    #[serde(default)]
     layers: Vec<FontlabLayer>,
 }
 
 impl FontlabGlyph {
-    fn try_into(self, font: &Font) -> Result<Glyph, BabelfontError> {
+    fn try_into(self, font: &Font, elements: &ElementTable) -> Result<Glyph, BabelfontError> {
         let codepoints = if let Some(unicode) = self.unicode {
             unicode
                 .split(',')
@@ -535,7 +599,7 @@ impl FontlabGlyph {
         let mut layers: Vec<Layer> = self
             .layers
             .into_iter()
-            .map(|x| x.try_into_babel(font))
+            .map(|x| x.try_into_babel(font, elements))
             .collect::<Result<_, _>>()?;
         // FontLab writes glyph layers in reverse master order (plus any
         // mask/image layer first). Put the master layers back into master
@@ -615,7 +679,9 @@ impl From<FontlabAxis> for Axis {
 #[derive(Serialize, Deserialize, Debug)]
 struct FontlabInstance {
     name: String,
+    #[serde(default)]
     tsn: String,
+    #[serde(default)]
     sgn: String,
     location: HashMap<String, f32>,
 }
@@ -645,14 +711,18 @@ struct FontlabFontInfo {
 #[derive(Serialize, Deserialize, Debug)]
 struct FontlabMaster {
     name: String,
+    #[serde(default)]
     tsn: String,
+    #[serde(default)]
     sgn: String,
+    #[serde(default)]
     ffn: String,
+    #[serde(default)]
     psn: String,
     ascender: i32,
     descender: i32,
     xHeight: Option<i32>,
-    capsHeight: Option<i32>,
+    capsHeight: Option<f64>,
     lineGap: Option<i32>,
     safeTop: Option<i32>,
     safeBottom: Option<i32>,
@@ -696,7 +766,9 @@ impl FontlabMaster {
             master.metrics.insert(MetricType::XHeight, xh);
         }
         if let Some(ch) = self.capsHeight {
-            master.metrics.insert(MetricType::CapHeight, ch);
+            master
+                .metrics
+                .insert(MetricType::CapHeight, ch.round() as i32);
         }
         if let Some(ut) = self.underlineThickness {
             master.metrics.insert(MetricType::UnderlineThickness, ut);
@@ -1037,8 +1109,18 @@ pub fn load_str(contents: &str) -> Result<Font, BabelfontError> {
         }
         assert!(font.default_master_index().is_some())
     }
+
+    let mut elements = ElementTable::new();
+    for glyph in &fontlab.glyphs {
+        for layer in &glyph.layers {
+            for element in &layer.elements {
+                element.collect_ids(&mut elements);
+            }
+        }
+    }
+
     for glyph in fontlab.glyphs {
-        let new_glyph = glyph.try_into(&font)?;
+        let new_glyph = glyph.try_into(&font, &elements)?;
         font.glyphs.push(new_glyph);
     }
 
@@ -1098,7 +1180,9 @@ mod tests {
           }
         "#;
         let fl_layer = serde_json::from_str::<FontlabLayer>(layer).unwrap();
-        let bb_layer = fl_layer.try_into_babel(&Font::new()).unwrap();
+        let bb_layer = fl_layer
+            .try_into_babel(&Font::new(), &ElementTable::new())
+            .unwrap();
         assert!(bb_layer.shapes.len() == 2);
         let first_shape = &bb_layer.shapes[0];
         match first_shape {
@@ -1173,7 +1257,9 @@ mod tests {
             }
 "#;
         let fl_layer = serde_json::from_str::<FontlabLayer>(layer).unwrap();
-        let bb_layer = fl_layer.try_into_babel(&Font::new()).unwrap();
+        let bb_layer = fl_layer
+            .try_into_babel(&Font::new(), &ElementTable::new())
+            .unwrap();
         assert!(bb_layer.shapes.len() == 2);
         let first_shape = &bb_layer.shapes[0];
         match first_shape {
@@ -1328,5 +1414,49 @@ mod tests {
             "expected >600 kerning pairs, got {}",
             master.kerning.len()
         );
+    }
+
+    #[test]
+    fn element_reference_resolves_to_the_shape_it_names() {
+        let layer = r#"{ "name": "Regular", "advanceWidth": 500, "elements": [
+            { "elementData": { "id": "a.Regular", "contours": [
+                { "nodes": ["0 0", "100 0", "50 100"] } ] } } ] }"#;
+        let defining = serde_json::from_str::<FontlabLayer>(layer).unwrap();
+        let mut elements = ElementTable::new();
+        for e in &defining.elements {
+            e.collect_ids(&mut elements);
+        }
+        assert_eq!(1, elements.len());
+
+        let referring = serde_json::from_str::<FontlabLayer>(
+            r#"{ "name": "Regular", "advanceWidth": 500,
+                 "elements": [{ "elementData": "a.Regular" }] }"#,
+        )
+        .unwrap();
+        let layer = referring.try_into_babel(&Font::new(), &elements).unwrap();
+        assert_eq!(1, layer.shapes.len());
+    }
+
+    #[test]
+    fn elements_without_geometry_are_skipped() {
+        // Stickers are text annotations; their pen and brush are note colours.
+        let layer = serde_json::from_str::<FontlabLayer>(
+            r#"{ "name": "Regular", "advanceWidth": 500, "elements": [
+                { "elementData": { "sticker": { "text": "note" } },
+                  "pen": { "color": "white" } } ] }"#,
+        )
+        .unwrap();
+        let layer = layer
+            .try_into_babel(&Font::new(), &ElementTable::new())
+            .unwrap();
+        assert!(layer.shapes.is_empty());
+    }
+
+    #[test]
+    fn a_glyph_may_have_no_layers() {
+        let glyph =
+            serde_json::from_str::<FontlabGlyph>(r#"{ "name": ".notdef", "unicode": null }"#)
+                .unwrap();
+        assert!(glyph.layers.is_empty());
     }
 }
