@@ -28,6 +28,24 @@ impl I18NDictionary {
         self.0.insert(DFLT.to_string(), s);
     }
 
+    /// The default string, falling back to English, then to a sole entry.
+    ///
+    /// For output fields that cannot carry a localization (e.g. Glyphs 3
+    /// singular properties), a dictionary populated only under a language
+    /// tag -- as an SFD's `LangName` strings are, under `ENG` -- still has
+    /// an obvious best value; returning `None` there silently drops it.
+    pub fn get_default_or_fallback(&self) -> Option<&String> {
+        self.get_default()
+            .or_else(|| self.0.get("ENG"))
+            .or_else(|| {
+                if self.0.len() == 1 {
+                    self.0.values().next()
+                } else {
+                    None
+                }
+            })
+    }
+
     /// Insert a string for a given language code.
     ///
     /// Language codes should be [OpenType Language System Tags](https://docs.microsoft.com/en-us/typography/opentype/spec/languagetags).

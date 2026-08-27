@@ -496,10 +496,13 @@ fn load_properties(
 fn save_properties(names: &Names, custom_ot_values: &CustomOTValues) -> Vec<glyphs3::Property> {
     let mut properties: Vec<glyphs3::Property> = vec![];
 
-    // Macro for singular-only properties (no localized variant)
+    // Macro for singular-only properties (no localized variant). These
+    // cannot carry a localization, so a name that exists only under a
+    // language tag (an SFD's LangName strings live under ENG) must fall
+    // back to it rather than be dropped.
     macro_rules! push_singular {
         ($field:expr, $key:expr) => {
-            if let Some(value) = $field.get_default() {
+            if let Some(value) = $field.get_default_or_fallback() {
                 properties.push(glyphs3::Property::SingularProperty {
                     key: $key,
                     value: value.clone(),
@@ -1231,6 +1234,45 @@ fn save_master(
 #[allow(clippy::unwrap_used, clippy::indexing_slicing)]
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn english_only_singular_properties_are_not_dropped() {
+        // An SFD's LangName strings populate the names under the ENG tag,
+        // not the default; the singular Glyphs properties (the URLs among
+        // them) must fall back to that instead of vanishing. Verified
+        // against the Google Fonts corpus: 119 of 121 shipped fonts carry a
+        // license URL that the converted .glyphs lost this way.
+        let mut font = crate::Font::new();
+        font.names
+            .designer_url
+            .insert("ENG".to_string(), "http://example.com/d".to_string());
+        font.names
+            .license_url
+            .insert("ENG".to_string(), "http://scripts.sil.org/OFL".to_string());
+        font.names
+            .manufacturer_url
+            .insert("ENG".to_string(), "http://example.com/m".to_string());
+        let props = super::save_properties(&font.names, &font.custom_ot_values);
+        let singulars: Vec<_> = props
+            .iter()
+            .filter_map(|p| match p {
+                glyphslib::glyphs3::Property::SingularProperty { key, value } => {
+                    Some((format!("{:?}", key), value.clone()))
+                }
+                _ => None,
+            })
+            .collect();
+        for (key, value) in [
+            ("DesignerUrl", "http://example.com/d"),
+            ("LicenseUrl", "http://scripts.sil.org/OFL"),
+            ("ManufacturerUrl", "http://example.com/m"),
+        ] {
+            assert!(
+                singulars.iter().any(|(k, v)| k == key && v == value),
+                "missing singular property {key}: got {singulars:?}"
+            );
+        }
+    }
+
     #[test]
     fn font_level_os2_classes_reach_the_exported_instance() {
         // The Glyphs format carries usWeightClass/usWidthClass on instances.
