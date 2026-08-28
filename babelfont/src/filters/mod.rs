@@ -117,6 +117,8 @@ declare_filters! {
         CubicToQuadratic(cubic2quadratic) => "cubic2quadratic",
         QuadraticToCubic(quadratic2cubic) => "quadratic2cubic",
         CleanupPaths(cleanuppaths) => "cleanuppaths",
+        #[cfg(feature = "linesweeper")]
+        RemoveOverlaps(removeoverlaps) => "removeoverlaps",
         CorrectPathDirection(correctpathdirection) => "correctpathdirection",
         MakeCompatible(makecompatible) => "makecompatible",
         Recompose(recomposition) => "recompose",
