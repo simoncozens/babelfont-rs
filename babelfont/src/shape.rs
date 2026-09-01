@@ -293,15 +293,19 @@ impl Path {
     ///
     /// Deleted off-curves reduce their segment to a line; a single deleted
     /// curve node between two curve nodes is replaced by one curve fitted
-    /// within [`crate::common::pathtools::DEFAULT_JOIN_TOLERANCE`]; anything
+    /// within `tolerance`; anything
     /// else collapses to a line. See
     /// [`crate::common::pathtools::delete_keeping_shape`] for the full rules.
-    pub fn delete_keeping_shape(&mut self, to_delete: &[usize]) -> Result<(), BabelfontError> {
+    pub fn delete_keeping_shape(
+        &mut self,
+        to_delete: &[usize],
+        tolerance: f64,
+    ) -> Result<(), BabelfontError> {
         self.nodes = crate::common::pathtools::delete_keeping_shape(
             &self.nodes,
             self.closed,
             to_delete,
-            crate::common::pathtools::DEFAULT_JOIN_TOLERANCE,
+            tolerance,
         )?;
         Ok(())
     }
