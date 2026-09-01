@@ -288,6 +288,24 @@ impl Path {
         self.rotate_to_preferred_representation();
     }
 
+    /// Delete the nodes at the given indices, keeping the shape of the outline
+    /// where possible.
+    ///
+    /// Deleted off-curves reduce their segment to a line; a single deleted
+    /// curve node between two curve nodes is replaced by one curve fitted
+    /// within [`crate::common::pathtools::DEFAULT_JOIN_TOLERANCE`]; anything
+    /// else collapses to a line. See
+    /// [`crate::common::pathtools::delete_keeping_shape`] for the full rules.
+    pub fn delete_keeping_shape(&mut self, to_delete: &[usize]) -> Result<(), BabelfontError> {
+        self.nodes = crate::common::pathtools::delete_keeping_shape(
+            &self.nodes,
+            self.closed,
+            to_delete,
+            crate::common::pathtools::DEFAULT_JOIN_TOLERANCE,
+        )?;
+        Ok(())
+    }
+
     /// The signed area enclosed by a closed path.
     ///
     /// Positive is counter-clockwise, in the y-up coordinate system fonts use.
@@ -1099,5 +1117,24 @@ mod tests {
         let before = path.clone();
         path.reverse();
         assert_eq!(before, path);
+    }
+
+    #[test]
+    fn delete_keeping_shape_method_removes_nodes_in_place() {
+        let mut path = Path {
+            nodes: vec![
+                Node::new_line(0.0, 0.0),
+                Node::new_line(100.0, 0.0),
+                Node::new_line(100.0, 100.0),
+                Node::new_line(0.0, 100.0),
+            ],
+            closed: true,
+            ..Default::default()
+        };
+        path.delete_keeping_shape(&[1]).unwrap();
+        // Deleting one corner of the square leaves a triangle.
+        assert_eq!(path.nodes.len(), 3);
+        assert!(path.nodes.iter().all(|n| n.nodetype == NodeType::Line));
+        path.to_kurbo().unwrap();
     }
 }

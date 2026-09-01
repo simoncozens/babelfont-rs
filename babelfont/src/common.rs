@@ -10,6 +10,7 @@ pub(crate) mod decomposition;
 pub(crate) mod formatspecific;
 mod node;
 pub(crate) mod otvalue;
+pub mod pathtools;
 pub use node::{Node, NodeType};
 
 use crate::BabelfontError;
