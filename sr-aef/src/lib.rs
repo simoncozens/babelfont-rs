@@ -1,7 +1,34 @@
-//! Uncompile a TTF font into a fea file.
+//! # sr-aef
+//!
+//! `sr-aef` "uncompiles" an OpenType/TrueType font back into Adobe Feature File
+//! (`fea`) source code. It reads the OpenType layout tables (GSUB, GPOS and,
+//! optionally, GDEF) out of a compiled binary font and reconstructs an equivalent
+//! feature file using the [`fea_rs_ast`] AST.
+//!
+//! Because binary fonts lose the original structure of their layout code (lookup
+//! splitting, class naming, comments, ...), the output is a faithful *functional*
+//! reconstruction rather than a byte-for-byte copy of the original source.
+//!
+//! The main entry points are [`uncompile`], [`uncompile_bytes`] and
+//! [`uncompile_context`]:
+//!
+//! ```no_run
+//! use sr_aef::{fea_rs_ast::AsFea, uncompile_bytes};
+//!
+//! fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     let data = std::fs::read("MyFont.ttf")?;
+//!     // `true` also uncompiles the GDEF table.
+//!     let feature_file = uncompile_bytes(&data, true)?;
+//!     println!("{}", feature_file.as_fea(""));
+//!     Ok(())
+//! }
+//! ```
+//!
+//! The crate also powers the TrueType round-trip in
+//! [babelfont](https://crates.io/crates/babelfont).
 use std::collections::{HashMap, HashSet};
 
-/// A handle to the version of fea-rs-ast that sr-eaf is using.
+/// A handle to the version of fea-rs-ast that sr-aef is using.
 ///
 /// The return value of uncompile() will be a [fea_rs_ast::FeatureFile]; you will probably want to call `.as_fea()` on it.
 pub use fea_rs_ast;
@@ -14,18 +41,18 @@ use indexmap::{IndexMap, IndexSet};
 /// A handle to the version of Skrifa that sr-eaf is using. Pass a skrifa::FontRef to uncompile()
 pub use skrifa;
 use skrifa::{
-    GlyphId, GlyphId16, GlyphNames, Tag,
     metrics::GlyphMetrics,
     prelude::{LocationRef, Size},
     raw::{
-        ReadError, TableProvider,
         tables::{
             gdef::Gdef,
             gpos::Gpos,
             gsub::{ClassDef, Gsub},
             layout::{CoverageTable, LookupFlag},
         },
+        ReadError, TableProvider,
     },
+    GlyphId, GlyphId16, GlyphNames, Tag,
 };
 use smol_str::SmolStr;
 

@@ -1135,7 +1135,7 @@ mod tests {
             closed: true,
             ..Default::default()
         };
-        path.delete_keeping_shape(&[1]).unwrap();
+        path.delete_keeping_shape(&[1], 1.0).unwrap();
         // Deleting one corner of the square leaves a triangle.
         assert_eq!(path.nodes.len(), 3);
         assert!(path.nodes.iter().all(|n| n.nodetype == NodeType::Line));

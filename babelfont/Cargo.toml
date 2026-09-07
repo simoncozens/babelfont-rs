@@ -2,12 +2,27 @@
 name = "babelfont"
 version = "0.2.0"
 edition = "2021"
-# authors = ["Simon Cozens <simon@simon-cozens.org>"]
+rust-version = "1.85"
+authors = ["Simon Cozens <simon@simon-cozens.org>"]
 license = "MIT OR Apache-2.0"
 description = "A universal font format converter and processor"
+readme = "README.md"
 repository = "https://github.com/simoncozens/babelfont-rs"
 documentation = "https://docs.rs/babelfont"
 keywords = ["fonts", "typography", "font-conversion", "font-processing"]
+categories = ["text-processing", "graphics"]
+# Keep the published package lean: only ship what is needed to build. The many
+# files under resources/ are test fixtures and would bloat the .crate file.
+include = [
+    "Cargo.toml",
+    "build.rs",
+    "src/**",
+    "tests/**",
+    "resources/GlyphData.xml",
+    "README.md",
+    "LICENSE-MIT",
+    "LICENSE-APACHE",
+]
 
 [[bin]]
 name = "babelfont"

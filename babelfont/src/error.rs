@@ -183,6 +183,9 @@ impl From<fea_rs_ast::Error> for BabelfontError {
                     })
                     .collect(),
             ),
+            fea_rs_ast::Error::GlyphOrderBuilding(glyph_order_error) => BabelfontError::General(
+                format!("Problem building glyph order: {}", glyph_order_error),
+            ),
         }
     }
 }

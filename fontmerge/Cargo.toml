@@ -2,13 +2,22 @@
 name = "fontmerge"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
+authors = ["Simon Cozens <simon@simon-cozens.org>"]
+license = "MIT OR Apache-2.0"
+description = "Merge two font source files, copying glyphs and OpenType layout features from one font to another"
+readme = "README.md"
+repository = "https://github.com/simoncozens/babelfont-rs"
+documentation = "https://docs.rs/fontmerge"
+keywords = ["fonts", "typography", "merge", "opentype", "font-tools"]
+categories = ["command-line-utilities", "text-processing"]
 
 [dependencies]
-babelfont = { version = "0.2.0-pre", path = "../babelfont" }
+babelfont = { version = "0.2.0", path = "../babelfont" }
 clap = { workspace = true, features = ["derive"] }
 log = { workspace = true }
 env_logger = { workspace = true }
-thiserror = { workspace =  true }
+thiserror = { workspace = true }
 indexmap = { workspace = true }
 clap-verbosity-flag = "3.0.4"
 fontdrasil = { workspace = true }

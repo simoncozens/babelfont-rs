@@ -1,32 +1,28 @@
-# Babelfont (babelfont-rs)
+# Babelfont
 
-> This repository is the `babelfont-rs` workspace. It contains three crates, each
-> published separately on crates.io:
->
-> - **babelfont** — the universal font format converter/processor (this README)
-> - **fontmerge** — merge glyphs and layout features between font sources ([README](fontmerge/README.md))
-> - **sr-aef** — "uncompile" OpenType fonts back into fea source ([README](sr-aef/README.md))
+[![crates.io](https://img.shields.io/crates/v/babelfont.svg)](https://crates.io/crates/babelfont)
+[![docs.rs](https://docs.rs/babelfont/badge.svg)](https://docs.rs/babelfont)
 
 Babelfont is a Rust library for working with font source files from different font editing software. It provides a unified interface to load, examine, manipulate, and convert fonts between various formats, abstracting over the differences between font editors' native representations.
 
 ## Features
 
-- **Multi-format Support**: Load and save fonts in UFO, DesignSpace, Glyphs, FontLab VFJ, and Babelfont's own JSON format
+- **Multi-format Support**: Load and save fonts in UFO, DesignSpace, Glyphs, FontLab VFJ, FontForge, and Babelfont's own JSON format
 - **Format Conversion**: Convert fonts between different editor formats seamlessly
 - **Font Manipulation**: Apply filters to subset, scale, or otherwise transform fonts
 - **JSON Serialization**: Full serialization/deserialization of Babelfont's internal representation
 - **Variable Font Support**: Full support for variable/multiple master fonts with axes, masters, and instances
-- **Feature-based Compilation**: Optional dependencies for specific format support
+- **TTF Compilation**: Compile fonts to binary OpenType/TrueType output
+- **Optional Format Support**: Fine-grained feature flags let you pull in only the format support you need
 
 ## Status
 
-Babelfont is currently in early development. While the core architecture and many features are implemented, some format support and filters are still works in progress.
+Babelfont is in early development. While the core architecture and many features are implemented, some format support and filters are still works in progress.
 
 * Glyphs file format: Mostly complete for reading and writing Glyphs 2 and Glyphs 3 files.
 * UFO/DesignSpace: Reading support is implemented; writing support is in progress.
 * FontLab VFJ: Very basic reading support is implemented; writing support is planned.
 * Fontra: Basic reading and writing support is implemented.
-
 
 ## Installation
 
@@ -54,11 +50,11 @@ Available features (all enabled by default unless noted):
 - `fontforge` - Support for FontForge SplineFont formats (`.sfd`, `.sfdir`)
 - `fontra` - Support for Fontra format
 - `robocjk` - Support for the RoboCJK subset workflow format
-- `fontir` / `ttf` - Enable compilation to binary font formats (`.ttf`)
-- `types` - Typeshare annotations for TypeScript type definition generation
+- `ttf` / `fontir` - Compilation to binary font formats (`.ttf`)
+- `types` - Typeshare annotations for generating TypeScript type definitions of the JSON format
 - `rayon` - Rayon-based parallelism in `norad`
-- `cli` - Command-line interface support (not in default features)
-- `linesweeper` - Overlap-removal filters (not in default features)
+- `cli` - Command-line interface (builds the `babelfont` binary; not in default features)
+- `linesweeper` - Overlap-removal filters (requires external binaries)
 
 ## Quick Start
 
@@ -70,13 +66,13 @@ use babelfont::{load, BabelfontError};
 fn main() -> Result<(), BabelfontError> {
     // Load a font from any supported format
     let font = load("MyFont.designspace")?;
-    
+
     // Convert to Glyphs format
     font.save("MyFont.glyphs")?;
-    
+
     // Or save as JSON
     font.save("MyFont.babelfont")?;
-    
+
     Ok(())
 }
 ```
@@ -90,7 +86,7 @@ use babelfont::filters::{FontFilter, RetainGlyphs};
 fn main() -> Result<(), BabelfontError> {
     // Load a DesignSpace file
     let mut font = load("MyFont.designspace")?;
-    
+
     // Create a filter to retain only certain glyphs
     let filter = RetainGlyphs::new(vec![
         "A".to_string(),
@@ -98,13 +94,13 @@ fn main() -> Result<(), BabelfontError> {
         "C".to_string(),
         "space".to_string(),
     ]);
-    
+
     // Apply the filter
     filter.apply(&mut font)?;
-    
+
     // Save as a Glyphs file
     font.save("MyFont-Subset.glyphs")?;
-    
+
     Ok(())
 }
 ```
@@ -130,7 +126,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Access specific glyphs
     if let Some(glyph) = font.glyphs.get("A") {
         println!("Glyph 'A' has {} layers", glyph.layers.len());
-        
+
         for layer in &glyph.layers {
             println!("  Layer: {:?}", layer.id);
         }
@@ -142,17 +138,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## Supported Formats
 
-### Input/Output Formats
+The input and output formats available depend on which feature flags are enabled:
 
-| Format | Extension | Read | Write | Feature Flag |
-|--------|-----------|------|-------|--------------|
-| UFO | `.ufo` | ✓ | ✓ | `ufo` |
-| DesignSpace | `.designspace` | ✓ | ✓ | `ufo` |
-| Glyphs 2/3 | `.glyphs` | ✓ | ✓ | `glyphs` |
-| Glyphs Package | `.glyphspackage` | ✓ | ✓ | `glyphs` |
-| FontLab VFJ | `.vfj` | ✓ | ✗ | `fontlab` |
-| Babelfont JSON | `.babelfont` | ✓ | ✓ | (always) |
-| TrueType | `.ttf` | ✗ | ✓ | `fontir` |
+| Format | Extension | Feature Flag |
+|--------|-----------|--------------|
+| UFO | `.ufo` | `ufo` |
+| DesignSpace | `.designspace` | `ufo` |
+| Glyphs 2/3 | `.glyphs` | `glyphs` |
+| Glyphs Package | `.glyphspackage` | `glyphs` |
+| FontLab VFJ | `.vfj` | `fontlab` |
+| FontForge | `.sfd` / `.sfdir` | `fontforge` |
+| Fontra | `.fontra` | `fontra` |
+| Babelfont JSON | `.babelfont` | (always) |
+| TrueType/OpenType | `.ttf` / `.otf` | `ttf` / `fontir` |
 
 ## JSON Serialization
 
@@ -173,24 +171,19 @@ use babelfont::load;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Load from Glyphs
     let font = load("MyFont.glyphs")?;
-    
+
     // Save as JSON
     font.save("MyFont.babelfont")?;
-    
+
     // Load from JSON
     let font2 = load("MyFont.babelfont")?;
-    
+
     // Convert to DesignSpace
     font2.save("MyFont.designspace")?;
-    
+
     Ok(())
 }
 ```
-
-The JSON types are annotated with [typeshare](https://github.com/1Password/typeshare)
-attributes when the `types` feature is enabled, so TypeScript type definitions can be
-generated by running the `typeshare` CLI against the `babelfont` crate's sources (see the
-typeshare documentation for the exact invocation).
 
 ## Font Filters
 
@@ -213,12 +206,12 @@ use babelfont::{load, filters::*};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut font = load("MyFont.glyphs")?;
-    
+
     // Apply multiple filters
     RetainGlyphs::new(vec!["A".into(), "B".into()]).apply(&mut font)?;
     DropGuides.apply(&mut font)?;
     DropKerning.apply(&mut font)?;
-    
+
     font.save("MyFont-Filtered.glyphs")?;
     Ok(())
 }
@@ -241,30 +234,32 @@ With the `cli` feature enabled, Babelfont also provides a command-line tool:
 
 ```bash
 # Convert between formats
-babelfont MyFont.glyphs --output MyFont.babelfont
+babelfont MyFont.glyphs MyFont.babelfont
 
 # Apply filters
-babelfont MyFont.babelfont --filter dropaxis=wdth --filter retainglyphs=A,B,C --output Subset.babelfont
+babelfont MyFont.babelfont Subset.babelfont --filter dropaxis=wdth --filter retainglyphs=A,B,C
 
 # Compile to TTF
-babelfont Subset.babelfont --output Subset.ttf
-
+babelfont Subset.babelfont Subset.ttf
 ```
 
-Compile the CLI with:
+Install it from source with:
 
-```
-$ cargo build --release --bin babelfont --features=cli
+```bash
+cargo install babelfont --features cli
 ```
 
 ## Related Projects
+
+- [fontmerge](https://crates.io/crates/fontmerge) - merge selected glyphs and layout features from one font into another
+- [sr-aef](https://crates.io/crates/sr-aef) - "uncompile" OpenType layout tables back into feature file (fea) source
 
 Babelfont is based on the Python [babelfont](https://github.com/simoncozens/babelfont) library. Additional development is now happening here, rather than in the original Python version.
 
 ## License
 
-Babelfont is available under the MIT or Apache-2.0 licenses, at your option.
+Babelfont is available under the MIT or Apache-2.0 licenses, at your option. See [LICENSE-MIT](LICENSE-MIT) and [LICENSE-APACHE](LICENSE-APACHE).
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit pull requests or open issues on GitHub.
+Contributions are welcome! Please feel free to submit pull requests or open issues on [GitHub](https://github.com/simoncozens/babelfont-rs).

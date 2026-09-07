@@ -1,10 +1,20 @@
+//! # fontmerge
+//!
+//! Merges two font source files together, copying selected glyphs from a *donor*
+//! font into a *host* font, along with any necessary OpenType layout features.
+//!
+//! This is a mixed binary/library crate: the `fontmerge` binary provides a
+//! command-line tool, and the library exposes the same merging routine for
+//! programmatic use. See the [`fontmerge`](crate::fontmerge) function and the
+//! [`Args`](crate::Args) / [`GlyphsetFilter`](crate::GlyphsetFilter) types for
+//! the entry points.
 use babelfont::{
     close_layout,
     filters::{DropFeatures, FontFilter as _, ResolveIncludes, RetainGlyphs},
 };
 use fea_rs_ast::{
-    AsFea as _,
     fea_rs::{self, GlyphMap},
+    AsFea as _,
 };
 use indexmap::IndexSet;
 use indicatif::ProgressIterator;
@@ -298,7 +308,8 @@ fn sanity_check_features(font: &babelfont::Font) {
     let resolver: Box<dyn fea_rs::parse::SourceResolver> = Box::new(
         fea_rs::parse::FileSystemResolver::new(font.source.clone().unwrap()),
     );
-    let glyph_map = GlyphMap::from_iter(font.glyphs.iter().map(|g| g.name.as_str()));
+    let glyph_map = GlyphMap::new(font.glyphs.iter().map(|g| g.name.as_str()))
+        .expect("Failed to create glyph map for sanity check");
     let (parse_tree, diagnostics) = fea_rs::parse::parse_root(
         "get_parse_tree".into(),
         Some(&glyph_map),
