@@ -12,7 +12,7 @@ fontc = { version = "1.0.0", default-features = false }                      # M
 write-fonts = { version = "0.52.0", features = ["serde", "read", "tables"] }
 skrifa = { version = "0.46.2", features = ["traversal"] }
 kurbo = "0.13"                                                               # Must use same version as norad / fontir /etc.
-fea-rs-ast = { version = "0.1.5" }
+fea-rs-ast = { version = "0.2.0" }
 regex = "1.12.2"
 thiserror = "2.0.17"
 indexmap = { version = "2.12.0", features = ["serde"] }

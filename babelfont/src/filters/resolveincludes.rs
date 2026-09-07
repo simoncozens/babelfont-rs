@@ -75,7 +75,9 @@ fn resolve_includes(
         .iter()
         .map(|gl| gl.name.clone())
         .collect::<Vec<_>>();
-    let glyph_map = fea_rs::GlyphMap::from_iter(glyph_names.iter().cloned());
+    let glyph_map = fea_rs::GlyphMap::new(glyph_names.iter().cloned()).map_err(|e| {
+        crate::BabelfontError::FilterError(format!("Failed to create glyph map: {}", e))
+    })?;
     let mut paths = vec![base_path.clone()];
     paths.extend(font.features.include_paths.iter().cloned());
     for prefix in font.features.prefixes.values_mut() {
