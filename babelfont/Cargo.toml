@@ -1,6 +1,6 @@
 [package]
 name = "babelfont"
-version = "0.2.0-pre"
+version = "0.2.0"
 edition = "2021"
 # authors = ["Simon Cozens <simon@simon-cozens.org>"]
 license = "MIT OR Apache-2.0"
@@ -32,7 +32,12 @@ default = [
     "robocjk",
     "ttf",
 ]
-vfb = ["dep:vfbreader"]
+
+# We *have* VFB support but it is in an unpublished crate, so for this
+# public release, we hide the feature. On git, the feature gets
+# unhidden.
+vfb = [] # ["dep:vfbreader"]
+
 glyphs = ["dep:glyphslib"]
 ufo = ["dep:norad"]
 fontra = []
@@ -80,7 +85,7 @@ clap-verbosity-flag = { version = "3.0.4", optional = true }
 fea-rs-ast = { workspace = true }
 typeshare = { version = "1.0.4", optional = true }
 num-traits = "0.2.19"
-vfbreader = { git = "https://github.com/simoncozens/vfbLib-rust", optional = true }
+#vfbreader = { git = "https://github.com/simoncozens/vfbLib-rust", optional = true }
 skrifa = { workspace = true, optional = true }
 sr-aef = { version = "0.1.0", path = "../sr-aef" }
 itertools = "0.14.0"

@@ -103,10 +103,6 @@ pub fn join_bez(a: &CubicBez, b: &CubicBez, tolerance: f64) -> Option<CubicBez> 
     }
 }
 
-/// Default tolerance, in font units, used by [`crate::Path::delete_keeping_shape`]
-/// when fitting a single curve across a deleted node.
-pub const DEFAULT_JOIN_TOLERANCE: f64 = 1.0;
-
 /// Delete the nodes at the given indices from a path, keeping its shape where
 /// possible.
 ///

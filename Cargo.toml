@@ -5,13 +5,13 @@ members = ["babelfont", "fontmerge", "sr-aef"]
 [workspace.dependencies]
 log = "0.4"
 env_logger = "0.10"
-fontdrasil = { git = "https://github.com/googlefonts/fontc", rev = "484e26c" }
-fontir = { version = "0.5.0", git = "https://github.com/googlefonts/fontc", rev = "484e26c" }                           # Must use version fondrasil uses
-fontbe = { version = "0.5.0", git = "https://github.com/googlefonts/fontc", rev = "484e26c", default-features = false } # Must use version fondrasil uses
-fontc = { version = "0.6.0", git = "https://github.com/googlefonts/fontc", rev = "484e26c", default-features = false }  # Must use version fondrasil uses
-write-fonts = { version = "0.51.0", features = ["serde", "read", "tables"]  }
-skrifa = { version = "0.45.0", features = ["traversal"] }
-kurbo = "0.13"                                          # Must use same version as norad / fontir /etc.
+fontdrasil = { version = "1.0.0" }
+fontir = { version = "1.0.0" }
+fontbe = { version = "1.0.0" }
+fontc = { version = "1.0.0", default-features = false }                      # Must use version fondrasil uses
+write-fonts = { version = "0.52.0", features = ["serde", "read", "tables"] }
+skrifa = { version = "0.46.2", features = ["traversal"] }
+kurbo = "0.13"                                                               # Must use same version as norad / fontir /etc.
 fea-rs-ast = { version = "0.1.5" }
 regex = "1.12.2"
 thiserror = "2.0.17"
