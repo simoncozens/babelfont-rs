@@ -48,7 +48,7 @@ pub(crate) fn is_vertical_metric_cp(metric: &MetricType) -> bool {
 /// The enabled value of a custom parameter, unwrapped from the
 /// `{value, disabled}` shape `copy_custom_parameters` stores it in; `None`
 /// when the parameter is absent or disabled.
-fn enabled_cp_value<'a>(
+pub(crate) fn enabled_cp_value<'a>(
     format_specific: &'a FormatSpecific,
     name: &str,
 ) -> Option<&'a serde_json::Value> {
