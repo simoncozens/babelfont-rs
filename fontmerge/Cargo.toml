@@ -13,7 +13,7 @@ keywords = ["fonts", "typography", "merge", "opentype", "font-tools"]
 categories = ["command-line-utilities", "text-processing"]
 
 [dependencies]
-babelfont = { version = "0.2.0", path = "../babelfont" }
+babelfont = { version = "0.2.1", path = "../babelfont" }
 clap = { workspace = true, features = ["derive"] }
 log = { workspace = true }
 env_logger = { workspace = true }
