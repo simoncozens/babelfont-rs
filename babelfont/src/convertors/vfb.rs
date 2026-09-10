@@ -242,6 +242,9 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
             VfbEntry::AnchorsProperties(_anchors_supplementals) => {} // => todo!(),
             VfbEntry::AnchorsMm(_items) => {}   // => todo!(),
             VfbEntry::GuideProperties(_raw_data) => {} // => todo!(),
+            VfbEntry::BlockFileDataStart(_) => {} // todo!(),
+            VfbEntry::BlockFontStart(_) => {}   // todo!(),
+            VfbEntry::BlockNamesStart(_) => {}  // todo!(),
         }
     }
 
