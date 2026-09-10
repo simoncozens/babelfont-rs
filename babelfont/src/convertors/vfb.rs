@@ -10,7 +10,7 @@ use vfbreader::{read_vfb, GlyphEntry, Node as VFBNode, Vfb, VfbEntry};
 
 use crate::{
     common::decomposition::DecomposedAffine, features::PossiblyAutomaticCode, Axis, BabelfontError,
-    Features, Font, FormatSpecific, Glyph, Layer, LayerType, Master, OutlinePen as _, Shape,
+    Features, Font, FormatSpecific, Glyph, Layer, LayerType, Master, Node, NodeType, Path, Shape,
 };
 /// VFB convertor
 pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
@@ -344,96 +344,9 @@ fn load_glyph(font: &mut Font, items: Vec<GlyphEntry>) -> Result<(), BabelfontEr
             } // => todo!(),
             GlyphEntry::Kerning(_hash_map) => {} // => todo!(),
             GlyphEntry::Outlines(nodes) => {
-                // For each layer, build the path
+                // For each layer (i.e. master), build the paths
                 for (index, layer) in glyph.layers.iter_mut().enumerate() {
-                    let mut pathbuilder = crate::shape::PathBuilder::new();
-                    for node in nodes.iter() {
-                        match node {
-                            VFBNode::Move { coords, flags: _ } => {
-                                // close any open path
-                                pathbuilder.close();
-                                let these_coords = coords.get(index).ok_or_else(|| {
-                                    BabelfontError::GlyphNotInterpolatable {
-                                        glyph: glyph.name.clone().into(),
-                                        reason: "Not enough coordinates for move node".to_string(),
-                                    }
-                                })?;
-                                pathbuilder.move_to(these_coords.0 as f32, these_coords.1 as f32);
-                            }
-                            VFBNode::Line { coords, flags: _ } => {
-                                let these_coords = coords.get(index).ok_or_else(|| {
-                                    BabelfontError::GlyphNotInterpolatable {
-                                        glyph: glyph.name.clone().into(),
-                                        reason: "Not enough coordinates for line node".to_string(),
-                                    }
-                                })?;
-                                pathbuilder.line_to(these_coords.0 as f32, these_coords.1 as f32);
-                            }
-                            VFBNode::Curve {
-                                coords,
-                                c1_coords,
-                                c2_coords,
-                                flags: _,
-                            } => {
-                                let these_coords = coords.get(index).ok_or_else(|| {
-                                    BabelfontError::GlyphNotInterpolatable {
-                                        glyph: glyph.name.clone().into(),
-                                        reason: "Not enough coordinates for curve node".to_string(),
-                                    }
-                                })?;
-                                let these_c1_coords = c1_coords.get(index).ok_or_else(|| {
-                                    BabelfontError::GlyphNotInterpolatable {
-                                        glyph: glyph.name.clone().into(),
-                                        reason: "Not enough c1 coordinates for curve node"
-                                            .to_string(),
-                                    }
-                                })?;
-                                let these_c2_coords = c2_coords.get(index).ok_or_else(|| {
-                                    BabelfontError::GlyphNotInterpolatable {
-                                        glyph: glyph.name.clone().into(),
-                                        reason: "Not enough c2 coordinates for curve node"
-                                            .to_string(),
-                                    }
-                                })?;
-                                pathbuilder.curve_to(
-                                    these_c1_coords.0 as f32,
-                                    these_c1_coords.1 as f32,
-                                    these_c2_coords.0 as f32,
-                                    these_c2_coords.1 as f32,
-                                    these_coords.0 as f32,
-                                    these_coords.1 as f32,
-                                );
-                            }
-                            VFBNode::QCurve {
-                                coords,
-                                c1_coords,
-                                flags: _,
-                            } => {
-                                let these_coords = coords.get(index).ok_or_else(|| {
-                                    BabelfontError::GlyphNotInterpolatable {
-                                        glyph: glyph.name.clone().into(),
-                                        reason: "Not enough coordinates for qcurve node"
-                                            .to_string(),
-                                    }
-                                })?;
-                                let these_c1_coords = c1_coords.get(index).ok_or_else(|| {
-                                    BabelfontError::GlyphNotInterpolatable {
-                                        glyph: glyph.name.clone().into(),
-                                        reason: "Not enough c1 coordinates for qcurve node"
-                                            .to_string(),
-                                    }
-                                })?;
-                                pathbuilder.quad_to(
-                                    these_c1_coords.0 as f32,
-                                    these_c1_coords.1 as f32,
-                                    these_coords.0 as f32,
-                                    these_coords.1 as f32,
-                                );
-                            }
-                        }
-                    }
-                    pathbuilder.close();
-                    let paths = pathbuilder.build();
+                    let paths = outline_to_paths(&nodes, index, glyph.name.as_str())?;
                     layer.shapes.extend(paths.into_iter().map(Shape::Path));
                 }
             }
@@ -443,4 +356,150 @@ fn load_glyph(font: &mut Font, items: Vec<GlyphEntry>) -> Result<(), BabelfontEr
     }
     font.glyphs.push(glyph);
     Ok(())
+}
+
+/// Fetch one master's coordinates from a VFB node, converting the error when
+/// the node does not have a point for that master.
+fn master_coords(
+    coords: &[(i32, i32)],
+    index: usize,
+    what: &str,
+    glyph_name: &str,
+) -> Result<(f64, f64), BabelfontError> {
+    let (x, y) =
+        coords
+            .get(index)
+            .copied()
+            .ok_or_else(|| BabelfontError::GlyphNotInterpolatable {
+                glyph: glyph_name.to_string(),
+                reason: format!("Not enough coordinates for {what} node"),
+            })?;
+    Ok((x as f64, y as f64))
+}
+
+/// Convert one master's worth of VFB outline nodes into paths.
+///
+/// VFB stores quadratic curves differently from every other format we support.
+/// Rather than pairing each off-curve control point with its own on-curve
+/// endpoint, it emits a run of `qcurve` nodes (the off-curve control points)
+/// terminated by a `line` node which is the on-curve point ending the run. (A
+/// `line` node which is *not* preceded by `qcurve` nodes is a real straight
+/// line.) We rebuild the conventional representation here, i.e. a run of
+/// off-curve nodes ended by a single on-curve `QCurve` node.
+fn outline_to_paths(
+    nodes: &[VFBNode],
+    master_index: usize,
+    glyph_name: &str,
+) -> Result<Vec<Path>, BabelfontError> {
+    let mut paths = Vec::new();
+    // The nodes of the contour we are currently building, in UFO point-pen
+    // order.
+    let mut contour: Vec<Node> = Vec::new();
+    // Whether the node we last saw was a `qcurve` control point.
+    let mut in_qcurve = false;
+    // Whether the current contour is open (flag bit 3) rather than closed.
+    let mut is_open = false;
+
+    for node in nodes {
+        match node {
+            VFBNode::Move { coords, flags } => {
+                if !contour.is_empty() {
+                    finish_contour(&mut contour, is_open, &mut paths);
+                }
+                let (x, y) = master_coords(coords, master_index, "move", glyph_name)?;
+                is_open = flags & 8 != 0;
+                in_qcurve = false;
+                let mut node = Node::new_move(x, y);
+                node.smooth = flags & 1 != 0;
+                contour.push(node);
+            }
+            VFBNode::Line { coords, flags } => {
+                let (x, y) = master_coords(coords, master_index, "line", glyph_name)?;
+                if in_qcurve {
+                    // A line following qcurve control points is the on-curve
+                    // point which ends the quadratic run.
+                    let mut node = Node::new_qcurve(x, y);
+                    node.smooth = flags & 1 != 0;
+                    contour.push(node);
+                    in_qcurve = false;
+                } else {
+                    let mut node = Node::new_line(x, y);
+                    node.smooth = flags & 1 != 0;
+                    contour.push(node);
+                }
+            }
+            VFBNode::QCurve { coords, .. } => {
+                // A qcurve node is an off-curve control point, not the end of
+                // the segment.
+                let (x, y) = master_coords(coords, master_index, "qcurve", glyph_name)?;
+                contour.push(Node::new_offcurve(x, y));
+                in_qcurve = true;
+            }
+            VFBNode::Curve {
+                coords,
+                c1_coords,
+                c2_coords,
+                flags,
+            } => {
+                let (c1x, c1y) = master_coords(c1_coords, master_index, "c1", glyph_name)?;
+                let (c2x, c2y) = master_coords(c2_coords, master_index, "c2", glyph_name)?;
+                let (x, y) = master_coords(coords, master_index, "curve", glyph_name)?;
+                contour.push(Node::new_offcurve(c1x, c1y));
+                contour.push(Node::new_offcurve(c2x, c2y));
+                let mut node = Node::new_curve(x, y);
+                node.smooth = flags & 1 != 0;
+                contour.push(node);
+                in_qcurve = false;
+            }
+        }
+    }
+    if !contour.is_empty() {
+        finish_contour(&mut contour, is_open, &mut paths);
+    }
+    Ok(paths)
+}
+
+/// Finish the contour currently under construction, applying the same
+/// closepath fixups that vfbLib performs.
+fn finish_contour(contour: &mut Vec<Node>, is_open: bool, paths: &mut Vec<Path>) {
+    if contour.is_empty() {
+        return;
+    }
+
+    if !is_open {
+        let last_index = contour.len() - 1;
+        let last_nodetype = contour[last_index].nodetype;
+        if last_nodetype == NodeType::OffCurve {
+            // Trailing control points wrap around to the contour's start point,
+            // which is therefore the on-curve node ending a quadratic run.
+            contour[0].nodetype = NodeType::QCurve;
+        } else {
+            let closes_on_start =
+                contour[0].x == contour[last_index].x && contour[0].y == contour[last_index].y;
+            if contour.len() > 1
+                && closes_on_start
+                && !matches!(last_nodetype, NodeType::Line | NodeType::QCurve)
+            {
+                // The last node coincides with the start point: drop the
+                // implicit move and rotate the last node to the front.
+                #[allow(clippy::unwrap_used)] // The contour is non-empty
+                let last = contour.pop().unwrap();
+                contour[0] = last;
+            } else {
+                // Otherwise the closing segment is a straight line back to the
+                // start point.
+                contour[0].nodetype = NodeType::Line;
+            }
+        }
+    }
+
+    // Babelfont stores closed contours rotated one place from the UFO point
+    // order (see `convertors::ufo::load_path`).
+    let mut nodes = std::mem::take(contour);
+    nodes.rotate_left(1);
+    paths.push(Path {
+        nodes,
+        closed: !is_open,
+        ..Default::default()
+    });
 }
