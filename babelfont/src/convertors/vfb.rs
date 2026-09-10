@@ -33,7 +33,10 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
     )];
     for entry in vfb.entries {
         match entry {
+            VfbEntry::BlockFileDataStart(_) => {}
+            VfbEntry::BlockFontStart(_) => {}
             VfbEntry::FlVersion(_) => {}               // => todo!(),
+            VfbEntry::BlockNamesStart(_) => {}
             VfbEntry::FontOptions(_) => {}             // => todo!(),
             VfbEntry::EncodingDefault(_encoding) => {} // => todo!(),
             VfbEntry::Encoding(_encoding) => {}        // => todo!(),
