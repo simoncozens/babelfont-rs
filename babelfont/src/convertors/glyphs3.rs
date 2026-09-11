@@ -19,7 +19,7 @@ use std::{
 
 mod customparameters;
 
-use customparameters::{export_font_level_cps, interpret_custom_parameters};
+use customparameters::{enabled_cp_value, export_font_level_cps, interpret_custom_parameters};
 
 pub(crate) type UserData = BTreeMap<SmolStr, glyphslib::Plist>;
 
@@ -718,7 +718,8 @@ fn get_origin_master(font: &Font) -> Option<&Master> {
         return None;
     }
     // The current Glyphs spec uses "Variable Font Origin" (matched by master ID).
-    if let Some(id) = get_cp(&font.format_specific, "Variable Font Origin").and_then(|x| x.as_str())
+    if let Some(id) =
+        enabled_cp_value(&font.format_specific, "Variable Font Origin").and_then(|x| x.as_str())
     {
         if let Some(master) = font.masters.iter().find(|m| m.id == id) {
             return Some(master);
@@ -726,7 +727,7 @@ fn get_origin_master(font: &Font) -> Option<&Master> {
     }
     // Older name: "Variation Font Origin" (matched by master name).
     if let Some(name) =
-        get_cp(&font.format_specific, "Variation Font Origin").and_then(|x| x.as_str())
+        enabled_cp_value(&font.format_specific, "Variation Font Origin").and_then(|x| x.as_str())
     {
         if let Some(master) = font
             .masters
@@ -766,174 +767,533 @@ fn get_origin_master(font: &Font) -> Option<&Master> {
     font.masters.first()
 }
 
-fn interpret_axes(font: &mut Font) -> Result<(), BabelfontError> {
-    // This is going to look very wrong, but after much trial and error I can confirm
-    // it works. First: load the axes assuming that userspace=designspace. Then
-    // work out the axis mappings. Then apply the mappings to the axis locations.
+/// The OS/2 width class is a 1–9 enumeration, not a user-space value; the
+/// user-space width Glyphs exposes is a percentage of the normal width. See
+/// <https://learn.microsoft.com/en-us/typography/opentype/spec/os2#uswidthclass>.
+/// This mirrors glyphsLib's `WIDTH_CLASS_TO_VALUE`.
+const WIDTH_CLASS_TO_VALUE: [f64; 9] = [
+    50.0,  // Ultra-condensed
+    62.5,  // Extra-condensed
+    75.0,  // Condensed
+    87.5,  // Semi-condensed
+    100.0, // Medium (normal)
+    112.5, // Semi-expanded
+    125.0, // Expanded
+    150.0, // Extra-expanded
+    200.0, // Ultra-expanded
+];
 
-    let origin_id = get_origin_master(font).map(|m| m.id.clone());
-    for master in font.masters.iter() {
-        for axis in font.axes.iter_mut() {
-            let loc = master
-                .location
-                .get(axis.tag)
-                .unwrap_or(DesignCoord::default());
-            axis.min = if axis.min.is_none() {
-                Some(UserCoord::new(loc.to_f64()))
-            } else {
-                axis.min.map(|v| v.min(UserCoord::new(loc.to_f64())))
-            };
-            axis.max = if axis.max.is_none() {
-                Some(UserCoord::new(loc.to_f64()))
-            } else {
-                axis.max.map(|v| v.max(UserCoord::new(loc.to_f64())))
-            };
-            if Some(&master.id) == origin_id.as_ref() {
-                axis.default = Some(UserCoord::new(loc.to_f64()));
-            }
-        }
+/// Translate an OS/2 width class (1–9) into the user-space percentage Glyphs
+/// uses for the width axis.
+fn width_class_to_user_loc(class: i64) -> Option<f64> {
+    let index = usize::try_from(class).ok()?;
+    if index == 0 || index > WIDTH_CLASS_TO_VALUE.len() {
+        return None;
     }
-    // println!("After initial axis load: {:#?}", font.axes);
-    interpret_axis_mappings(font)?;
-    // println!("After interpreting axis mappings: {:#?}", font.axes);
-
-    // Now treat as designspace and to userspace
-    for axis in font.axes.iter_mut() {
-        if let Some(map) = &axis.map {
-            axis.default = map
-                .iter()
-                .find(|(_, design)| Some(design.to_f64()) == axis.default.map(|x| x.to_f64()))
-                .map(|(user, _)| *user);
-            axis.min = map.iter().map(|(user, _)| *user).min();
-            axis.max = map.iter().map(|(user, _)| *user).max();
-        }
-    }
-    // println!("After smashing designspace and userspace: {:#?}", font.axes);
-    Ok(())
+    WIDTH_CLASS_TO_VALUE.get(index - 1).copied()
 }
 
-fn interpret_axis_mappings(font: &mut Font) -> Result<(), BabelfontError> {
-    if let Some(mappings) =
-        get_cp(&font.format_specific, "Axis Mappings").and_then(|x| x.as_object())
-    {
-        let mappings = mappings
-            .get("value")
-            .and_then(|x| x.as_object())
-            .unwrap_or(mappings);
-        for (tagstr, map) in mappings {
-            if let Ok(tag) = Tag::from_str(tagstr) {
-                if let Some(axis) = font.axes.iter_mut().find(|a| a.tag == tag) {
-                    // Sometimes they're an array, sometimes they're a dictionary!
-                    if let Some(map) = map.as_array() {
-                        let mut axis_map: Vec<(UserCoord, DesignCoord)> = vec![];
-                        for pair in map {
-                            if let Some(pair) = pair.as_array() {
-                                if pair.len() == 2 {
-                                    if let (Some(user), Some(design)) =
-                                        (pair[0].as_f64(), pair[1].as_f64())
-                                    {
-                                        axis_map
-                                            .push((UserCoord::new(user), DesignCoord::new(design)));
-                                    }
-                                }
-                            }
-                        }
-                        axis.map = Some(axis_map);
-                    } else if let Some(map) = map.as_object() {
-                        let mut axis_map: Vec<(UserCoord, DesignCoord)> = vec![];
-                        for (user, design) in map {
-                            if let (Ok(user), Some(design)) = (user.parse::<f64>(), design.as_f64())
-                            {
-                                axis_map.push((UserCoord::new(user), DesignCoord::new(design)));
-                            }
-                        }
-                        axis.map = Some(axis_map);
-                    }
-                }
-            }
-        }
-    }
-    for instance in font.instances.iter() {
-        // The Axis Location custom parameter is in userspace, use this to make the map
-        let c = get_cp(&instance.format_specific, "Axis Location").and_then(|x| x.as_array());
-        let empty = &vec![];
-        let c = c.unwrap_or(empty);
-        let mut c_pairs: Vec<(&str, f64)> = vec![];
-        for pair in c {
-            if let Some(pair) = pair.as_object() {
-                if let (Some(axis), Some(location)) = (
-                    pair.get("Axis").and_then(|x| x.as_str()),
-                    pair.get("Location").and_then(|x| x.as_f64()),
-                ) {
-                    c_pairs.push((axis, location));
-                }
-            }
-        }
-        if c_pairs.is_empty() {
-            if let Some(weightclass) = instance
-                .format_specific
-                .get(KEY_WEIGHT_CLASS)
-                .and_then(|x| x.as_f64())
-            {
-                c_pairs.push(("Weight", weightclass));
-            }
-            if let Some(widthclass) = instance
-                .format_specific
-                .get(KEY_WIDTH_CLASS)
-                .and_then(|x| x.as_f64())
-            {
-                c_pairs.push(("Width", widthclass));
-            }
-        }
-        if c_pairs.is_empty() {
-            let instance_name = instance.name.get_default();
-            match instance_name.map(|s| s.as_str()) {
-                Some("Regular") | Some("Italic") => {
-                    c_pairs.push(("Weight", 400.0));
-                    c_pairs.push(("Width", 100.0));
-                }
-                Some("Bold") | Some("Bold Italic") => {
-                    c_pairs.push(("Weight", 700.0));
-                    c_pairs.push(("Width", 100.0));
-                }
-                _ => {}
-            }
-        }
+/// Which family an axis belongs to. This decides the default user location and
+/// whether the OS/2 weight/width classes are used to derive one. Mirrors
+/// glyphsLib's `AxisDefinition`.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum AxisKind {
+    Weight,
+    Width,
+    Other,
+}
 
-        for (axis_name, user_location) in c_pairs {
-            if let Some(axis) = font
-                .axes
-                .iter_mut()
-                .find(|a| a.name.get_default().map(|x| x.as_str()) == Some(axis_name))
+impl AxisKind {
+    fn of(tag: Tag) -> Self {
+        if tag == Tag::new(b"wght") {
+            AxisKind::Weight
+        } else if tag == Tag::new(b"wdth") {
+            AxisKind::Width
+        } else {
+            AxisKind::Other
+        }
+    }
+
+    /// The user location used when nothing else supplies one.
+    fn default_user_loc(self) -> f64 {
+        match self {
+            AxisKind::Weight => 400.0,
+            AxisKind::Width => 100.0,
+            AxisKind::Other => 0.0,
+        }
+    }
+}
+
+/// A user → design mapping being assembled for one axis.
+#[derive(Default, Clone)]
+struct AxisMapping {
+    pairs: Vec<(f64, f64)>,
+}
+
+impl AxisMapping {
+    /// Add a mapping, overwriting (with a warning) any previous mapping for the
+    /// same user location — glyphsLib's behaviour, rather than erroring.
+    fn insert(&mut self, user: f64, design: f64, axis_name: &str) {
+        if let Some(existing) = self.pairs.iter_mut().find(|(u, _)| *u == user) {
+            if existing.1 != design {
+                log::warn!(
+                    "Axis {axis_name}: redefining the mapping for user location {user} \
+                     from {} to {design}",
+                    existing.1
+                );
+            }
+            existing.1 = design;
+        } else {
+            self.pairs.push((user, design));
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.pairs.is_empty()
+    }
+
+    /// Whether every entry maps a user location to the identical design
+    /// location, so there is nothing to record.
+    fn is_identity(&self) -> bool {
+        self.pairs.iter().all(|(user, design)| user == design)
+    }
+
+    /// Mapping entries sorted by user location.
+    fn sorted(&self) -> Vec<(f64, f64)> {
+        let mut pairs = self.pairs.clone();
+        pairs.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+        pairs
+    }
+}
+
+/// The computed range, default and mapping for one axis.
+#[derive(Default)]
+struct ComputedAxis {
+    min: Option<f64>,
+    max: Option<f64>,
+    default: Option<f64>,
+    map: Option<Vec<(f64, f64)>>,
+}
+
+/// The per-object inputs used to derive a user location along one axis.
+struct UserLocSource<'a> {
+    format_specific: &'a FormatSpecific,
+    design_loc: Option<f64>,
+    weight_class: Option<f64>,
+    width_class: Option<f64>,
+}
+
+impl<'a> UserLocSource<'a> {
+    /// A master: Glyphs masters have no weight/width class of their own (their
+    /// `weight`/`width` keys are legacy name fragments, not locations).
+    fn master(format_specific: &'a FormatSpecific, design_loc: Option<f64>) -> Self {
+        Self {
+            format_specific,
+            design_loc,
+            weight_class: None,
+            width_class: None,
+        }
+    }
+
+    /// An instance, whose `weightClass`/`widthClass` attributes are OS/2
+    /// classes used to derive a user location.
+    fn instance(instance: &'a crate::Instance, design_loc: Option<f64>) -> Self {
+        Self {
+            format_specific: &instance.format_specific,
+            design_loc,
+            weight_class: instance_weight_class(instance),
+            width_class: instance_width_class(instance),
+        }
+    }
+}
+
+/// Resolve the user location of a master or instance along one axis, following
+/// glyphsLib's precedence: the default/design location is overridden by the
+/// `weightClass`/`widthClass` attributes, and finally by the `Axis Location`
+/// custom parameter (which is already in user space).
+fn get_user_loc(
+    kind: AxisKind,
+    default_user_loc: f64,
+    tag: Tag,
+    axis_name: &str,
+    source: UserLocSource<'_>,
+) -> Option<f64> {
+    let UserLocSource {
+        format_specific,
+        design_loc,
+        weight_class,
+        width_class,
+    } = source;
+    // For weight the user location defaults to 400 regardless of the design
+    // location; for every other axis it defaults to the design location.
+    let mut user_loc = match kind {
+        AxisKind::Weight => Some(default_user_loc),
+        _ => design_loc,
+    };
+
+    match kind {
+        AxisKind::Weight => {
+            if let Some(class) = weight_class {
+                // An OS/2 weight class *is* a user location.
+                user_loc = Some(class);
+            }
+        }
+        AxisKind::Width => {
+            if let Some(class) = width_class.and_then(|c| width_class_to_user_loc(c.round() as i64))
             {
-                if let Some(design_location) = instance.location.get(axis.tag) {
-                    let axis_name = axis.name();
-                    if axis.map.is_none() {
-                        axis.map = Some(vec![]);
-                    }
-                    if let Some(axis_map) = &mut axis.map {
-                        // Check we don't already have this mapping
-                        if let Some(map_entry) = axis_map
-                            .iter()
-                            .find(|(u, _)| *u == UserCoord::new(user_location))
-                        {
-                            // If we're mapped to somewhere else, complain
-                            if map_entry.1 != design_location {
-                                return Err(BabelfontError::IllDefinedAxis { axis_name: axis_name.clone(), reason: format!(
-                                    "Conflicting mappings for user location {}: design location {} vs {}",
-                                    user_location,
-                                    map_entry.1.to_f64(),
-                                    design_location.to_f64()
-                                ) });
-                            }
-                            continue;
-                        }
-                        axis_map.push((UserCoord::new(user_location), design_location));
-                    }
+                user_loc = Some(class);
+            }
+        }
+        AxisKind::Other => {}
+    }
+
+    // The Axis Location custom parameter wins over everything else.
+    if let Some(location) = axis_location_value(format_specific, tag, axis_name) {
+        user_loc = Some(location);
+    }
+
+    user_loc
+}
+
+/// The enabled `Axis Location` custom parameter of a master or instance, if
+/// any.
+fn axis_location_cp(format_specific: &FormatSpecific) -> Option<&serde_json::Value> {
+    enabled_cp_value(format_specific, "Axis Location")
+}
+
+/// The user-space location for one axis from an `Axis Location` custom
+/// parameter. Glyphs stores this as a list of `{Axis, Location}` dicts; some
+/// versions use a dict keyed by axis name or tag.
+fn axis_location_value(format_specific: &FormatSpecific, tag: Tag, axis_name: &str) -> Option<f64> {
+    let value = axis_location_cp(format_specific)?;
+    if let Some(list) = value.as_array() {
+        for entry in list {
+            if let Some(entry) = entry.as_object() {
+                if entry.get("Axis").and_then(|axis| axis.as_str()) == Some(axis_name) {
+                    return entry.get("Location").and_then(parse_number);
                 }
             }
         }
+    } else if let Some(map) = value.as_object() {
+        let tag_string = tag.to_string();
+        for key in [axis_name, tag_string.as_str()] {
+            if let Some(location) = map.get(key).and_then(parse_number) {
+                return Some(location);
+            }
+        }
     }
+    None
+}
+
+/// A JSON number, or a string holding one (Glyphs sometimes writes
+/// `Location = "200"`).
+fn parse_number(value: &serde_json::Value) -> Option<f64> {
+    value
+        .as_f64()
+        .or_else(|| value.as_str().and_then(|s| s.trim().parse::<f64>().ok()))
+}
+
+/// Instances that contribute to the axis mapping: exported, non-variable ones
+/// (glyphsLib's `is_instance_active` plus its `InstanceType.VARIABLE` filter).
+fn mapping_instances(font: &Font) -> impl Iterator<Item = &crate::Instance> {
+    font.instances.iter().filter(|instance| {
+        !instance.variable
+            && instance
+                .format_specific
+                .get(KEY_INSTANCE_EXPORTS)
+                .and_then(|exports| exports.as_bool())
+                .unwrap_or(true)
+    })
+}
+
+fn instance_weight_class(instance: &crate::Instance) -> Option<f64> {
+    instance
+        .format_specific
+        .get(KEY_WEIGHT_CLASS)
+        .and_then(|class| class.as_f64())
+}
+
+fn instance_width_class(instance: &crate::Instance) -> Option<f64> {
+    instance
+        .format_specific
+        .get(KEY_WIDTH_CLASS)
+        .and_then(|class| class.as_f64())
+}
+
+/// Invert a user → design mapping at `design`, interpolating between known
+/// points and extrapolating beyond the ends (as fontTools' `piecewiseLinearMap`
+/// does).
+fn design_to_user(pairs: &[(f64, f64)], design: f64) -> Option<f64> {
+    if pairs.is_empty() {
+        return None;
+    }
+    let mut by_design: Vec<(f64, f64)> = pairs
+        .iter()
+        .map(|(user, design)| (*design, *user))
+        .collect();
+    by_design.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+
+    if let Some((_, user)) = by_design.iter().find(|(d, _)| *d == design) {
+        return Some(*user);
+    }
+    let (first_design, first_user) = *by_design.first()?;
+    if design < first_design {
+        return Some(design + first_user - first_design);
+    }
+    let (last_design, last_user) = *by_design.last()?;
+    if design > last_design {
+        return Some(design + last_user - last_design);
+    }
+    for window in by_design.windows(2) {
+        if let [(d0, u0), (d1, u1)] = window {
+            if design >= *d0 && design <= *d1 {
+                if d1 == d0 {
+                    return Some(*u0);
+                }
+                let t = (design - d0) / (d1 - d0);
+                return Some(u0 + t * (u1 - u0));
+            }
+        }
+    }
+    None
+}
+
+/// The user location in `pairs` closest to `value`. `Axis`'s converter requires
+/// the default to be one of the mapping's user coordinates, so an interpolated
+/// default is snapped to the nearest entry.
+fn nearest_user_loc(pairs: &[(f64, f64)], value: f64) -> Option<f64> {
+    pairs.iter().map(|(user, _)| *user).min_by(|a, b| {
+        (a - value)
+            .abs()
+            .partial_cmp(&(b - value).abs())
+            .unwrap_or(std::cmp::Ordering::Equal)
+    })
+}
+
+/// Turn a mapping into the axis's range/default/map, following glyphsLib: the
+/// min/max are the mapping's extremes, the default is derived from the regular
+/// master, and an identity mapping is elided.
+fn finish_axis(mapping: AxisMapping, regular_design: Option<f64>, axis_name: &str) -> ComputedAxis {
+    if mapping.is_empty() {
+        return ComputedAxis::default();
+    }
+    let pairs = mapping.sorted();
+    let (Some(min), Some(max)) = (
+        pairs.first().map(|(user, _)| *user),
+        pairs.last().map(|(user, _)| *user),
+    ) else {
+        return ComputedAxis::default();
+    };
+
+    if mapping.is_identity() {
+        // user == design, so there is nothing to map; the default is just the
+        // regular master's location, clamped into range.
+        let default = regular_design.map(|d| d.clamp(min, max)).unwrap_or(min);
+        return ComputedAxis {
+            min: Some(min),
+            max: Some(max),
+            default: Some(default),
+            map: None,
+        };
+    }
+
+    let default = regular_design
+        .and_then(|design| design_to_user(&pairs, design))
+        .map(|user| user.clamp(min, max))
+        .and_then(|user| nearest_user_loc(&pairs, user))
+        .or(Some(min));
+    if default.is_none() {
+        log::warn!("Axis {axis_name}: could not determine a default location");
+    }
+    ComputedAxis {
+        min: Some(min),
+        max: Some(max),
+        default,
+        map: Some(pairs),
+    }
+}
+
+/// An identity mapping built from the masters' design locations — glyphsLib's
+/// `master_mapping`, used when the instances don't provide a usable mapping.
+fn mapping_from_masters(master_locs: &[f64], axis_name: &str) -> AxisMapping {
+    let mut mapping = AxisMapping::default();
+    for design in master_locs {
+        mapping.insert(*design, *design, axis_name);
+    }
+    mapping
+}
+
+/// Parse the `Axis Mappings` custom parameter for one axis. The parameter is a
+/// dict of tag → mapping, where each mapping is either a list of `[user,
+/// design]` pairs or a dict of user → design.
+fn explicit_axis_mapping(mappings: &serde_json::Value, tag: Tag) -> Option<Vec<(f64, f64)>> {
+    let map = mappings.as_object()?.get(&tag.to_string())?;
+    let mut pairs = Vec::new();
+    if let Some(array) = map.as_array() {
+        for item in array {
+            if let Some(pair) = item.as_array() {
+                if let (Some(user), Some(design)) = (
+                    pair.first().and_then(parse_number),
+                    pair.get(1).and_then(parse_number),
+                ) {
+                    pairs.push((user, design));
+                }
+            }
+        }
+    } else if let Some(object) = map.as_object() {
+        for (user, design) in object {
+            if let (Ok(user), Some(design)) = (user.parse::<f64>(), parse_number(design)) {
+                pairs.push((user, design));
+            }
+        }
+    }
+    Some(pairs)
+}
+
+/// Compute the range, default and mapping for one axis, following glyphsLib's
+/// three-way strategy:
+///
+/// * an explicit `Axis Mappings` custom parameter is authoritative;
+/// * otherwise, if every master carries an `Axis Location` parameter, the
+///   mapping comes from the masters (instances contributing only their own
+///   `Axis Location`);
+/// * otherwise the mapping is derived from the instances, falling back to the
+///   masters' design locations when that yields nothing useful.
+fn compute_axis(
+    font: &Font,
+    axis: &Axis,
+    origin_id: Option<&str>,
+    explicit_mappings: Option<&serde_json::Value>,
+    uses_axis_locations: bool,
+) -> ComputedAxis {
+    let tag = axis.tag;
+    let kind = AxisKind::of(tag);
+    let axis_name = axis.name();
+    let default_user_loc = kind.default_user_loc();
+
+    let master_locs: Vec<f64> = font
+        .masters
+        .iter()
+        .filter_map(|master| master.location.get(tag).map(|coord| coord.to_f64()))
+        .collect();
+    let regular_design = origin_id
+        .and_then(|id| font.masters.iter().find(|master| master.id == id))
+        .and_then(|master| master.location.get(tag))
+        .map(|coord| coord.to_f64())
+        .or_else(|| master_locs.first().copied());
+
+    // Strategy A: an explicit "Axis Mappings" custom parameter is authoritative.
+    if let Some(mappings) = explicit_mappings {
+        if let Some(pairs) = explicit_axis_mapping(mappings, tag) {
+            if !pairs.is_empty() {
+                let mut mapping = AxisMapping::default();
+                for (user, design) in pairs {
+                    mapping.insert(user, design, &axis_name);
+                }
+                return finish_axis(mapping, regular_design, &axis_name);
+            }
+        }
+        log::warn!(
+            "Font has an Axis Mappings custom parameter but no mapping for axis {tag}; \
+             leaving it unmapped"
+        );
+        return finish_axis(
+            mapping_from_masters(&master_locs, &axis_name),
+            regular_design,
+            &axis_name,
+        );
+    }
+
+    // Strategy B: every master states its user location with an "Axis Location"
+    // parameter. Instances then only contribute their own "Axis Location".
+    if uses_axis_locations {
+        let mut mapping = AxisMapping::default();
+        for master in font.masters.iter() {
+            let Some(design) = master.location.get(tag).map(|coord| coord.to_f64()) else {
+                continue;
+            };
+            if let Some(user) = get_user_loc(
+                kind,
+                default_user_loc,
+                tag,
+                &axis_name,
+                UserLocSource::master(&master.format_specific, Some(design)),
+            ) {
+                mapping.insert(user, design, &axis_name);
+            }
+        }
+        for instance in mapping_instances(font) {
+            let Some(design) = instance.location.get(tag).map(|coord| coord.to_f64()) else {
+                continue;
+            };
+            if let Some(user) = axis_location_value(&instance.format_specific, tag, &axis_name) {
+                mapping.insert(user, design, &axis_name);
+            }
+        }
+        return finish_axis(mapping, regular_design, &axis_name);
+    }
+
+    // Strategy C: derive the mapping from the instances; if that yields nothing
+    // useful, fall back to the masters' design locations.
+    let mut instance_mapping = AxisMapping::default();
+    for instance in mapping_instances(font) {
+        let Some(design) = instance.location.get(tag).map(|coord| coord.to_f64()) else {
+            continue;
+        };
+        if let Some(user) = get_user_loc(
+            kind,
+            default_user_loc,
+            tag,
+            &axis_name,
+            UserLocSource::instance(instance, Some(design)),
+        ) {
+            instance_mapping.insert(user, design, &axis_name);
+        }
+    }
+    let mapping = if !instance_mapping.is_empty() && !instance_mapping.is_identity() {
+        instance_mapping
+    } else {
+        mapping_from_masters(&master_locs, &axis_name)
+    };
+    finish_axis(mapping, regular_design, &axis_name)
+}
+
+fn interpret_axes(font: &mut Font) -> Result<(), BabelfontError> {
+    let origin_id = get_origin_master(font).map(|m| m.id.clone());
+    let explicit_mappings = enabled_cp_value(&font.format_specific, "Axis Mappings");
+    let uses_axis_locations = !font.axes.is_empty()
+        && !font.masters.is_empty()
+        && font
+            .masters
+            .iter()
+            .all(|master| axis_location_cp(&master.format_specific).is_some());
+
+    let computed: Vec<ComputedAxis> = font
+        .axes
+        .iter()
+        .map(|axis| {
+            compute_axis(
+                font,
+                axis,
+                origin_id.as_deref(),
+                explicit_mappings,
+                uses_axis_locations,
+            )
+        })
+        .collect();
+
+    for (axis, computed) in font.axes.iter_mut().zip(computed) {
+        axis.min = computed.min.map(UserCoord::new);
+        axis.max = computed.max.map(UserCoord::new);
+        axis.default = computed.default.map(UserCoord::new);
+        axis.map = computed.map.map(|pairs| {
+            pairs
+                .into_iter()
+                .map(|(user, design)| (UserCoord::new(user), DesignCoord::new(design)))
+                .collect()
+        });
+    }
+
     Ok(())
 }
 
@@ -1350,6 +1710,28 @@ mod tests {
         assert_eq!(font.axes[0].min.unwrap().to_f64(), 200.0);
         assert_eq!(font.axes[0].max.unwrap().to_f64(), 1000.0);
         assert_eq!(font.axes[0].default.unwrap().to_f64(), 200.0);
+        // Every master states an "Axis Location", so the mapping comes from
+        // those (with instances contributing their own Axis Location). This
+        // matches glyphsLib's designspace output for the same file.
+        assert_eq!(
+            axis_map(&font.axes[0]),
+            vec![
+                (200.0, 42.0),
+                (300.0, 61.0),
+                (400.0, 81.0),
+                (600.0, 101.0),
+                (700.0, 125.0),
+                (800.0, 151.0),
+                (900.0, 178.0),
+                (1000.0, 208.0),
+            ]
+        );
+        // The italic axis is unmapped (user == design) and runs 0..9.
+        assert_eq!(font.axes[1].tag, Tag::new(b"ital"));
+        assert_eq!(font.axes[1].min.unwrap().to_f64(), 0.0);
+        assert_eq!(font.axes[1].max.unwrap().to_f64(), 9.0);
+        assert_eq!(font.axes[1].default.unwrap().to_f64(), 0.0);
+        assert!(font.axes[1].map.is_none());
         assert!(font.default_master().is_some());
     }
 
@@ -1405,6 +1787,11 @@ mod tests {
         // Axes values are in userspace units
         assert_eq!(font.axes[0].min.unwrap().to_f64(), 100.0);
         assert_eq!(font.axes[0].max.unwrap().to_f64(), 600.0);
+        assert_eq!(font.axes[0].default.unwrap().to_f64(), 100.0);
+        // Every master carries an "Axis Location", so the mapping comes from
+        // those and not from the instances' weightClass values. Verified
+        // against glyphsLib's own output for this file.
+        assert_eq!(axis_map(&font.axes[0]), vec![(100.0, 1.0), (600.0, 199.0)]);
         // Master locations are in designspace units
         assert_eq!(
             font.masters[0]
@@ -1546,5 +1933,376 @@ mod tests {
             DesignLocation::from(vec![(Tag::new(b"wght"), DesignCoord::new(400.0))])
         );
         assert_eq!(font.axes[0].min, Some(UserCoord::new(400.0)));
+        // No instance supplies a distinct user location, so the axis is
+        // unmapped and spans the masters. Matches glyphsLib's output.
+        assert_eq!(font.axes[0].max, Some(UserCoord::new(700.0)));
+        assert_eq!(font.axes[0].default, Some(UserCoord::new(400.0)));
+        assert!(font.axes[0].map.is_none());
+    }
+
+    fn load_test_font(source: &str) -> Font {
+        load_str(source, PathBuf::from("test.glyphs")).unwrap()
+    }
+
+    fn axis_map(axis: &Axis) -> Vec<(f64, f64)> {
+        axis.map
+            .as_ref()
+            .map(|map| {
+                map.iter()
+                    .map(|(user, design)| (user.to_f64(), design.to_f64()))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    fn user(axis: &Axis, which: fn(&Axis) -> Option<UserCoord>) -> Option<f64> {
+        which(axis).map(|coord| coord.to_f64())
+    }
+
+    /// A two-master width-axis font. The design locations are deliberately not
+    /// the user-space percentages, so a raw class leaking through would show up.
+    const WIDTH_CLASS_FONT: &str = r#"{
+.formatVersion = 3;
+.appVersion = "3243";
+familyName = WidthClassTest;
+date = "2024-05-08 05:56:55 +0000";
+unitsPerEm = 1000;
+versionMajor = 1;
+versionMinor = 0;
+axes = (
+{
+name = Width;
+tag = wdth;
+}
+);
+metrics = ();
+fontMaster = (
+{
+id = m01;
+name = Condensed;
+axesValues = (0);
+metricValues = ();
+},
+{
+id = m02;
+name = Regular;
+axesValues = (1000);
+metricValues = ();
+}
+);
+glyphs = ();
+instances = (
+{
+name = Condensed;
+axesValues = (0);
+widthClass = 3;
+},
+{
+name = SemiCondensed;
+axesValues = (500);
+widthClass = 4;
+},
+{
+name = Regular;
+axesValues = (1000);
+widthClass = 5;
+}
+);
+}
+"#;
+
+    #[test]
+    fn width_class_is_a_percentage_not_a_raw_class() {
+        // An OS/2 width class of 4 means "semi-condensed", i.e. 87.5% of the
+        // normal width — the user-space value 4 is wrong (as is 3, "condensed").
+        let font = load_test_font(WIDTH_CLASS_FONT);
+        let axis = &font.axes[0];
+        assert_eq!(axis.tag, Tag::new(b"wdth"));
+        assert_eq!(
+            axis_map(axis),
+            vec![(75.0, 0.0), (87.5, 500.0), (100.0, 1000.0)]
+        );
+        assert_eq!(user(axis, |a| a.min), Some(75.0));
+        assert_eq!(user(axis, |a| a.max), Some(100.0));
+        // Default comes from the "Regular" master, inverted through the mapping.
+        assert_eq!(user(axis, |a| a.default), Some(100.0));
+    }
+
+    #[test]
+    fn instance_axis_location_overrides_the_width_class() {
+        // The "Axis Location" custom parameter is already in user space, so it
+        // wins over the width class (and, before this was fixed, it was read
+        // from the wrong place and ignored entirely).
+        let font = load_test_font(&WIDTH_CLASS_FONT.replace(
+            r#"name = Condensed;
+axesValues = (0);
+widthClass = 3;"#,
+            r#"name = Condensed;
+axesValues = (0);
+widthClass = 3;
+customParameters = (
+{
+name = "Axis Location";
+value = (
+{
+Axis = Width;
+Location = 80;
+}
+);
+}
+);"#,
+        ));
+        let axis = &font.axes[0];
+        assert_eq!(
+            axis_map(axis),
+            vec![(80.0, 0.0), (87.5, 500.0), (100.0, 1000.0)]
+        );
+        assert_eq!(user(axis, |a| a.min), Some(80.0));
+    }
+
+    #[test]
+    fn axis_location_on_masters_builds_the_mapping_from_masters() {
+        // When every master has an "Axis Location", that is the mapping; the
+        // instances' weight classes must not contribute extra points.
+        let font = load_test_font(
+            r#"{
+.formatVersion = 3;
+.appVersion = "3243";
+familyName = MasterAxisLocationTest;
+date = "2024-05-08 05:56:55 +0000";
+unitsPerEm = 1000;
+versionMajor = 1;
+versionMinor = 0;
+axes = (
+{
+name = Weight;
+tag = wght;
+}
+);
+metrics = ();
+fontMaster = (
+{
+id = m01;
+name = Thin;
+axesValues = (1);
+customParameters = (
+{
+name = "Axis Location";
+value = (
+{
+Axis = Weight;
+Location = 100;
+}
+);
+}
+);
+metricValues = ();
+},
+{
+id = m02;
+name = Bold;
+axesValues = (199);
+customParameters = (
+{
+name = "Axis Location";
+value = (
+{
+Axis = Weight;
+Location = 700;
+}
+);
+}
+);
+metricValues = ();
+}
+);
+glyphs = ();
+instances = (
+{
+name = Thin;
+axesValues = (1);
+weightClass = 100;
+},
+{
+name = Regular;
+axesValues = (100);
+weightClass = 400;
+},
+{
+name = Bold;
+axesValues = (199);
+weightClass = 700;
+}
+);
+}
+"#,
+        );
+        let axis = &font.axes[0];
+        assert_eq!(axis_map(axis), vec![(100.0, 1.0), (700.0, 199.0)]);
+        assert_eq!(user(axis, |a| a.min), Some(100.0));
+        assert_eq!(user(axis, |a| a.max), Some(700.0));
+        assert_eq!(user(axis, |a| a.default), Some(100.0));
+    }
+
+    #[test]
+    fn explicit_axis_mappings_take_precedence_over_instances() {
+        let font = load_test_font(
+            r#"{
+.formatVersion = 3;
+.appVersion = "3243";
+familyName = ExplicitMappingTest;
+date = "2024-05-08 05:56:55 +0000";
+unitsPerEm = 1000;
+versionMajor = 1;
+versionMinor = 0;
+axes = (
+{
+name = Weight;
+tag = wght;
+}
+);
+customParameters = (
+{
+name = "Axis Mappings";
+value = {
+wght = {
+300 = 1;
+900 = 199;
+};
+};
+}
+);
+metrics = ();
+fontMaster = (
+{
+id = m01;
+name = Light;
+axesValues = (1);
+metricValues = ();
+},
+{
+id = m02;
+name = Black;
+axesValues = (199);
+metricValues = ();
+}
+);
+glyphs = ();
+instances = (
+{
+name = Regular;
+axesValues = (100);
+weightClass = 400;
+}
+);
+}
+"#,
+        );
+        let axis = &font.axes[0];
+        // The instance's weightClass would map 400 -> 100 if it were consulted.
+        assert_eq!(axis_map(axis), vec![(300.0, 1.0), (900.0, 199.0)]);
+        assert_eq!(user(axis, |a| a.min), Some(300.0));
+        assert_eq!(user(axis, |a| a.max), Some(900.0));
+    }
+
+    #[test]
+    fn identity_mapping_is_elided() {
+        let font = load_test_font(
+            r#"{
+.formatVersion = 3;
+.appVersion = "3243";
+familyName = IdentityTest;
+date = "2024-05-08 05:56:55 +0000";
+unitsPerEm = 1000;
+versionMajor = 1;
+versionMinor = 0;
+axes = (
+{
+name = Weight;
+tag = wght;
+}
+);
+metrics = ();
+fontMaster = (
+{
+id = m01;
+name = Regular;
+axesValues = (400);
+metricValues = ();
+}
+);
+glyphs = ();
+instances = (
+{
+name = Regular;
+axesValues = (400);
+weightClass = 400;
+}
+);
+}
+"#,
+        );
+        let axis = &font.axes[0];
+        assert!(axis.map.is_none(), "an identity mapping must be elided");
+        assert_eq!(user(axis, |a| a.min), Some(400.0));
+        assert_eq!(user(axis, |a| a.max), Some(400.0));
+        assert_eq!(user(axis, |a| a.default), Some(400.0));
+    }
+
+    #[test]
+    fn instance_without_a_weight_class_defaults_to_400() {
+        // An instance with no `weightClass` is Glyphs' "Regular", i.e. 400 in
+        // user space — not its design location. (This replaces the old
+        // name-matching heuristic.)
+        let font = load_test_font(
+            r#"{
+.formatVersion = 3;
+.appVersion = "3243";
+familyName = DefaultWeightTest;
+date = "2024-05-08 05:56:55 +0000";
+unitsPerEm = 1000;
+versionMajor = 1;
+versionMinor = 0;
+axes = (
+{
+name = Weight;
+tag = wght;
+}
+);
+metrics = ();
+fontMaster = (
+{
+id = m01;
+name = Regular;
+axesValues = (94);
+metricValues = ();
+},
+{
+id = m02;
+name = Bold;
+axesValues = (152);
+metricValues = ();
+}
+);
+glyphs = ();
+instances = (
+{
+name = Regular;
+axesValues = (94);
+},
+{
+name = Bold;
+axesValues = (152);
+weightClass = 700;
+}
+);
+}
+"#,
+        );
+        let axis = &font.axes[0];
+        assert_eq!(axis_map(axis), vec![(400.0, 94.0), (700.0, 152.0)]);
+        assert_eq!(user(axis, |a| a.min), Some(400.0));
+        assert_eq!(user(axis, |a| a.max), Some(700.0));
+        assert_eq!(user(axis, |a| a.default), Some(400.0));
     }
 }

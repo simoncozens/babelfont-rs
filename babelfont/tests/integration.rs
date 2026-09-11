@@ -1,4 +1,4 @@
-use babelfont::{load, BabelfontError, Shape, Tag};
+use babelfont::{load, BabelfontError, NodeType, Shape, Tag};
 use fontdrasil::coords::UserCoord;
 use kurbo::Affine;
 use pretty_assertions::assert_eq;
@@ -188,4 +188,37 @@ fn test_ufo_export_unifies_glyphs3_rtl_kerning() {
             .copied(),
         Some(-80.0)
     );
+}
+
+#[test]
+fn test_load_vfb_quadratic_curves() {
+    // Regression test: VFB stores the off-curve control points of a quadratic
+    // run as `qcurve` nodes and the terminating on-curve point as a `line`
+    // node. These have to be rebuilt as off-curve nodes followed by an
+    // on-curve `QCurve` node, otherwise the glyph cannot be loaded at all.
+    let font = load("resources/IBMPlexSerif-Text.vfb").expect("Failed to load VFB");
+    let a = font.glyphs.get("a").expect("No 'a' glyph");
+
+    let mut qcurves = 0;
+    let mut offcurves = 0;
+    for layer in a.layers.iter() {
+        for shape in layer.shapes.iter() {
+            if let Shape::Path(path) = shape {
+                qcurves += path
+                    .nodes
+                    .iter()
+                    .filter(|n| n.nodetype == NodeType::QCurve)
+                    .count();
+                offcurves += path
+                    .nodes
+                    .iter()
+                    .filter(|n| n.nodetype == NodeType::OffCurve)
+                    .count();
+                // This is where the invalid contour structures used to blow up.
+                path.to_kurbo().expect("Path should convert to kurbo");
+            }
+        }
+    }
+    assert!(qcurves > 0, "Expected quadratic curves in glyph 'a'");
+    assert!(offcurves > 0, "Expected off-curve points in glyph 'a'");
 }
