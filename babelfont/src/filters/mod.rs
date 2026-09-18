@@ -121,6 +121,7 @@ declare_filters! {
         #[cfg(feature = "linesweeper")]
         RemoveOverlaps(removeoverlaps) => "removeoverlaps",
         CorrectPathDirection(correctpathdirection) => "correctpathdirection",
+        ReversePathDirection(reversepathdirection) => "reversepathdirection",
         MakeCompatible(makecompatible) => "makecompatible",
         Recompose(recomposition) => "recompose",
     }
