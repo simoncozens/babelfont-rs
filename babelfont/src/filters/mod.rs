@@ -111,6 +111,7 @@ declare_filters! {
         DropSparseMasters(dropsparsemasters) => "dropsparsemasters",
         DropIncompatiblePaths(dropincompatiblepaths) => "dropincompatiblepaths",
         RetainGlyphs(retainglyphs) => "retainglyphs",
+        DropAlternateUnicodes(dropalternateunicodes) => "dropalternateunicodes",
     }
     group "Filters for manipulating outlines" {
         DecomposeComponentReferences(decomposecomponentreferences) => "decomposecomponents",
