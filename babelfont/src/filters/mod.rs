@@ -115,6 +115,7 @@ declare_filters! {
     }
     group "Filters for keeping what the source states" {
         KeepSourceGlyphNames(keepsourceglyphnames) => "keepsourceglyphnames",
+        KeepSourceAdvances(keepsourceadvances) => "keepsourceadvances",
     }
     group "Filters for manipulating outlines" {
         DecomposeComponentReferences(decomposecomponentreferences) => "decomposecomponents",
