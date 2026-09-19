@@ -762,6 +762,89 @@ fn test_chain_context_emission() {
     );
 }
 
+/// The SFD of `test_chain_context_emission` with `Other Lookup` registered only
+/// to `aalt`, and with or without the chain rule's call to it.
+fn chain_target_sfd(calls_other_lookup: bool) -> String {
+    let seq_lookups = if calls_other_lookup {
+        " 1\n  SeqLookup: 0 \"Other Lookup\"\n"
+    } else {
+        " 0\n"
+    };
+    format!(
+        concat!(
+            "SplineFontDB: 3.0\n",
+            "Lookup: 6 0 0 \"Chain Lookup\" {{\"chain-sub-1\"}} [\n",
+            "ChainSub2: coverage \"chain-sub-1\"  0 0 0 1\n",
+            " 1 0 1\n",
+            "  Coverage: 2 glyph_a glyph_b\n",
+            "  FCoverage: 1 glyph_c\n",
+            "{seq_lookups}",
+            "EndFPST\n",
+            "Lookup: 1 0 0 \"Other Lookup\" {{\"other-sub\"}} ['aalt' ('DFLT' <'dflt' > ) ]\n",
+            "BeginChars: 4 4\n",
+            "StartChar: space\n",
+            "Encoding: 32 32 0\n",
+            "Width: 250\n",
+            "EndChar\n",
+            "StartChar: glyph_a\n",
+            "Encoding: 97 97 1\n",
+            "Width: 250\n",
+            "Substitution2: \"other-sub\" glyph_b\n",
+            "EndChar\n",
+            "StartChar: glyph_b\n",
+            "Encoding: 98 98 2\n",
+            "Width: 250\n",
+            "EndChar\n",
+            "StartChar: glyph_c\n",
+            "Encoding: 99 99 3\n",
+            "Width: 250\n",
+            "EndChar\n",
+            "EndChars\n",
+            "EndSplineFont\n"
+        ),
+        seq_lookups = seq_lookups
+    )
+}
+
+#[test]
+fn test_aalt_only_lookup_called_from_a_chain_is_still_defined() {
+    // A lookup whose only feature registration is `aalt` has its single and
+    // alternate substitutions inlined into the feature, so it is not written out
+    // as a feature prefix. But a chain context may still call it by name, and that
+    // call needs a definition to refer to.
+    let data = chain_target_sfd(true);
+    let font = load_str(&data).expect("Failed to parse chain context SFD");
+    let fea = font.features.to_fea();
+
+    assert!(
+        fea.contains("sub [glyph_a glyph_b]' lookup Other_Lookup glyph_c;"),
+        "The chain rule should still call the aalt-only lookup:\n{fea}"
+    );
+    assert!(
+        fea.contains("lookup Other_Lookup {"),
+        "...and the lookup it calls must be defined, or the call dangles:\n{fea}"
+    );
+}
+
+#[test]
+fn test_aalt_only_lookup_nothing_calls_is_not_defined() {
+    // The converse, and the reason the suppression exists: with no chain calling
+    // it, an aalt-only lookup written out as a prefix is a named lookup nothing
+    // references.
+    let data = chain_target_sfd(false);
+    let font = load_str(&data).expect("Failed to parse chain context SFD");
+    let fea = font.features.to_fea();
+
+    assert!(
+        !fea.contains("lookup Other_Lookup {"),
+        "An aalt-only lookup no chain calls should not be emitted:\n{fea}"
+    );
+    assert!(
+        fea.contains("feature aalt {\nsub glyph_a by glyph_b;"),
+        "aalt must still carry the inlined rule:\n{fea}"
+    );
+}
+
 #[test]
 fn test_class_fpst_emission() {
     // A `class` FPST defines its glyph classes once and then lists rules that
