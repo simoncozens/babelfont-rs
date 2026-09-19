@@ -119,6 +119,7 @@ declare_filters! {
     }
     group "Filters for manipulating outlines" {
         DecomposeComponentReferences(decomposecomponentreferences) => "decomposecomponents",
+        SnapComponentTransforms(snapcomponenttransforms) => "snapcomponenttransforms",
         CubicToQuadratic(cubic2quadratic) => "cubic2quadratic",
         QuadraticToCubic(quadratic2cubic) => "quadratic2cubic",
         CleanupPaths(cleanuppaths) => "cleanuppaths",
