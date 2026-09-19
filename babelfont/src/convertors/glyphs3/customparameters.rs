@@ -41,8 +41,49 @@ pub(crate) const VERTICAL_METRIC_TYPES: [MetricType; 8] = [
     MetricType::HheaLineGap,
 ];
 
-pub(crate) fn is_vertical_metric_cp(metric: &MetricType) -> bool {
-    VERTICAL_METRIC_TYPES.contains(metric)
+/// The OS/2 and post fields a FontForge SFD carries in its header
+/// (`OS2SubXSize`, `OS2StrikeYPos`, `UnderlinePosition` ...) and that babelfont
+/// parses into the master's metric map.
+///
+/// None of these is a Glyphs 3 metric *type*. A `metrics` entry is keyed by its
+/// `type`, and `glyphslib` enumerates eleven of them -- ascender, cap height,
+/// slant height, x-height, midHeight, topHeight, bodyHeight, descender, baseline,
+/// italic angle, italic slope. Everything here is a custom parameter in that
+/// format, and a custom parameter is where every compiler looks.
+///
+/// Writing them into `metrics` under a `name` therefore put the values in the
+/// source in a form nothing reads. fontc's `RawMetric` carries only `type_`, so
+/// the plist derive drops the `name` key, the entry parses with an empty type,
+/// and it collapses under the fold that keys metrics by type; glyphsLib keeps the
+/// `name`, assigns no type, and hands ufo2ft a UFO with the defaults in place.
+/// The built font then falls back to those defaults -- on Krona One,
+/// `post.underlinePosition` went out as -100 where the release has -75.
+/// Measured across 121 styles in 100 merged repositories, every one was affected.
+///
+/// Fixed order so the emitted .glyphs is reproducible.
+pub(crate) const OS2_METRIC_TYPES: [MetricType; 12] = [
+    MetricType::UnderlinePosition,
+    MetricType::UnderlineThickness,
+    MetricType::StrikeoutSize,
+    MetricType::StrikeoutPosition,
+    MetricType::SubscriptXSize,
+    MetricType::SubscriptYSize,
+    MetricType::SubscriptXOffset,
+    MetricType::SubscriptYOffset,
+    MetricType::SuperscriptXSize,
+    MetricType::SuperscriptYSize,
+    MetricType::SuperscriptXOffset,
+    MetricType::SuperscriptYOffset,
+];
+
+/// Every metric that must leave as a custom parameter rather than as an entry in
+/// the `metrics` array.
+pub(crate) fn is_custom_parameter_metric(metric: &MetricType) -> bool {
+    VERTICAL_METRIC_TYPES.contains(metric) || OS2_METRIC_TYPES.contains(metric)
+}
+
+fn cp_metric_types() -> impl Iterator<Item = MetricType> {
+    VERTICAL_METRIC_TYPES.into_iter().chain(OS2_METRIC_TYPES)
 }
 
 /// The enabled value of a custom parameter, unwrapped from the
@@ -78,14 +119,12 @@ fn cp_metric_value(format_specific: &FormatSpecific, metric: &MetricType) -> Opt
 /// each master's metric map, a master-level parameter overriding a font-level
 /// one (the resolution order Glyphs itself uses).
 fn interpret_vertical_metrics(font: &mut Font) -> Result<(), BabelfontError> {
-    let font_level: Vec<(MetricType, i32)> = VERTICAL_METRIC_TYPES
-        .iter()
-        .filter_map(|metric| {
-            cp_metric_value(&font.format_specific, metric).map(|v| (metric.clone(), v))
-        })
+    let font_level: Vec<(MetricType, i32)> = cp_metric_types()
+        .filter_map(|metric| cp_metric_value(&font.format_specific, &metric).map(|v| (metric, v)))
         .collect();
+    let all: Vec<MetricType> = cp_metric_types().collect();
     for master in font.masters.iter_mut() {
-        for metric in VERTICAL_METRIC_TYPES.iter() {
+        for metric in all.iter() {
             if master.metrics.contains_key(metric) {
                 continue;
             }
@@ -116,7 +155,7 @@ pub(crate) fn append_master_vertical_metrics(
     master: &crate::Master,
     font_format_specific: &FormatSpecific,
 ) {
-    for metric in VERTICAL_METRIC_TYPES {
+    for metric in cp_metric_types() {
         if let Some(&value) = master.metrics.get(&metric) {
             if custom_parameters
                 .iter()
@@ -336,6 +375,63 @@ mod tests {
             .custom_parameters
             .iter()
             .any(|cp| cp.name == "Use Typo Metrics"));
+    }
+
+    #[test]
+    fn test_os2_and_post_metrics_leave_as_custom_parameters_not_named_metrics() {
+        use crate::{Master, MetricType};
+        use glyphslib::Plist;
+
+        // The defect this guards: these twelve were written into the `metrics` array
+        // as entries carrying a `name`. A Glyphs 3 metrics entry is keyed by its
+        // `type`, so a name-only entry is data no compiler reads -- fontc's RawMetric
+        // carries only type_, and glyphsLib assigns no type either.
+        let mut font = crate::Font::new();
+        let mut master = Master::default();
+        for (metric, value) in [
+            (MetricType::UnderlinePosition, -50),
+            (MetricType::UnderlineThickness, 50),
+            (MetricType::StrikeoutSize, 102),
+            (MetricType::StrikeoutPosition, 512),
+            (MetricType::SubscriptXSize, 1434),
+            (MetricType::SuperscriptYOffset, 977),
+            // A real metric type, to prove the filter is selective.
+            (MetricType::Ascender, 1638),
+        ] {
+            master.metrics.insert(metric, value);
+        }
+        font.masters.push(master);
+
+        let glyphs = as_glyphs3(&font).unwrap();
+
+        let master_cps = &glyphs.masters[0].custom_parameters;
+        let cp = |name: &str| {
+            master_cps
+                .iter()
+                .find(|c| c.name == name)
+                .map(|c| c.value.clone())
+        };
+        assert_eq!(cp("underlinePosition"), Some(Plist::Integer(-50)));
+        assert_eq!(cp("underlineThickness"), Some(Plist::Integer(50)));
+        assert_eq!(cp("strikeoutSize"), Some(Plist::Integer(102)));
+        assert_eq!(cp("strikeoutPosition"), Some(Plist::Integer(512)));
+        assert_eq!(cp("subscriptXSize"), Some(Plist::Integer(1434)));
+        assert_eq!(cp("superscriptYOffset"), Some(Plist::Integer(977)));
+
+        // ...and none of them is left in the metrics array. The invariant is stronger
+        // than "these six are absent": NO entry may carry a `name`, because an entry
+        // is keyed by its `metric_type` and a name-only one collapses on read.
+        let described: Vec<String> = glyphs
+            .metrics
+            .iter()
+            .map(|m| format!("{:?}/{:?}", m.metric_type, m.name))
+            .collect();
+        assert!(
+            glyphs.metrics.iter().all(|m| m.name.is_empty()),
+            "no metrics entry may be keyed by name, got {described:?}"
+        );
+        // The one real metric type still is one.
+        assert_eq!(glyphs.metrics.len(), 1, "got {described:?}");
     }
 
     #[test]

@@ -1320,9 +1320,11 @@ pub(crate) fn as_glyphs3(font: &Font) -> Result<glyphs3::Glyphs3, BabelfontError
             if key.as_str().ends_with(" overshoot") {
                 continue;
             }
-            // OS/2 + hhea vertical metrics are emitted as custom parameters
-            // (append_master_vertical_metrics), not as metric slots.
-            if customparameters::is_vertical_metric_cp(key) {
+            // OS/2 + hhea vertical metrics, and the OS/2 sub/superscript,
+            // strikeout and underline fields, are emitted as custom parameters
+            // (append_master_vertical_metrics), not as metric slots. A named
+            // entry in the metrics array is data no compiler reads.
+            if customparameters::is_custom_parameter_metric(key) {
                 continue;
             }
             if !our_metrics.contains(key) {
