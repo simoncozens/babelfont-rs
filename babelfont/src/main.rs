@@ -191,6 +191,13 @@ fn main() {
         log::info!("Applied filters in {:.2?}", after_filters - before_filters);
     }
 
+    // An enabled "Don't use Production Names" custom parameter set to 1, as
+    // --keep-source-glyph-names writes it, makes the request --no-production-names makes.
+    #[cfg(feature = "fontir")]
+    if compiling && babelfont::filters::KeepSourceGlyphNames::is_requested(&input) {
+        compilation_options.dont_use_production_names = true;
+    }
+
     log::info!("Saving {}", output_name.display());
     if output_name == to_stdout {
         println!("{}", serde_json::to_string_pretty(&input).unwrap());

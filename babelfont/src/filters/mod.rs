@@ -118,6 +118,9 @@ declare_filters! {
         FontForgeHeightGlyphCountMean(fontforgeheightglyphcountmean) => "fontforgeheightglyphcountmean",
         FontForgeOs2Defaults(fontforgeos2defaults) => "fontforgeos2defaults",
     }
+    group "Filters for keeping what the source states" {
+        KeepSourceGlyphNames(keepsourceglyphnames) => "keepsourceglyphnames",
+    }
     group "Filters for manipulating outlines" {
         DecomposeComponentReferences(decomposecomponentreferences) => "decomposecomponents",
         CubicToQuadratic(cubic2quadratic) => "cubic2quadratic",
