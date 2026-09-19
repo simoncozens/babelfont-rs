@@ -138,6 +138,7 @@ declare_filters! {
         GlyphsStylisticSetLabel(glyphsstylisticsetlabel) => "glyphsstylisticsetlabel",
         GlyphsBracketLayers(glyphsbracketlayers) => "glyphsbracketlayers",
         SetSubcategory(setsubcategory) => "setsubcategory",
+        KeepSourceGlyphNames(keepsourceglyphnames) => "keepsourceglyphnames",
     }
     group "Filters for manipulating feature code" {
         ResolveIncludes(resolveincludes) => "resolveincludes",
