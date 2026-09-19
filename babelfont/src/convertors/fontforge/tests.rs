@@ -290,6 +290,73 @@ fn test_blank_script_tag_becomes_dflt() {
 }
 
 #[test]
+fn test_quoted_glyph_name_is_decoded_and_trimmed() {
+    // A quoted name is modified UTF-7, and FontForge can leave whitespace after
+    // the closing quote:
+    //   StartChar: "C+AJIA-rculo0"<space>
+    // names the glyph `C`, U+0092, `rculo0`.
+    let data = concat!(
+        "SplineFontDB: 3.0\n",
+        "Ascent: 800\n",
+        "Descent: 200\n",
+        "LayerCount: 2\n",
+        "Layer: 0 0 \"Back\" 1\n",
+        "Layer: 1 0 \"Fore\" 0\n",
+        "BeginChars: 2 2\n",
+        "StartChar: \"C+AJIA-rculo0\" \n",
+        "Encoding: 57351 57351 0\n",
+        "Width: 600\n",
+        "Fore\n",
+        "EndChar\n",
+        "StartChar: A\n",
+        "Encoding: 65 65 1\n",
+        "Width: 600\n",
+        "Fore\n",
+        "EndChar\n",
+        "EndChars\n",
+        "EndSplineFont\n"
+    );
+    let font = load_str(data).expect("Failed to parse quoted-name SFD");
+    let names: Vec<&str> = font.glyphs.0.iter().map(|g| g.name.as_str()).collect();
+    assert_eq!(names, vec!["C\u{92}rculo0", "A"]);
+}
+
+#[test]
+fn test_unquoted_glyph_name_is_literal() {
+    // FontForge writes a name of printable ASCII unquoted and reads it back as
+    // it stands, so a `+` in it is not a modified-UTF-7 shift.
+    let data = concat!(
+        "SplineFontDB: 3.0\n",
+        "Ascent: 800\n",
+        "Descent: 200\n",
+        "LayerCount: 2\n",
+        "Layer: 0 0 \"Back\" 1\n",
+        "Layer: 1 0 \"Fore\" 0\n",
+        "BeginChars: 3 3\n",
+        "StartChar: a+b\n",
+        "Encoding: 65536 -1 0\n",
+        "Width: 600\n",
+        "Fore\n",
+        "EndChar\n",
+        "StartChar: a+-b\n",
+        "Encoding: 65537 -1 1\n",
+        "Width: 600\n",
+        "Fore\n",
+        "EndChar\n",
+        "StartChar: a\n",
+        "Encoding: 97 97 2\n",
+        "Width: 600\n",
+        "Fore\n",
+        "EndChar\n",
+        "EndChars\n",
+        "EndSplineFont\n"
+    );
+    let font = load_str(data).expect("Failed to parse unquoted-name SFD");
+    let names: Vec<&str> = font.glyphs.0.iter().map(|g| g.name.as_str()).collect();
+    assert_eq!(names, vec!["a+b", "a+-b", "a"]);
+}
+
+#[test]
 fn test_load_sfdir() {
     // An SFDir is an exploded SFD: font.props holds the header and each
     // glyph is a standalone StartChar block in its own *.glyph file

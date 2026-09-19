@@ -1442,7 +1442,20 @@ impl SfdParser {
             .split_once(": ")
             .map(|(_, v)| v.to_string())
             .unwrap_or_else(|| data[0].clone());
-        let glyph_name = name_line.trim_matches('"');
+        // FontForge quotes a glyph name only when it has a character other than
+        // printable ASCII, tab, CR or LF, and a quoted name is in its modified UTF-7,
+        // like subtable, lookup, class and nameid strings. An unquoted name is
+        // literal, `+` included. FontForge can leave whitespace after the closing
+        // quote.
+        let name_line = name_line.trim();
+        let decoded_name = match name_line
+            .strip_prefix('"')
+            .and_then(|name| name.strip_suffix('"'))
+        {
+            Some(quoted) => decode_utf7(quoted),
+            None => name_line.to_string(),
+        };
+        let glyph_name = decoded_name.as_str();
         let mut glyph = Glyph::new(glyph_name);
         glyph.exported = true; // All FontForge glyphs are exported by default
 
