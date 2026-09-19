@@ -113,6 +113,9 @@ declare_filters! {
         RetainGlyphs(retainglyphs) => "retainglyphs",
         DropAlternateUnicodes(dropalternateunicodes) => "dropalternateunicodes",
     }
+    group "Filters for keeping what the source states" {
+        KeepSourceGlyphNames(keepsourceglyphnames) => "keepsourceglyphnames",
+    }
     group "Filters for manipulating outlines" {
         DecomposeComponentReferences(decomposecomponentreferences) => "decomposecomponents",
         CubicToQuadratic(cubic2quadratic) => "cubic2quadratic",
