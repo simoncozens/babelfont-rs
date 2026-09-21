@@ -60,8 +60,11 @@ pub fn fontmerge(
         .and_then(|p| p.parent())
         .unwrap_or(std::path::Path::new("."));
     if layout_handling == LayoutHandling::Closure {
-        let closed_glyphset = close_layout(&font2, font2_glyphnames.into_iter().cloned().collect())
-            .expect("Failed to perform layout closure");
+        let closed_glyphset = close_layout(
+            &font2,
+            glyphset_filter.incoming_glyphset.into_iter().collect(),
+        )
+        .expect("Failed to perform layout closure");
         glyphset_filter.incoming_glyphset = closed_glyphset.iter().cloned().collect();
     }
 
