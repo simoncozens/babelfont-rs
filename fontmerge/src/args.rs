@@ -153,7 +153,10 @@ fn parse_codepoint(input: &str) -> Result<char, String> {
     }
 
     let input = input.to_lowercase();
-    let input = input.trim_start_matches("u+").trim_start_matches("0x");
+    let input = input
+        .trim_start_matches("u+")
+        .trim_start_matches("0x")
+        .trim();
     let cp = u32::from_str_radix(input, 16).map_err(|_| format!("Invalid codepoint: {}", input))?;
 
     char::from_u32(cp).ok_or_else(|| format!("Invalid Unicode codepoint: U+{:04X}", cp))
@@ -165,6 +168,11 @@ pub fn parse_codepoints(input: &str) -> Result<CodepointArgs, String> {
     let mut result = Vec::new();
 
     for item in input.split(",") {
+        // Handle comments
+        let item = item.split("#").next().unwrap_or("").trim();
+        if item.is_empty() {
+            continue;
+        }
         if item.contains('-') {
             // Parse range
             let parts: Vec<&str> = item.split('-').collect();
