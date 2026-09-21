@@ -13,8 +13,8 @@ use babelfont::{
     filters::{DropFeatures, FontFilter as _, ResolveIncludes, RetainGlyphs},
 };
 use fea_rs_ast::{
-    fea_rs::{self, GlyphMap},
     AsFea as _,
+    fea_rs::{self, GlyphMap},
 };
 use indexmap::IndexSet;
 use indicatif::ProgressIterator;
@@ -49,11 +49,6 @@ pub fn fontmerge(
     glyphset_filter.check_for_presence(&font2);
     let existing_handling = glyphset_filter.existing_glyph_handling;
 
-    let font2_glyphnames = font2
-        .glyphs
-        .iter()
-        .map(|g| &g.name)
-        .collect::<Vec<&SmolStr>>();
     let font1_root = font1
         .source
         .as_ref()
