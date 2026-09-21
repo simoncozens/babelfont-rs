@@ -112,6 +112,9 @@ declare_filters! {
         DropIncompatiblePaths(dropincompatiblepaths) => "dropincompatiblepaths",
         RetainGlyphs(retainglyphs) => "retainglyphs",
     }
+    group "Filters for reproducing a legacy FontForge export" {
+        FontForgeUnderlinePosition(fontforgeunderlineposition) => "fontforgeunderlineposition",
+    }
     group "Filters for manipulating outlines" {
         DecomposeComponentReferences(decomposecomponentreferences) => "decomposecomponents",
         CubicToQuadratic(cubic2quadratic) => "cubic2quadratic",
