@@ -12,6 +12,14 @@ documentation = "https://docs.rs/fontmerge"
 keywords = ["fonts", "typography", "merge", "opentype", "font-tools"]
 categories = ["command-line-utilities", "text-processing"]
 
+[[bin]]
+name = "fontmerge"
+path = "src/main.rs"
+
+[[bin]]
+name = "fontsubset"
+path = "src/fontsubset.rs"
+
 [dependencies]
 babelfont = { version = "0.2.1", path = "../babelfont" }
 clap = { workspace = true, features = ["derive"] }

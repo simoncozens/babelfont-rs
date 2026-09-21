@@ -13,12 +13,12 @@ use babelfont::{
     filters::{DropFeatures, FontFilter as _, ResolveIncludes, RetainGlyphs},
 };
 use fea_rs_ast::{
-    AsFea as _,
     fea_rs::{self, GlyphMap},
+    AsFea as _,
 };
 use indexmap::IndexSet;
 use indicatif::ProgressIterator;
-mod args;
+pub mod args;
 mod designspace;
 mod error;
 mod glyphset;
