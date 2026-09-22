@@ -11,10 +11,11 @@
 use babelfont::{
     close_layout,
     filters::{DropFeatures, FontFilter as _, ResolveIncludes, RetainGlyphs},
+    Features, GlyphList,
 };
 use fea_rs_ast::{
-    AsFea as _,
     fea_rs::{self, GlyphMap},
+    AsFea as _,
 };
 use indexmap::IndexSet;
 use indicatif::ProgressIterator;
@@ -38,6 +39,24 @@ use crate::{
 use babelfont::SmolStr;
 
 use std::path::PathBuf;
+
+pub fn fontsubset(
+    font1: babelfont::Font,
+    glyphset_filter: glyphset::GlyphsetFilter,
+    layout_handling: LayoutHandling,
+    process_avar_mapping: bool,
+) -> Result<babelfont::Font, error::FontmergeError> {
+    let mut target = font1.clone();
+    target.features = Features::default();
+    target.glyphs = GlyphList::default();
+    fontmerge(
+        target,
+        font1,
+        glyphset_filter,
+        layout_handling,
+        process_avar_mapping,
+    )
+}
 
 pub fn fontmerge(
     mut font1: babelfont::Font,

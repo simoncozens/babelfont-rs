@@ -95,6 +95,40 @@ impl GlyphsetFilter {
         }
     }
 
+    /// Creates a new `GlyphsetFilter` from a list of glyphs to include.
+    pub fn new_from_glyphs(
+        include_glyphs: Vec<SmolStr>,
+        font1: &mut babelfont::Font,
+        font2: &babelfont::Font,
+        existing_glyph_handling: ExistingGlyphHandling,
+    ) -> Self {
+        GlyphsetFilter::new(
+            include_glyphs,
+            vec![],
+            vec![],
+            font1,
+            font2,
+            existing_glyph_handling,
+        )
+    }
+
+    /// Creates a new `GlyphsetFilter` from a list of codepoints to include.
+    pub fn new_from_codepoints(
+        include_codepoints: Vec<char>,
+        font1: &mut babelfont::Font,
+        font2: &babelfont::Font,
+        existing_glyph_handling: ExistingGlyphHandling,
+    ) -> Self {
+        GlyphsetFilter::new(
+            vec![],
+            vec![],
+            include_codepoints,
+            font1,
+            font2,
+            existing_glyph_handling,
+        )
+    }
+
     pub(crate) fn de_encode(&self, font_1: &mut Font, font_2: &mut Font) {
         let mut existing_codepoints: IndexSet<u32> = IndexSet::new();
         for glyph in font_1.glyphs.iter_mut() {
