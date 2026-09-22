@@ -9,13 +9,12 @@
 //! [`Args`](crate::Args) / [`GlyphsetFilter`](crate::GlyphsetFilter) types for
 //! the entry points.
 use babelfont::{
-    close_layout,
+    Features, GlyphList, close_layout,
     filters::{DropFeatures, FontFilter as _, ResolveIncludes, RetainGlyphs},
-    Features, GlyphList,
 };
 use fea_rs_ast::{
-    fea_rs::{self, GlyphMap},
     AsFea as _,
+    fea_rs::{self, GlyphMap},
 };
 use indexmap::IndexSet;
 use indicatif::ProgressIterator;
