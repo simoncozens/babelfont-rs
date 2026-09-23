@@ -8,7 +8,7 @@ use crate::{
 pub(crate) fn interpret_custom_parameters(font: &mut Font) -> Result<(), BabelfontError> {
     interpret_variable_font_origin(font)?;
     interpret_use_typo_metrics(font)?;
-    interpret_vertical_metrics(font)?;
+    interpret_metric_custom_parameters(font)?;
     Ok(())
 }
 
@@ -22,15 +22,21 @@ pub(crate) fn export_font_level_cps(
     Ok(())
 }
 
-/// The OS/2 and `hhea` vertical metrics that Glyphs stores as custom
-/// parameters (master-level, falling back to font-level), not as entries in
-/// the `metrics` array. fontc (and Glyphs) read these as custom parameters,
-/// so emitting them as metric slots — which the generic metric export
-/// otherwise does — leaves them ignored and the built font falls back to
-/// computed bbox defaults (wrong line height).
+/// The metrics Glyphs keeps in `customParameters` rather than in the `metrics`
+/// array: the `OS/2` and `hhea` vertical metrics, and the `OS/2`
+/// sub/superscript and strikeout and `post` underline fields.
 ///
-/// Fixed order so the emitted .glyphs is reproducible.
-pub(crate) const VERTICAL_METRIC_TYPES: [MetricType; 8] = [
+/// A Glyphs 3 `metrics` entry is keyed by its `type`, and the types that exist
+/// are all design positions or angles: ascender, cap height, slant height,
+/// x-height, midHeight, topHeight, bodyHeight, descender, baseline, italic
+/// angle, italic slope. None of the metrics below is one of them, so an entry
+/// naming one is keyed by nothing and its value is unreachable. A custom
+/// parameter is where Glyphs stores these, and so where a compiler reads them.
+///
+/// Read by [`interpret_metric_custom_parameters`] and written by
+/// [`append_master_metric_custom_parameters`]. Those two are twins, so they
+/// share this one list. Order is fixed to keep the emitted .glyphs reproducible.
+pub(crate) const CUSTOM_PARAMETER_METRIC_TYPES: [MetricType; 20] = [
     MetricType::TypoAscender,
     MetricType::TypoDescender,
     MetricType::TypoLineGap,
@@ -39,29 +45,6 @@ pub(crate) const VERTICAL_METRIC_TYPES: [MetricType; 8] = [
     MetricType::HheaAscender,
     MetricType::HheaDescender,
     MetricType::HheaLineGap,
-];
-
-/// The OS/2 and post fields a FontForge SFD carries in its header
-/// (`OS2SubXSize`, `OS2StrikeYPos`, `UnderlinePosition` ...) and that babelfont
-/// parses into the master's metric map.
-///
-/// None of these is a Glyphs 3 metric *type*. A `metrics` entry is keyed by its
-/// `type`, and `glyphslib` enumerates eleven of them -- ascender, cap height,
-/// slant height, x-height, midHeight, topHeight, bodyHeight, descender, baseline,
-/// italic angle, italic slope. Everything here is a custom parameter in that
-/// format, and a custom parameter is where every compiler looks.
-///
-/// Writing them into `metrics` under a `name` therefore put the values in the
-/// source in a form nothing reads. fontc's `RawMetric` carries only `type_`, so
-/// the plist derive drops the `name` key, the entry parses with an empty type,
-/// and it collapses under the fold that keys metrics by type; glyphsLib keeps the
-/// `name`, assigns no type, and hands ufo2ft a UFO with the defaults in place.
-/// The built font then falls back to those defaults -- on Krona One,
-/// `post.underlinePosition` went out as -100 where the release has -75.
-/// Measured across 121 styles in 100 merged repositories, every one was affected.
-///
-/// Fixed order so the emitted .glyphs is reproducible.
-pub(crate) const OS2_METRIC_TYPES: [MetricType; 12] = [
     MetricType::UnderlinePosition,
     MetricType::UnderlineThickness,
     MetricType::StrikeoutSize,
@@ -76,14 +59,10 @@ pub(crate) const OS2_METRIC_TYPES: [MetricType; 12] = [
     MetricType::SuperscriptYOffset,
 ];
 
-/// Every metric that must leave as a custom parameter rather than as an entry in
-/// the `metrics` array.
+/// Whether a metric belongs in `customParameters` instead of the `metrics`
+/// array.
 pub(crate) fn is_custom_parameter_metric(metric: &MetricType) -> bool {
-    VERTICAL_METRIC_TYPES.contains(metric) || OS2_METRIC_TYPES.contains(metric)
-}
-
-fn cp_metric_types() -> impl Iterator<Item = MetricType> {
-    VERTICAL_METRIC_TYPES.into_iter().chain(OS2_METRIC_TYPES)
+    CUSTOM_PARAMETER_METRIC_TYPES.contains(metric)
 }
 
 /// The enabled value of a custom parameter, unwrapped from the
@@ -104,8 +83,8 @@ pub(crate) fn enabled_cp_value<'a>(
     wrapper.get("value")
 }
 
-/// A vertical-metric custom parameter's numeric value, or `None` when absent,
-/// disabled, or non-numeric.
+/// A metric custom parameter's numeric value, or `None` when absent, disabled,
+/// or non-numeric.
 fn cp_metric_value(format_specific: &FormatSpecific, metric: &MetricType) -> Option<i32> {
     let value = enabled_cp_value(format_specific, metric.as_str())?;
     value
@@ -114,17 +93,19 @@ fn cp_metric_value(format_specific: &FormatSpecific, metric: &MetricType) -> Opt
         .map(|v| v as i32)
 }
 
-/// The load-side twin of [`append_master_vertical_metrics`]: read the OS/2 +
-/// hhea vertical metrics a Glyphs source declares as custom parameters into
-/// each master's metric map, a master-level parameter overriding a font-level
-/// one (the resolution order Glyphs itself uses).
-fn interpret_vertical_metrics(font: &mut Font) -> Result<(), BabelfontError> {
-    let font_level: Vec<(MetricType, i32)> = cp_metric_types()
-        .filter_map(|metric| cp_metric_value(&font.format_specific, &metric).map(|v| (metric, v)))
+/// The load-side twin of [`append_master_metric_custom_parameters`]: read every
+/// metric a Glyphs source declares as a custom parameter into each master's
+/// metric map, a master-level parameter overriding a font-level one (the
+/// resolution order Glyphs itself uses).
+fn interpret_metric_custom_parameters(font: &mut Font) -> Result<(), BabelfontError> {
+    let font_level: Vec<(MetricType, i32)> = CUSTOM_PARAMETER_METRIC_TYPES
+        .iter()
+        .filter_map(|metric| {
+            cp_metric_value(&font.format_specific, metric).map(|v| (metric.clone(), v))
+        })
         .collect();
-    let all: Vec<MetricType> = cp_metric_types().collect();
     for master in font.masters.iter_mut() {
-        for metric in all.iter() {
+        for metric in CUSTOM_PARAMETER_METRIC_TYPES.iter() {
             if master.metrics.contains_key(metric) {
                 continue;
             }
@@ -142,20 +123,19 @@ fn interpret_vertical_metrics(font: &mut Font) -> Result<(), BabelfontError> {
     Ok(())
 }
 
-/// Emit a master's OS/2 + hhea vertical metrics (parsed into its metric map,
-/// e.g. from a FontForge SFD's `OS2TypoAscent`/`OS2WinAscent`/`HheadAscent`
-/// fields) as *master-level* custom parameters with values.
+/// Emit the [`CUSTOM_PARAMETER_METRIC_TYPES`] a master carries in its metric map
+/// as *master-level* custom parameters.
 ///
 /// Parameters already present (typically restored verbatim from the master's
 /// `format_specific` on a Glyphs→Glyphs round-trip) are left untouched, as is
 /// any metric whose value a *font-level* parameter already carries — echoing
 /// it onto every master would churn round-tripped files.
-pub(crate) fn append_master_vertical_metrics(
+pub(crate) fn append_master_metric_custom_parameters(
     custom_parameters: &mut Vec<CustomParameter>,
     master: &crate::Master,
     font_format_specific: &FormatSpecific,
 ) {
-    for metric in cp_metric_types() {
+    for metric in CUSTOM_PARAMETER_METRIC_TYPES {
         if let Some(&value) = master.metrics.get(&metric) {
             if custom_parameters
                 .iter()
@@ -382,10 +362,9 @@ mod tests {
         use crate::{Master, MetricType};
         use glyphslib::Plist;
 
-        // The defect this guards: these twelve were written into the `metrics` array
-        // as entries carrying a `name`. A Glyphs 3 metrics entry is keyed by its
-        // `type`, so a name-only entry is data no compiler reads -- fontc's RawMetric
-        // carries only type_, and glyphsLib assigns no type either.
+        // These used to be written into the `metrics` array as entries carrying a
+        // `name`. An entry is keyed by its `type`, so a name-only entry carries its
+        // value nowhere.
         let mut font = crate::Font::new();
         let mut master = Master::default();
         for (metric, value) in [
@@ -418,9 +397,9 @@ mod tests {
         assert_eq!(cp("subscriptXSize"), Some(Plist::Integer(1434)));
         assert_eq!(cp("superscriptYOffset"), Some(Plist::Integer(977)));
 
-        // ...and none of them is left in the metrics array. The invariant is stronger
-        // than "these six are absent": NO entry may carry a `name`, because an entry
-        // is keyed by its `metric_type` and a name-only one collapses on read.
+        // ...and none is left in the metrics array. The invariant is stronger than
+        // "these six are absent": no entry at all may carry a `name`, since an entry
+        // is keyed by its `metric_type`.
         let described: Vec<String> = glyphs
             .metrics
             .iter()
@@ -457,7 +436,7 @@ mod tests {
         };
 
         let mut light_cps = vec![];
-        super::append_master_vertical_metrics(&mut light_cps, &light, &Default::default());
+        super::append_master_metric_custom_parameters(&mut light_cps, &light, &Default::default());
         assert_eq!(
             value(&light_cps, "typoAscender"),
             Some(Plist::Integer(1928))
@@ -471,7 +450,7 @@ mod tests {
         assert!(value(&light_cps, "typoLineGap").is_none());
 
         let mut bold_cps = vec![];
-        super::append_master_vertical_metrics(&mut bold_cps, &bold, &Default::default());
+        super::append_master_metric_custom_parameters(&mut bold_cps, &bold, &Default::default());
         assert_eq!(value(&bold_cps, "typoAscender"), Some(Plist::Integer(1836)));
         assert_eq!(
             value(&bold_cps, "typoDescender"),
@@ -485,7 +464,11 @@ mod tests {
             value: Plist::Integer(999),
             disabled: false,
         }];
-        super::append_master_vertical_metrics(&mut preexisting, &light, &Default::default());
+        super::append_master_metric_custom_parameters(
+            &mut preexisting,
+            &light,
+            &Default::default(),
+        );
         assert_eq!(
             value(&preexisting, "typoAscender"),
             Some(Plist::Integer(999))
@@ -510,7 +493,7 @@ mod tests {
             serde_json::json!({"value": 1000, "disabled": false}),
         );
         let mut covered = vec![];
-        super::append_master_vertical_metrics(&mut covered, &light, &font_fs);
+        super::append_master_metric_custom_parameters(&mut covered, &light, &font_fs);
         assert!(value(&covered, "typoAscender").is_none());
         assert_eq!(value(&covered, "winAscent"), Some(Plist::Integer(1928)));
     }
@@ -607,7 +590,7 @@ mod tests {
         font.masters.push(master);
         font.masters.push(Master::default());
 
-        super::interpret_vertical_metrics(&mut font).unwrap();
+        super::interpret_metric_custom_parameters(&mut font).unwrap();
         assert_eq!(
             font.masters[0].metrics.get(&MetricType::TypoAscender),
             Some(&950)
@@ -616,6 +599,81 @@ mod tests {
             font.masters[1].metrics.get(&MetricType::TypoAscender),
             Some(&1000)
         );
+    }
+
+    /// One distinct value per metric, so a test failure names the metric that was
+    /// dropped or crossed with another.
+    fn one_value_per_custom_parameter_metric() -> Vec<(crate::MetricType, i32)> {
+        super::CUSTOM_PARAMETER_METRIC_TYPES
+            .into_iter()
+            .enumerate()
+            .map(|(i, metric)| (metric, 100 + i as i32))
+            .collect()
+    }
+
+    /// Ingress: a custom parameter must come back as the matching `MetricType`.
+    /// Every entry of [`CUSTOM_PARAMETER_METRIC_TYPES`] is covered, so a metric
+    /// added to the egress list cannot be left unreadable.
+    #[test]
+    fn test_metric_custom_parameters_are_read_into_the_metric_map() {
+        use crate::Master;
+
+        let mut font = crate::Font::default();
+        for (metric, value) in one_value_per_custom_parameter_metric() {
+            font.format_specific.insert(
+                format!(
+                    "{}{}",
+                    crate::convertors::glyphs3::KEY_CUSTOM_PARAMETERS,
+                    metric.as_str()
+                ),
+                serde_json::json!({"value": value, "disabled": false}),
+            );
+        }
+        font.masters.push(Master::default());
+
+        super::interpret_metric_custom_parameters(&mut font).unwrap();
+
+        for (metric, value) in one_value_per_custom_parameter_metric() {
+            assert_eq!(
+                font.masters[0].metrics.get(&metric),
+                Some(&value),
+                "custom parameter {} was not read as MetricType::{:?}",
+                metric.as_str(),
+                metric
+            );
+        }
+    }
+
+    /// Ingress and egress are twins, checked through the convertor's own entry
+    /// points: whatever `as_glyphs3` writes as a custom parameter, `load` reads
+    /// back into the same `MetricType` with the same value.
+    #[test]
+    fn test_metric_custom_parameters_survive_a_glyphs_round_trip() {
+        use crate::Master;
+        use std::path::PathBuf;
+
+        let expected = one_value_per_custom_parameter_metric();
+        let mut font = crate::Font::default();
+        let mut master = Master {
+            id: "m01".to_string(),
+            ..Default::default()
+        };
+        for (metric, value) in expected.iter() {
+            master.metrics.insert(metric.clone(), *value);
+        }
+        font.masters.push(master);
+
+        let written = glyphslib::Font::Glyphs3(as_glyphs3(&font).unwrap());
+        let reloaded = crate::convertors::glyphs3::_load(&written, PathBuf::new()).unwrap();
+
+        for (metric, value) in expected {
+            assert_eq!(
+                reloaded.masters[0].metrics.get(&metric),
+                Some(&value),
+                "{} did not survive the round trip",
+                metric.as_str()
+            );
+        }
     }
 }
 
