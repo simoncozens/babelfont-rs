@@ -16,10 +16,15 @@ pub(crate) fn merge_glyph(
     strategies: &[Strategy],
 ) -> Result<(), FontmergeError> {
     let font1_axes = fontdrasil_axes(&font1.axes)?;
-    if font1.glyphs.get(&font2_glyph.name).is_none() {
+    // If this glyph already exists in font1, we only get here because the caller has decided
+    // to replace it (existing_handling == Skip is filtered out before merge_glyph is called),
+    // so it should be overwritten wholesale with font2's glyph, exactly as if it were new.
+    if let Some(existing) = font1.glyphs.get_mut(&font2_glyph.name) {
+        *existing = font2_glyph.clone();
+    } else {
         font1.glyphs.push(font2_glyph.clone());
     }
-    #[allow(clippy::unwrap_used)] // We check existence above
+    #[allow(clippy::unwrap_used)] // We just inserted or replaced this glyph above
     let glyph = font1.glyphs.get_mut(&font2_glyph.name).unwrap();
     // Move layers out
     let mut layers = std::mem::take(&mut glyph.layers);

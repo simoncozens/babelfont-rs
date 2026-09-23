@@ -153,6 +153,11 @@ declare_filters! {
     }
 }
 
+// `SubsetVisitor` normally operates behind the `SubsetLayout` filter, but callers
+// (such as fontmerge) may want to drive it directly, e.g. to preseed it with
+// lookups that should be dropped.
+pub use subsetlayout::SubsetVisitor;
+
 /// A trait for font filters that can be applied to a font
 pub trait FontFilter {
     /// Apply the filter to the given font
