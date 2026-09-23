@@ -763,7 +763,10 @@ impl<'a> SubsetVisitor<'a> {
         lookup_reference: &mut fea_rs_ast::LookupReferenceStatement,
     ) -> Option<Statement> {
         // Update the reference if the lookup it points at has been renamed.
-        if let Some(effective) = self.lookup_bindings.get(lookup_reference.lookup_name.as_str()) {
+        if let Some(effective) = self
+            .lookup_bindings
+            .get(lookup_reference.lookup_name.as_str())
+        {
             if effective.as_str() != lookup_reference.lookup_name {
                 lookup_reference.lookup_name = effective.to_string();
             }
