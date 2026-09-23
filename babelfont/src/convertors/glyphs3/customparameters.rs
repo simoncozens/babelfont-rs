@@ -232,9 +232,8 @@ fn fs_type_bits(value: u16) -> Vec<i64> {
         .collect()
 }
 
-/// Write the OS/2 and `head` values a source recorded (FontForge SFD:
-/// `FSType`, `Panose`, `OS2Vendor`, ...) out as custom parameters, so they
-/// reach the compiler instead of its defaults.
+/// Write the OS/2 and `head` values a source recorded out as custom parameters,
+/// so they reach the compiler instead of its defaults.
 ///
 /// Fields deliberately not exported here:
 ///
