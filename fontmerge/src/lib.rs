@@ -28,6 +28,7 @@ mod merge;
 
 pub use crate::{
     args::{Args, DuplicateLookupHandling, ExistingGlyphHandling, LayoutHandling},
+    error::FontmergeError,
     glyphset::GlyphsetFilter,
 };
 use crate::{
