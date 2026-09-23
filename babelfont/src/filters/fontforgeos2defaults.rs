@@ -1,4 +1,4 @@
-use crate::filters::fontforge_standard_height::{exported_heights, MeasuredHeights};
+use crate::filters::fontforge_standard_height::{exported_heights, CurveMean, MeasuredHeights};
 use crate::filters::FontFilter;
 use crate::{Font, Master, MetricType, Shape};
 use std::collections::HashSet;
@@ -122,7 +122,7 @@ impl FontFilter for FontForgeOs2Defaults {
         let heights: Vec<MeasuredHeights> = font
             .masters
             .iter()
-            .map(|master| exported_heights(font, master))
+            .map(|master| exported_heights(font, master, CurveMean::DistinctTops))
             .collect();
         for (master, measured) in font.masters.iter_mut().zip(heights) {
             for (metric, value) in [

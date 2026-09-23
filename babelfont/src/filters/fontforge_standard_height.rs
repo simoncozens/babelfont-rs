@@ -53,6 +53,20 @@ const MAX_REFERENCE_DEPTH: usize = 8;
 const RE_NEAR_ZERO: f64 = 1e-8;
 const RE_FACTOR: f64 = 1024.0 * 1024.0 * 1024.0 * 1024.0 * 1024.0 * 2.0;
 
+/// How FontForge averaged the tops when none of them is flat.
+///
+/// FontForge's code divided the sum of the distinct tops by the number of glyphs until
+/// commit 4d34d21ef866 (2012-05-14, "it was dividing by the wrong value"), and by the
+/// number of distinct tops afterwards. A font exported by a build from before that
+/// commit carries the smaller figure.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum CurveMean {
+    /// Current FontForge: the sum of the distinct tops over their number.
+    DistinctTops,
+    /// FontForge built before 2012-05-14: the same sum over the number of glyphs.
+    GlyphCount,
+}
+
 /// Which of the two heights to compute.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum StandardHeight {
@@ -78,18 +92,23 @@ pub(crate) struct MeasuredHeights {
 }
 
 /// Both heights FontForge's exporter writes for `master`.
-pub(crate) fn exported_heights(font: &Font, master: &Master) -> MeasuredHeights {
+pub(crate) fn exported_heights(font: &Font, master: &Master, mean: CurveMean) -> MeasuredHeights {
     MeasuredHeights {
-        x_height: exported_height(font, master, StandardHeight::XHeight),
-        cap_height: exported_height(font, master, StandardHeight::CapHeight),
+        x_height: exported_height(font, master, StandardHeight::XHeight, mean),
+        cap_height: exported_height(font, master, StandardHeight::CapHeight, mean),
     }
 }
 
 /// The value FontForge's exporter writes for `which`.
-pub(crate) fn exported_height(font: &Font, master: &Master, which: StandardHeight) -> i32 {
+pub(crate) fn exported_height(
+    font: &Font,
+    master: &Master,
+    which: StandardHeight,
+    mean: CurveMean,
+) -> i32 {
     // `os2->xHeight = (xh >= 0.0 ? xh : 0)`: into a short, so truncation, and 0
     // when none of the listed glyphs exist.
-    match standard_height(font, master, which) {
+    match standard_height(font, master, which, mean) {
         Some(h) if h >= 0.0 => h as i32,
         _ => 0,
     }
@@ -126,7 +145,12 @@ struct Occurrence {
     count: usize,
 }
 
-fn standard_height(font: &Font, master: &Master, which: StandardHeight) -> Option<f64> {
+fn standard_height(
+    font: &Font,
+    master: &Master,
+    which: StandardHeight,
+    mean: CurveMean,
+) -> Option<f64> {
     let by_codepoint = glyphs_by_primary_codepoint(font);
     let mut flats: Vec<Occurrence> = vec![];
     let mut curves: Vec<Occurrence> = vec![];
@@ -161,9 +185,13 @@ fn standard_height(font: &Font, master: &Master, which: StandardHeight) -> Optio
     } else if curves.is_empty() {
         return None;
     } else {
-        // The mean of the distinct heights, each counted once however many
-        // glyphs share it.
-        curves.iter().map(|o| o.height).sum::<f64>() / curves.len() as f64
+        // The sum of the distinct heights, each counted once however many glyphs
+        // share it, over their number -- or, before 2012, over the number of glyphs.
+        let divisor = match mean {
+            CurveMean::DistinctTops => curves.len(),
+            CurveMean::GlyphCount => curves.iter().map(|o| o.count).sum(),
+        };
+        curves.iter().map(|o| o.height).sum::<f64>() / divisor as f64
     };
     Some(snap_to_blue_zone(font, master, result))
 }
@@ -727,7 +755,7 @@ mod tests {
     }
 
     fn height(font: &Font, which: StandardHeight) -> i32 {
-        exported_height(font, &font.masters[0], which)
+        exported_height(font, &font.masters[0], which, CurveMean::DistinctTops)
     }
 
     #[test]
@@ -759,6 +787,25 @@ mod tests {
             ('e', arched(0.0, 400.0, 612.0)),
         ]);
         assert_eq!(height(&font, StandardHeight::XHeight), 606);
+    }
+
+    #[test]
+    fn test_before_2012_the_curve_sum_is_divided_by_the_glyph_count() {
+        // Distinct tops 600 (two glyphs) and 612 (one glyph): 1212 / 3 = 404.
+        let font = font_with_glyphs(vec![
+            ('o', arched(0.0, 400.0, 600.0)),
+            ('c', arched(0.0, 400.0, 600.0)),
+            ('e', arched(0.0, 400.0, 612.0)),
+        ]);
+        let m = &font.masters[0];
+        assert_eq!(
+            exported_height(&font, m, StandardHeight::XHeight, CurveMean::GlyphCount),
+            404
+        );
+        assert_eq!(
+            exported_height(&font, m, StandardHeight::XHeight, CurveMean::DistinctTops),
+            606
+        );
     }
 
     #[test]
