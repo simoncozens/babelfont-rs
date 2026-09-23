@@ -114,6 +114,7 @@ declare_filters! {
     }
     group "Filters for reproducing a legacy FontForge export" {
         FontForgeUnderlinePosition(fontforgeunderlineposition) => "fontforgeunderlineposition",
+        FontForgeOs2Defaults(fontforgeos2defaults) => "fontforgeos2defaults",
     }
     group "Filters for manipulating outlines" {
         DecomposeComponentReferences(decomposecomponentreferences) => "decomposecomponents",
