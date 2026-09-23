@@ -3,6 +3,7 @@ use fontdrasil::coords::{DesignCoord, DesignLocation};
 use smol_str::SmolStr;
 
 mod curve_filter_common;
+mod fontforge_standard_height;
 
 /// Parse a comma-separated list of glyph names from a string argument.
 /// Returns an empty `Vec` if the string is empty, indicating that all glyphs

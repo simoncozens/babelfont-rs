@@ -1,3 +1,4 @@
+use crate::filters::fontforge_standard_height::{exported_heights, MeasuredHeights};
 use crate::filters::FontFilter;
 use crate::{Font, Master, MetricType, Shape};
 use std::collections::HashSet;
@@ -19,7 +20,8 @@ const STRIKEOUT: [MetricType; 2] = [MetricType::StrikeoutSize, MetricType::Strik
 #[derive(Default)]
 /// A filter that fills in OS/2 values the way FontForge's exporter does: the ten
 /// sub/superscript and strikeout metrics of a source that states no `OS2SubXSize`,
-/// replacing any of them it does state, and the PANOSE the source does not state.
+/// replacing any of them it does state, and the x-height, cap height and PANOSE the
+/// source does not state.
 ///
 /// A FontForge `.sfd` usually carries no `OS2SubXSize` and friends. FontForge then
 /// computes them while writing the binary, so the exported font has values that are
@@ -63,6 +65,18 @@ const STRIKEOUT: [MetricType; 2] = [MetricType::StrikeoutSize, MetricType::Strik
 ///
 /// When the source states `OS2SubXSize`, none of the ten is changed.
 ///
+/// It also fills each of the x-height and cap height the source does not state,
+/// measured from the outlines, as `setos2` in the same file does with `SFXHeight`
+/// and `SFCapHeight` (see `fontforge_standard_height`). `setos2` writes the two only
+/// into an OS/2 table of version 2 or later. A CFF export gets version 3, but a
+/// TrueType export gets version 1 unless the source's `OS2Version:`,
+/// `OS2_UseTypoMetrics` or `OS2_WeightWidthSlopeOnly` selects a later one, and then
+/// the binary has neither field: the values filled here are FontForge's estimate, not
+/// values found in that binary. Up to tag 20150430 a non-zero `OS2Version:` replaced
+/// the computed version outright, so `OS2Version: 1` gave version 1 even with
+/// `OS2_UseTypoMetrics`, and for CFF; from 20150612 it can only raise it. FontForge
+/// before tag 20150330 measured the two even when the source stated them.
+///
 /// It also fills PANOSE, as `SFDefaultOS2Info` in the same file does.
 /// `SFDefaultOS2Simple` starts it at [2, 0, 5, 3, 0 ...]. `OS2WeightCheck` sets byte
 /// 2 from the `Weight:` name and then from the PostScript font name, so a match in
@@ -82,14 +96,15 @@ const STRIKEOUT: [MetricType; 2] = [MetricType::StrikeoutSize, MetricType::Strik
 /// Any of the lines `PfmFamily:`, `TTFWeight:`, `PfmWeight:`, `TTFWidth:`, `LineGap:`
 /// and `VLineGap:` sets FontForge's `pfmset`. Without one, `SFDefaultOS2Info` resets
 /// `pfminfo`, FontForge's record of the OS/2 values, before filling it, so the
-/// exporter computes PANOSE and the ten values even when the source states them,
-/// derives the weight and width classes from the same name words as PANOSE, and sets
-/// the line gaps to `rint(.09*emsize)`. This filter keeps the stated values and sets
-/// no weight or width class and no line gap. FontForge's Font Info dialog sets
-/// `pfmset` whenever it stores PANOSE or the ten, so a stated value is ignored only in
-/// a source edited by hand or written by another tool. A font made in FontForge whose
-/// OS/2 tab was never opened also lacks `pfmset`, and FontForge then derives its
-/// weight and width classes and line gaps as above.
+/// exporter computes PANOSE, the ten values, the x-height and the cap height even
+/// when the source states them, derives the weight and width classes from the same
+/// name words as PANOSE, and sets the line gaps to `rint(.09*emsize)`. This filter
+/// keeps the stated values and sets no weight or width class and no line gap.
+/// FontForge's Font Info dialog sets `pfmset` whenever it stores any of those values,
+/// so a stated value is ignored only in a source edited by hand or written by another
+/// tool. A font made in FontForge whose OS/2 tab was never opened also lacks
+/// `pfmset`, and FontForge then derives its weight and width classes and line gaps as
+/// above.
 pub struct FontForgeOs2Defaults;
 
 impl FontForgeOs2Defaults {
@@ -102,6 +117,24 @@ impl FontForgeOs2Defaults {
 impl FontFilter for FontForgeOs2Defaults {
     fn apply(&self, font: &mut crate::Font) -> Result<(), crate::BabelfontError> {
         let mut filled = 0;
+        // Measured before any master is borrowed mutably: the estimate reads the
+        // glyphs and the font's private dictionary.
+        let heights: Vec<MeasuredHeights> = font
+            .masters
+            .iter()
+            .map(|master| exported_heights(font, master))
+            .collect();
+        for (master, measured) in font.masters.iter_mut().zip(heights) {
+            for (metric, value) in [
+                (MetricType::XHeight, measured.x_height),
+                (MetricType::CapHeight, measured.cap_height),
+            ] {
+                if !master.metrics.contains_key(&metric) {
+                    master.metrics.insert(metric, value);
+                    filled += 1;
+                }
+            }
+        }
         for master in font.masters.iter_mut() {
             // `subsuper_set` comes from the `OS2SubXSize:` line alone; without it,
             // `SFDefaultOS2SubSuper` writes all ten.
@@ -160,8 +193,8 @@ impl FontFilter for FontForgeOs2Defaults {
             filled += 1;
         }
         log::info!(
-            "Filled {filled} OS/2 value(s) using FontForge's SFDefaultOS2SubSuper and \
-             SFDefaultOS2Info rules"
+            "Filled {filled} OS/2 value(s) using FontForge's SFDefaultOS2SubSuper, \
+             SFDefaultOS2Info and SFStandardHeight rules"
         );
         Ok(())
     }
@@ -183,10 +216,10 @@ impl FontFilter for FontForgeOs2Defaults {
             .help(
                 "Compute all ten OS/2 sub/superscript and strikeout metrics of a FontForge \
                  source that states no OS2SubXSize, replacing any it states, and fill the \
-                 PANOSE it does not state, using the rules FontForge's exporter uses \
-                 (SFDefaultOS2SubSuper and SFDefaultOS2Info in tottf.c). Use only to reproduce \
-                 a binary FontForge exported; a binary built by another compiler carries \
-                 different values",
+                 x-height, cap height and PANOSE it does not state, using the rules FontForge's \
+                 exporter uses (SFDefaultOS2SubSuper and SFDefaultOS2Info in tottf.c, \
+                 SFStandardHeight in splinefont.c). Use only to reproduce a binary FontForge \
+                 exported; a binary built by another compiler carries different values",
             )
             .action(clap::ArgAction::SetTrue)
     }
@@ -574,6 +607,16 @@ mod tests {
         f.custom_ot_values.os2_panose = Some([3, 1, 4, 1, 5, 9, 2, 6, 5, 3]);
         FontForgeOs2Defaults::new().apply(&mut f).unwrap();
         assert_eq!(f.custom_ot_values.os2_panose, Some([3, 1, 4, 1, 5, 9, 2, 6, 5, 3]));
+    }
+
+    #[test]
+    fn test_a_stated_x_height_is_never_overwritten() {
+        let mut f = font_with(800, -200, None);
+        f.masters[0].metrics.insert(MetricType::XHeight, 480);
+        FontForgeOs2Defaults::new().apply(&mut f).unwrap();
+        assert_eq!(got(&f, MetricType::XHeight), Some(480));
+        // A font with no outlines measures nothing, which the exporter writes as 0.
+        assert_eq!(got(&f, MetricType::CapHeight), Some(0));
     }
 
     #[test]
