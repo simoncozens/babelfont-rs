@@ -272,7 +272,7 @@ pub fn fontmerge(
             .expect("Failed to scale font2 to match font1 units per em");
     }
 
-    glyphset_filter.sort_glyphset(&mut font2);
+    glyphset_filter.sort_glyphset(&font2);
     glyphset_filter.de_encode(&mut font1, &mut font2);
 
     add_needed_masters(&mut font1, &mut font2, process_avar_mapping)

@@ -1,6 +1,7 @@
 use crate::args::ExistingGlyphHandling;
 use babelfont::{Font, SmolStr};
 use indexmap::{IndexMap, IndexSet};
+use std::collections::HashMap;
 
 pub struct GlyphsetFilter {
     pub incoming_glyphset: IndexSet<SmolStr>,
@@ -243,16 +244,20 @@ impl GlyphsetFilter {
     }
 
     /// Sort the incoming glyphset to match the order in font_2
-    pub(crate) fn sort_glyphset(&mut self, font_2: &mut Font) {
-        let font2_glyphorder = font_2
+    pub(crate) fn sort_glyphset(&mut self, font_2: &Font) {
+        // Index font 2's glyph order once rather than scanning it for every
+        // incoming glyph: that was O(incoming x font2), which is tens of
+        // billions of comparisons on a large CJK font.
+        let font2_glyphorder: HashMap<&str, usize> = font_2
             .glyphs
             .iter()
-            .map(|g| g.name.clone())
-            .collect::<Vec<SmolStr>>();
+            .enumerate()
+            .map(|(ix, g)| (g.name.as_str(), ix))
+            .collect();
         self.incoming_glyphset.sort_by_key(|g| {
             font2_glyphorder
-                .iter()
-                .position(|name| name == g)
+                .get(g.as_str())
+                .copied()
                 .unwrap_or(usize::MAX)
         });
     }
