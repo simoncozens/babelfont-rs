@@ -1,5 +1,7 @@
 use crate::error::FontmergeError;
 use babelfont::SmolStr;
+
+#[cfg(feature = "cli")]
 use clap::Parser;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -9,6 +11,7 @@ pub struct CodepointArgs(pub Vec<char>);
 ///
 /// Merges two font source files together, copying selected glyphs from the donor font into the host font,
 /// along with any necessary OpenType layout features.
+#[cfg(feature = "cli")]
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {
@@ -63,36 +66,38 @@ pub struct Args {
 }
 
 /// Glyph selection options
-#[derive(clap::Args, Debug)]
-#[command(next_help_heading = "Glyph selection")]
+#[cfg_attr(feature = "cli", derive(clap::Args))]
+#[derive(Debug)]
+#[cfg_attr(feature = "cli", command(next_help_heading = "Glyph selection"))]
 pub struct GlyphSelection {
     /// Space-separated list of glyphs to add from donor font
-    #[arg(short, long, value_delimiter = ' ')]
+    #[cfg_attr(feature = "cli", arg(short, long, value_delimiter = ' '))]
     pub glyphs: Vec<SmolStr>,
 
     /// File containing glyphs to add from donor font
-    #[arg(short = 'G', long)]
+    #[cfg_attr(feature = "cli", arg(short = 'G', long))]
     pub glyphs_file: Option<String>,
 
     /// Unicode codepoints to add from donor font (comma separated, hexadecimal, U+ prefix allowed, ranges with hyphen allowed)
-    #[arg(short = 'u', long, value_parser = crate::args::parse_codepoints)]
+    #[cfg_attr(feature = "cli", arg(short = 'u', long, value_parser = crate::args::parse_codepoints))]
     pub codepoints: Option<CodepointArgs>,
 
     /// File containing Unicode codepoints to add from donor font
-    #[arg(short = 'U', long)]
+    #[cfg_attr(feature = "cli", arg(short = 'U', long))]
     pub codepoints_file: Option<String>,
 
     /// Glyphs to exclude from donor font
-    #[arg(short = 'x', long, value_delimiter = ' ')]
+    #[cfg_attr(feature = "cli", arg(short = 'x', long, value_delimiter = ' '))]
     pub exclude_glyphs: Vec<SmolStr>,
 
     /// File containing glyphs to exclude from donor font
-    #[arg(short = 'X', long)]
+    #[cfg_attr(feature = "cli", arg(short = 'X', long))]
     pub exclude_glyphs_file: Option<String>,
 }
 
 /// Existing glyph handling options
-#[derive(clap::ValueEnum, Debug, Clone, Default, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
+#[derive(Debug, Clone, Default, Copy, PartialEq, Eq)]
 pub enum ExistingGlyphHandling {
     #[default]
     /// Skip glyphs already present in host font
@@ -102,7 +107,8 @@ pub enum ExistingGlyphHandling {
 }
 
 /// Layout closure handling options
-#[derive(clap::ValueEnum, Clone, Default, Debug, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
+#[derive(Clone, Default, Debug, Copy, PartialEq, Eq)]
 pub enum LayoutHandling {
     /// Drop layout rules concerning glyphs not selected
     #[default]
@@ -113,7 +119,8 @@ pub enum LayoutHandling {
     Ignore,
 }
 
-#[derive(clap::ValueEnum, Debug, Clone, Default, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
+#[derive(Debug, Clone, Default, Copy, PartialEq, Eq)]
 pub enum DuplicateLookupHandling {
     /// Drop duplicate lookups
     #[default]
@@ -132,15 +139,16 @@ impl std::fmt::Display for DuplicateLookupHandling {
 }
 
 /// Specialist fixups
-#[derive(clap::Args, Debug)]
-#[command(next_help_heading = "Specialist fixups")]
+#[derive(Debug)]
+#[cfg_attr(feature = "cli", derive(clap::Args))]
+#[cfg_attr(feature = "cli", command(next_help_heading = "Specialist fixups"))]
 pub struct Fixups {
     /// Merge anchors if both fonts contain a dotted circle glyph
-    #[arg(long, default_value = "true", action = clap::ArgAction::Set)]
+    #[cfg_attr(feature = "cli", arg(long, default_value = "true", action = clap::ArgAction::Set))]
     pub dotted_circle: bool,
 
     /// Don't add in additional masters to maintain differences between avar mappings
-    #[arg(long, default_value = "false", action = clap::ArgAction::Set)]
+    #[cfg_attr(feature = "cli", arg(long, default_value = "false", action = clap::ArgAction::Set))]
     pub skip_avar_masters: bool,
 }
 

@@ -15,23 +15,28 @@ categories = ["command-line-utilities", "text-processing"]
 [[bin]]
 name = "fontmerge"
 path = "src/main.rs"
+required-features = ["cli"]
 
 [[bin]]
 name = "fontsubset"
 path = "src/fontsubset.rs"
+required-features = ["cli"]
+
+[features]
+cli = ["indicatif", "clap", "env_logger", "clap-verbosity-flag"]
 
 [dependencies]
 babelfont = { version = "0.2.1", path = "../babelfont" }
-clap = { workspace = true, features = ["derive"] }
+clap = { workspace = true, features = ["derive"], optional = true }
 log = { workspace = true }
-env_logger = { workspace = true }
+env_logger = { workspace = true, optional = true }
 thiserror = { workspace = true }
 indexmap = { workspace = true }
-clap-verbosity-flag = "3.0.4"
+clap-verbosity-flag = { version = "3.0.4", optional = true }
 fontdrasil = { workspace = true }
 regex = { workspace = true }
 itertools = "0.14.0"
-indicatif = "0.18.2"
+indicatif = { version = "0.18.2", optional = true }
 log-once = "0.4.1"
 uuid = "1.18.1"
 fea-rs-ast = { workspace = true }

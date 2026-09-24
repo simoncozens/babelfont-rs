@@ -17,7 +17,22 @@ use fea_rs_ast::{
     fea_rs::{self, GlyphMap},
 };
 use indexmap::IndexSet;
+#[cfg(feature = "cli")]
 use indicatif::ProgressIterator;
+#[cfg(not(feature = "cli"))]
+mod fakeprogress {
+    pub trait FakeProgressIterator
+    where
+        Self: Sized + Iterator,
+    {
+        fn progress(self) -> Self {
+            self
+        }
+    }
+    impl<T> FakeProgressIterator for T where T: Sized + Iterator {}
+}
+#[cfg(not(feature = "cli"))]
+use crate::fakeprogress::FakeProgressIterator;
 pub mod args;
 mod designspace;
 mod error;
@@ -26,8 +41,11 @@ mod kerning;
 mod layout;
 mod merge;
 
+#[cfg(feature = "cli")]
+pub use args::Args;
+
 pub use crate::{
-    args::{Args, DuplicateLookupHandling, ExistingGlyphHandling, LayoutHandling},
+    args::{DuplicateLookupHandling, ExistingGlyphHandling, LayoutHandling},
     error::FontmergeError,
     glyphset::GlyphsetFilter,
 };
