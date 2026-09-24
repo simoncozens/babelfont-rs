@@ -1230,29 +1230,32 @@ impl SfdParser {
                 MetricType::TypoDescender,
                 descender,
             ),
+            // FontForge's head bbox, the base of the win/hhea metrics, is
+            // floor(ymin)/ceil(ymax) (tottf.c: gh.ymin = floor(bb.miny);
+            // gh.ymax = ceil(bb.maxy)), not the nearest integer.
             (
                 "OS2WinAOffset",
                 "OS2WinAscent",
                 MetricType::WinAscent,
-                ymax.round() as i32,
+                ymax.ceil() as i32,
             ),
             (
                 "OS2WinDOffset",
                 "OS2WinDescent",
                 MetricType::WinDescent,
-                -ymin.round() as i32,
+                -ymin.floor() as i32,
             ),
             (
                 "HheadAOffset",
                 "HheadAscent",
                 MetricType::HheaAscender,
-                ymax.round() as i32,
+                ymax.ceil() as i32,
             ),
             (
                 "HheadDOffset",
                 "HheadDescent",
                 MetricType::HheaDescender,
-                ymin.round() as i32,
+                ymin.floor() as i32,
             ),
         ];
         // Collect flag results first to avoid borrowing format_specific

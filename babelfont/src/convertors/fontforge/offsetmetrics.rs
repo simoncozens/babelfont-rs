@@ -53,17 +53,19 @@ pub(crate) fn compute_offset_delta(
                 .unwrap_or(0);
             absolute - base
         }
+        // The bases mirror resolve_offset_metrics: FontForge's head bbox is
+        // floor(ymin)/ceil(ymax) (tottf.c), not the nearest integer.
         "OS2WinAscent" | "HheadAscent" => {
             let (_, ymax) = compute_font_bbox_y(font)?;
-            absolute - ymax.round() as i32
+            absolute - ymax.ceil() as i32
         }
         "OS2WinDescent" => {
             let (ymin, _) = compute_font_bbox_y(font)?;
-            absolute - (-ymin.round() as i32)
+            absolute - (-ymin.floor() as i32)
         }
         "HheadDescent" => {
             let (ymin, _) = compute_font_bbox_y(font)?;
-            absolute - ymin.round() as i32
+            absolute - ymin.floor() as i32
         }
         _ => absolute,
     })
@@ -124,5 +126,50 @@ mod tests {
         assert_eq!(m(MetricType::WinDescent), Some(50)); // -yMin + 0
         assert_eq!(m(MetricType::HheaAscender), Some(780)); // yMax + 0
         assert_eq!(m(MetricType::HheaDescender), Some(-49)); // yMin + 1
+    }
+
+    #[test]
+    fn test_offset_mode_bbox_base_is_floor_ceil_not_round() {
+        // FontForge's head bbox floors ymin and ceils ymax (tottf.c), so a
+        // glyph spanning y = -50.4 .. 780.2 gives a bbox of -51 .. 781.
+        // Rounding instead loses a unit on each side: copse shipped
+        // usWinAscent 1992 (ceil) where a rounded base gave 1991.
+        let data = concat!(
+            "SplineFontDB: 3.0\n",
+            "Ascent: 800\n",
+            "Descent: 200\n",
+            "OS2WinAscent: 1\n",
+            "OS2WinAOffset: 1\n",
+            "OS2WinDescent: 0\n",
+            "OS2WinDOffset: 1\n",
+            "HheadAscent: 0\n",
+            "HheadAOffset: 1\n",
+            "HheadDescent: 1\n",
+            "HheadDOffset: 1\n",
+            "LayerCount: 2\n",
+            "Layer: 0 0 \"Back\" 1\n",
+            "Layer: 1 0 \"Fore\" 0\n",
+            "BeginChars: 1 1\n",
+            "StartChar: box\n",
+            "Encoding: 65 65 0\n",
+            "Width: 600\n",
+            "Fore\n",
+            "SplineSet\n",
+            "100 -50.4 m 1\n",
+            " 100 780.2 l 1\n",
+            " 500 780.2 l 1\n",
+            " 500 -50.4 l 1\n",
+            " 100 -50.4 l 1\n",
+            "EndSplineSet\n",
+            "EndChar\n",
+            "EndChars\n",
+            "EndSplineFont\n"
+        );
+        let font = load_str(data).expect("Failed to parse offset-mode SFD");
+        let m = |mt: MetricType| font.masters[0].metrics.get(&mt).copied();
+        assert_eq!(m(MetricType::WinAscent), Some(782)); // ceil(780.2) + 1
+        assert_eq!(m(MetricType::WinDescent), Some(51)); // -floor(-50.4) + 0
+        assert_eq!(m(MetricType::HheaAscender), Some(781)); // ceil(780.2) + 0
+        assert_eq!(m(MetricType::HheaDescender), Some(-50)); // floor(-50.4) + 1
     }
 }
