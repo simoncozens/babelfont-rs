@@ -245,6 +245,7 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
             VfbEntry::BlockFileDataStart(_) => {} // todo!(),
             VfbEntry::BlockFontStart(_) => {}   // todo!(),
             VfbEntry::BlockNamesStart(_) => {}  // todo!(),
+            VfbEntry::BlockFontEnd(_) | VfbEntry::BlockFileDataEnd(_) => {}
         }
     }
 
