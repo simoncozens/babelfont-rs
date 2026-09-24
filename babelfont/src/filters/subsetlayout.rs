@@ -617,22 +617,18 @@ impl<'a> SubsetVisitor<'a> {
         &mut self,
         statement: &mut fea_rs_ast::GlyphClassDefStatement,
     ) -> Option<Statement> {
-        let _ = statement
-            .base_glyphs
-            .iter_mut()
-            .map(|x| self.filter_container(x));
-        let _ = statement
-            .mark_glyphs
-            .iter_mut()
-            .map(|container| self.filter_container(container));
-        let _ = statement
-            .ligature_glyphs
-            .iter_mut()
-            .map(|container| self.filter_container(container));
-        let _ = statement
-            .component_glyphs
-            .iter_mut()
-            .map(|container| self.filter_container(container));
+        if let Some(container) = &mut statement.base_glyphs {
+            self.filter_container(container);
+        }
+        if let Some(container) = &mut statement.mark_glyphs {
+            self.filter_container(container);
+        }
+        if let Some(container) = &mut statement.ligature_glyphs {
+            self.filter_container(container);
+        }
+        if let Some(container) = &mut statement.component_glyphs {
+            self.filter_container(container);
+        }
 
         None
     }
