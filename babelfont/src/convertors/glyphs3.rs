@@ -1320,9 +1320,11 @@ pub(crate) fn as_glyphs3(font: &Font) -> Result<glyphs3::Glyphs3, BabelfontError
             if key.as_str().ends_with(" overshoot") {
                 continue;
             }
-            // OS/2 + hhea vertical metrics are emitted as custom parameters
-            // (append_master_vertical_metrics), not as metric slots.
-            if customparameters::is_vertical_metric_cp(key) {
+            // Some metrics live in customParameters, not in the metrics array;
+            // append_master_metric_custom_parameters emits those. A metrics entry
+            // is keyed by its type, so one that only names such a metric would
+            // carry its value nowhere.
+            if customparameters::is_custom_parameter_metric(key) {
                 continue;
             }
             if !our_metrics.contains(key) {
@@ -1546,8 +1548,8 @@ fn save_master(
     }
 
     let mut custom_parameters = serialize_custom_parameters(&master.format_specific);
-    // OS/2 + hhea vertical metrics live in master-level custom parameters.
-    customparameters::append_master_vertical_metrics(
+    // Metrics that Glyphs keeps in customParameters, not in the metrics array.
+    customparameters::append_master_metric_custom_parameters(
         &mut custom_parameters,
         master,
         font_format_specific,
