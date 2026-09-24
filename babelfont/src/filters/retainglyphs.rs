@@ -73,21 +73,32 @@ impl FontFilter for RetainGlyphs {
         for (_group, members) in font.second_kern_groups.iter_mut() {
             members.retain(|g| self.0.contains(g));
         }
-        // Drop dead groups
-        font.first_kern_groups
-            .retain(|_group, members| !members.is_empty());
-        font.second_kern_groups
-            .retain(|_group, members| !members.is_empty());
+        // Drop dead groups. We use the drain/filter trick because .retain is slow for large collections.
+        let old_first_kern_groups = std::mem::take(&mut font.first_kern_groups);
+        let old_second_kern_groups = std::mem::take(&mut font.second_kern_groups);
+        font.first_kern_groups = old_first_kern_groups
+            .into_iter()
+            .filter(|(_group, members)| !members.is_empty())
+            .collect();
+        font.second_kern_groups = old_second_kern_groups
+            .into_iter()
+            .filter(|(_group, members)| !members.is_empty())
+            .collect();
         // Filter kerning
         for master in font.masters.iter_mut() {
-            master.kerning.retain(|(left, right), _| {
-                // Because we removed all the dead groups, any groups still refer to things we care about
-                (self.0.contains(left)
-                    || (left.starts_with('@') && font.first_kern_groups.contains_key(&left[1..])))
-                    && (self.0.contains(right)
-                        || (right.starts_with('@')
-                            && font.second_kern_groups.contains_key(&right[1..])))
-            });
+            let old_kerning = std::mem::take(&mut master.kerning);
+            master.kerning = old_kerning
+                .into_iter()
+                .filter(|((left, right), _)| {
+                    // Because we removed all the dead groups, any groups still refer to things we care about
+                    (self.0.contains(left)
+                        || (left.starts_with('@')
+                            && font.first_kern_groups.contains_key(&left[1..])))
+                        && (self.0.contains(right)
+                            || (right.starts_with('@')
+                                && font.second_kern_groups.contains_key(&right[1..])))
+                })
+                .collect();
         }
         // Filter masters - remove any masters which were just sparse
         font.masters.retain(|master| {
