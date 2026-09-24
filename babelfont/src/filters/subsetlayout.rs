@@ -671,22 +671,25 @@ impl<'a> SubsetVisitor<'a> {
         &mut self,
         lookupflag: &mut fea_rs_ast::LookupFlagStatement,
     ) -> Option<Statement> {
-        if let Some(GlyphContainer::GlyphClassName(ma)) = lookupflag.mark_attachment.as_ref() {
-            // If the mark classes departed, replace with [] literal
-            if self.empty_classes.contains(ma.as_str()) {
-                lookupflag.mark_attachment = Some(GlyphContainer::GlyphClass(GlyphClass::new(
-                    vec![],
-                    lookupflag.location.clone(),
-                )))
-            }
-        }
-        // Same trick for mark filtering
-        if let Some(GlyphContainer::GlyphClassName(ma)) = lookupflag.mark_filtering_set.as_ref() {
-            if self.empty_classes.contains(ma.as_str()) {
-                lookupflag.mark_filtering_set = Some(GlyphContainer::GlyphClass(GlyphClass::new(
-                    vec![],
-                    lookupflag.location.clone(),
-                )))
+        let empty_class =
+            GlyphContainer::GlyphClass(GlyphClass::new(vec![], lookupflag.location.clone()));
+        for container in [
+            &mut lookupflag.mark_attachment,
+            &mut lookupflag.mark_filtering_set,
+        ]
+        .into_iter()
+        .flatten()
+        {
+            match container {
+                GlyphContainer::GlyphClass(_) => {
+                    self.filter_container(container);
+                }
+                GlyphContainer::GlyphClassName(name)
+                    if self.empty_classes.contains(name.as_str()) =>
+                {
+                    *container = empty_class.clone();
+                }
+                _ => {}
             }
         }
         None
@@ -1400,6 +1403,29 @@ sub [heh-ar.isol heh-ar.fina]' hamzaabove-ar by [heh-ar.isol.1 heh-ar.fina.1];
         assert!(
             fea.contains("lookup one_2;"),
             "references are updated to the renamed lookup:\n{fea}"
+        );
+    }
+
+    #[test]
+    fn test_subset_use_mark_filtering_set() {
+        let glyphs = vec!["a", "b"];
+        let mut feature_file = FeatureFile::new_from_fea(
+            "lookup one { lookupflag UseMarkFilteringSet [nuktaknda]; sub a by b; } one;",
+            Some(&glyphs),
+            None::<std::path::PathBuf>,
+        )
+        .expect("Failed to parse features");
+        let mut visitor = SubsetVisitor::new(glyphs.iter().copied().collect());
+        visitor
+            .visit(&mut feature_file)
+            .expect("Feature subsetting failed");
+        let fea = feature_file
+            .as_fea("")
+            .replace("\n", " ")
+            .replace("    ", "");
+        assert_eq!(
+            fea, "lookup one { lookupflag UseMarkFilteringSet []; sub a by b; } one; ",
+            "glyphs not in the subset are removed from UseMarkFilteringSet:\n{fea}"
         );
     }
 }
