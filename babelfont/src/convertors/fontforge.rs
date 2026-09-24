@@ -1,3 +1,19 @@
+//! FontForge SFD/SFDir conversion.
+//!
+//! The parser walks the file in the same order the `Font` model is shaped, and the
+//! functions below are grouped the same way so the two can be read side by side:
+//!
+//! 1. the font as a whole (names, metrics, layer definitions, top-level dispatch)
+//! 2. masters, axes and instances (vertical metric resolution, kerning declarations)
+//! 3. glyphs
+//! 4. layers
+//! 5. anchors and shapes
+//! 6. paths and components
+//! 7. font-level kerning groups
+//! 8. OpenType features (lookups, contextual rules, GSUB/GPOS assembly)
+//!
+//! Each section opens a fresh `impl SfdParser` block; they are all one type.
+
 use std::{
     collections::{HashMap, HashSet},
     fs,
@@ -11,22 +27,29 @@ use fontdrasil::coords::DesignLocation;
 use itertools::Itertools as _;
 
 use crate::{
-    common::{decomposition::DecomposedAffine, tag_from_string, Color, Node, NodeType},
+    common::{decomposition::DecomposedAffine, tag_from_string, Color, NodeType},
     convertors::fontforge::{
         layout::{make_langsys, GTable},
-        offsetmetrics::{compute_font_bbox_y, compute_offset_delta},
+        offsetmetrics::compute_font_bbox_y,
+        stringhelpers::{decode_sfd_line_escapes, tokenize_preserving_quotes},
         utf7::decode_utf7,
     },
     features::PossiblyAutomaticCode,
     names::ot_lang_id_to_layout_tag,
     BabelfontError, Component, Font, FormatSpecific, Glyph, GlyphCategory, Guide, Layer, LayerType,
-    MetricType, NameId, Path, Shape,
+    MetricType, NameId, Shape,
 };
 use indexmap::IndexMap;
 use smol_str::SmolStr;
 
+mod emit;
+mod layerregistry;
 mod layout;
 mod offsetmetrics;
+mod pathreading;
+mod stringhelpers;
+#[cfg(test)]
+mod tests;
 mod utf7;
 
 use regex::Regex;
@@ -37,12 +60,44 @@ static CHAIN_POSSUB_RE: LazyLock<Regex> = LazyLock::new(|| {
     // must reach the code that can say "unhandled kind", not fail as a bad header.
     Regex::new(r#"(\w+)\s+"([^"]*)"\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)"#).unwrap()
 });
-const GENERATED_KERN_SUBTABLE: &str = "generated_kern";
-const HEADER_VERSION_KEY: &str = "sfd.splinefontdb_version";
-const COMMENT_ENTRIES_KEY: &str = "sfd.comment_entries";
-const HSTEM_KEY: &str = "sfd.HStem";
-const VSTEM_KEY: &str = "sfd.VStem";
-const LAYER_QUADRATIC_KEY: &str = "sfd.is_quadratic";
+pub(crate) const GENERATED_KERN_SUBTABLE: &str = "generated_kern";
+pub(crate) const HEADER_VERSION_KEY: &str = "sfd.splinefontdb_version";
+pub(crate) const COMMENT_ENTRIES_KEY: &str = "sfd.comment_entries";
+pub(crate) const HSTEM_KEY: &str = "sfd.HStem";
+pub(crate) const VSTEM_KEY: &str = "sfd.VStem";
+pub(crate) const LAYER_QUADRATIC_KEY: &str = "sfd.is_quadratic";
+
+// ===========================================================================
+// Public entry points
+// ===========================================================================
+
+/// Load a FontForge SFD font or SFDir from a file path
+pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
+    SfdParser::new(path).into_font()
+}
+
+/// Load a FontForge SFD font from a string
+pub fn load_str(content: &str) -> Result<Font, BabelfontError> {
+    SfdParser::new_from_str(content.to_string()).into_font()
+}
+
+/// Save a Babelfont Font into a FontForge SFD file at the given path.
+pub fn save_sfd(font: &Font, path: &PathBuf) -> Result<(), BabelfontError> {
+    let sfd_str = emit::to_str(font)?;
+    std::fs::write(path, sfd_str)?;
+    Ok(())
+}
+
+fn read_file_lossy(path: &std::path::Path) -> Result<String, BabelfontError> {
+    let bytes = fs::read(path)?;
+    Ok(String::from_utf8_lossy(&bytes).into_owned())
+}
+
+// ===========================================================================
+// Parser state
+// The parser carries the whole in-progress Font, plus the raw
+// SFD tables that are folded into it once every glyph is known.
+// ===========================================================================
 
 /// A parser for the FontForge SFD/SFDir text format.
 struct SfdParser {
@@ -98,63 +153,9 @@ macro_rules! parse_metric {
     };
 }
 
-fn remove_implicit_move_in_closed_path(p: &mut Path) {
-    #[allow(clippy::unwrap_used)] // We check for is_empty() before, so unwrap is safe
-    if p.closed
-        && p.nodes.len() > 1
-        && p.nodes.first().map(|n| n.nodetype) == Some(NodeType::Move)
-        && p.nodes.first().unwrap().x == p.nodes.last().unwrap().x
-        && p.nodes.first().unwrap().y == p.nodes.last().unwrap().y
-    {
-        p.nodes = p.nodes[1..].to_vec(); // Remove the initial move node if path is closed
-    }
-}
-
-type SplineSegment = (Vec<(f64, f64)>, char, String);
-
-fn layer_is_quadratic(layer: &Layer) -> bool {
-    layer
-        .format_specific
-        .get(LAYER_QUADRATIC_KEY)
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false)
-}
-
-/// Is this FEA line a rule that may appear directly inside `aalt`?
-///
-/// The spec allows only feature references and single or alternate substitutions
-/// there. A single sub is `sub <glyph> by <glyph>;` and an alternate sub is
-/// `sub <glyph> from [<glyphs>];`. Anything else -- ligatures, multiples,
-/// contextual rules -- has to stay in its own lookup and out of `aalt`.
-fn is_single_or_alternate_sub(line: &str) -> bool {
-    let line = line.trim();
-    let Some(rest) = line
-        .strip_prefix("sub ")
-        .or_else(|| line.strip_prefix("substitute "))
-    else {
-        return false;
-    };
-    if rest.contains(" from ") {
-        // Alternate substitution.
-        return true;
-    }
-    let Some((from, to)) = rest.split_once(" by ") else {
-        return false;
-    };
-    // Single substitution: exactly one glyph on each side, and no class or
-    // sequence syntax that would make it something else.
-    let one_glyph = |part: &str| {
-        let part = part.trim().trim_end_matches(';').trim();
-        !part.is_empty()
-            && !part.contains('[')
-            && !part.contains(']')
-            && !part.contains('\'')
-            // A glyph class expands to several rules; keep aalt to plain glyphs.
-            && !part.starts_with('@')
-            && part.split_whitespace().count() == 1
-    };
-    one_glyph(from) && one_glyph(to)
-}
+// ===========================================================================
+// 1. The font as a whole
+// ===========================================================================
 
 /// Write a run-together italic style the way the Glyphs convention spells it.
 ///
@@ -474,7 +475,7 @@ impl SfdParser {
                 "Grid" => {
                     let (section, next_i) = self.get_section(&data, i, "EndSplineSet", None);
                     // This is a splineset, so we parse it into paths
-                    let paths = Self::splines_to_path(&section, false)?;
+                    let paths = pathreading::splines_to_path(&section, false)?;
                     // We only want the ones which are two nodes, move + line
                     for gridline in paths.iter().filter(|p| {
                         p.nodes.len() == 2
@@ -613,7 +614,7 @@ impl SfdParser {
                         // '<feature tag>' followed by one `<language id> "<name>"` pair
                         // per language. The names are UTF-7, quotes included, so the
                         // quote characters on the line are always delimiters.
-                        let tokens = Self::tokenize_preserving_quotes(v);
+                        let tokens = tokenize_preserving_quotes(v);
                         let mut it = tokens.iter();
                         let tag = it
                             .next()
@@ -1005,6 +1006,176 @@ impl SfdParser {
         Ok(())
     }
 
+    fn parse_layer_def(&mut self, value: &str) {
+        // Expected format: "<idx> <quadratic> \"Name\" <flags>"; we ignore flags
+        let tokenized = tokenize_preserving_quotes(value);
+        let parts: Vec<&str> = tokenized.iter().map(String::as_str).collect();
+        if parts.len() < 3 {
+            return;
+        }
+        let idx = parts[0].parse::<usize>().ok();
+        let quadratic = parts[1] == "1";
+        let name = parts[2].trim_matches('"').to_string();
+        let flags = parts
+            .last()
+            .and_then(|s| s.parse::<usize>().ok())
+            .unwrap_or(0);
+        if let Some(i) = idx {
+            if self.layer_defs.len() <= i {
+                self.layer_defs.resize(i + 1, None);
+            }
+            self.layer_defs[i] = Some(LayerDefinition {
+                name: Some(name),
+                is_quadratic: quadratic,
+                flags,
+            });
+            let serialized_defs: Vec<serde_json::Value> = self
+                .layer_defs
+                .iter()
+                .enumerate()
+                .filter_map(|(index, def)| {
+                    let def = def.as_ref()?;
+                    let mut obj = serde_json::Map::new();
+                    obj.insert(
+                        "index".to_string(),
+                        serde_json::Value::Number((index as u64).into()),
+                    );
+                    obj.insert(
+                        "name".to_string(),
+                        serde_json::Value::String(def.name.clone().unwrap_or_default()),
+                    );
+                    obj.insert(
+                        "is_quadratic".to_string(),
+                        serde_json::Value::Bool(def.is_quadratic),
+                    );
+                    obj.insert(
+                        "flags".to_string(),
+                        serde_json::Value::Number((def.flags as u64).into()),
+                    );
+                    Some(serde_json::Value::Object(obj))
+                })
+                .collect();
+            self.font.format_specific.insert(
+                "sfd.layer_defs".to_string(),
+                serde_json::Value::Array(serialized_defs),
+            );
+        }
+    }
+
+    fn push_comment_entry(&mut self, key: &str, raw_value: &str) {
+        let entry = self
+            .font
+            .format_specific
+            .entry(COMMENT_ENTRIES_KEY.to_string())
+            .or_insert_with(|| serde_json::Value::Array(Vec::new()));
+        if let serde_json::Value::Array(entries) = entry {
+            let mut object = serde_json::Map::new();
+            object.insert(
+                "key".to_string(),
+                serde_json::Value::String(key.to_string()),
+            );
+            object.insert(
+                "raw".to_string(),
+                serde_json::Value::String(raw_value.to_string()),
+            );
+            entries.push(serde_json::Value::Object(object));
+        }
+    }
+
+    fn parse_language_specific_name(&mut self, v: &str) {
+        // Format: <language_id> "string0" "string1" "string2" ...
+        // Strings are UTF-7 encoded, indices correspond to OpenType Name IDs
+        let tokens = tokenize_preserving_quotes(v);
+        if tokens.is_empty() {
+            return;
+        }
+
+        // First token is the language ID
+        let lang_id = match tokens[0].parse::<u16>() {
+            Ok(id) => id,
+            Err(_) => return,
+        };
+
+        // Convert OpenType language ID to OT layout tag
+        let Some(otl_tag) = ot_lang_id_to_layout_tag(lang_id) else {
+            log::warn!("Unknown OpenType language ID: {}", lang_id);
+            return;
+        };
+
+        // Process each quoted string
+        for (ix, token) in tokens.iter().skip(1).enumerate() {
+            if !token.starts_with('"') || !token.ends_with('"') {
+                continue;
+            }
+
+            // Strip quotes and decode from UTF-7
+            let utf7_string = token.trim_matches('"');
+            let decoded = decode_utf7(utf7_string);
+
+            // Skip empty strings
+            if decoded.is_empty() {
+                continue;
+            }
+
+            // Get the appropriate name field by OpenType Name ID (index)
+            if let Some(name_dict) = self.font.names.get_mut(NameId::new(ix as u16)) {
+                name_dict.insert(otl_tag.to_string(), decoded);
+            }
+        }
+    }
+
+    /// Split a family name that ends in its own weight, as (family, weight).
+    ///
+    /// `None` unless the file states a weight, that weight is a real one
+    /// rather than a synonym for Regular, and the family name ends with it
+    /// with something left over -- so "Elsie Black"/Black splits and
+    /// "Black"/Black does not. The comparison ignores spacing, because the
+    /// family name spaces the weight ("Elsie Swash Caps Black") where the
+    /// PostScript name does not.
+    fn weight_suffix_of_family_name(&self) -> Option<(String, String)> {
+        let weight = self
+            .font
+            .format_specific
+            .get("postscript_weight_name")
+            .and_then(|v| v.as_str())?
+            .trim();
+        if weight.is_empty()
+            || weight.eq_ignore_ascii_case("Book")
+            || weight.eq_ignore_ascii_case("Regular")
+            || weight.eq_ignore_ascii_case("Normal")
+            || weight.eq_ignore_ascii_case("Medium")
+        {
+            return None;
+        }
+        let family = self.font.names.family_name.get_default()?.trim();
+        let unspaced = |s: &str| s.replace(' ', "");
+        // The shortest suffix that spells the weight; whatever precedes it is
+        // the family. Cutting on a character boundary keeps this sound for
+        // non-ASCII family names.
+        let stem = family
+            .char_indices()
+            .map(|(ix, _)| ix)
+            .find(|&ix| {
+                family
+                    .get(ix..)
+                    .is_some_and(|tail| unspaced(tail).eq_ignore_ascii_case(weight))
+            })
+            .and_then(|ix| family.get(..ix))?
+            .trim_end();
+        if stem.is_empty() {
+            return None;
+        }
+        Some((stem.to_string(), weight.to_string()))
+    }
+}
+
+// ===========================================================================
+// 2. Masters, axes and instances
+// Master metrics, and the kerning declarations the file states
+// (KernClass2 at font level, Kerns2 per glyph).
+// ===========================================================================
+
+impl SfdParser {
     /// Resolve FontForge offset-mode OS/2 and hhea vertical metrics.
     ///
     /// When the companion flag is nonzero (`OS2TypoAOffset`, `OS2TypoDOffset`,
@@ -1106,82 +1277,142 @@ impl SfdParser {
         Ok(())
     }
 
-    fn parse_layer_def(&mut self, value: &str) {
-        // Expected format: "<idx> <quadratic> \"Name\" <flags>"; we ignore flags
-        let tokenized = Self::tokenize_preserving_quotes(value);
-        let parts: Vec<&str> = tokenized.iter().map(String::as_str).collect();
-        if parts.len() < 3 {
-            return;
+    /// Parse a KernClass2 block following the value line.
+    /// The value line contains: n1 [+] n2 "subtable name"
+    /// We then consume:
+    /// - (n1 - classstart) lines for first-side groups
+    /// - (n2 - 1) lines for second-side groups (with an implicit None at index 0)
+    /// - 1 line of device table values
+    fn parse_kern_class(&mut self, data: &[String], mut i: usize, value: &str) -> usize {
+        let (n1, classstart, n2, name) = Self::parse_kernclass_value(value);
+
+        // First-side groups
+        let mut groups1: Vec<Vec<String>> = Vec::new();
+        let count1 = n1.saturating_sub(classstart);
+        for line in &data[i..i + count1] {
+            let toks: Vec<String> = line.split_whitespace().map(|s| s.to_string()).collect();
+            // Skip the first token (class id or flag)
+            let grp = toks.into_iter().skip(1).collect();
+            groups1.push(grp);
         }
-        let idx = parts[0].parse::<usize>().ok();
-        let quadratic = parts[1] == "1";
-        let name = parts[2].trim_matches('"').to_string();
-        let flags = parts
-            .last()
-            .and_then(|s| s.parse::<usize>().ok())
-            .unwrap_or(0);
-        if let Some(i) = idx {
-            if self.layer_defs.len() <= i {
-                self.layer_defs.resize(i + 1, None);
+        if classstart != 0 {
+            // FontForge omits explicit class 0 unless n1 has a '+' suffix.
+            // Keep a placeholder so kern matrix row indexing matches SFD semantics.
+            groups1.insert(0, Vec::new());
+        }
+        i += count1;
+
+        // Second-side groups
+        let mut groups2: Vec<Vec<String>> = Vec::new();
+        // Insert placeholder for the implicit None at index 0
+        groups2.push(Vec::new());
+        let count2 = n2.saturating_sub(1);
+        for line in &data[i..i + count2] {
+            let toks: Vec<String> = line.split_whitespace().map(|s| s.to_string()).collect();
+            let grp = toks.into_iter().skip(1).collect();
+            groups2.push(grp);
+        }
+        i += count2;
+
+        // Device table line
+        let kerns_line = data.get(i).cloned().unwrap_or_default();
+        let kerns = Self::parse_devicetable(&kerns_line);
+        i += 1;
+
+        self.kern_classes.insert(
+            name,
+            KernClass {
+                groups1,
+                groups2,
+                kerns,
+            },
+        );
+
+        i
+    }
+
+    fn parse_kernclass_value(value: &str) -> (usize, usize, usize, String) {
+        // Regex-like parsing: <n1><+?><space><n2><space>"name"
+        let mut n1 = 0usize;
+        let mut n2 = 0usize;
+        let mut classstart = 1usize;
+        let mut name = String::new();
+
+        // Find quoted name
+        if let Some(start) = value.find('"') {
+            if let Some(end) = value.rfind('"') {
+                if end > start {
+                    name = value[start + 1..end].to_string();
+                }
             }
-            self.layer_defs[i] = Some(LayerDefinition {
-                name: Some(name),
-                is_quadratic: quadratic,
-                flags,
-            });
-            let serialized_defs: Vec<serde_json::Value> = self
-                .layer_defs
-                .iter()
-                .enumerate()
-                .filter_map(|(index, def)| {
-                    let def = def.as_ref()?;
-                    let mut obj = serde_json::Map::new();
-                    obj.insert(
-                        "index".to_string(),
-                        serde_json::Value::Number((index as u64).into()),
-                    );
-                    obj.insert(
-                        "name".to_string(),
-                        serde_json::Value::String(def.name.clone().unwrap_or_default()),
-                    );
-                    obj.insert(
-                        "is_quadratic".to_string(),
-                        serde_json::Value::Bool(def.is_quadratic),
-                    );
-                    obj.insert(
-                        "flags".to_string(),
-                        serde_json::Value::Number((def.flags as u64).into()),
-                    );
-                    Some(serde_json::Value::Object(obj))
-                })
-                .collect();
-            self.font.format_specific.insert(
-                "sfd.layer_defs".to_string(),
-                serde_json::Value::Array(serialized_defs),
-            );
+        }
+        // Parse leading numbers and optional plus
+        let head = value.split('"').next().unwrap_or("").trim();
+        let mut it = head.split_whitespace();
+        if let Some(a) = it.next() {
+            if a.contains('+') {
+                classstart = 0;
+            }
+            n1 = a.trim_matches('+').parse().unwrap_or(0);
+        }
+        if let Some(b) = it.next() {
+            n2 = b.parse().unwrap_or(0);
+        }
+        (n1, classstart, n2, name)
+    }
+
+    fn parse_devicetable(value: &str) -> Vec<i16> {
+        // Remove braces and split on whitespace, parse integers
+        let cleaned: String = value
+            .chars()
+            .map(|c| if c == '{' || c == '}' { ' ' } else { c })
+            .collect();
+        cleaned
+            .split_whitespace()
+            .filter_map(|t| t.parse::<i32>().ok())
+            .map(|v| v as i16)
+            .collect()
+    }
+
+    fn parse_kerns(&mut self, left_glyph: &str, data: &str) {
+        let triples = Self::parse_kerns_line(data);
+        for (gid2, kern, subtable) in triples {
+            let entry = self
+                .kern_pairs
+                .entry(subtable)
+                .or_default()
+                .entry(left_glyph.to_string())
+                .or_default();
+            entry.push((gid2 as usize, kern as i16));
         }
     }
 
-    fn push_comment_entry(&mut self, key: &str, raw_value: &str) {
-        let entry = self
-            .font
-            .format_specific
-            .entry(COMMENT_ENTRIES_KEY.to_string())
-            .or_insert_with(|| serde_json::Value::Array(Vec::new()));
-        if let serde_json::Value::Array(entries) = entry {
-            let mut object = serde_json::Map::new();
-            object.insert(
-                "key".to_string(),
-                serde_json::Value::String(key.to_string()),
-            );
-            object.insert(
-                "raw".to_string(),
-                serde_json::Value::String(raw_value.to_string()),
-            );
-            entries.push(serde_json::Value::Object(object));
+    fn parse_kerns_line(value: &str) -> Vec<(i32, f32, String)> {
+        let tokens = tokenize_preserving_quotes(value);
+        let mut out = Vec::new();
+        let mut i = 0usize;
+        while i + 2 < tokens.len() {
+            let gid = match tokens[i].parse::<i32>() {
+                Ok(v) => v,
+                Err(_) => break,
+            };
+            let kern = match tokens[i + 1].parse::<f32>() {
+                Ok(v) => v,
+                Err(_) => break,
+            };
+            let sub = tokens[i + 2].trim().trim_matches('"').to_string();
+            out.push((gid, kern, sub));
+            i += 3;
         }
+        out
     }
+}
 
+// ===========================================================================
+// 3. Glyphs
+// ===========================================================================
+
+impl SfdParser {
     fn parse_chars(&mut self, data: &[String], master_id: &str) -> Result<(), BabelfontError> {
         let mut i = 0usize;
         while i < data.len() {
@@ -1244,7 +1475,8 @@ impl SfdParser {
                 if let Some(layer_idx) = current_layer_idx {
                     if let Some(layer_pos) = layer_map.get(&layer_idx) {
                         let layer = &mut glyph.layers[*layer_pos];
-                        let paths = Self::splines_to_path(&section, layer_is_quadratic(layer))?;
+                        let paths =
+                            pathreading::splines_to_path(&section, layer_is_quadratic(layer))?;
                         layer.format_specific.insert(
                             "sfd.explicit_splineset".to_string(),
                             serde_json::Value::Bool(false),
@@ -1396,7 +1628,8 @@ impl SfdParser {
                     if let Some(layer_idx) = current_layer_idx {
                         if let Some(layer_pos) = layer_map.get(&layer_idx) {
                             let layer = &mut glyph.layers[*layer_pos];
-                            let paths = Self::splines_to_path(&section, layer_is_quadratic(layer))?;
+                            let paths =
+                                pathreading::splines_to_path(&section, layer_is_quadratic(layer))?;
                             layer.format_specific.insert(
                                 "sfd.explicit_splineset".to_string(),
                                 serde_json::Value::Bool(true),
@@ -1754,6 +1987,57 @@ impl SfdParser {
         Ok(glyph)
     }
 
+    fn looks_like_spline_line(line: &str) -> bool {
+        let trimmed = line.trim_start();
+        if trimmed.is_empty() {
+            return false;
+        }
+        let starts_numeric = trimmed
+            .chars()
+            .next()
+            .map(|c| c.is_ascii_digit() || c == '-' || c == '+')
+            .unwrap_or(false);
+        if !starts_numeric {
+            return false;
+        }
+        (trimmed.contains(" m ") || trimmed.contains(" l ") || trimmed.contains(" c "))
+            && !trimmed.contains(':')
+    }
+
+    fn parse_oneline_layout(&self, value: Option<&str>) -> Option<(SmolStr, Vec<SmolStr>)> {
+        if let Some(v) = value {
+            // Split quoted "name" component and following glyphs
+            let parts: Vec<&str> = v.split('"').collect();
+            if parts.len() >= 3 {
+                // Decoded, to match the subtable names the Lookup: line declares.
+                let name = SmolStr::from(decode_utf7(parts[1]));
+                let glyphs_part = parts[2].trim();
+                let glyphs: Vec<SmolStr> = glyphs_part
+                    .split_whitespace()
+                    .map(|s| SmolStr::from(s.trim_matches('"')))
+                    .collect();
+                return Some((name, glyphs));
+            }
+            None
+        } else {
+            None
+        }
+    }
+}
+
+// ===========================================================================
+// 4. Layers
+// ===========================================================================
+
+pub(crate) fn layer_is_quadratic(layer: &Layer) -> bool {
+    layer
+        .format_specific
+        .get(LAYER_QUADRATIC_KEY)
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+}
+
+impl SfdParser {
     fn ensure_layer(
         glyph: &mut Glyph,
         layer_map: &mut std::collections::HashMap<usize, usize>,
@@ -1815,427 +2099,15 @@ impl SfdParser {
         Self::ensure_layer(glyph, layer_map, 1, width, def, master_id);
         layer_map.get(&1).copied().unwrap_or(0)
     }
+}
 
-    fn parse_language_specific_name(&mut self, v: &str) {
-        // Format: <language_id> "string0" "string1" "string2" ...
-        // Strings are UTF-7 encoded, indices correspond to OpenType Name IDs
-        let tokens = Self::tokenize_preserving_quotes(v);
-        if tokens.is_empty() {
-            return;
-        }
+// ===========================================================================
+// 5. Anchors and shapes
+// ===========================================================================
 
-        // First token is the language ID
-        let lang_id = match tokens[0].parse::<u16>() {
-            Ok(id) => id,
-            Err(_) => return,
-        };
-
-        // Convert OpenType language ID to OT layout tag
-        let Some(otl_tag) = ot_lang_id_to_layout_tag(lang_id) else {
-            log::warn!("Unknown OpenType language ID: {}", lang_id);
-            return;
-        };
-
-        // Process each quoted string
-        for (ix, token) in tokens.iter().skip(1).enumerate() {
-            if !token.starts_with('"') || !token.ends_with('"') {
-                continue;
-            }
-
-            // Strip quotes and decode from UTF-7
-            let utf7_string = token.trim_matches('"');
-            let decoded = decode_utf7(utf7_string);
-
-            // Skip empty strings
-            if decoded.is_empty() {
-                continue;
-            }
-
-            // Get the appropriate name field by OpenType Name ID (index)
-            if let Some(name_dict) = self.font.names.get_mut(NameId::new(ix as u16)) {
-                name_dict.insert(otl_tag.to_string(), decoded);
-            }
-        }
-    }
-
-    /// Split a family name that ends in its own weight, as (family, weight).
-    ///
-    /// `None` unless the file states a weight, that weight is a real one
-    /// rather than a synonym for Regular, and the family name ends with it
-    /// with something left over -- so "Elsie Black"/Black splits and
-    /// "Black"/Black does not. The comparison ignores spacing, because the
-    /// family name spaces the weight ("Elsie Swash Caps Black") where the
-    /// PostScript name does not.
-    fn weight_suffix_of_family_name(&self) -> Option<(String, String)> {
-        let weight = self
-            .font
-            .format_specific
-            .get("postscript_weight_name")
-            .and_then(|v| v.as_str())?
-            .trim();
-        if weight.is_empty()
-            || weight.eq_ignore_ascii_case("Book")
-            || weight.eq_ignore_ascii_case("Regular")
-            || weight.eq_ignore_ascii_case("Normal")
-            || weight.eq_ignore_ascii_case("Medium")
-        {
-            return None;
-        }
-        let family = self.font.names.family_name.get_default()?.trim();
-        let unspaced = |s: &str| s.replace(' ', "");
-        // The shortest suffix that spells the weight; whatever precedes it is
-        // the family. Cutting on a character boundary keeps this sound for
-        // non-ASCII family names.
-        let stem = family
-            .char_indices()
-            .map(|(ix, _)| ix)
-            .find(|&ix| {
-                family
-                    .get(ix..)
-                    .is_some_and(|tail| unspaced(tail).eq_ignore_ascii_case(weight))
-            })
-            .and_then(|ix| family.get(..ix))?
-            .trim_end();
-        if stem.is_empty() {
-            return None;
-        }
-        Some((stem.to_string(), weight.to_string()))
-    }
-
-    fn parse_lookup(&mut self, data: &str) {
-        // Format per fontforge.md:
-        // Lookup: <kind> <flags> <save-afm> "<lookup name>" { ...subtables... } [ ...features/scripts/languages... ]
-        let head_end = data.find('"').unwrap_or(data.len());
-        let head = data[..head_end].trim();
-        let mut it = head.split_whitespace();
-        let kind: u16 = it.next().and_then(|s| s.parse().ok()).unwrap_or(0);
-        let flag: u16 = it.next().and_then(|s| s.parse().ok()).unwrap_or(0);
-        // let _save_afm: u16 = it.next().and_then(|s| s.parse().ok()).unwrap_or(0);
-
-        // Lookup name between quotes. Decoded, because SeqLookup references to it are
-        // decoded too, and a name carrying a UTF-7 escape has to match on both sides.
-        let name = if let Some(start) = data.find('"') {
-            if let Some(end) = data[start + 1..].find('"') {
-                decode_utf7(&data[start + 1..start + 1 + end])
-            } else {
-                String::new()
-            }
-        } else {
-            String::new()
-        };
-
-        let subtables_vec = Self::parse_subtable_names(data);
-        let mut subtables: IndexMap<SmolStr, Vec<fea_rs_ast::Statement>> = IndexMap::new();
-        for sub in subtables_vec {
-            subtables.entry(sub).or_default();
-        }
-
-        // Features part inside [...] (may contain multiple scripts/languages for one or more features)
-        let features_part = if let Some(lb) = data.rfind('[') {
-            if let Some(rb) = data.rfind(']') {
-                if rb > lb {
-                    Some(&data[lb + 1..rb])
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        let features = features_part
-            .map(Self::parse_lookup_features)
-            .unwrap_or_default();
-
-        let lookup_type = Self::lookup_type_from_kind(kind);
-        let sanitized_name =
-            Self::sanitize_and_dedupe_lookup_name(&name, &mut self.taken_lookup_names);
-        if let Some(previous) = self
-            .assigned_lookup_names
-            .insert(name.clone(), sanitized_name.clone())
-        {
-            // Two SFD lookups with the same name: references can only mean one of
-            // them, and they now mean this one.
-            log::warn!(
-                "two lookups are both named {name:?}; references resolve to the \
-                 later one ({sanitized_name}), not {previous}"
-            );
-        }
-        let info = layout::LookupInfo {
-            lookup_type,
-            flag,
-            features,
-            block: fea_rs_ast::LookupBlock::new(sanitized_name.clone().into(), vec![], false, 0..0),
-            subtables,
-        };
-
-        // Determine GSUB vs GPOS from high byte of kind
-        if (kind) >> 8 == 1 {
-            self.gpos_lookups.0.insert(sanitized_name, info);
-        } else {
-            self.gsub_lookups.0.insert(sanitized_name, info);
-        }
-    }
-
-    fn parse_subtable_names(data: &str) -> Vec<SmolStr> {
-        // Capture content between the first '{' and the matching '}' (use last '}' if simple)
-        let (start, end) = match (data.find('{'), data.rfind('}')) {
-            (Some(s), Some(e)) if e > s => (s, e),
-            _ => return Vec::new(),
-        };
-        let body = &data[start + 1..end];
-        let tokens = Self::tokenize_preserving_quotes(body);
-        tokens
-            .into_iter()
-            .filter(|t| t.starts_with('"') && t.ends_with('"') && t.len() >= 2)
-            // Decoded: chain_pos_sub is keyed by the decoded subtable name, so a name
-            // carrying a UTF-7 escape would otherwise never match its rules.
-            .map(|t| SmolStr::from(decode_utf7(t.trim_matches('"'))))
-            .collect()
-    }
-
-    fn lookup_type_from_kind(kind: u16) -> layout::LookupType {
-        use layout::LookupType as LT;
-        match kind {
-            1 => LT::SingleSubstitution,
-            2 => LT::MultipleSubstitution,
-            3 => LT::AlternateSubstitution,
-            4 => LT::LigatureSubstitution,
-            5 => LT::GsubContext,
-            6 => LT::GsubChainContext,
-            8 => LT::ReverseChain,
-            0x101 => LT::SinglePosition,
-            0x102 => LT::PairPosition,
-            0x103 => LT::CursivePosition,
-            0x104 => LT::MarkToBasePosition,
-            0x105 => LT::MarkToLigaturePosition,
-            0x106 => LT::MarkToMarkPosition,
-            0x107 => LT::ContextPosition,
-            0x108 => LT::ChainContextPosition,
-            _ => LT::SingleSubstitution,
-        }
-    }
-
-    fn parse_lookup_features(s: &str) -> Vec<layout::FeatureLangSys> {
-        // Expect patterns like: 'kern' ('DFLT' <'dflt' > 'latn' <'dflt' > )
-        let mut out = Vec::new();
-        let mut rest = s;
-        while let Some(start) = rest.find('\'') {
-            let after = &rest[start + 1..];
-            if let Some(end_rel) = after.find('\'') {
-                let feature = &after[..end_rel];
-                // Find the following parenthesis block
-                let after_feat = &after[end_rel + 1..];
-                if let Some(p_start) = after_feat.find('(') {
-                    if let Some(p_end) = after_feat[p_start + 1..].find(')') {
-                        let body = &after_feat[p_start + 1..p_start + 1 + p_end];
-                        // Body contains one or more: 'script' < 'lang' 'lang2' >
-                        let mut b = body;
-                        loop {
-                            if let Some(s_start) = b.find('\'') {
-                                let s_after = &b[s_start + 1..];
-                                if let Some(s_end_rel) = s_after.find('\'') {
-                                    let script = &s_after[..s_end_rel];
-                                    // find angle bracket block
-                                    let s_tail = &s_after[s_end_rel + 1..];
-                                    if let Some(a_start) = s_tail.find('<') {
-                                        if let Some(a_end) = s_tail[a_start + 1..].find('>') {
-                                            let langs_blob =
-                                                &s_tail[a_start + 1..a_start + 1 + a_end];
-                                            // languages are quoted tokens
-                                            let mut lb = langs_blob;
-                                            loop {
-                                                if let Some(l_start) = lb.find('\'') {
-                                                    let l_after = &lb[l_start + 1..];
-                                                    if let Some(l_end_rel) = l_after.find('\'') {
-                                                        let language = &l_after[..l_end_rel];
-                                                        // FontForge writes a
-                                                        // blank script tag for
-                                                        // lookups with no
-                                                        // script; treat it as
-                                                        // DFLT/dflt so the FEA
-                                                        // stays valid.
-                                                        let script = if script.trim().is_empty() {
-                                                            "DFLT"
-                                                        } else {
-                                                            script
-                                                        };
-                                                        let language = if language.trim().is_empty()
-                                                        {
-                                                            "dflt"
-                                                        } else {
-                                                            language
-                                                        };
-                                                        out.push(layout::FeatureLangSys {
-                                                            feature: SmolStr::from(feature),
-                                                            script: SmolStr::from(script),
-                                                            language: SmolStr::from(language),
-                                                        });
-                                                        lb = &l_after[l_end_rel + 1..];
-                                                        continue;
-                                                    }
-                                                }
-                                                break;
-                                            }
-                                            b = &s_tail[a_start + 1 + a_end + 1..];
-                                            continue;
-                                        }
-                                    }
-                                    b = s_tail;
-                                    continue;
-                                }
-                            }
-                            break;
-                        }
-                        // Advance rest beyond this feature block
-                        rest = &after_feat[p_start + 1 + p_end + 1..];
-                        continue;
-                    }
-                }
-                // No parenthesis found; advance and continue
-                rest = after;
-                continue;
-            } else {
-                break;
-            }
-        }
-        out
-    }
-
-    /// Parse a KernClass2 block following the value line.
-    /// The value line contains: n1 [+] n2 "subtable name"
-    /// We then consume:
-    /// - (n1 - classstart) lines for first-side groups
-    /// - (n2 - 1) lines for second-side groups (with an implicit None at index 0)
-    /// - 1 line of device table values
-    fn parse_kern_class(&mut self, data: &[String], mut i: usize, value: &str) -> usize {
-        let (n1, classstart, n2, name) = Self::parse_kernclass_value(value);
-
-        // First-side groups
-        let mut groups1: Vec<Vec<String>> = Vec::new();
-        let count1 = n1.saturating_sub(classstart);
-        for line in &data[i..i + count1] {
-            let toks: Vec<String> = line.split_whitespace().map(|s| s.to_string()).collect();
-            // Skip the first token (class id or flag)
-            let grp = toks.into_iter().skip(1).collect();
-            groups1.push(grp);
-        }
-        if classstart != 0 {
-            // FontForge omits explicit class 0 unless n1 has a '+' suffix.
-            // Keep a placeholder so kern matrix row indexing matches SFD semantics.
-            groups1.insert(0, Vec::new());
-        }
-        i += count1;
-
-        // Second-side groups
-        let mut groups2: Vec<Vec<String>> = Vec::new();
-        // Insert placeholder for the implicit None at index 0
-        groups2.push(Vec::new());
-        let count2 = n2.saturating_sub(1);
-        for line in &data[i..i + count2] {
-            let toks: Vec<String> = line.split_whitespace().map(|s| s.to_string()).collect();
-            let grp = toks.into_iter().skip(1).collect();
-            groups2.push(grp);
-        }
-        i += count2;
-
-        // Device table line
-        let kerns_line = data.get(i).cloned().unwrap_or_default();
-        let kerns = Self::parse_devicetable(&kerns_line);
-        i += 1;
-
-        self.kern_classes.insert(
-            name,
-            KernClass {
-                groups1,
-                groups2,
-                kerns,
-            },
-        );
-
-        i
-    }
-
-    fn parse_kerns(&mut self, left_glyph: &str, data: &str) {
-        let triples = Self::parse_kerns_line(data);
-        for (gid2, kern, subtable) in triples {
-            let entry = self
-                .kern_pairs
-                .entry(subtable)
-                .or_default()
-                .entry(left_glyph.to_string())
-                .or_default();
-            entry.push((gid2 as usize, kern as i16));
-        }
-    }
-
-    fn parse_kernclass_value(value: &str) -> (usize, usize, usize, String) {
-        // Regex-like parsing: <n1><+?><space><n2><space>"name"
-        let mut n1 = 0usize;
-        let mut n2 = 0usize;
-        let mut classstart = 1usize;
-        let mut name = String::new();
-
-        // Find quoted name
-        if let Some(start) = value.find('"') {
-            if let Some(end) = value.rfind('"') {
-                if end > start {
-                    name = value[start + 1..end].to_string();
-                }
-            }
-        }
-        // Parse leading numbers and optional plus
-        let head = value.split('"').next().unwrap_or("").trim();
-        let mut it = head.split_whitespace();
-        if let Some(a) = it.next() {
-            if a.contains('+') {
-                classstart = 0;
-            }
-            n1 = a.trim_matches('+').parse().unwrap_or(0);
-        }
-        if let Some(b) = it.next() {
-            n2 = b.parse().unwrap_or(0);
-        }
-        (n1, classstart, n2, name)
-    }
-
-    fn parse_devicetable(value: &str) -> Vec<i16> {
-        // Remove braces and split on whitespace, parse integers
-        let cleaned: String = value
-            .chars()
-            .map(|c| if c == '{' || c == '}' { ' ' } else { c })
-            .collect();
-        cleaned
-            .split_whitespace()
-            .filter_map(|t| t.parse::<i32>().ok())
-            .map(|v| v as i16)
-            .collect()
-    }
-
-    fn parse_kerns_line(value: &str) -> Vec<(i32, f32, String)> {
-        let tokens = Self::tokenize_preserving_quotes(value);
-        let mut out = Vec::new();
-        let mut i = 0usize;
-        while i + 2 < tokens.len() {
-            let gid = match tokens[i].parse::<i32>() {
-                Ok(v) => v,
-                Err(_) => break,
-            };
-            let kern = match tokens[i + 1].parse::<f32>() {
-                Ok(v) => v,
-                Err(_) => break,
-            };
-            let sub = tokens[i + 2].trim().trim_matches('"').to_string();
-            out.push((gid, kern, sub));
-            i += 3;
-        }
-        out
-    }
-
+impl SfdParser {
     fn register_anchor_classes(&mut self, v: &str) {
-        let tokens = Self::tokenize_preserving_quotes(v);
+        let tokens = tokenize_preserving_quotes(v);
         let mut i = 0;
         while i + 1 < tokens.len() {
             let class_name = decode_utf7(tokens[i].trim_matches('"'));
@@ -2253,31 +2125,241 @@ impl SfdParser {
         }
     }
 
-    fn tokenize_preserving_quotes(s: &str) -> Vec<String> {
-        let mut out = Vec::new();
-        let mut cur = String::new();
-        let mut in_quotes = false;
-        for ch in s.chars() {
-            match ch {
-                '"' => {
-                    in_quotes = !in_quotes;
-                    cur.push(ch);
-                }
-                c if c.is_whitespace() && !in_quotes => {
-                    if !cur.is_empty() {
-                        out.push(cur.clone());
-                        cur.clear();
-                    }
-                }
-                _ => cur.push(ch),
-            }
+    fn parse_anchor(&self, v: &str) -> Option<crate::Anchor> {
+        // Quoted name, x, y, kind, index
+        let parts: Vec<&str> = v.split_whitespace().collect();
+        if parts.len() < 5 {
+            return None;
         }
-        if !cur.is_empty() {
-            out.push(cur);
+        let mut name = decode_utf7(parts[0].trim_matches('"'));
+        let x = parts[1].parse::<f64>().ok()?;
+        let y = parts[2].parse::<f64>().ok()?;
+        let kind = parts[3];
+        let index = parts[4].parse::<usize>().ok()?;
+        let mut format_specific = FormatSpecific::default();
+        format_specific.insert(
+            "sfd.kind".to_string(),
+            serde_json::Value::String(kind.to_string()),
+        );
+        format_specific.insert(
+            "sfd.index".to_string(),
+            serde_json::Value::Number(index.into()),
+        );
+        if kind == "mark" {
+            name = "_".to_string() + &name;
         }
-        out
+        Some(crate::Anchor {
+            name,
+            x,
+            y,
+            format_specific,
+        })
     }
 
+    /// Classify GlyphClass-less glyphs that carry only mark-side anchors as
+    /// Nonspacing marks.
+    ///
+    /// SFD records a glyph's role in two ways: the coarse `GlyphClass` line and,
+    /// per anchor, the attachment `kind` (`mark` = the glyph attaches AS a mark,
+    /// `basechar`/`baselig`/... = base side). Some sources (e.g. Glegoo Bold)
+    /// omit `GlyphClass` on conjunct marks, leaving their category Unknown. Such
+    /// a glyph then exports without a category, and fontc — seeing an
+    /// underscore-joined name — treats it as a ligature and drops it from the
+    /// abvm/blwm mark coverage. The anchor `kind` is the authoritative signal:
+    /// a glyph whose anchors are exclusively mark-side is a mark, so mirror the
+    /// `GlyphClass: 4` path (category = Mark, subCategory = Nonspacing).
+    fn infer_mark_categories_from_anchors(&mut self) {
+        for glyph in self.font.glyphs.0.iter_mut() {
+            if glyph.category != GlyphCategory::Unknown {
+                continue;
+            }
+            let mut has_mark_anchor = false;
+            let mut has_base_anchor = false;
+            for layer in glyph.layers.iter() {
+                for anchor in layer.anchors.iter() {
+                    match anchor
+                        .format_specific
+                        .get("sfd.kind")
+                        .and_then(|v| v.as_str())
+                    {
+                        Some("mark") => has_mark_anchor = true,
+                        Some(_) => has_base_anchor = true,
+                        None => {}
+                    }
+                }
+            }
+            if has_mark_anchor && !has_base_anchor {
+                glyph.category = GlyphCategory::Mark;
+                glyph.format_specific.insert(
+                    "subcategory".to_string(),
+                    serde_json::Value::String("Nonspacing".to_string()),
+                );
+            }
+        }
+    }
+}
+
+// ===========================================================================
+// 6. Paths and components
+// Paths themselves are read and written in `pathreading`; these are the
+// glyph-level component references that point at them.
+// ===========================================================================
+
+impl SfdParser {
+    /// Resolve component references after all glyphs have been parsed.
+    /// SFD stores references by glyph index; we need to convert to glyph names
+    /// and extract the transformation matrix.
+    fn resolve_component_references(&mut self) -> Result<(), BabelfontError> {
+        // Build a mapping from glyph index to glyph name
+        let glyph_order: Vec<String> = self
+            .font
+            .glyphs
+            .iter()
+            .map(|g| g.name.to_string())
+            .collect();
+
+        for glyph in &mut self.font.glyphs.0 {
+            for layer in &mut glyph.layers {
+                // Extract and process stored references
+                if let Some(serde_json::Value::Array(refer_array)) =
+                    layer.format_specific.get("sfd.refer")
+                {
+                    let refer_strs: Vec<String> = refer_array
+                        .iter()
+                        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                        .collect();
+
+                    for refer_str in refer_strs {
+                        if let Some(component) = Self::parse_refer(&refer_str, &glyph_order)? {
+                            layer.shapes.push(Shape::Component(component));
+                        }
+                    }
+
+                    // Remove the temporary storage after processing
+                    layer.format_specific.remove("sfd.refer");
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Parse a single Refer line from SFD format.
+    /// Format: "<glyph_index> <unicodeenc> <N|S> <xx> <xy> <yx> <yy> <tx> <ty> <flags> [base_pt ref_pt [O]]"
+    fn parse_refer(
+        refer_str: &str,
+        glyph_order: &[String],
+    ) -> Result<Option<Component>, BabelfontError> {
+        let parts: Vec<&str> = refer_str.split_whitespace().collect();
+        if parts.len() < 10 {
+            // Malformed reference; skip it
+            return Ok(None);
+        }
+
+        // Parse the glyph index
+        let glyph_idx = parts[0].parse::<usize>().map_err(|_| {
+            BabelfontError::General(format!("Invalid glyph index in Refer: {}", parts[0]))
+        })?;
+
+        if glyph_idx >= glyph_order.len() {
+            return Err(BabelfontError::General(format!(
+                "Glyph index {} out of bounds (max {})",
+                glyph_idx,
+                glyph_order.len()
+            )));
+        }
+
+        let reference_name = glyph_order[glyph_idx].clone();
+
+        // Extract the transformation matrix from positions 3-8
+        // Format: [xx, xy, yx, yy, tx, ty]
+        let matrix_parts: Result<Vec<f64>, _> =
+            parts[3..9].iter().map(|p| p.parse::<f64>()).collect();
+
+        let matrix = matrix_parts.map_err(|_| {
+            BabelfontError::General("Failed to parse transformation matrix".to_string())
+        })?;
+
+        if matrix.len() != 6 {
+            return Ok(None);
+        }
+
+        // Convert the matrix [xx, xy, yx, yy, tx, ty] into a kurbo::Affine
+        // kurbo::Affine coefficients are [xx, xy, yx, yy, tx, ty]
+        let matrix_arr = [
+            matrix[0], matrix[1], matrix[2], matrix[3], matrix[4], matrix[5],
+        ];
+        let affine = kurbo::Affine::new(matrix_arr);
+        let transform = DecomposedAffine::from(affine);
+
+        let mut format_specific = FormatSpecific::default();
+
+        format_specific.insert(
+            "sfd.refer.unicodeenc".to_string(),
+            serde_json::Value::String(parts[1].to_string()),
+        );
+        format_specific.insert(
+            "sfd.refer.selected".to_string(),
+            serde_json::Value::Bool(parts[2] == "S"),
+        );
+
+        let flags = parts[9].parse::<u32>().unwrap_or(0);
+        format_specific.insert(
+            "sfd.refer.flags".to_string(),
+            serde_json::Value::Number(flags.into()),
+        );
+        format_specific.insert(
+            "sfd.refer.use_my_metrics".to_string(),
+            serde_json::Value::Bool((flags & 0x1) != 0),
+        );
+        format_specific.insert(
+            "sfd.refer.round_translation_to_grid".to_string(),
+            serde_json::Value::Bool((flags & 0x2) != 0),
+        );
+        format_specific.insert(
+            "sfd.refer.point_match".to_string(),
+            serde_json::Value::Bool((flags & 0x4) != 0),
+        );
+
+        if (flags & 0x4) != 0 && parts.len() >= 12 {
+            if let Ok(base_pt) = parts[10].parse::<i64>() {
+                format_specific.insert(
+                    "sfd.refer.match_pt_base".to_string(),
+                    serde_json::Value::Number(base_pt.into()),
+                );
+            }
+            if let Ok(ref_pt) = parts[11].parse::<i64>() {
+                format_specific.insert(
+                    "sfd.refer.match_pt_ref".to_string(),
+                    serde_json::Value::Number(ref_pt.into()),
+                );
+            }
+            if parts.get(12).copied() == Some("O") {
+                format_specific.insert(
+                    "sfd.refer.point_match_out_of_date".to_string(),
+                    serde_json::Value::Bool(true),
+                );
+            }
+        }
+
+        let component = Component {
+            reference: reference_name.into(),
+            transform,
+            location: Default::default(),
+            format_specific,
+        };
+
+        Ok(Some(component))
+    }
+}
+
+// ===========================================================================
+// 7. Font-level kerning groups
+// Folds the parsed classes and pairs into `Master::kerning` and the
+// font-wide `@group` definitions.
+// ===========================================================================
+
+impl SfdParser {
     fn glyph_from_token(token: &str, glyph_order: &[String]) -> Option<SmolStr> {
         let trimmed = token.trim_matches('"');
         if let Ok(idx) = trimmed.parse::<usize>() {
@@ -2293,98 +2375,6 @@ impl SfdParser {
         members
             .first()
             .and_then(|t| Self::glyph_from_token(t, glyph_order))
-    }
-
-    /// Sanitize a lookup name for FEA and make it unique: the first taker keeps
-    /// the bare form, later ones get `_2`, `_3`, ... Every returned name goes into
-    /// `taken`, generated ones included, so a later lookup whose own name happens
-    /// to sanitize to an already-generated form cannot collide with it.
-    fn sanitize_and_dedupe_lookup_name(name: &str, taken: &mut HashSet<String>) -> String {
-        let mut sanitized: String = name
-            .chars()
-            .map(|c| {
-                if c.is_alphanumeric() || c == '_' {
-                    c
-                } else {
-                    '_'
-                }
-            })
-            .collect();
-        // A label may not begin with a digit, and a label that IS a keyword fails
-        // to parse wherever it stands ("Expected LABEL found SubKw"); either one
-        // aborts the whole conversion downstream. The list mirrors FEA_KEYWORDS in
-        // fea-rs-ast 0.1.6 (glyphcontainers.rs), which that crate keeps private.
-        const FEA_KEYWORDS: [&str; 52] = [
-            "anchor",
-            "anchordef",
-            "anon",
-            "anonymous",
-            "by",
-            "contour",
-            "cursive",
-            "device",
-            "enum",
-            "enumerate",
-            "excludedflt",
-            "exclude_dflt",
-            "feature",
-            "from",
-            "ignore",
-            "ignorebaseglyphs",
-            "ignoreligatures",
-            "ignoremarks",
-            "include",
-            "includedflt",
-            "include_dflt",
-            "language",
-            "languagesystem",
-            "lookup",
-            "lookupflag",
-            "mark",
-            "markattachmenttype",
-            "markclass",
-            "nameid",
-            "null",
-            "parameters",
-            "pos",
-            "position",
-            "required",
-            "righttoleft",
-            "reversesub",
-            "rsub",
-            "script",
-            "sub",
-            "substitute",
-            "subtable",
-            "table",
-            "usemarkfilteringset",
-            "useextension",
-            "valuerecorddef",
-            "base",
-            "gdef",
-            "head",
-            "hhea",
-            "name",
-            "vhea",
-            "vmtx",
-        ];
-        if sanitized.starts_with(|c: char| c.is_ascii_digit()) {
-            sanitized.insert(0, '_');
-        }
-        if FEA_KEYWORDS.contains(&sanitized.as_str()) {
-            sanitized.push('_');
-        }
-        if taken.insert(sanitized.clone()) {
-            return sanitized;
-        }
-        let mut n = 2usize;
-        loop {
-            let candidate = format!("{sanitized}_{n}");
-            if taken.insert(candidate.clone()) {
-                return candidate;
-            }
-            n += 1;
-        }
     }
 
     fn make_unique_group_name(base: SmolStr, seen: &mut HashMap<SmolStr, usize>) -> SmolStr {
@@ -2571,498 +2561,340 @@ impl SfdParser {
 
         Ok(())
     }
+}
 
-    /// Parse a single spline segment line from SFD format.
-    /// SFD spline lines have the format: "x1 y1 x2 y2 ... segment_type flags"
-    /// Where segment_type is 'm' (move), 'l' (line), or 'c' (curve).
-    /// Returns (points, segment_type, flags).
-    fn parse_spline_segment(line: &str) -> Option<SplineSegment> {
-        let line = line.trim();
-        if line.is_empty() {
-            return None;
-        }
+// ===========================================================================
+// 8. OpenType features
+// ===========================================================================
 
-        // Use regex pattern similar to Python: split on " [lmc] "
-        if let Some(m_pos) = line.rfind(" m ") {
-            let (coords_str, rest) = line.split_at(m_pos);
-            let rest = rest.trim_start_matches(" m ").trim();
-            let (flags, _) = rest.split_once(' ').unwrap_or((rest, ""));
-            let points = Self::parse_coordinates(coords_str)?;
-            return Some((points, 'm', flags.to_string()));
-        }
-        if let Some(m_pos) = line.rfind(" l ") {
-            let (coords_str, rest) = line.split_at(m_pos);
-            let rest = rest.trim_start_matches(" l ").trim();
-            let (flags, _) = rest.split_once(' ').unwrap_or((rest, ""));
-            let points = Self::parse_coordinates(coords_str)?;
-            return Some((points, 'l', flags.to_string()));
-        }
-        if let Some(m_pos) = line.rfind(" c ") {
-            let (coords_str, rest) = line.split_at(m_pos);
-            let rest = rest.trim_start_matches(" c ").trim();
-            let (flags, _) = rest.split_once(' ').unwrap_or((rest, ""));
-            let points = Self::parse_coordinates(coords_str)?;
-            return Some((points, 'c', flags.to_string()));
-        }
-
-        None
+/// Is this FEA line a rule that may appear directly inside `aalt`?
+///
+/// The spec allows only feature references and single or alternate substitutions
+/// there. A single sub is `sub <glyph> by <glyph>;` and an alternate sub is
+/// `sub <glyph> from [<glyphs>];`. Anything else -- ligatures, multiples,
+/// contextual rules -- has to stay in its own lookup and out of `aalt`.
+fn is_single_or_alternate_sub(line: &str) -> bool {
+    let line = line.trim();
+    let Some(rest) = line
+        .strip_prefix("sub ")
+        .or_else(|| line.strip_prefix("substitute "))
+    else {
+        return false;
+    };
+    if rest.contains(" from ") {
+        // Alternate substitution.
+        return true;
     }
+    let Some((from, to)) = rest.split_once(" by ") else {
+        return false;
+    };
+    // Single substitution: exactly one glyph on each side, and no class or
+    // sequence syntax that would make it something else.
+    let one_glyph = |part: &str| {
+        let part = part.trim().trim_end_matches(';').trim();
+        !part.is_empty()
+            && !part.contains('[')
+            && !part.contains(']')
+            && !part.contains('\'')
+            // A glyph class expands to several rules; keep aalt to plain glyphs.
+            && !part.starts_with('@')
+            && part.split_whitespace().count() == 1
+    };
+    one_glyph(from) && one_glyph(to)
+}
 
-    /// Parse a coordinate string into pairs of (x, y) f64 values.
-    fn parse_coordinates(coords_str: &str) -> Option<Vec<(f64, f64)>> {
-        let values: Result<Vec<f64>, _> = coords_str
-            .split_whitespace()
-            .map(|s| s.parse::<f64>())
-            .collect();
+impl SfdParser {
+    fn parse_lookup(&mut self, data: &str) {
+        // Format per fontforge.md:
+        // Lookup: <kind> <flags> <save-afm> "<lookup name>" { ...subtables... } [ ...features/scripts/languages... ]
+        let head_end = data.find('"').unwrap_or(data.len());
+        let head = data[..head_end].trim();
+        let mut it = head.split_whitespace();
+        let kind: u16 = it.next().and_then(|s| s.parse().ok()).unwrap_or(0);
+        let flag: u16 = it.next().and_then(|s| s.parse().ok()).unwrap_or(0);
+        // let _save_afm: u16 = it.next().and_then(|s| s.parse().ok()).unwrap_or(0);
 
-        let values = values.ok()?;
-        if values.len() % 2 != 0 {
-            return None; // Must have even number of coordinates
+        // Lookup name between quotes. Decoded, because SeqLookup references to it are
+        // decoded too, and a name carrying a UTF-7 escape has to match on both sides.
+        let name = if let Some(start) = data.find('"') {
+            if let Some(end) = data[start + 1..].find('"') {
+                decode_utf7(&data[start + 1..start + 1 + end])
+            } else {
+                String::new()
+            }
+        } else {
+            String::new()
+        };
+
+        let subtables_vec = Self::parse_subtable_names(data);
+        let mut subtables: IndexMap<SmolStr, Vec<fea_rs_ast::Statement>> = IndexMap::new();
+        for sub in subtables_vec {
+            subtables.entry(sub).or_default();
         }
 
-        let mut points = Vec::new();
-        for chunk in values.chunks(2) {
-            if chunk.len() == 2 {
-                points.push((chunk[0], chunk[1]));
-            }
-        }
-        Some(points)
-    }
-
-    /// Convert SFD spline lines into a Path structure.
-    /// Handles contours, segments, and node types.
-    fn splines_to_path(
-        spline_lines: &[String],
-        is_quadratic: bool,
-    ) -> Result<Vec<Path>, BabelfontError> {
-        let mut paths = Vec::new();
-        let mut nodes = Vec::new();
-        let mut last_point_flags: Option<String> = None;
-
-        for line in spline_lines {
-            let line = line.trim();
-            if line.is_empty() {
-                continue;
-            }
-
-            // Check for contour name/other markers (can be added as format-specific)
-            if line.contains(": ")
-                && !line.contains(|c: char| c.is_numeric() || c == '-' || c == '.')
-            {
-                // This looks like a key-value (e.g., "Contour name: something")
-                // Finish current path if any
-                if !nodes.is_empty() {
-                    paths.push(Path {
-                        nodes: nodes.clone(),
-                        closed: !Self::is_force_open_path(last_point_flags.as_deref()),
-                        ..Default::default()
-                    });
-                    nodes.clear();
-                    last_point_flags = None;
+        // Features part inside [...] (may contain multiple scripts/languages for one or more features)
+        let features_part = if let Some(lb) = data.rfind('[') {
+            if let Some(rb) = data.rfind(']') {
+                if rb > lb {
+                    Some(&data[lb + 1..rb])
+                } else {
+                    None
                 }
-                continue;
+            } else {
+                None
             }
+        } else {
+            None
+        };
 
-            // Try to parse as a segment line
-            if let Some((points, seg_type, flags)) = Self::parse_spline_segment(line) {
-                let smooth = Self::is_smooth_from_flags(&flags);
+        let features = features_part
+            .map(Self::parse_lookup_features)
+            .unwrap_or_default();
 
-                match seg_type {
-                    'm' => {
-                        // Move: start a new contour
-                        if !nodes.is_empty() {
-                            let mut path = Path {
-                                nodes: nodes.clone(),
-                                closed: !Self::is_force_open_path(last_point_flags.as_deref()),
-                                ..Default::default()
-                            };
-                            remove_implicit_move_in_closed_path(&mut path);
-                            paths.push(path);
-                            nodes.clear();
-                            last_point_flags = None;
-                        }
-                        if let Some((x, y)) = points.first() {
-                            let mut format_specific = FormatSpecific::default();
-                            format_specific.insert(
-                                "sfd.point_flags".to_string(),
-                                serde_json::Value::String(flags.clone()),
-                            );
-                            nodes.push(Node {
-                                x: *x,
-                                y: *y,
-                                nodetype: NodeType::Move,
-                                smooth,
-                                format_specific,
-                            });
-                            last_point_flags = Some(flags.clone());
-                        }
-                    }
-                    'l' => {
-                        // Line: add a line node
-                        if let Some((x, y)) = points.first() {
-                            let mut format_specific = FormatSpecific::default();
-                            format_specific.insert(
-                                "sfd.point_flags".to_string(),
-                                serde_json::Value::String(flags.clone()),
-                            );
-                            nodes.push(Node {
-                                x: *x,
-                                y: *y,
-                                nodetype: NodeType::Line,
-                                smooth,
-                                format_specific,
-                            });
-                            last_point_flags = Some(flags.clone());
-                        }
-                    }
-                    'c' => {
-                        if is_quadratic {
-                            if let (Some((cx, cy)), Some((x, y))) = (points.first(), points.last())
-                            {
-                                nodes.push(Node {
-                                    x: *cx,
-                                    y: *cy,
-                                    nodetype: NodeType::OffCurve,
-                                    smooth: false,
-                                    format_specific: Default::default(),
-                                });
-                                let mut format_specific = FormatSpecific::default();
-                                format_specific.insert(
-                                    "sfd.point_flags".to_string(),
-                                    serde_json::Value::String(flags.clone()),
-                                );
-                                nodes.push(Node {
-                                    x: *x,
-                                    y: *y,
-                                    nodetype: NodeType::QCurve,
-                                    smooth,
-                                    format_specific,
-                                });
-                                last_point_flags = Some(flags.clone());
-                            }
-                        } else {
-                            // Cubic curve: add 2 off-curve points, then 1 on-curve
-                            for (i, (x, y)) in points.iter().enumerate() {
-                                if i < 2 {
-                                    // Off-curve control points
-                                    nodes.push(Node {
-                                        x: *x,
-                                        y: *y,
-                                        nodetype: NodeType::OffCurve,
-                                        smooth: false,
-                                        format_specific: Default::default(),
-                                    });
-                                } else {
-                                    // Final on-curve point
-                                    let mut format_specific = FormatSpecific::default();
-                                    format_specific.insert(
-                                        "sfd.point_flags".to_string(),
-                                        serde_json::Value::String(flags.clone()),
-                                    );
-                                    nodes.push(Node {
-                                        x: *x,
-                                        y: *y,
-                                        nodetype: NodeType::Curve,
-                                        smooth,
-                                        format_specific,
-                                    });
-                                    last_point_flags = Some(flags.clone());
+        let lookup_type = Self::lookup_type_from_kind(kind);
+        let sanitized_name =
+            Self::sanitize_and_dedupe_lookup_name(&name, &mut self.taken_lookup_names);
+        if let Some(previous) = self
+            .assigned_lookup_names
+            .insert(name.clone(), sanitized_name.clone())
+        {
+            // Two SFD lookups with the same name: references can only mean one of
+            // them, and they now mean this one.
+            log::warn!(
+                "two lookups are both named {name:?}; references resolve to the \
+                 later one ({sanitized_name}), not {previous}"
+            );
+        }
+        let info = layout::LookupInfo {
+            lookup_type,
+            flag,
+            features,
+            block: fea_rs_ast::LookupBlock::new(sanitized_name.clone().into(), vec![], false, 0..0),
+            subtables,
+        };
+
+        // Determine GSUB vs GPOS from high byte of kind
+        if (kind) >> 8 == 1 {
+            self.gpos_lookups.0.insert(sanitized_name, info);
+        } else {
+            self.gsub_lookups.0.insert(sanitized_name, info);
+        }
+    }
+
+    fn parse_subtable_names(data: &str) -> Vec<SmolStr> {
+        // Capture content between the first '{' and the matching '}' (use last '}' if simple)
+        let (start, end) = match (data.find('{'), data.rfind('}')) {
+            (Some(s), Some(e)) if e > s => (s, e),
+            _ => return Vec::new(),
+        };
+        let body = &data[start + 1..end];
+        let tokens = tokenize_preserving_quotes(body);
+        tokens
+            .into_iter()
+            .filter(|t| t.starts_with('"') && t.ends_with('"') && t.len() >= 2)
+            // Decoded: chain_pos_sub is keyed by the decoded subtable name, so a name
+            // carrying a UTF-7 escape would otherwise never match its rules.
+            .map(|t| SmolStr::from(decode_utf7(t.trim_matches('"'))))
+            .collect()
+    }
+
+    fn lookup_type_from_kind(kind: u16) -> layout::LookupType {
+        use layout::LookupType as LT;
+        match kind {
+            1 => LT::SingleSubstitution,
+            2 => LT::MultipleSubstitution,
+            3 => LT::AlternateSubstitution,
+            4 => LT::LigatureSubstitution,
+            5 => LT::GsubContext,
+            6 => LT::GsubChainContext,
+            8 => LT::ReverseChain,
+            0x101 => LT::SinglePosition,
+            0x102 => LT::PairPosition,
+            0x103 => LT::CursivePosition,
+            0x104 => LT::MarkToBasePosition,
+            0x105 => LT::MarkToLigaturePosition,
+            0x106 => LT::MarkToMarkPosition,
+            0x107 => LT::ContextPosition,
+            0x108 => LT::ChainContextPosition,
+            _ => LT::SingleSubstitution,
+        }
+    }
+
+    fn parse_lookup_features(s: &str) -> Vec<layout::FeatureLangSys> {
+        // Expect patterns like: 'kern' ('DFLT' <'dflt' > 'latn' <'dflt' > )
+        let mut out = Vec::new();
+        let mut rest = s;
+        while let Some(start) = rest.find('\'') {
+            let after = &rest[start + 1..];
+            if let Some(end_rel) = after.find('\'') {
+                let feature = &after[..end_rel];
+                // Find the following parenthesis block
+                let after_feat = &after[end_rel + 1..];
+                if let Some(p_start) = after_feat.find('(') {
+                    if let Some(p_end) = after_feat[p_start + 1..].find(')') {
+                        let body = &after_feat[p_start + 1..p_start + 1 + p_end];
+                        // Body contains one or more: 'script' < 'lang' 'lang2' >
+                        let mut b = body;
+                        loop {
+                            if let Some(s_start) = b.find('\'') {
+                                let s_after = &b[s_start + 1..];
+                                if let Some(s_end_rel) = s_after.find('\'') {
+                                    let script = &s_after[..s_end_rel];
+                                    // find angle bracket block
+                                    let s_tail = &s_after[s_end_rel + 1..];
+                                    if let Some(a_start) = s_tail.find('<') {
+                                        if let Some(a_end) = s_tail[a_start + 1..].find('>') {
+                                            let langs_blob =
+                                                &s_tail[a_start + 1..a_start + 1 + a_end];
+                                            // languages are quoted tokens
+                                            let mut lb = langs_blob;
+                                            loop {
+                                                if let Some(l_start) = lb.find('\'') {
+                                                    let l_after = &lb[l_start + 1..];
+                                                    if let Some(l_end_rel) = l_after.find('\'') {
+                                                        let language = &l_after[..l_end_rel];
+                                                        // FontForge writes a
+                                                        // blank script tag for
+                                                        // lookups with no
+                                                        // script; treat it as
+                                                        // DFLT/dflt so the FEA
+                                                        // stays valid.
+                                                        let script = if script.trim().is_empty() {
+                                                            "DFLT"
+                                                        } else {
+                                                            script
+                                                        };
+                                                        let language = if language.trim().is_empty()
+                                                        {
+                                                            "dflt"
+                                                        } else {
+                                                            language
+                                                        };
+                                                        out.push(layout::FeatureLangSys {
+                                                            feature: SmolStr::from(feature),
+                                                            script: SmolStr::from(script),
+                                                            language: SmolStr::from(language),
+                                                        });
+                                                        lb = &l_after[l_end_rel + 1..];
+                                                        continue;
+                                                    }
+                                                }
+                                                break;
+                                            }
+                                            b = &s_tail[a_start + 1 + a_end + 1..];
+                                            continue;
+                                        }
+                                    }
+                                    b = s_tail;
+                                    continue;
                                 }
                             }
+                            break;
                         }
+                        // Advance rest beyond this feature block
+                        rest = &after_feat[p_start + 1 + p_end + 1..];
+                        continue;
                     }
-                    _ => {}
                 }
-            }
-        }
-
-        // Finish the last path
-        if !nodes.is_empty() {
-            let mut path = Path {
-                nodes: nodes.clone(),
-                closed: !Self::is_force_open_path(last_point_flags.as_deref()),
-                ..Default::default()
-            };
-            remove_implicit_move_in_closed_path(&mut path);
-            paths.push(path);
-        }
-
-        Ok(paths)
-    }
-
-    fn is_force_open_path(flags: Option<&str>) -> bool {
-        let Some(raw) = flags else {
-            return false;
-        };
-        let parsed = Self::parse_point_flags(raw).unwrap_or(0);
-        (parsed & 0x400) != 0
-    }
-
-    fn parse_point_flags(flags: &str) -> Option<u32> {
-        let token = flags
-            .split(',')
-            .next()
-            .map(str::trim)
-            .filter(|s| !s.is_empty())?;
-
-        if let Some(hex) = token.strip_prefix("0x") {
-            u32::from_str_radix(hex, 16).ok()
-        } else {
-            token.parse::<u32>().ok()
-        }
-    }
-
-    /// Extract the smooth flag from SFD flags string.
-    /// Flags are like "0x100,0x200" or just "0". The lower 2 bits encode smoothness.
-    fn is_smooth_from_flags(flags: &str) -> bool {
-        if let Some(part) = flags.split(',').next() {
-            if let Some(num_str) = part.strip_prefix("0x") {
-                if let Ok(num) = u32::from_str_radix(num_str, 16) {
-                    return (num & 0x3) != 1;
-                }
-            } else if let Ok(num) = flags.parse::<u32>() {
-                return (num & 0x3) != 1;
-            }
-        }
-        false
-    }
-
-    /// Resolve component references after all glyphs have been parsed.
-    /// SFD stores references by glyph index; we need to convert to glyph names
-    /// and extract the transformation matrix.
-    fn resolve_component_references(&mut self) -> Result<(), BabelfontError> {
-        // Build a mapping from glyph index to glyph name
-        let glyph_order: Vec<String> = self
-            .font
-            .glyphs
-            .iter()
-            .map(|g| g.name.to_string())
-            .collect();
-
-        for glyph in &mut self.font.glyphs.0 {
-            for layer in &mut glyph.layers {
-                // Extract and process stored references
-                if let Some(serde_json::Value::Array(refer_array)) =
-                    layer.format_specific.get("sfd.refer")
-                {
-                    let refer_strs: Vec<String> = refer_array
-                        .iter()
-                        .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                        .collect();
-
-                    for refer_str in refer_strs {
-                        if let Some(component) = Self::parse_refer(&refer_str, &glyph_order)? {
-                            layer.shapes.push(Shape::Component(component));
-                        }
-                    }
-
-                    // Remove the temporary storage after processing
-                    layer.format_specific.remove("sfd.refer");
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Parse a single Refer line from SFD format.
-    /// Format: "<glyph_index> <unicodeenc> <N|S> <xx> <xy> <yx> <yy> <tx> <ty> <flags> [base_pt ref_pt [O]]"
-    fn parse_refer(
-        refer_str: &str,
-        glyph_order: &[String],
-    ) -> Result<Option<Component>, BabelfontError> {
-        let parts: Vec<&str> = refer_str.split_whitespace().collect();
-        if parts.len() < 10 {
-            // Malformed reference; skip it
-            return Ok(None);
-        }
-
-        // Parse the glyph index
-        let glyph_idx = parts[0].parse::<usize>().map_err(|_| {
-            BabelfontError::General(format!("Invalid glyph index in Refer: {}", parts[0]))
-        })?;
-
-        if glyph_idx >= glyph_order.len() {
-            return Err(BabelfontError::General(format!(
-                "Glyph index {} out of bounds (max {})",
-                glyph_idx,
-                glyph_order.len()
-            )));
-        }
-
-        let reference_name = glyph_order[glyph_idx].clone();
-
-        // Extract the transformation matrix from positions 3-8
-        // Format: [xx, xy, yx, yy, tx, ty]
-        let matrix_parts: Result<Vec<f64>, _> =
-            parts[3..9].iter().map(|p| p.parse::<f64>()).collect();
-
-        let matrix = matrix_parts.map_err(|_| {
-            BabelfontError::General("Failed to parse transformation matrix".to_string())
-        })?;
-
-        if matrix.len() != 6 {
-            return Ok(None);
-        }
-
-        // Convert the matrix [xx, xy, yx, yy, tx, ty] into a kurbo::Affine
-        // kurbo::Affine coefficients are [xx, xy, yx, yy, tx, ty]
-        let matrix_arr = [
-            matrix[0], matrix[1], matrix[2], matrix[3], matrix[4], matrix[5],
-        ];
-        let affine = kurbo::Affine::new(matrix_arr);
-        let transform = DecomposedAffine::from(affine);
-
-        let mut format_specific = FormatSpecific::default();
-
-        format_specific.insert(
-            "sfd.refer.unicodeenc".to_string(),
-            serde_json::Value::String(parts[1].to_string()),
-        );
-        format_specific.insert(
-            "sfd.refer.selected".to_string(),
-            serde_json::Value::Bool(parts[2] == "S"),
-        );
-
-        let flags = parts[9].parse::<u32>().unwrap_or(0);
-        format_specific.insert(
-            "sfd.refer.flags".to_string(),
-            serde_json::Value::Number(flags.into()),
-        );
-        format_specific.insert(
-            "sfd.refer.use_my_metrics".to_string(),
-            serde_json::Value::Bool((flags & 0x1) != 0),
-        );
-        format_specific.insert(
-            "sfd.refer.round_translation_to_grid".to_string(),
-            serde_json::Value::Bool((flags & 0x2) != 0),
-        );
-        format_specific.insert(
-            "sfd.refer.point_match".to_string(),
-            serde_json::Value::Bool((flags & 0x4) != 0),
-        );
-
-        if (flags & 0x4) != 0 && parts.len() >= 12 {
-            if let Ok(base_pt) = parts[10].parse::<i64>() {
-                format_specific.insert(
-                    "sfd.refer.match_pt_base".to_string(),
-                    serde_json::Value::Number(base_pt.into()),
-                );
-            }
-            if let Ok(ref_pt) = parts[11].parse::<i64>() {
-                format_specific.insert(
-                    "sfd.refer.match_pt_ref".to_string(),
-                    serde_json::Value::Number(ref_pt.into()),
-                );
-            }
-            if parts.get(12).copied() == Some("O") {
-                format_specific.insert(
-                    "sfd.refer.point_match_out_of_date".to_string(),
-                    serde_json::Value::Bool(true),
-                );
-            }
-        }
-
-        let component = Component {
-            reference: reference_name.into(),
-            transform,
-            location: Default::default(),
-            format_specific,
-        };
-
-        Ok(Some(component))
-    }
-
-    /// Classify GlyphClass-less glyphs that carry only mark-side anchors as
-    /// Nonspacing marks.
-    ///
-    /// SFD records a glyph's role in two ways: the coarse `GlyphClass` line and,
-    /// per anchor, the attachment `kind` (`mark` = the glyph attaches AS a mark,
-    /// `basechar`/`baselig`/... = base side). Some sources (e.g. Glegoo Bold)
-    /// omit `GlyphClass` on conjunct marks, leaving their category Unknown. Such
-    /// a glyph then exports without a category, and fontc — seeing an
-    /// underscore-joined name — treats it as a ligature and drops it from the
-    /// abvm/blwm mark coverage. The anchor `kind` is the authoritative signal:
-    /// a glyph whose anchors are exclusively mark-side is a mark, so mirror the
-    /// `GlyphClass: 4` path (category = Mark, subCategory = Nonspacing).
-    fn infer_mark_categories_from_anchors(&mut self) {
-        for glyph in self.font.glyphs.0.iter_mut() {
-            if glyph.category != GlyphCategory::Unknown {
+                // No parenthesis found; advance and continue
+                rest = after;
                 continue;
+            } else {
+                break;
             }
-            let mut has_mark_anchor = false;
-            let mut has_base_anchor = false;
-            for layer in glyph.layers.iter() {
-                for anchor in layer.anchors.iter() {
-                    match anchor
-                        .format_specific
-                        .get("sfd.kind")
-                        .and_then(|v| v.as_str())
-                    {
-                        Some("mark") => has_mark_anchor = true,
-                        Some(_) => has_base_anchor = true,
-                        None => {}
-                    }
+        }
+        out
+    }
+
+    /// Sanitize a lookup name for FEA and make it unique: the first taker keeps
+    /// the bare form, later ones get `_2`, `_3`, ... Every returned name goes into
+    /// `taken`, generated ones included, so a later lookup whose own name happens
+    /// to sanitize to an already-generated form cannot collide with it.
+    fn sanitize_and_dedupe_lookup_name(name: &str, taken: &mut HashSet<String>) -> String {
+        let mut sanitized: String = name
+            .chars()
+            .map(|c| {
+                if c.is_alphanumeric() || c == '_' {
+                    c
+                } else {
+                    '_'
                 }
-            }
-            if has_mark_anchor && !has_base_anchor {
-                glyph.category = GlyphCategory::Mark;
-                glyph.format_specific.insert(
-                    "subcategory".to_string(),
-                    serde_json::Value::String("Nonspacing".to_string()),
-                );
-            }
+            })
+            .collect();
+        // A label may not begin with a digit, and a label that IS a keyword fails
+        // to parse wherever it stands ("Expected LABEL found SubKw"); either one
+        // aborts the whole conversion downstream. The list mirrors FEA_KEYWORDS in
+        // fea-rs-ast 0.1.6 (glyphcontainers.rs), which that crate keeps private.
+        const FEA_KEYWORDS: [&str; 52] = [
+            "anchor",
+            "anchordef",
+            "anon",
+            "anonymous",
+            "by",
+            "contour",
+            "cursive",
+            "device",
+            "enum",
+            "enumerate",
+            "excludedflt",
+            "exclude_dflt",
+            "feature",
+            "from",
+            "ignore",
+            "ignorebaseglyphs",
+            "ignoreligatures",
+            "ignoremarks",
+            "include",
+            "includedflt",
+            "include_dflt",
+            "language",
+            "languagesystem",
+            "lookup",
+            "lookupflag",
+            "mark",
+            "markattachmenttype",
+            "markclass",
+            "nameid",
+            "null",
+            "parameters",
+            "pos",
+            "position",
+            "required",
+            "righttoleft",
+            "reversesub",
+            "rsub",
+            "script",
+            "sub",
+            "substitute",
+            "subtable",
+            "table",
+            "usemarkfilteringset",
+            "useextension",
+            "valuerecorddef",
+            "base",
+            "gdef",
+            "head",
+            "hhea",
+            "name",
+            "vhea",
+            "vmtx",
+        ];
+        if sanitized.starts_with(|c: char| c.is_ascii_digit()) {
+            sanitized.insert(0, '_');
         }
-    }
-
-    fn parse_anchor(&self, v: &str) -> Option<crate::Anchor> {
-        // Quoted name, x, y, kind, index
-        let parts: Vec<&str> = v.split_whitespace().collect();
-        if parts.len() < 5 {
-            return None;
+        if FEA_KEYWORDS.contains(&sanitized.as_str()) {
+            sanitized.push('_');
         }
-        let mut name = decode_utf7(parts[0].trim_matches('"'));
-        let x = parts[1].parse::<f64>().ok()?;
-        let y = parts[2].parse::<f64>().ok()?;
-        let kind = parts[3];
-        let index = parts[4].parse::<usize>().ok()?;
-        let mut format_specific = FormatSpecific::default();
-        format_specific.insert(
-            "sfd.kind".to_string(),
-            serde_json::Value::String(kind.to_string()),
-        );
-        format_specific.insert(
-            "sfd.index".to_string(),
-            serde_json::Value::Number(index.into()),
-        );
-        if kind == "mark" {
-            name = "_".to_string() + &name;
+        if taken.insert(sanitized.clone()) {
+            return sanitized;
         }
-        Some(crate::Anchor {
-            name,
-            x,
-            y,
-            format_specific,
-        })
-    }
-
-    fn parse_oneline_layout(&self, value: Option<&str>) -> Option<(SmolStr, Vec<SmolStr>)> {
-        if let Some(v) = value {
-            // Split quoted "name" component and following glyphs
-            let parts: Vec<&str> = v.split('"').collect();
-            if parts.len() >= 3 {
-                // Decoded, to match the subtable names the Lookup: line declares.
-                let name = SmolStr::from(decode_utf7(parts[1]));
-                let glyphs_part = parts[2].trim();
-                let glyphs: Vec<SmolStr> = glyphs_part
-                    .split_whitespace()
-                    .map(|s| SmolStr::from(s.trim_matches('"')))
-                    .collect();
-                return Some((name, glyphs));
+        let mut n = 2usize;
+        loop {
+            let candidate = format!("{sanitized}_{n}");
+            if taken.insert(candidate.clone()) {
+                return candidate;
             }
-            None
-        } else {
-            None
+            n += 1;
         }
     }
 
@@ -3403,60 +3235,6 @@ impl SfdParser {
         entries
     }
 
-    fn glyph_container(name: impl AsRef<str>) -> fea_rs_ast::GlyphContainer {
-        fea_rs_ast::GlyphContainer::GlyphName(fea_rs_ast::GlyphName::new(name.as_ref()))
-    }
-
-    fn parse_pos_value_record(tokens: &[SmolStr]) -> Option<fea_rs_ast::ValueRecord> {
-        let mut x_placement: Option<fea_rs_ast::Metric> = None;
-        let mut y_placement: Option<fea_rs_ast::Metric> = None;
-        let mut x_advance: Option<fea_rs_ast::Metric> = None;
-        let mut y_advance: Option<fea_rs_ast::Metric> = None;
-
-        for token in tokens {
-            let (k, v) = token.split_once('=')?;
-            let value: i16 = v.parse().ok()?;
-            match k {
-                "dx" => x_placement = Some(value.into()),
-                "dy" => y_placement = Some(value.into()),
-                "dh" => x_advance = Some(value.into()),
-                "dv" => y_advance = Some(value.into()),
-                _ => {}
-            }
-        }
-
-        Some(fea_rs_ast::ValueRecord::new(
-            x_placement,
-            y_placement,
-            x_advance,
-            y_advance,
-            None,
-            None,
-            None,
-            None,
-            false,
-            0..0,
-            None,
-        ))
-    }
-
-    fn looks_like_spline_line(line: &str) -> bool {
-        let trimmed = line.trim_start();
-        if trimmed.is_empty() {
-            return false;
-        }
-        let starts_numeric = trimmed
-            .chars()
-            .next()
-            .map(|c| c.is_ascii_digit() || c == '-' || c == '+')
-            .unwrap_or(false);
-        if !starts_numeric {
-            return false;
-        }
-        (trimmed.contains(" m ") || trimmed.contains(" l ") || trimmed.contains(" c "))
-            && !trimmed.contains(':')
-    }
-
     /// Turn one chain/context rule into a feature statement:
     ///
     ///   [ignore] sub <backtrack> <input>' lookup <Name> <lookahead>;
@@ -3653,26 +3431,6 @@ impl SfdParser {
                 ))
             }
         })
-    }
-
-    /// Format a list of glyph names as a feature file glyph group.
-    /// Single glyph -> just the glyph name; multiple -> [glyph1 glyph2 ...]
-    /// Escape a string for a quoted Windows-platform FEA name: anything outside
-    /// printable ASCII, plus the quote and backslash, becomes a `\XXXX` escape of
-    /// its UTF-16 code units.
-    fn fea_string_escape(s: &str) -> String {
-        let mut out = String::with_capacity(s.len());
-        for c in s.chars() {
-            if (' '..='~').contains(&c) && c != '"' && c != '\\' {
-                out.push(c);
-            } else {
-                let mut units = [0u16; 2];
-                for unit in c.encode_utf16(&mut units) {
-                    out.push_str(&format!("\\{unit:04X}"));
-                }
-            }
-        }
-        out
     }
 
     fn insert_gtables(&mut self) {
@@ -4024,7 +3782,7 @@ impl SfdParser {
                             format!(
                                 "    name 3 1 {} \"{}\";\n",
                                 lang_id,
-                                Self::fea_string_escape(name)
+                                stringhelpers::fea_string_escape(name)
                             )
                         })
                         .collect::<String>()
@@ -4034,3452 +3792,41 @@ impl SfdParser {
             }
         }
     }
-}
 
-/// Load a FontForge SFD font or SFDir from a file path
-pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
-    SfdParser::new(path).into_font()
-}
-
-/// Load a FontForge SFD font from a string
-pub fn load_str(content: &str) -> Result<Font, BabelfontError> {
-    SfdParser::new_from_str(content.to_string()).into_font()
-}
-
-/// Save a Babelfont Font into a FontForge SFD file at the given path.
-pub fn save_sfd(font: &Font, path: &PathBuf) -> Result<(), BabelfontError> {
-    let sfd_str = to_str(font)?;
-    std::fs::write(path, sfd_str)?;
-    Ok(())
-}
-
-/// Serialize a Babelfont Font into a FontForge SFD text representation.
-pub fn to_str(font: &Font) -> Result<String, BabelfontError> {
-    let mut out: Vec<String> = Vec::new();
-    let default_master_id = font
-        .masters
-        .first()
-        .map(|m| m.id.as_str())
-        .unwrap_or("default");
-
-    let layer_registry = LayerRegistry::from_font(font, default_master_id);
-    let glyph_order: Vec<String> = font.glyphs.iter().map(|g| g.name.to_string()).collect();
-    let glyph_index: HashMap<SmolStr, usize> = font
-        .glyphs
-        .iter()
-        .enumerate()
-        .map(|(ix, g)| (g.name.clone(), ix))
-        .collect();
-    let explicit_kerns = collect_explicit_kerns(font, &glyph_index);
-
-    emit_font_header(&mut out, font, &layer_registry)?;
-    emit_font_level_kerning(&mut out, font, &glyph_order, &glyph_index);
-    emit_features(&mut out, font);
-
-    out.push(format!(
-        "BeginChars: {} {}",
-        begin_chars_encoding_slots(font, &glyph_order),
-        begin_chars_glyph_count(font, &glyph_order)
-    ));
-    if !font.glyphs.is_empty()
-        && font
-            .format_specific
-            .get("sfd.beginchars_blank_line")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(true)
-    {
-        out.push(String::new());
+    fn glyph_container(name: impl AsRef<str>) -> fea_rs_ast::GlyphContainer {
+        fea_rs_ast::GlyphContainer::GlyphName(fea_rs_ast::GlyphName::new(name.as_ref()))
     }
-    for (gid, glyph) in font.glyphs.iter().enumerate() {
-        emit_glyph(
-            &mut out,
-            glyph,
-            gid,
-            &layer_registry,
-            default_master_id,
-            &glyph_index,
-            explicit_kerns.get(&glyph.name),
-        )?;
-        if gid + 1 < font.glyphs.len() {
-            out.push(String::new());
-        }
-    }
-    out.push("EndChars".to_string());
-    out.push("EndSplineFont".to_string());
 
-    Ok(out.join("\n") + "\n")
-}
+    fn parse_pos_value_record(tokens: &[SmolStr]) -> Option<fea_rs_ast::ValueRecord> {
+        let mut x_placement: Option<fea_rs_ast::Metric> = None;
+        let mut y_placement: Option<fea_rs_ast::Metric> = None;
+        let mut x_advance: Option<fea_rs_ast::Metric> = None;
+        let mut y_advance: Option<fea_rs_ast::Metric> = None;
 
-#[derive(Debug, Default)]
-struct LayerRegistry {
-    layer_count: usize,
-    defs: Vec<(usize, bool, String, usize)>,
-    extras: HashMap<String, usize>,
-}
-
-impl LayerRegistry {
-    fn from_font(font: &Font, default_master_id: &str) -> Self {
-        let mut extra_quadratic: HashMap<String, bool> = HashMap::new();
-        let mut defs: Vec<(usize, bool, String, usize)> = font
-            .format_specific
-            .get("sfd.layer_defs")
-            .and_then(|v| v.as_array())
-            .map(|defs| {
-                defs.iter()
-                    .filter_map(|entry| {
-                        let obj = entry.as_object()?;
-                        let index = obj.get("index")?.as_u64()? as usize;
-                        let name = obj.get("name")?.as_str()?.to_string();
-                        let is_quadratic = obj
-                            .get("is_quadratic")
-                            .and_then(|v| v.as_bool())
-                            .unwrap_or(false);
-                        let flags = obj.get("flags").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
-                        Some((index, is_quadratic, name, flags))
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
-        let mut extras: HashMap<String, usize> = defs
-            .iter()
-            .filter(|(_, _, name, _)| {
-                !name.eq_ignore_ascii_case("Back") && !name.eq_ignore_ascii_case("Fore")
-            })
-            .map(|(idx, _, name, _)| (name.clone(), *idx))
-            .collect();
-        let mut next_idx = defs
-            .iter()
-            .map(|(idx, _, _, _)| *idx)
-            .max()
-            .map(|v| v + 1)
-            .unwrap_or(2);
-
-        for glyph in font.glyphs.iter() {
-            for layer in &glyph.layers {
-                if Self::is_background_layer(layer)
-                    || Self::is_foreground_layer(layer, default_master_id)
-                {
-                    continue;
-                }
-                let key = Self::layer_key(layer);
-                if let std::collections::hash_map::Entry::Vacant(v) = extras.entry(key) {
-                    extra_quadratic.insert(v.key().clone(), layer_is_quadratic(layer));
-                    v.insert(next_idx);
-                    next_idx += 1;
-                }
+        for token in tokens {
+            let (k, v) = token.split_once('=')?;
+            let value: i16 = v.parse().ok()?;
+            match k {
+                "dx" => x_placement = Some(value.into()),
+                "dy" => y_placement = Some(value.into()),
+                "dh" => x_advance = Some(value.into()),
+                "dv" => y_advance = Some(value.into()),
+                _ => {}
             }
         }
 
-        if defs.is_empty() {
-            defs = vec![
-                (0, false, "Back".to_string(), 1),
-                (1, false, "Fore".to_string(), 0),
-            ];
-        }
-
-        let mut extra_pairs: Vec<(&String, &usize)> = extras.iter().collect();
-        extra_pairs.sort_by_key(|(_, ix)| **ix);
-        for (key, ix) in extra_pairs {
-            if !defs
-                .iter()
-                .any(|(existing_idx, _, _, _)| existing_idx == ix)
-            {
-                defs.push((
-                    *ix,
-                    extra_quadratic.get(key).copied().unwrap_or(false),
-                    key.clone(),
-                    0,
-                ));
-            }
-        }
-        defs.sort_by_key(|(idx, _, _, _)| *idx);
-
-        Self {
-            layer_count: defs.len(),
-            defs,
-            extras,
-        }
-    }
-
-    fn is_background_layer(layer: &Layer) -> bool {
-        layer.is_background
-            || layer
-                .name
-                .as_deref()
-                .map(|n| n.eq_ignore_ascii_case("Back"))
-                .unwrap_or(false)
-    }
-
-    fn is_foreground_layer(layer: &Layer, default_master_id: &str) -> bool {
-        matches!(&layer.master, LayerType::DefaultForMaster(id) if id == default_master_id)
-            || layer
-                .name
-                .as_deref()
-                .map(|n| n.eq_ignore_ascii_case("Fore"))
-                .unwrap_or(false)
-    }
-
-    fn layer_key(layer: &Layer) -> String {
-        layer
-            .name
-            .clone()
-            .or_else(|| layer.id.clone())
-            .unwrap_or_else(|| "Layer".to_string())
-    }
-
-    fn index_for(&self, layer: &Layer, default_master_id: &str) -> usize {
-        if Self::is_background_layer(layer) {
-            0
-        } else if Self::is_foreground_layer(layer, default_master_id) {
-            1
-        } else {
-            self.extras
-                .get(&Self::layer_key(layer))
-                .copied()
-                .unwrap_or(1)
-        }
-    }
-}
-
-fn begin_chars_encoding_slots(font: &Font, glyph_order: &[String]) -> usize {
-    if let Some(slots) = font
-        .format_specific
-        .get("sfd.beginchars_slots")
-        .and_then(|v| v.as_u64())
-    {
-        return slots as usize;
-    }
-
-    let unencoded_count = font
-        .glyphs
-        .iter()
-        .filter(|g| g.codepoints.is_empty())
-        .count();
-
-    if let Some(enc) = font
-        .format_specific
-        .get("Encoding")
-        .and_then(|v| v.as_str())
-    {
-        if enc.eq_ignore_ascii_case("UnicodeBmp") {
-            return 65_536 + unencoded_count;
-        }
-        if enc.eq_ignore_ascii_case("UnicodeFull") {
-            return 1_114_112 + unencoded_count;
-        }
-    }
-
-    let max_cp = font
-        .glyphs
-        .iter()
-        .flat_map(|g| g.codepoints.iter().copied())
-        .max()
-        .map(|v| v as usize + 1)
-        .unwrap_or(0);
-
-    max_cp.max(glyph_order.len())
-}
-
-fn begin_chars_glyph_count(font: &Font, glyph_order: &[String]) -> usize {
-    font.format_specific
-        .get("sfd.beginchars_count")
-        .and_then(|v| v.as_u64())
-        .map(|v| v as usize)
-        .unwrap_or(glyph_order.len())
-}
-
-fn emit_font_header(
-    out: &mut Vec<String>,
-    font: &Font,
-    layer_registry: &LayerRegistry,
-) -> Result<(), BabelfontError> {
-    let mut state = HeaderEmitState::new(font, layer_registry);
-    let emit_layer_header = font
-        .format_specific
-        .get("sfd.has_header_layers")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false)
-        || layer_registry.layer_count > 2;
-
-    // Follow FontForge's current metadata dump ordering from sfd.cpp.
-    for key in [
-        "SplineFontDB",
-        "FontName",
-        "FullName",
-        "FamilyName",
-        "Weight",
-        "Copyright",
-        "UComments",
-        "Comments",
-        "FontLog",
-        "Version",
-        "FONDName",
-        "DefaultBaseFilename",
-        "StrokeWidth",
-        "ItalicAngle",
-        "UnderlinePosition",
-        "UnderlineWidth",
-        "Ascent",
-        "Descent",
-        "InvalidEm",
-        "sfntRevision",
-        "woffMajor",
-        "woffMinor",
-        "woffMetadata",
-        "UFOAscent",
-        "UFODescent",
-        "LayerCount",
-        "Layer",
-        "PreferredKerning",
-        "StrokedFont",
-        "MultiLayer",
-        "HasVMetrics",
-        "NeedsXUIDChange",
-        "XUID",
-        "UniqueID",
-        "UseXUID",
-        "UseUniqueID",
-        "BaseHoriz",
-        "BaseVert",
-        "StyleMap",
-        "FSType",
-        "OS2Version",
-        "OS2_WeightWidthSlopeOnly",
-        "OS2_UseTypoMetrics",
-        "CreationTime",
-        "ModificationTime",
-        "PfmFamily",
-        "TTFWeight",
-        "TTFWidth",
-        "LineGap",
-        "VLineGap",
-        "Panose",
-        "OS2TypoAscent",
-        "OS2TypoAOffset",
-        "OS2TypoDescent",
-        "OS2TypoDOffset",
-        "OS2TypoLinegap",
-        "OS2WinAscent",
-        "OS2WinAOffset",
-        "OS2WinDescent",
-        "OS2WinDOffset",
-        "HheadAscent",
-        "HheadAOffset",
-        "HheadDescent",
-        "HheadDOffset",
-        "OS2SubXSize",
-        "OS2SubYSize",
-        "OS2SubXOff",
-        "OS2SubYOff",
-        "OS2SupXSize",
-        "OS2SupYSize",
-        "OS2SupXOff",
-        "OS2SupYOff",
-        "OS2StrikeYSize",
-        "OS2StrikeYPos",
-        "OS2CapHeight",
-        "OS2XHeight",
-        "OS2FamilyClass",
-        "OS2Vendor",
-        "MarkAttachClasses",
-        "DEI",
-        "LangName",
-        "Encoding",
-        "UnicodeInterp",
-        "NameList",
-        "DisplaySize",
-        "AntiAlias",
-        "FitToEm",
-        "WinInfo",
-        "BeginPrivate",
-        "Grid",
-    ] {
-        if (key == "LayerCount" || key == "Layer") && !emit_layer_header {
-            continue;
-        }
-        emit_header_key(out, font, layer_registry, key, &mut state)?;
-    }
-
-    while state.comment_index < comment_entries(font).len() {
-        let entry = &comment_entries(font)[state.comment_index];
-        state.comment_index += 1;
-        out.push(format!("{}:{}", entry.0, entry.1));
-    }
-
-    while emit_layer_header && state.layer_index < layer_registry.defs.len() {
-        emit_header_key(out, font, layer_registry, "Layer", &mut state)?;
-    }
-
-    emit_font_passthrough_keys_remaining(out, font, &mut state);
-    Ok(())
-}
-
-struct HeaderEmitState {
-    emitted: HashMap<String, bool>,
-    layer_index: usize,
-    comment_index: usize,
-}
-
-impl HeaderEmitState {
-    fn new(_font: &Font, _layer_registry: &LayerRegistry) -> Self {
-        Self {
-            emitted: HashMap::new(),
-            layer_index: 0,
-            comment_index: 0,
-        }
-    }
-
-    fn is_emitted(&self, key: &str) -> bool {
-        self.emitted.get(key).copied().unwrap_or(false)
-    }
-
-    fn mark_emitted(&mut self, key: &str) {
-        self.emitted.insert(key.to_string(), true);
-    }
-}
-
-fn emit_header_key(
-    out: &mut Vec<String>,
-    font: &Font,
-    layer_registry: &LayerRegistry,
-    key: &str,
-    state: &mut HeaderEmitState,
-) -> Result<(), BabelfontError> {
-    match key {
-        "SplineFontDB" if !state.is_emitted(key) => {
-            out.push(format!(
-                "SplineFontDB: {}",
-                font.format_specific
-                    .get(HEADER_VERSION_KEY)
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("3.0")
-            ));
-            state.mark_emitted(key);
-        }
-        "FontName" if !state.is_emitted(key) => {
-            if let Some(line) = font_name_line(font) {
-                out.push(line);
-            }
-            state.mark_emitted(key);
-        }
-        "FullName" if !state.is_emitted(key) => {
-            if let Some(line) = full_name_line(font) {
-                out.push(line);
-            }
-            state.mark_emitted(key);
-        }
-        "FamilyName" if !state.is_emitted(key) => {
-            if let Some(line) = family_name_line(font) {
-                out.push(line);
-            }
-            state.mark_emitted(key);
-        }
-        "Weight" if !state.is_emitted(key) => {
-            if let Some(line) = weight_line(font) {
-                out.push(line);
-            }
-            state.mark_emitted(key);
-        }
-        "Copyright" if !state.is_emitted(key) => {
-            if let Some(line) = copyright_line(font) {
-                out.push(line);
-            }
-            state.mark_emitted(key);
-        }
-        "Comments" | "UComments" | "FontLog" => {
-            if let Some(line) = next_comment_line(font, key, state) {
-                out.push(line);
-            }
-        }
-        "Version" if !state.is_emitted(key) => {
-            out.push(version_line(font));
-            state.mark_emitted(key);
-        }
-        "UniqueID" if !state.is_emitted(key) => {
-            if let Some(line) = unique_id_line(font) {
-                out.push(line);
-            }
-            state.mark_emitted(key);
-        }
-        "LayerCount" if !state.is_emitted(key) => {
-            out.push(format!("LayerCount: {}", layer_registry.layer_count));
-            state.mark_emitted(key);
-        }
-        "Layer" => {
-            while let Some((idx, quadratic, name, flags)) =
-                layer_registry.defs.get(state.layer_index)
-            {
-                out.push(format!(
-                    "Layer: {} {} \"{}\" {}",
-                    idx,
-                    if *quadratic { 1 } else { 0 },
-                    escape_quoted(name),
-                    flags
-                ));
-                state.layer_index += 1;
-            }
-            state.mark_emitted(key);
-        }
-        "CreationTime" if !state.is_emitted(key) => {
-            if font.format_specific.contains_key(key) {
-                out.push(format!("CreationTime: {}", font.date.timestamp()));
-                state.mark_emitted(key);
-            }
-        }
-        "LangName" => {
-            if let Some(serde_json::Value::Array(lines)) =
-                font.format_specific.get("sfd.lang_names")
-            {
-                if !state.is_emitted(key) {
-                    for line in lines.iter().filter_map(|v| v.as_str()) {
-                        out.push(format!("LangName: {}", line));
-                    }
-                    state.mark_emitted(key);
-                }
-            }
-        }
-        "BeginPrivate" if !state.is_emitted(key) => {
-            if let Some(serde_json::Value::Array(lines)) =
-                font.format_specific.get("sfd.private_section")
-            {
-                let first = lines.first().and_then(|v| v.as_str()).unwrap_or("0");
-                out.push(format!("BeginPrivate: {}", first));
-                for line in lines.iter().skip(1).filter_map(|v| v.as_str()) {
-                    out.push(line.to_string());
-                }
-                out.push("EndPrivate".to_string());
-                state.mark_emitted(key);
-            }
-        }
-        "Grid" if !state.is_emitted(key) => {
-            emit_guides(out, font);
-            state.mark_emitted(key);
-        }
-        _ => {
-            if emit_metric_key(out, font, key, state)?
-                || emit_ot_key(out, font, key, state)
-                || emit_passthrough_key(out, font, key, state)
-            {}
-        }
-    }
-    Ok(())
-}
-
-fn comment_entries(font: &Font) -> Vec<(String, String)> {
-    font.format_specific
-        .get(COMMENT_ENTRIES_KEY)
-        .and_then(|v| v.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|entry| {
-                    let object = entry.as_object()?;
-                    let key = object.get("key")?.as_str()?.to_string();
-                    let raw = object.get("raw")?.as_str()?.to_string();
-                    Some((key, raw))
-                })
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default()
-}
-
-fn next_comment_line(font: &Font, key: &str, state: &mut HeaderEmitState) -> Option<String> {
-    let entries = comment_entries(font);
-    if let Some((entry_key, raw)) = entries.get(state.comment_index) {
-        if entry_key == key {
-            state.comment_index += 1;
-            return Some(format!("{}:{}", key, raw));
-        }
-    }
-    None
-}
-
-fn font_name_line(font: &Font) -> Option<String> {
-    let value = font
-        .names
-        .postscript_name
-        .get_default()
-        .or_else(|| font.names.full_name.get_default())
-        .or_else(|| font.names.family_name.get_default())?;
-    Some(format!("FontName: {}", sanitize_unquoted(value)))
-}
-
-fn full_name_line(font: &Font) -> Option<String> {
-    let fallback = font
-        .names
-        .postscript_name
-        .get_default()
-        .or_else(|| font.names.family_name.get_default())?;
-    let value = font.names.full_name.get_default().unwrap_or(fallback);
-    Some(format!("FullName: {}", sanitize_unquoted(value)))
-}
-
-fn family_name_line(font: &Font) -> Option<String> {
-    let fallback = font
-        .names
-        .full_name
-        .get_default()
-        .or_else(|| font.names.postscript_name.get_default())?;
-    let value = font.names.family_name.get_default().unwrap_or(fallback);
-    Some(format!("FamilyName: {}", sanitize_unquoted(value)))
-}
-
-fn weight_line(font: &Font) -> Option<String> {
-    font.format_specific
-        .get("postscript_weight_name")
-        .and_then(|v| v.as_str())
-        .map(|s| format!("Weight: {}", sanitize_unquoted(s)))
-}
-
-fn copyright_line(font: &Font) -> Option<String> {
-    // Escaped rather than sanitize_unquoted's space-flattening, so the line
-    // breaks FontForge escapes survive an SFD -> SFD round trip.
-    font.names
-        .copyright
-        .get_default()
-        .map(|s| format!("Copyright: {}", escape_sfd_line(s)))
-}
-
-fn version_line(font: &Font) -> String {
-    let version_str = font
-        .names
-        .version
-        .get_default()
-        .cloned()
-        .unwrap_or_else(|| format!("{}.{}", font.version.0, font.version.1));
-    // SFD stores a bare number here. The "Version " prefix belongs to name ID 5,
-    // where the OpenType spec asks for it, and writing it back into the SFD
-    // would produce "Version: Version 1.002" and break a round-trip.
-    let version_str = version_str
-        .strip_prefix("Version ")
-        .unwrap_or(&version_str)
-        .to_string();
-    format!("Version: {}", sanitize_unquoted(&version_str))
-}
-
-fn unique_id_line(font: &Font) -> Option<String> {
-    font.names
-        .unique_id
-        .get_default()
-        .map(|s| format!("UniqueID: {}", sanitize_unquoted(s)))
-}
-
-fn emit_metric_key(
-    out: &mut Vec<String>,
-    font: &Font,
-    key: &str,
-    state: &mut HeaderEmitState,
-) -> Result<bool, BabelfontError> {
-    if state.is_emitted(key) {
-        return Ok(false);
-    }
-    let Some(master) = font.masters.first() else {
-        return Ok(false);
-    };
-    let metric = match key {
-        "ItalicAngle" => MetricType::ItalicAngle,
-        "UnderlinePosition" => MetricType::UnderlinePosition,
-        "UnderlineWidth" => MetricType::UnderlineThickness,
-        "Ascent" => MetricType::Ascender,
-        "Descent" => MetricType::Descender,
-        "LineGap" => MetricType::HheaLineGap,
-        "HheadAscent" => MetricType::HheaAscender,
-        "HheadDescent" => MetricType::HheaDescender,
-        "OS2TypoLinegap" => MetricType::TypoLineGap,
-        "OS2TypoAscent" => MetricType::TypoAscender,
-        "OS2TypoDescent" => MetricType::TypoDescender,
-        "OS2WinAscent" => MetricType::WinAscent,
-        "OS2WinDescent" => MetricType::WinDescent,
-        "OS2SubXSize" => MetricType::SubscriptXSize,
-        "OS2SubYSize" => MetricType::SubscriptYSize,
-        "OS2SubXOff" => MetricType::SubscriptXOffset,
-        "OS2SubYOff" => MetricType::SubscriptYOffset,
-        "OS2SupXSize" => MetricType::SuperscriptXSize,
-        "OS2SupYSize" => MetricType::SuperscriptYSize,
-        "OS2SupXOff" => MetricType::SuperscriptXOffset,
-        "OS2SupYOff" => MetricType::SuperscriptYOffset,
-        "OS2StrikeYSize" => MetricType::StrikeoutSize,
-        "OS2StrikeYPos" => MetricType::StrikeoutPosition,
-        "OS2CapHeight" => MetricType::CapHeight,
-        "OS2XHeight" => MetricType::XHeight,
-        _ => return Ok(false),
-    };
-    if master.metrics.contains_key(&metric) {
-        // Offset-mode metrics were resolved to absolutes at parse time;
-        // reconstruct the delta from the current (possibly user-modified)
-        // absolute metric and the appropriate base value.
-        let offset_key = format!("sfd.offset_mode.{}", key);
-        let is_offset = font
-            .format_specific
-            .get(&offset_key)
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
-
-        if is_offset {
-            let absolute = *master.metrics.get(&metric).unwrap_or(&0);
-            let delta = compute_offset_delta(font, key, absolute)?;
-            out.push(format!("{}: {}", key, delta));
-        } else if metric == MetricType::ItalicAngle {
-            // ItalicAngle is stored as a counter-clockwise value in FontForge;
-            // we store as clockwise, so negate when writing out.
-            let value = *master.metrics.get(&metric).unwrap_or(&0);
-            out.push(format!("{}: {}", key, -value));
-        } else {
-            emit_metric(out, master, metric, key);
-        }
-        state.mark_emitted(key);
-    }
-    Ok(true)
-}
-
-fn ot_line_for_key(font: &Font, key: &str) -> Option<String> {
-    let ot = &font.custom_ot_values;
-    match key {
-        "FSType" => font
-            .format_specific
-            .get("sfd.has_fstype")
-            .and_then(|v| v.as_bool())
-            .filter(|v| *v)
-            .and(ot.os2_fs_type)
-            .map(|v| format!("FSType: {}", v)),
-        "OS2_UseTypoMetrics" => {
-            if let Some(raw) = font.format_specific.get(key).and_then(|v| v.as_str()) {
-                Some(format!("{}: {}", key, sanitize_unquoted(raw)))
-            } else if ot
-                .os2_fs_selection
-                .map(|v| (v & (1 << 7)) != 0)
-                .unwrap_or(false)
-            {
-                Some("OS2_UseTypoMetrics: 1".to_string())
-            } else {
-                None
-            }
-        }
-        "OS2_WeightWidthSlopeOnly" => {
-            if let Some(raw) = font.format_specific.get(key).and_then(|v| v.as_str()) {
-                Some(format!("{}: {}", key, sanitize_unquoted(raw)))
-            } else if ot
-                .os2_fs_selection
-                .map(|v| (v & (1 << 8)) != 0)
-                .unwrap_or(false)
-            {
-                Some("OS2_WeightWidthSlopeOnly: 1".to_string())
-            } else {
-                None
-            }
-        }
-        "TTFWeight" => ot.os2_us_weight_class.map(|v| format!("TTFWeight: {}", v)),
-        "TTFWidth" => ot.os2_us_width_class.map(|v| format!("TTFWidth: {}", v)),
-        "OS2FamilyClass" => ot
-            .os2_family_class
-            .map(|v| format!("OS2FamilyClass: {}", v)),
-        "Panose" => ot.os2_panose.map(|panose| {
-            format!(
-                "Panose: {}",
-                panose
-                    .iter()
-                    .map(u8::to_string)
-                    .collect::<Vec<_>>()
-                    .join(" ")
-            )
-        }),
-        "OS2Vendor" => ot.os2_vendor_id.map(|v| format!("OS2Vendor: '{}'", v)),
-        "OS2UnicodeRanges" => match (
-            ot.os2_unicode_range1,
-            ot.os2_unicode_range2,
-            ot.os2_unicode_range3,
-            ot.os2_unicode_range4,
-        ) {
-            (Some(r1), Some(r2), Some(r3), Some(r4)) => Some(format!(
-                "OS2UnicodeRanges: {:08x}.{:08x}.{:08x}.{:08x}",
-                r1, r2, r3, r4
-            )),
-            _ => None,
-        },
-        "OS2CodePages" => match (ot.os2_code_page_range1, ot.os2_code_page_range2) {
-            (Some(c1), Some(c2)) => Some(format!("OS2CodePages: {:08x}.{:08x}", c1, c2)),
-            _ => None,
-        },
-        _ => None,
-    }
-}
-
-fn emit_ot_key(out: &mut Vec<String>, font: &Font, key: &str, state: &mut HeaderEmitState) -> bool {
-    if state.is_emitted(key) {
-        return false;
-    }
-    let Some(line) = ot_line_for_key(font, key) else {
-        return false;
-    };
-    out.push(line);
-    state.mark_emitted(key);
-    true
-}
-
-fn emit_passthrough_key(
-    out: &mut Vec<String>,
-    font: &Font,
-    key: &str,
-    state: &mut HeaderEmitState,
-) -> bool {
-    if state.is_emitted(key) {
-        return false;
-    }
-    let Some(value) = font.format_specific.get(key).and_then(|v| v.as_str()) else {
-        return false;
-    };
-    out.push(format!("{}: {}", key, sanitize_unquoted(value)));
-    state.mark_emitted(key);
-    true
-}
-
-fn emit_font_passthrough_keys_remaining(
-    out: &mut Vec<String>,
-    font: &Font,
-    state: &mut HeaderEmitState,
-) {
-    for key in [
-        "NeedsXUIDChange",
-        "XUID",
-        "OS2Version",
-        "OS2TypoAOffset",
-        "OS2TypoDOffset",
-        "OS2WinAOffset",
-        "OS2WinDOffset",
-        "HheadAOffset",
-        "HheadDOffset",
-        "MarkAttachClasses",
-        "DEI",
-        "Encoding",
-        "UnicodeInterp",
-        "NameList",
-        "DisplaySize",
-        "AntiAlias",
-        "FitToEm",
-        "WinInfo",
-        "ModificationTime",
-    ] {
-        let _ = emit_passthrough_key(out, font, key, state);
-    }
-}
-
-fn read_file_lossy(path: &std::path::Path) -> Result<String, BabelfontError> {
-    let bytes = fs::read(path)?;
-    Ok(String::from_utf8_lossy(&bytes).into_owned())
-}
-
-fn emit_metric(out: &mut Vec<String>, master: &crate::Master, metric: MetricType, key: &str) {
-    if let Some(v) = master.metrics.get(&metric) {
-        if metric == MetricType::Descender {
-            out.push(format!("{}: {}", key, -v));
-        } else {
-            out.push(format!("{}: {}", key, v));
-        }
-    }
-}
-
-#[allow(dead_code)]
-fn emit_ot_values(out: &mut Vec<String>, font: &Font) {
-    let ot = &font.custom_ot_values;
-    if let Some(v) = ot.os2_fs_type {
-        if font
-            .format_specific
-            .get("sfd.has_fstype")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false)
-        {
-            out.push(format!("FSType: {}", v));
-        }
-        let has_typometrics_line = font.format_specific.contains_key("OS2_UseTypoMetrics");
-        let has_wws_line = font
-            .format_specific
-            .contains_key("OS2_WeightWidthSlopeOnly");
-
-        if !has_typometrics_line && (v & (1 << 7)) != 0 {
-            out.push("OS2_UseTypoMetrics: 1".to_string());
-        }
-        if !has_wws_line && (v & (1 << 8)) != 0 {
-            out.push("OS2_WeightWidthSlopeOnly: 1".to_string());
-        }
-    }
-    if let Some(v) = ot.os2_us_weight_class {
-        out.push(format!("TTFWeight: {}", v));
-    }
-    if let Some(v) = ot.os2_us_width_class {
-        out.push(format!("TTFWidth: {}", v));
-    }
-    if let Some(v) = ot.os2_family_class {
-        out.push(format!("OS2FamilyClass: {}", v));
-    }
-    if let Some(panose) = ot.os2_panose {
-        let vals: Vec<String> = panose.iter().map(u8::to_string).collect();
-        out.push(format!("Panose: {}", vals.join(" ")));
-    }
-    if let Some(vendor) = ot.os2_vendor_id {
-        out.push(format!("OS2Vendor: '{}'", vendor));
-    }
-    if let (Some(r1), Some(r2), Some(r3), Some(r4)) = (
-        ot.os2_unicode_range1,
-        ot.os2_unicode_range2,
-        ot.os2_unicode_range3,
-        ot.os2_unicode_range4,
-    ) {
-        out.push(format!(
-            "OS2UnicodeRanges: {:08x}.{:08x}.{:08x}.{:08x}",
-            r1, r2, r3, r4
-        ));
-    }
-    if let (Some(c1), Some(c2)) = (ot.os2_code_page_range1, ot.os2_code_page_range2) {
-        out.push(format!("OS2CodePages: {:08x}.{:08x}", c1, c2));
-    }
-}
-
-fn emit_guides(out: &mut Vec<String>, font: &Font) {
-    let Some(master) = font.masters.first() else {
-        return;
-    };
-    if master.guides.is_empty() {
-        return;
-    }
-
-    out.push("Grid".to_string());
-    for g in &master.guides {
-        let x1 = g.pos.x as f64;
-        let y1 = g.pos.y as f64;
-        let angle = (g.pos.angle as f64).to_radians();
-        let x2 = x1 + angle.cos() * 1000.0;
-        let y2 = y1 + angle.sin() * 1000.0;
-        out.push(format!("{} {} m 0", fmt_num(x1), fmt_num(y1),));
-        out.push(format!("{} {} l 0", fmt_num(x2), fmt_num(y2),));
-    }
-    out.push("EndSplineSet".to_string());
-}
-
-fn emit_font_level_kerning(
-    _out: &mut Vec<String>,
-    _font: &Font,
-    _glyph_order: &[String],
-    _glyph_index: &HashMap<SmolStr, usize>,
-) {
-    // Placeholder for class-based kerning (KernClass2) emission.
-}
-
-fn emit_features(_out: &mut Vec<String>, _font: &Font) {
-    // Placeholder for Lookup/feature table emission.
-}
-
-fn collect_explicit_kerns(
-    font: &Font,
-    glyph_index: &HashMap<SmolStr, usize>,
-) -> HashMap<SmolStr, Vec<(usize, i16)>> {
-    let mut by_left: HashMap<SmolStr, Vec<(usize, i16)>> = HashMap::new();
-    let Some(master) = font.masters.first() else {
-        return by_left;
-    };
-
-    for ((left, right), value) in &master.kerning {
-        if left.starts_with('@') || right.starts_with('@') {
-            continue;
-        }
-        if let Some(&right_ix) = glyph_index.get(right) {
-            by_left
-                .entry(left.clone())
-                .or_default()
-                .push((right_ix, *value));
-        }
-    }
-
-    by_left
-}
-
-fn emit_glyph(
-    out: &mut Vec<String>,
-    glyph: &Glyph,
-    gid: usize,
-    layer_registry: &LayerRegistry,
-    default_master_id: &str,
-    glyph_index: &HashMap<SmolStr, usize>,
-    kerns: Option<&Vec<(usize, i16)>>,
-) -> Result<(), BabelfontError> {
-    out.push(format!("StartChar: {}", sanitize_unquoted(&glyph.name)));
-
-    let encoding_slot = glyph
-        .format_specific
-        .get("sfd.encoding_slot")
-        .and_then(|v| v.as_i64())
-        .unwrap_or_else(|| {
-            glyph
-                .codepoints
-                .first()
-                .copied()
-                .map(|cp| cp as i64)
-                .unwrap_or(-1)
-        });
-    let unicode_value = glyph
-        .format_specific
-        .get("sfd.encoding_unicode")
-        .and_then(|v| v.as_i64())
-        .unwrap_or_else(|| {
-            glyph
-                .codepoints
-                .first()
-                .copied()
-                .map(|cp| cp as i64)
-                .unwrap_or(-1)
-        });
-    let has_gid = glyph
-        .format_specific
-        .get("sfd.encoding_has_gid")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(true);
-    if has_gid {
-        let encoding_gid = glyph
-            .format_specific
-            .get("sfd.encoding_gid")
-            .and_then(|v| v.as_i64())
-            .unwrap_or(gid as i64);
-        out.push(format!(
-            "Encoding: {} {} {}",
-            encoding_slot, unicode_value, encoding_gid
-        ));
-    } else {
-        out.push(format!("Encoding: {} {}", encoding_slot, unicode_value));
-    }
-
-    let width = pick_foreground_width(glyph, default_master_id);
-    out.push(format!("Width: {}", fmt_num(width as f64)));
-
-    if let Some(vwidth) = glyph.format_specific.get("vwidth").and_then(|v| v.as_str()) {
-        out.push(format!("VWidth: {}", sanitize_unquoted(vwidth)));
-    }
-
-    let class_num = match glyph.category {
-        GlyphCategory::Base => 2,
-        GlyphCategory::Ligature => 3,
-        GlyphCategory::Mark => 4,
-        _ => 0,
-    };
-    if class_num != 0 {
-        out.push(format!("GlyphClass: {}", class_num));
-    }
-
-    if let Some(flags) = glyph_flags_for_emit(glyph) {
-        out.push(format!("Flags: {}", sanitize_unquoted(&flags)));
-    }
-
-    if let Some(layer) = glyph_foreground_layer(glyph, default_master_id) {
-        if let Some(hstem) = layer
-            .format_specific
-            .get(HSTEM_KEY)
-            .and_then(|v| v.as_str())
-        {
-            out.push(format!("HStem: {}", sanitize_unquoted(hstem)));
-        }
-        if let Some(vstem) = layer
-            .format_specific
-            .get(VSTEM_KEY)
-            .and_then(|v| v.as_str())
-        {
-            out.push(format!("VStem: {}", sanitize_unquoted(vstem)));
-        }
-    }
-
-    let emit_layer_count = glyph
-        .format_specific
-        .get("sfd.has_layer_count")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false)
-        || glyph.layers.len() > 1;
-
-    if emit_layer_count {
-        out.push(format!("LayerCount: {}", layer_registry.layer_count));
-    }
-
-    let mut indexed_layers: Vec<(usize, &Layer)> = glyph
-        .layers
-        .iter()
-        .map(|l| (layer_registry.index_for(l, default_master_id), l))
-        .collect();
-    indexed_layers.sort_by_key(|(ix, _)| *ix);
-
-    for (ix, layer) in indexed_layers {
-        emit_layer(out, glyph, layer, ix, glyph_index)?;
-    }
-
-    if let Some(comment) = glyph
-        .format_specific
-        .get("sfd.comment")
-        .and_then(|v| v.as_str())
-    {
-        out.push(format!("Comment: {}", sanitize_unquoted(comment)));
-    }
-
-    if let Some(entries) = kerns {
-        if !entries.is_empty() {
-            let payload = entries
-                .iter()
-                .map(|(right_gid, value)| {
-                    format!("{} {} \"{}\"", right_gid, value, GENERATED_KERN_SUBTABLE)
-                })
-                .collect::<Vec<_>>()
-                .join(" ");
-            out.push(format!("Kerns2: {}", payload));
-        }
-    }
-
-    out.push("EndChar".to_string());
-    Ok(())
-}
-
-fn pick_foreground_width(glyph: &Glyph, default_master_id: &str) -> f32 {
-    glyph_foreground_layer(glyph, default_master_id)
-        .map(|l| l.width)
-        .unwrap_or(0.0)
-}
-
-fn glyph_foreground_layer<'a>(glyph: &'a Glyph, default_master_id: &str) -> Option<&'a Layer> {
-    glyph
-        .layers
-        .iter()
-        .find(|l| LayerRegistry::is_foreground_layer(l, default_master_id))
-        .or_else(|| {
-            glyph
-                .layers
-                .iter()
-                .find(|l| !LayerRegistry::is_background_layer(l))
-        })
-        .or_else(|| glyph.layers.first())
-}
-
-fn emit_layer(
-    out: &mut Vec<String>,
-    glyph: &Glyph,
-    layer: &Layer,
-    layer_idx: usize,
-    glyph_index: &HashMap<SmolStr, usize>,
-) -> Result<(), BabelfontError> {
-    match layer_idx {
-        0 => out.push("Back".to_string()),
-        1 => out.push("Fore".to_string()),
-        _ => out.push(format!("Layer: {}", layer_idx)),
-    }
-
-    if let Some(color) = layer.color {
-        let r = (color.r.clamp(0, 255) as u32) << 16;
-        let g = (color.g.clamp(0, 255) as u32) << 8;
-        let b = color.b.clamp(0, 255) as u32;
-        out.push(format!("Colour: {:06x}", r | g | b));
-    }
-
-    emit_layer_shapes(out, glyph, layer, layer_idx, glyph_index)?;
-    emit_layer_anchors(out, layer);
-    Ok(())
-}
-
-fn emit_layer_shapes(
-    out: &mut Vec<String>,
-    glyph: &Glyph,
-    layer: &Layer,
-    layer_idx: usize,
-    glyph_index: &HashMap<SmolStr, usize>,
-) -> Result<(), BabelfontError> {
-    let has_path = layer.shapes.iter().any(|s| matches!(s, Shape::Path(_)));
-    if has_path {
-        let explicit_splineset = layer
-            .format_specific
-            .get("sfd.explicit_splineset")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(true);
-
-        if explicit_splineset {
-            out.push("SplineSet".to_string());
-        }
-        for (shape_index, shape) in layer.shapes.iter().enumerate() {
-            if let Shape::Path(path) = shape {
-                let path_str = save_path(path, layer_is_quadratic(layer)).map_err(|error| {
-                    BabelfontError::General(format!(
-                        "Failed to save path for glyph '{}' layer {} shape {}: {}",
-                        glyph.name, layer_idx, shape_index, error
-                    ))
-                })?;
-                out.push(path_str);
-            }
-        }
-        out.push("EndSplineSet".to_string());
-    }
-
-    for shape in &layer.shapes {
-        if let Shape::Component(component) = shape {
-            let component_str = save_component(component, glyph_index)?;
-            out.push(component_str);
-        }
-    }
-    Ok(())
-}
-
-fn emit_layer_anchors(out: &mut Vec<String>, layer: &Layer) {
-    for anchor in &layer.anchors {
-        let kind = anchor
-            .format_specific
-            .get("sfd.kind")
-            .and_then(|v| v.as_str())
-            .unwrap_or("base");
-        let index = anchor
-            .format_specific
-            .get("sfd.index")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(0);
-        let name = if kind == "mark" && anchor.name.starts_with('_') {
-            anchor.name[1..].to_string()
-        } else {
-            anchor.name.clone()
-        };
-
-        out.push(format!(
-            "AnchorPoint: \"{}\" {} {} {} {}",
-            escape_quoted(&name),
-            fmt_num(anchor.x),
-            fmt_num(anchor.y),
-            kind,
-            index
-        ));
-    }
-}
-
-fn save_component(
-    component: &Component,
-    glyph_index: &HashMap<SmolStr, usize>,
-) -> Result<String, BabelfontError> {
-    let Some(gid) = glyph_index.get(&component.reference) else {
-        return Err(BabelfontError::MissingGlyphReference(
-            component.reference.to_string(),
-        ));
-    };
-
-    let coeffs = component.transform.as_affine().as_coeffs();
-    // SFD Refer matrix order is [xx, xy, yx, yy, tx, ty].
-    let xx = coeffs[0];
-    let yx = coeffs[1];
-    let xy = coeffs[2];
-    let yy = coeffs[3];
-    let tx = coeffs[4];
-    let ty = coeffs[5];
-
-    let unicodeenc = component
-        .format_specific
-        .get("sfd.refer.unicodeenc")
-        .and_then(|v| v.as_str())
-        .unwrap_or("0");
-    let selected = component
-        .format_specific
-        .get("sfd.refer.selected")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
-
-    let flags = component
-        .format_specific
-        .get("sfd.refer.flags")
-        .and_then(|v| v.as_u64())
-        .map(|v| v as u32)
-        .unwrap_or_else(|| {
-            let mut bits = 0u32;
-            if component
-                .format_specific
-                .get("sfd.refer.use_my_metrics")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false)
-            {
-                bits |= 0x1;
-            }
-            if component
-                .format_specific
-                .get("sfd.refer.round_translation_to_grid")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false)
-            {
-                bits |= 0x2;
-            }
-            if component
-                .format_specific
-                .get("sfd.refer.point_match")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false)
-            {
-                bits |= 0x4;
-            }
-            bits
-        });
-
-    let mut line = format!(
-        "Refer: {} {} {} {} {} {} {} {} {} {}",
-        gid,
-        unicodeenc,
-        if selected { "S" } else { "N" },
-        fmt_num(xx),
-        fmt_num(xy),
-        fmt_num(yx),
-        fmt_num(yy),
-        fmt_num(tx),
-        fmt_num(ty),
-        flags
-    );
-
-    if (flags & 0x4) != 0 {
-        let base_pt = component
-            .format_specific
-            .get("sfd.refer.match_pt_base")
-            .and_then(|v| v.as_i64())
-            .unwrap_or(0);
-        let ref_pt = component
-            .format_specific
-            .get("sfd.refer.match_pt_ref")
-            .and_then(|v| v.as_i64())
-            .unwrap_or(0);
-        line.push_str(&format!(" {} {}", base_pt, ref_pt));
-        if component
-            .format_specific
-            .get("sfd.refer.point_match_out_of_date")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false)
-        {
-            line.push_str(" O");
-        }
-    }
-
-    Ok(line)
-}
-
-fn save_path(path: &Path, is_quadratic: bool) -> Result<String, BabelfontError> {
-    let oncurve_indices: Vec<usize> = path
-        .nodes
-        .iter()
-        .enumerate()
-        .filter_map(|(i, n)| {
-            if matches!(n.nodetype, NodeType::OffCurve) {
-                None
-            } else {
-                Some(i)
-            }
-        })
-        .collect();
-
-    let implicit_move_closed = path.closed
-        && path
-            .nodes
-            .first()
-            .map(|node| node.nodetype != NodeType::Move)
-            .unwrap_or(false);
-    let start_ix = if implicit_move_closed {
-        oncurve_indices.last().copied()
-    } else {
-        oncurve_indices.first().copied()
-    };
-
-    let Some(start_ix) = start_ix else {
-        return Err(BabelfontError::General(format!(
-            "Path has no on-curve points ({} nodes: {})",
-            path.nodes.len(),
-            path.nodes
-                .iter()
-                .map(|node| format!(
-                    "{:?}@{},{}",
-                    node.nodetype,
-                    fmt_num(node.x),
-                    fmt_num(node.y)
-                ))
-                .collect::<Vec<_>>()
-                .join(", ")
-        )));
-    };
-    let start = &path.nodes[start_ix];
-    let mut out: Vec<String> = Vec::new();
-    out.push(format!(
-        "{} {} m {}",
-        fmt_num(start.x),
-        fmt_num(start.y),
-        point_flags_for_node(start)
-    ));
-
-    let mut current = start;
-    let mut offcurves: Vec<&Node> = Vec::new();
-    let remaining_nodes: Vec<&Node> = if path.closed {
-        path.nodes[start_ix + 1..]
-            .iter()
-            .chain(path.nodes[..start_ix].iter())
-            .collect()
-    } else {
-        path.nodes[start_ix + 1..].iter().collect()
-    };
-
-    for node in remaining_nodes {
-        match node.nodetype {
-            NodeType::OffCurve => offcurves.push(node),
-            NodeType::Curve => {
-                if offcurves.len() >= 2 {
-                    let c1 = offcurves[offcurves.len() - 2];
-                    let c2 = offcurves[offcurves.len() - 1];
-                    out.push(format!(
-                        " {} {} {} {} {} {} c {}",
-                        fmt_num(c1.x),
-                        fmt_num(c1.y),
-                        fmt_num(c2.x),
-                        fmt_num(c2.y),
-                        fmt_num(node.x),
-                        fmt_num(node.y),
-                        point_flags_for_node(node)
-                    ));
-                } else {
-                    out.push(format!(
-                        " {} {} l {}",
-                        fmt_num(node.x),
-                        fmt_num(node.y),
-                        point_flags_for_node(node)
-                    ));
-                }
-                current = node;
-                offcurves.clear();
-            }
-            NodeType::QCurve => {
-                if let Some(control) = offcurves.last() {
-                    out.push(format!(
-                        " {} {} {} {} {} {} c {}",
-                        fmt_num(control.x),
-                        fmt_num(control.y),
-                        fmt_num(control.x),
-                        fmt_num(control.y),
-                        fmt_num(node.x),
-                        fmt_num(node.y),
-                        point_flags_for_node(node)
-                    ));
-                } else if is_quadratic {
-                    out.push(format!(
-                        " {} {} {} {} {} {} c {}",
-                        fmt_num(current.x),
-                        fmt_num(current.y),
-                        fmt_num(current.x),
-                        fmt_num(current.y),
-                        fmt_num(node.x),
-                        fmt_num(node.y),
-                        point_flags_for_node(node)
-                    ));
-                } else {
-                    out.push(format!(
-                        " {} {} l {}",
-                        fmt_num(node.x),
-                        fmt_num(node.y),
-                        point_flags_for_node(node)
-                    ));
-                }
-                current = node;
-                offcurves.clear();
-            }
-            NodeType::Line | NodeType::Move => {
-                out.push(format!(
-                    " {} {} l {}",
-                    fmt_num(node.x),
-                    fmt_num(node.y),
-                    point_flags_for_node(node)
-                ));
-                current = node;
-                offcurves.clear();
-            }
-        }
-    }
-
-    if path.closed
-        && (implicit_move_closed
-            || current.x != start.x
-            || current.y != start.y
-            || !offcurves.is_empty())
-    {
-        if is_quadratic && !offcurves.is_empty() {
-            let control = offcurves[offcurves.len() - 1];
-            out.push(format!(
-                " {} {} {} {} {} {} c {}",
-                fmt_num(control.x),
-                fmt_num(control.y),
-                fmt_num(control.x),
-                fmt_num(control.y),
-                fmt_num(start.x),
-                fmt_num(start.y),
-                point_flags_for_node(start)
-            ));
-        } else if offcurves.len() >= 2 {
-            let c1 = offcurves[offcurves.len() - 2];
-            let c2 = offcurves[offcurves.len() - 1];
-            out.push(format!(
-                " {} {} {} {} {} {} c {}",
-                fmt_num(c1.x),
-                fmt_num(c1.y),
-                fmt_num(c2.x),
-                fmt_num(c2.y),
-                fmt_num(start.x),
-                fmt_num(start.y),
-                point_flags_for_node(start)
-            ));
-        } else {
-            out.push(format!(
-                " {} {} l {}",
-                fmt_num(start.x),
-                fmt_num(start.y),
-                point_flags_for_node(start)
-            ));
-        }
-    }
-
-    Ok(out.join("\n"))
-}
-
-fn point_flags_for_node(node: &Node) -> String {
-    if let Some(flags) = node
-        .format_specific
-        .get("sfd.point_flags")
-        .and_then(|v| v.as_str())
-    {
-        return flags.to_string();
-    }
-
-    if node.smooth {
-        "0x100".to_string()
-    } else {
-        "0".to_string()
-    }
-}
-
-fn glyph_flags_for_emit(glyph: &Glyph) -> Option<String> {
-    if let Some(flags) = glyph
-        .format_specific
-        .get("sfd.flags")
-        .and_then(|v| v.as_str())
-    {
-        return Some(flags.to_string());
-    }
-
-    let mut out = String::new();
-    if glyph
-        .format_specific
-        .get("sfd.changed_since_last_hinted")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false)
-    {
-        out.push('H');
-    }
-    if glyph
-        .format_specific
-        .get("sfd.manual_hints")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false)
-    {
-        out.push('M');
-    }
-    if glyph
-        .format_specific
-        .get("sfd.width_set")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false)
-    {
-        out.push('W');
-    }
-    if glyph
-        .format_specific
-        .get("sfd.editor_state_saved")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false)
-    {
-        out.push('O');
-    }
-    if glyph
-        .format_specific
-        .get("sfd.instructions_out_of_date")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false)
-    {
-        out.push('I');
-    }
-
-    if out.is_empty() {
-        None
-    } else {
-        Some(out)
-    }
-}
-
-fn fmt_num(n: f64) -> String {
-    if (n.round() - n).abs() < 1e-6 {
-        format!("{}", n.round() as i64)
-    } else {
-        let s = format!("{:.6}", n);
-        s.trim_end_matches('0').trim_end_matches('.').to_string()
-    }
-}
-
-fn sanitize_unquoted(s: &str) -> String {
-    s.chars()
-        .map(|c| if c == '\n' || c == '\r' { ' ' } else { c })
-        .collect::<String>()
-}
-
-/// Decode FontForge's single-line escapes: "\\n" is a line break and "\\\\"
-/// a backslash; any other backslash sequence is literal text.
-fn decode_sfd_line_escapes(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    let mut chars = s.chars();
-    while let Some(c) = chars.next() {
-        if c != '\\' {
-            out.push(c);
-            continue;
-        }
-        match chars.next() {
-            Some('n') => out.push('\n'),
-            Some('\\') => out.push('\\'),
-            Some(other) => {
-                out.push('\\');
-                out.push(other);
-            }
-            None => out.push('\\'),
-        }
-    }
-    out
-}
-
-/// The inverse of decode_sfd_line_escapes, for fields FontForge stores on a
-/// single SFD line. A lone CR (name records use it as a line break) becomes
-/// "\\n" too.
-fn escape_sfd_line(s: &str) -> String {
-    s.replace('\\', "\\\\")
-        .replace("\r\n", "\n")
-        .replace('\r', "\n")
-        .replace('\n', "\\n")
-}
-
-fn escape_quoted(s: &str) -> String {
-    s.replace('"', "'")
-}
-
-#[allow(clippy::expect_used)]
-#[cfg(test)]
-mod tests {
-    use std::fs;
-
-    use rstest::rstest;
-    use similar::TextDiff;
-
-    use super::*;
-
-    #[test]
-    fn test_blank_vendor_is_preserved() {
-        // A blank vendor is a deliberate value; dropping it made the downstream
-        // default substitute the literal string "NONE".
-        let sfd = "SplineFontDB: 3.0\nFontName: T\nAscent: 800\nDescent: 200\n\
-                   OS2Vendor: '    '\nBeginChars: 1 1\nStartChar: .notdef\n\
-                   Encoding: 0 -1 0\nWidth: 500\nEndChar\nEndChars\nEndSplineFont\n";
-        let font = load_str(sfd).expect("blank-vendor SFD should load");
-        assert_eq!(
-            font.custom_ot_values.os2_vendor_id.map(|t| t.to_string()),
-            Some("    ".to_string()),
-            "a blank vendor must survive as four spaces, not be dropped"
-        );
-    }
-
-    #[test]
-    fn test_nul_padded_vendor_is_repadded_with_spaces() {
-        // FontForge pads a short vendor with NULs inside the quotes; a NUL is
-        // not legal in an OpenType tag.
-        let sfd = "SplineFontDB: 3.0\nFontName: T\nAscent: 800\nDescent: 200\n\
-                   OS2Vendor: 'ltt\u{0}'\nBeginChars: 1 1\nStartChar: .notdef\n\
-                   Encoding: 0 -1 0\nWidth: 500\nEndChar\nEndChars\nEndSplineFont\n";
-        let font = load_str(sfd).expect("NUL-padded vendor SFD should load");
-        assert_eq!(
-            font.custom_ot_values.os2_vendor_id.map(|t| t.to_string()),
-            Some("ltt ".to_string()),
-            "a NUL-padded vendor must be re-padded with spaces"
-        );
-    }
-
-    #[test]
-    fn test_converting_twice_gives_the_same_ids() {
-        let sfd = "SplineFontDB: 3.0\nFontName: T\nAscent: 800\nDescent: 200\n\
-                   BeginChars: 1 1\nStartChar: .notdef\nEncoding: 0 -1 0\n\
-                   Width: 500\nEndChar\nEndChars\nEndSplineFont\n";
-        let a = load_str(sfd).expect("load");
-        let b = load_str(sfd).expect("load");
-        assert_eq!(a.masters[0].id, b.masters[0].id, "master id must be stable");
-    }
-
-    #[test]
-    fn test_italic_angle_sign_is_converted() {
-        // FontForge uses the OpenType convention (negative = right-leaning);
-        // Glyphs uses the opposite, and the compiler negates on the way out.
-        // Without the conversion here the two negations never cancel and every
-        // converted italic is back-slanted.
-        let sfd = |angle: &str| {
-            format!(
-                "SplineFontDB: 3.0\nFontName: T\nAscent: 800\nDescent: 200\n\
-                 ItalicAngle: {angle}\nBeginChars: 1 1\nStartChar: .notdef\n\
-                 Encoding: 0 -1 0\nWidth: 500\nEndChar\nEndChars\nEndSplineFont\n"
-            )
-        };
-        let angle_of = |src: String| {
-            load_str(&src).expect("SFD should load").masters[0]
-                .metrics
-                .get(&MetricType::ItalicAngle)
-                .copied()
-        };
-
-        // A right-leaning italic: -12 in the SFD becomes +12 for Glyphs.
-        assert_eq!(angle_of(sfd("-12")), Some(12));
-        // And back the other way.
-        assert_eq!(angle_of(sfd("12")), Some(-12));
-        // Upright stays upright, with no negative zero.
-        assert_eq!(angle_of(sfd("0")), Some(0));
-        // A fractional angle must survive: an integer parse would drop it.
-        assert_eq!(angle_of(sfd("-12.4")), Some(12));
-        assert_eq!(angle_of(sfd("-12.6")), Some(13));
-    }
-
-    #[test]
-    fn test_italic_angle_survives_an_sfd_roundtrip_as_text() {
-        // The generic round-trip test re-parses the emitted SFD and compares
-        // model fields, so a sign flip on BOTH sides cancels out and goes
-        // unnoticed. Compare the emitted text instead.
-        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("resources/fontforge/AmbrosiaItalic.sfd");
-        let data = String::from_utf8_lossy(&fs::read(&path).expect("Missing SFD")).into_owned();
-        let original = data
-            .lines()
-            .find(|l| l.starts_with("ItalicAngle:"))
-            .expect("this fixture must declare an ItalicAngle");
-        assert_eq!(original, "ItalicAngle: -10", "fixture changed");
-
-        let font = load_str(&data).expect("Failed to load SFD");
-        // Stored in the Glyphs convention, i.e. negated.
-        assert_eq!(
-            font.masters[0]
-                .metrics
-                .get(&MetricType::ItalicAngle)
-                .copied(),
-            Some(10)
-        );
-
-        let emitted = to_str(&font).expect("Failed to emit SFD");
-        let emitted_line = emitted
-            .lines()
-            .find(|l| l.starts_with("ItalicAngle:"))
-            .expect("emitted SFD lost its ItalicAngle");
-        assert_eq!(
-            emitted_line, original,
-            "an SFD -> SFD round trip must not flip the italic angle"
-        );
-    }
-
-    #[test]
-    fn test_copyright_line_break_escapes_are_decoded_and_survive_a_roundtrip() {
-        // FontForge stores Copyright on one SFD line with "\n" escapes and
-        // decodes them on export (devonshire: the SFD says
-        // `Reserved\nFont Name`, the shipped binary has a real line break).
-        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("resources/fontforge/AmbrosiaItalic.sfd");
-        let data = String::from_utf8_lossy(&fs::read(&path).expect("Missing SFD")).into_owned();
-        let escaped =
-            "Copyright: (c) 2011 Someone, with Reserved\\nFont Name \"Ambrosia\" and a C:\\\\path";
-        let data = data.replace("Copyright: Generated by Fontographer 3.5", escaped);
-
-        let font = load_str(&data).expect("Failed to load SFD");
-        assert_eq!(
-            font.names.copyright.get_default().map(String::as_str),
-            Some("(c) 2011 Someone, with Reserved\nFont Name \"Ambrosia\" and a C:\\path")
-        );
-
-        let emitted = to_str(&font).expect("Failed to emit SFD");
-        let emitted_line = emitted
-            .lines()
-            .find(|l| l.starts_with("Copyright:"))
-            .expect("emitted SFD lost its Copyright");
-        assert_eq!(emitted_line, escaped);
-    }
-
-    #[test]
-    fn test_weight_suffix_of_family_name() {
-        let split = |family: &str, weight: &str| {
-            let mut parser = SfdParser::new(PathBuf::from("test.sfd"));
-            parser.font.names.family_name = family.into();
-            if !weight.is_empty() {
-                parser.font.format_specific.insert(
-                    "postscript_weight_name".to_string(),
-                    serde_json::Value::String(weight.to_string()),
-                );
-            }
-            parser.weight_suffix_of_family_name()
-        };
-
-        // The case this exists for.
-        assert_eq!(
-            split("Elsie Black", "Black"),
-            Some(("Elsie".to_string(), "Black".to_string()))
-        );
-        // The family name spaces the weight, the weight itself does not.
-        assert_eq!(
-            split("Elsie Swash Caps Black", "Black"),
-            Some(("Elsie Swash Caps".to_string(), "Black".to_string()))
-        );
-
-        // Weights that mean Regular are not a suffix worth splitting; almost
-        // every file in a FontForge corpus says "Book".
-        assert_eq!(split("Fjord One", "Book"), None);
-        assert_eq!(split("Anything", "Regular"), None);
-        assert_eq!(split("Anything", "Medium"), None);
-        assert_eq!(split("Anything", ""), None);
-
-        // The weight must actually end the family name.
-        assert_eq!(split("Elsie", "Black"), None);
-        assert_eq!(split("Black Ops One", "Black"), None);
-
-        // Nothing left over is not a split -- a family really called "Black"
-        // keeps its name.
-        assert_eq!(split("Black", "Black"), None);
-        assert_eq!(split("  Black  ", "Black"), None);
-    }
-
-    #[test]
-    fn test_space_before_italic() {
-        // The case this exists for: a run-together compound style.
-        assert_eq!(space_before_italic("BoldItalic"), "Bold Italic");
-        assert_eq!(space_before_italic("LightItalic"), "Light Italic");
-
-        // A bare slope has no weight to separate it from.
-        assert_eq!(space_before_italic("Italic"), "Italic");
-
-        // Already spelled correctly -- must not gain a second space.
-        assert_eq!(space_before_italic("Bold Italic"), "Bold Italic");
-
-        // Weight names are spelled without a space by the same convention, so
-        // nothing that is not a slope gets split.
-        assert_eq!(space_before_italic("SemiBold"), "SemiBold");
-        assert_eq!(space_before_italic("Regular"), "Regular");
-        assert_eq!(space_before_italic("Bold"), "Bold");
-
-        // "Italic" inside a word is not a suffix and is left alone.
-        assert_eq!(space_before_italic("Italiano"), "Italiano");
-    }
-
-    #[rstest]
-    fn test_roundtrip(#[files("resources/fontforge/*.sfd")] path: PathBuf) {
-        let data =
-            String::from_utf8_lossy(&fs::read(&path).expect("Failed to read SFD file bytes"))
-                .into_owned();
-        let font = load_str(&data).expect("Failed to load SFD font");
-        let output = to_str(&font).expect("Failed to convert font back to SFD");
-
-        // Re-parse the generated SFD and compare core model fields.
-        let reparsed = load_str(&output).expect("Failed to reparse emitted SFD");
-
-        assert_eq!(
-            reparsed.glyphs.len(),
-            font.glyphs.len(),
-            "glyph count changed"
-        );
-        assert_eq!(
-            reparsed
-                .glyphs
-                .iter()
-                .map(|g| g.name.to_string())
-                .collect::<Vec<_>>(),
-            font.glyphs
-                .iter()
-                .map(|g| g.name.to_string())
-                .collect::<Vec<_>>(),
-            "glyph order changed"
-        );
-
-        // Check a few key fields so regressions are surfaced early while
-        // acknowledging that this emitter currently serializes only a subset of SFD.
-        assert_eq!(
-            reparsed
-                .names
-                .postscript_name
-                .get_default()
-                .map(|s| s.as_str()),
-            font.names.postscript_name.get_default().map(|s| s.as_str())
-        );
-        assert_eq!(reparsed.masters.len(), font.masters.len());
-
-        // Now do a full diff to see what we're missing
-        if output != data && data.split("\n").count() < 1000 {
-            let diff = TextDiff::from_lines(&data, &output)
-                .unified_diff()
-                .context_radius(5)
-                .header("Original SFD", "Re-emitted SFD")
-                .to_string();
-            println!("{}", diff);
-            panic!("Roundtrip SFD did not match original");
-        }
-    }
-
-    #[test]
-    fn test_blank_script_tag_becomes_dflt() {
-        // FontForge writes a blank script tag for lookups with no script;
-        // it must become DFLT/dflt or the emitted languagesystem/script
-        // FEA statements are invalid.
-        let data = concat!(
-            "SplineFontDB: 3.0\n",
-            "Ascent: 800\n",
-            "Descent: 200\n",
-            "LayerCount: 2\n",
-            "Layer: 0 0 \"Back\" 1\n",
-            "Layer: 1 0 \"Fore\" 0\n",
-            "Lookup: 1 0 0 \"t\" {\"t-1\"} [ 'titl' ('    ' <'dflt' > ) ]\n",
-            "BeginChars: 2 2\n",
-            "StartChar: A\n",
-            "Encoding: 65 65 0\n",
-            "Width: 600\n",
-            "Substitution2: \"t-1\" A.titl\n",
-            "Fore\n",
-            "EndChar\n",
-            "StartChar: A.titl\n",
-            "Encoding: -1 -1 1\n",
-            "Width: 600\n",
-            "Fore\n",
-            "EndChar\n",
-            "EndChars\n",
-            "EndSplineFont\n"
-        );
-        let font = load_str(data).expect("Failed to parse blank-script SFD");
-        let fea = font.features.to_fea();
-        assert!(fea.contains("languagesystem DFLT dflt"), "{}", fea);
-        assert!(!fea.contains("languagesystem  "), "{}", fea);
-    }
-
-    #[test]
-    fn test_load_sfdir() {
-        // An SFDir is an exploded SFD: font.props holds the header and each
-        // glyph is a standalone StartChar block in its own *.glyph file
-        // (including dot-files such as .notdef.glyph). Glyphs must come out
-        // in original-GID order, not directory or filename order: in the
-        // fixture, b.glyph has GID 1 and a.glyph has GID 2.
-        let font =
-            load(PathBuf::from("resources/fontforge/simple.sfdir")).expect("Failed to load SFDir");
-        let names: Vec<&str> = font.glyphs.0.iter().map(|g| g.name.as_str()).collect();
-        assert_eq!(names, vec![".notdef", "b", "a"]);
-        assert_eq!(font.upm, 1000); // Ascent 800 + Descent 200
-        assert_eq!(
-            font.glyphs.get("a").and_then(|g| g.codepoints.first()),
-            Some(&0x61)
-        );
-        assert_eq!(
-            font.glyphs.get("b").and_then(|g| g.codepoints.first()),
-            Some(&0x62)
-        );
-        // Outlines from the glyph files are parsed, not just names
-        let b = font.glyphs.get("b").expect("missing glyph b");
-        assert!(b.layers.iter().any(|l| l.paths().next().is_some()));
-    }
-
-    #[test]
-    fn test_quadratic_layer_parses_and_emits_qcurves() {
-        let data = concat!(
-            "SplineFontDB: 3.0\n",
-            "LayerCount: 2\n",
-            "Layer: 0 1 \"Back\" 1\n",
-            "Layer: 1 1 \"Fore\" 0\n",
-            "BeginChars: 1 1\n",
-            "StartChar: quad\n",
-            "Encoding: -1 -1 0\n",
-            "Width: 500\n",
-            "Fore\n",
-            "SplineSet\n",
-            "268 610 m 4,0,1\n",
-            " 336 610 336 610 386.5 585.5 c 0x400,-1,2\n",
-            "EndSplineSet\n",
-            "EndChar\n",
-            "EndChars\n",
-            "EndSplineFont\n"
-        );
-
-        let font = load_str(data).expect("Failed to parse quadratic SFD");
-        let layer = glyph_foreground_layer(&font.glyphs[0], "default").expect("Missing layer");
-        let path = layer.paths().next().expect("Missing path");
-
-        assert_eq!(
-            layer
-                .format_specific
-                .get(LAYER_QUADRATIC_KEY)
-                .and_then(|v| v.as_bool()),
-            Some(true)
-        );
-        assert_eq!(path.nodes.len(), 3);
-        assert_eq!(path.nodes[0].nodetype, NodeType::Move);
-        assert_eq!(path.nodes[1].nodetype, NodeType::OffCurve);
-        assert_eq!(path.nodes[2].nodetype, NodeType::QCurve);
-
-        let emitted = to_str(&font).expect("Failed to emit quadratic SFD");
-        assert!(emitted.contains("Layer: 1 1 \"Fore\" 0"));
-        assert!(emitted.contains(" 336 610 336 610 386.5 585.5 c 0x400,-1,2"));
-    }
-
-    #[test]
-    fn test_altuni_adds_alternate_codepoints() {
-        // FontForge records a glyph's extra Unicode mappings in AltUni2 as
-        // space-separated `uni.vs.reserved` hex triples. Plain alternates
-        // (variation selector 0xffffffff) must become additional codepoints so
-        // the cmap matches; a real variation selector is skipped, and repeats
-        // are de-duplicated.
-        let data = concat!(
-            "SplineFontDB: 3.0\n",
-            "LayerCount: 2\n",
-            "Layer: 0 1 \"Back\" 1\n",
-            "Layer: 1 1 \"Fore\" 0\n",
-            "BeginChars: 2 2\n",
-            "StartChar: space\n",
-            "Encoding: 32 32 0\n",
-            "Width: 250\n",
-            "AltUni2: 0000a0.ffffffff.0\n",
-            "EndChar\n",
-            "StartChar: mu\n",
-            "Encoding: 181 181 1\n",
-            "Width: 500\n",
-            "AltUni2: 0003bc.ffffffff.0 0003bc.ffffffff.0 000041.0000fe00.0\n",
-            "EndChar\n",
-            "EndChars\n",
-            "EndSplineFont\n"
-        );
-
-        let font = load_str(data).expect("Failed to parse SFD with AltUni2");
-        // space: primary U+0020 plus the plain alternate U+00A0.
-        assert_eq!(font.glyphs[0].codepoints, vec![0x0020, 0x00A0]);
-        // mu: primary U+00B5 plus U+03BC (the duplicate is collapsed). The U+0041
-        // entry has a real variation selector (0xfe00), so it is NOT a codepoint.
-        assert_eq!(font.glyphs[1].codepoints, vec![0x00B5, 0x03BC]);
-    }
-
-    #[test]
-    fn test_oneline_glyph_rules_are_added_to_lookups() {
-        let data = concat!(
-            "SplineFontDB: 3.0\n",
-            "Lookup: 1 0 0 \"Latin Smallcaps Lookup\" {\"Latin Smallcaps\"} [ ]\n",
-            "Lookup: 2 0 0 \"Latin Decomp Lookup\" {\"Latin Decomposition\"} [ ]\n",
-            "Lookup: 3 0 0 \"Latin Alt Lookup\" {\"Latin Swash\"} [ ]\n",
-            "Lookup: 4 0 0 \"Latin Liga Lookup\" {\"Latin Ligatures\"} [ ]\n",
-            "Lookup: 257 0 0 \"Inferiors Lookup\" {\"Inferiors\"} [ ]\n",
-            "Lookup: 258 0 0 \"Distances Lookup\" {\"Distances\"} [ ]\n",
-            "BeginChars: 1 1\n",
-            "StartChar: agrave\n",
-            "Encoding: -1 224 0\n",
-            "Width: 500\n",
-            "Fore\n",
-            "Substitution2: \"Latin Smallcaps\" agrave.sc\n",
-            "AlternateSubs2: \"Latin Swash\" agrave.alt agrave.swash\n",
-            "MultipleSubs2: \"Latin Decomposition\" a grave\n",
-            "Ligature2: \"Latin Ligatures\" a grave\n",
-            "Position2: \"Inferiors\" dx=0 dy=-900 dh=0 dv=0\n",
-            "PairPos2: \"Distances\" B dx=0 dy=0 dh=0 dv=0 dx=-10 dy=0 dh=0 dv=0\n",
-            "EndChar\n",
-            "EndChars\n",
-            "EndSplineFont\n"
-        );
-
-        let font = load_str(data).expect("Failed to parse one-line glyph rule SFD");
-        let prefixes = font
-            .features
-            .prefixes
-            .values()
-            .map(|p| p.code.clone())
-            .collect::<Vec<_>>()
-            .join("\n");
-
-        assert!(prefixes.contains("sub agrave by agrave.sc;"));
-        assert!(prefixes.contains("sub agrave by a grave;"));
-        assert!(prefixes.contains("sub agrave from [agrave.alt agrave.swash];"));
-        assert!(prefixes.contains("sub a grave by agrave;"));
-        assert!(prefixes.contains("pos agrave <0 -900 0 0>;"));
-        assert!(prefixes.contains("pos agrave <0 0 0 0> B <-10 0 0 0>;"));
-    }
-
-    #[test]
-    fn test_indic_mark_anchors_and_subcategory() {
-        // AnchorPoint lines appear before the "Fore" marker in SFD and use
-        // FontForge anchor-class names. The convertor must (a) keep the anchors
-        // by attaching them to the foreground layer, (b) translate the class
-        // names into the Glyphs top/bottom (base) and _top/_bottom (mark)
-        // convention using the AnchorClass2 above/below classification, and
-        // (c) mark GlyphClass-4 glyphs as Nonspacing marks.
-        let data = concat!(
-            "SplineFontDB: 3.0\n",
-            // Two mark-to-base (kind 0x104 = 260) GPOS lookups, one per feature.
-            // These are anchor-based and must be skipped on export.
-            "Lookup: 260 0 0 \"abvm mark\" {\"abvm-1\"} [ 'abvm' ('deva' <'dflt' > ) ]\n",
-            "Lookup: 260 0 0 \"blwm mark\" {\"blwm-1\"} [ 'blwm' ('deva' <'dflt' > ) ]\n",
-            "AnchorClass2: \"Above\" \"'abvm' Above Base Mark lookup 1 subtable\" ",
-            "\"Below\" \"'blwm' Below Base Mark lookup 2 subtable\"\n",
-            "BeginChars: 3 3\n",
-            "StartChar: ka\n",
-            "Encoding: 0 -1 0\n",
-            "Width: 600\n",
-            "GlyphClass: 2\n",
-            "AnchorPoint: \"Above\" 300 700 basechar 0\n",
-            "AnchorPoint: \"Below\" 300 -50 basechar 0\n",
-            "Fore\n",
-            "EndChar\n",
-            "StartChar: anusvara\n",
-            "Encoding: 1 -1 1\n",
-            "Width: 0\n",
-            "GlyphClass: 4\n",
-            "AnchorPoint: \"Above\" 0 500 mark 0\n",
-            "Fore\n",
-            "EndChar\n",
-            "StartChar: k_ka\n",
-            "Encoding: 2 -1 2\n",
-            "Width: 1000\n",
-            "GlyphClass: 3\n",
-            "Fore\n",
-            "EndChar\n",
-            "EndChars\n",
-            "EndSplineFont\n"
-        );
-        let font = load_str(data).expect("Failed to parse Indic-mark SFD");
-        let default_master_id = font.masters[0].id.clone();
-
-        // Base glyph: still a Base, with its anchors kept under the names the
-        // SFD gives them, and attached to the (implicit) foreground layer even
-        // though they appear before the "Fore" marker.
-        let ka = font.glyphs.get("ka").expect("missing base glyph 'ka'");
-        assert_eq!(ka.category, GlyphCategory::Base);
-        let ka_layer = glyph_foreground_layer(ka, &default_master_id).expect("ka foreground layer");
-        let mut ka_names: Vec<&str> = ka_layer.anchors.iter().map(|a| a.name.as_str()).collect();
-        ka_names.sort();
-        assert_eq!(ka_names, vec!["Above", "Below"], "base anchor names");
-
-        // Mark glyph: category Mark + subCategory Nonspacing.
-        let mark = font
-            .glyphs
-            .get("anusvara")
-            .expect("missing mark glyph 'anusvara'");
-        assert_eq!(mark.category, GlyphCategory::Mark);
-        assert_eq!(
-            mark.format_specific
-                .get("subcategory")
-                .and_then(|v| v.as_str()),
-            Some("Nonspacing"),
-            "mark glyph must carry Nonspacing subCategory"
-        );
-        let mark_layer =
-            glyph_foreground_layer(mark, &default_master_id).expect("mark foreground layer");
-        let mark_names: Vec<&str> = mark_layer.anchors.iter().map(|a| a.name.as_str()).collect();
-        assert_eq!(mark_names, vec!["_Above"], "mark anchor name");
-
-        // Ligature glyph (GlyphClass 3): category Ligature + subCategory
-        // Ligature, so the exported category becomes a valid Glyphs "Letter".
-        let lig = font
-            .glyphs
-            .get("k_ka")
-            .expect("missing ligature glyph 'k_ka'");
-        assert_eq!(lig.category, GlyphCategory::Ligature);
-        assert_eq!(
-            lig.format_specific
-                .get("subcategory")
-                .and_then(|v| v.as_str()),
-            Some("Ligature"),
-            "ligature glyph must carry Ligature subCategory"
-        );
-
-        // Anchor-based mark GPOS lookups carry no FEA rules, so they must not
-        // be emitted as empty feature blocks.
-        assert!(
-            !font
-                .features
-                .features
-                .iter()
-                .any(|(tag, _)| tag == "abvm" || tag == "blwm"),
-            "empty anchor-based mark features must not be exported"
-        );
-    }
-
-    #[test]
-    fn test_feature_code_order_is_deterministic() {
-        // Rust seeds its hasher per process, so anything built by iterating a
-        // HashMap comes out in a different order on every run. The lookup and
-        // feature order used to be, which made one unchanged .sfd convert to
-        // different .glyphs files and compile to different binaries: 10 of 101
-        // families in a Google Fonts corpus, and a QA check on lookup order
-        // that passed or failed depending on the run.
-        //
-        // Iterating within one process cannot vary, so this compares the
-        // ordering against the source's own, which is what it must follow.
-        let sfd_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("resources/fontforge/Glegoo-Regular.sfd");
-        let data = String::from_utf8_lossy(&fs::read(&sfd_path).expect("Missing SFD")).into_owned();
-        let font = load_str(&data).expect("Failed to parse Glegoo SFD");
-
-        // Each emitted prefix carries the index of the lookup it came from, so
-        // the emitted sequence of indices shows the order that was used.
-        let indices: Vec<u32> = font
-            .features
-            .prefixes
-            .keys()
-            .filter_map(|name| name.rsplit_once("lookup_"))
-            .filter_map(|(_, index)| index.parse().ok())
-            .collect();
-        assert!(
-            indices.len() > 20,
-            "test needs a file with many lookups, found {}",
-            indices.len()
-        );
-
-        // Definition order is declaration order with one deviation: a lookup a
-        // chain rule calls is hoisted to just before its caller, since the
-        // feature file must define it first. Glegoo declares each contextual
-        // lookup ahead of its callees, so every swapped pair below is such a
-        // hoist; the final 0 is the first GPOS lookup following the GSUB ones.
-        //
-        // The exact sequence is asserted because it is what a hash-seeded
-        // shuffle destroys and what an ordering-policy change must own up to.
-        assert_eq!(
-            indices,
-            vec![
-                0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 13, 17, 16, 19, 18, 21, 20, 23,
-                22, 24, 25, 26, 27, 29, 28, 30, 31, 32, 34, 33, 0
-            ],
-            "lookup definition order changed"
-        );
-    }
-
-    #[test]
-    fn test_chain_pos_sub_parsing() {
-        // Test with the Glegoo font, which has ChainSub2 lookups
-        let sfd_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("resources/fontforge/Glegoo-Regular.sfd");
-        let data = String::from_utf8_lossy(&fs::read(&sfd_path).expect("Missing SFD")).into_owned();
-        let font = load_str(&data).expect("Failed to parse Glegoo SFD");
-
-        let fea = font.features.to_fea();
-
-        assert!(
-            fea.contains("isign_ra_virama.alt2"),
-            "Should contain the coverage match glyphs"
-        );
-        assert!(
-            fea.contains("Single_Substitution_lookup_34"),
-            "Should reference the chained lookup"
-        );
-        assert!(
-            fea.contains("rradeva"),
-            "Should contain the String match glyphs"
-        );
-        assert!(
-            fea.contains("zerowidthjoiner"),
-            "Should contain the second String match glyph"
-        );
-        // Verify the 'glyph' kind emits individual glyphs with ' markers
-        assert!(
-            fea.contains("rradeva' lookup Ligature_Substitution_lookup_31 viramadeva'"),
-            "Should emit each glyph position with its own lookup"
-        );
-
-        // Verify emission ordering: referenced lookups must come before
-        // the chain/context lookup that references them.
-        let prefixes: Vec<&str> = font
-            .features
-            .prefixes
-            .values()
-            .map(|p| p.code.as_str())
-            .collect();
-        let glegoo_fea = prefixes.join("\n");
-
-        // Find positions of key lookups in the emitted output
-        let dep_pos = glegoo_fea
-            .find("lookup Ligature_Substitution_lookup_31")
-            .expect("Referenced lookup Ligature_Substitution_lookup_31 should exist");
-        let chain_pos = glegoo_fea
-            .find("lookup _psts__Post_Base_Substitutions_lookup_32")
-            .expect("Chain lookup _psts__Post_Base_Substitutions_lookup_32 should exist");
-        assert!(
-            dep_pos < chain_pos,
-            "Referenced lookup must be emitted before the chain lookup that references it"
-        );
-
-        let dep2_pos = glegoo_fea
-            .find("lookup Single_Substitution_lookup_34")
-            .expect("Referenced lookup Single_Substitution_lookup_34 should exist");
-        let chain2_pos = glegoo_fea
-            .find("lookup _psts__Post_Base_Substitutions_lookup_33")
-            .expect("Chain lookup _psts__Post_Base_Substitutions_lookup_33 should exist");
-        assert!(
-            dep2_pos < chain2_pos,
-            "Referenced lookup Single_Substitution_lookup_34 must be emitted before \
-             the chain lookup _psts__Post_Base_Substitutions_lookup_33"
-        );
-    }
-
-    #[test]
-    fn test_chain_context_emission() {
-        // Minimal inline test
-        let data = concat!(
-            "SplineFontDB: 3.0\n",
-            "Lookup: 6 0 0 \"Chain Lookup\" {\"chain-sub-1\"} [\n",
-            "ChainSub2: coverage \"chain-sub-1\"  0 0 0 1\n",
-            " 1 0 1\n",
-            "  Coverage: 2 glyph_a glyph_b\n",
-            "  FCoverage: 1 glyph_c\n",
-            " 1\n",
-            "  SeqLookup: 0 \"Other Lookup\"\n",
-            "EndFPST\n",
-            "Lookup: 1 0 0 \"Other Lookup\" {\"other-sub\"} [ ]\n",
-            "BeginChars: 4 4\n",
-            "StartChar: space\n",
-            "Encoding: 32 32 0\n",
-            "Width: 250\n",
-            "EndChar\n",
-            "StartChar: glyph_a\n",
-            "Encoding: 97 97 1\n",
-            "Width: 250\n",
-            "Substitution2: \"other-sub\" glyph_b\n",
-            "EndChar\n",
-            "StartChar: glyph_b\n",
-            "Encoding: 98 98 2\n",
-            "Width: 250\n",
-            "EndChar\n",
-            "StartChar: glyph_c\n",
-            "Encoding: 99 99 3\n",
-            "Width: 250\n",
-            "EndChar\n",
-            "EndChars\n",
-            "EndSplineFont\n"
-        );
-
-        let font = load_str(data).expect("Failed to parse chain context SFD");
-        let fea = font.features.to_fea();
-
-        assert!(
-            fea.contains("sub [glyph_a glyph_b]' lookup Other_Lookup glyph_c;"),
-            "The chain rule should carry its coverage, lookup and lookahead:\n{fea}"
-        );
-    }
-
-    #[test]
-    fn test_class_fpst_emission() {
-        // A `class` FPST defines its glyph classes once and then lists rules that
-        // reference them by index. Class 0 is never written: it means "any glyph not
-        // in one of the other classes", and has to be expanded from the glyph list.
-        let data = concat!(
-            "SplineFontDB: 3.0\n",
-            "Lookup: 6 0 0 \"Chain Lookup\" {\"chain-sub-1\"} [\n",
-            "ChainSub2: class \"chain-sub-1\" 3 1 3 2\n",
-            "  Class: 7 glyph_a\n",
-            "  Class: 7 glyph_b\n",
-            "  FClass: 7 glyph_c\n",
-            "  FClass: 7 glyph_d\n",
-            " 2 0 0\n",
-            "  ClsList: 1 2\n",
-            "  BClsList:\n",
-            "  FClsList:\n",
-            " 1\n",
-            "  SeqLookup: 0 \"Other Lookup\"\n",
-            " 1 0 2\n",
-            "  ClsList: 1\n",
-            "  BClsList:\n",
-            "  FClsList: 0 2\n",
-            " 1\n",
-            "  SeqLookup: 0 \"Other Lookup\"\n",
-            "  ClassNames: \"All_Others\" \"a\" \"b\"\n",
-            "EndFPST\n",
-            "Lookup: 1 0 0 \"Other Lookup\" {\"other-sub\"} [ ]\n",
-            "BeginChars: 5 5\n",
-            "StartChar: glyph_a\n",
-            "Encoding: 97 97 0\n",
-            "Width: 250\n",
-            "Substitution2: \"other-sub\" glyph_b\n",
-            "EndChar\n",
-            "StartChar: glyph_b\n",
-            "Encoding: 98 98 1\n",
-            "Width: 250\n",
-            "EndChar\n",
-            "StartChar: glyph_c\n",
-            "Encoding: 99 99 2\n",
-            "Width: 250\n",
-            "EndChar\n",
-            "StartChar: glyph_d\n",
-            "Encoding: 100 100 3\n",
-            "Width: 250\n",
-            "EndChar\n",
-            "StartChar: space\n",
-            "Encoding: 32 32 4\n",
-            "Width: 250\n",
-            "EndChar\n",
-            "EndChars\n",
-            "EndSplineFont\n"
-        );
-
-        let font = load_str(data).expect("Failed to parse class FPST SFD");
-        let fea = font.features.to_fea();
-
-        // Both rules of the subtable must be emitted, not just the first.
-        assert_eq!(
-            fea.matches("' lookup Other_Lookup").count(),
-            2,
-            "Each rule of a class FPST should produce a line:\n{fea}"
-        );
-        // Rule 1: two input classes, the lookup applied at position 0.
-        assert!(
-            fea.contains("sub glyph_a' lookup Other_Lookup glyph_b';"),
-            "Class indices should resolve to their glyph lists:\n{fea}"
-        );
-        // Rule 2: `FClsList: 0 2` is "any other glyph, then class 2 (glyph_d)".
-        // Class 0 must expand to the glyphs not named by FClass 1 or FClass 2.
-        // A multi-glyph class is declared once and referred to, the way FontForge's
-        // own export writes it, rather than repeated at every position.
-        assert!(
-            fea.contains("@Chain_Lookup_c1 = [glyph_a glyph_b space];"),
-            "Class 0 should expand to every glyph not in a sibling class:\n{fea}"
-        );
-        assert!(
-            fea.contains("sub glyph_a' lookup Other_Lookup @Chain_Lookup_c1 glyph_d;"),
-            "The rule should refer to the declared class:\n{fea}"
-        );
-    }
-
-    #[test]
-    fn test_class_fpst_backtrack_order_is_preserved() {
-        // FontForge stores backtrack classes in feature-file order, farthest
-        // from the input first, and its own SFD -> FEA export writes them that
-        // way: Monomakh's `BClsList: 3 1` becomes
-        // `sub @cc22_back_3 @cc22_back_1 @cc22_match_4' ...`. Reversing here
-        // inverts every rule with more than one backtrack class.
-        let data = concat!(
-            "SplineFontDB: 3.0\n",
-            "Lookup: 6 0 0 \"Chain Lookup\" {\"chain-sub-1\"} [\n",
-            "ChainSub2: class \"chain-sub-1\" 2 3 1 1\n",
-            "  Class: 7 glyph_c\n",
-            "  BClass: 7 glyph_a\n",
-            "  BClass: 7 glyph_b\n",
-            " 1 2 0\n",
-            "  ClsList: 1\n",
-            "  BClsList: 2 1\n",
-            "  FClsList:\n",
-            " 1\n",
-            "  SeqLookup: 0 \"Other Lookup\"\n",
-            "EndFPST\n",
-            "Lookup: 1 0 0 \"Other Lookup\" {\"other-sub\"} [ ]\n",
-            "BeginChars: 3 3\n",
-            "StartChar: glyph_a\n",
-            "Encoding: 97 97 0\n",
-            "Width: 250\n",
-            "Substitution2: \"other-sub\" glyph_b\n",
-            "EndChar\n",
-            "StartChar: glyph_b\n",
-            "Encoding: 98 98 1\n",
-            "Width: 250\n",
-            "EndChar\n",
-            "StartChar: glyph_c\n",
-            "Encoding: 99 99 2\n",
-            "Width: 250\n",
-            "EndChar\n",
-            "EndChars\n",
-            "EndSplineFont\n"
-        );
-
-        let font = load_str(data).expect("Failed to parse class FPST SFD");
-        let fea = font.features.to_fea();
-
-        // BClass 1 is glyph_a and BClass 2 is glyph_b, so `BClsList: 2 1`
-        // must emit glyph_b then glyph_a, in that order.
-        assert!(
-            fea.contains("sub glyph_b glyph_a glyph_c' lookup Other_Lookup;"),
-            "Backtrack classes must keep their on-disk order:\n{fea}"
-        );
-    }
-
-    #[test]
-    fn test_class_fpst_ponomar() {
-        // Ponomar's contextual lookups are all `class`-kind, so the contextual half
-        // of its `ccmp` rests entirely on this path.
-        let sfd_path =
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/fontforge/Ponomar.sfd");
-        let data = String::from_utf8_lossy(&fs::read(&sfd_path).expect("Missing SFD")).into_owned();
-        let font = load_str(&data).expect("Failed to parse Ponomar SFD");
-        let fea = font.features.to_fea();
-
-        assert!(
-            fea.contains("' lookup Psi_Truncation"),
-            "Class-kind chain rules should reference their nested lookup"
-        );
-        assert!(
-            fea.contains("feature ccmp"),
-            "ccmp is built only from class-kind contextual lookups"
-        );
-    }
-
-    #[test]
-    fn test_feature_references_follow_declaration_order() {
-        // Definitions are hoisted so a lookup exists before a chain references it,
-        // while the references inside the feature block keep declaration order,
-        // exactly as FontForge's own export writes them. (The compiled font follows
-        // the definition order; the reference order is for the reader.)
-        let data = concat!(
-            "SplineFontDB: 3.0\n",
-            "Lookup: 6 0 0 \"Aaa First\" {\"chain-sub-1\"} ['calt' ('DFLT' <'dflt'>)]\n",
-            "ChainSub2: coverage \"chain-sub-1\"  0 0 0 1\n",
-            " 1 0 0\n",
-            "  Coverage: 7 glyph_a\n",
-            " 1\n",
-            "  SeqLookup: 0 \"Bbb Second\"\n",
-            "EndFPST\n",
-            "Lookup: 1 0 0 \"Bbb Second\" {\"second-sub\"} ['calt' ('DFLT' <'dflt'>)]\n",
-            "BeginChars: 2 2\n",
-            "StartChar: glyph_a\n",
-            "Encoding: 97 97 0\n",
-            "Width: 250\n",
-            "Substitution2: \"second-sub\" glyph_b\n",
-            "EndChar\n",
-            "StartChar: glyph_b\n",
-            "Encoding: 98 98 1\n",
-            "Width: 250\n",
-            "EndChar\n",
-            "EndChars\n",
-            "EndSplineFont\n"
-        );
-
-        let font = load_str(data).expect("Failed to parse SFD");
-        let fea = font.features.to_fea();
-
-        let block_start = fea.find("feature calt {").expect("calt feature emitted");
-        let block = &fea[block_start..];
-        let first = block
-            .find("lookup Aaa_First;")
-            .expect("calt should reference the chain lookup");
-        let second = block
-            .find("lookup Bbb_Second;")
-            .expect("calt should reference the simple lookup");
-        assert!(
-            first < second,
-            "References must follow declaration order, not the definition buckets:\n{fea}"
-        );
-        let def = fea
-            .find("lookup Bbb_Second {")
-            .expect("the simple lookup should be defined");
-        let chain_def = fea.find("lookup Aaa_First {").expect("chain defined");
-        assert!(
-            def < chain_def,
-            "The referenced lookup must still be defined before the chain that calls \
-             it:\n{fea}"
-        );
-    }
-
-    #[test]
-    fn test_call_to_an_empty_lookup_becomes_ignore() {
-        // A lookup with no rules is never written out, so a call to it cannot be
-        // emitted as a reference. But the rule still matches, and a match with
-        // nothing to do stops later rules at that position -- which is exactly what
-        // `ignore` says. Dropping the rule instead would let those later rules fire.
-        let data = concat!(
-            "SplineFontDB: 3.0\n",
-            "Lookup: 6 0 0 \"Chain Lookup\" {\"chain-sub-1\"} ['calt' ('DFLT' <'dflt'>)]\n",
-            "ChainSub2: coverage \"chain-sub-1\"  0 0 0 1\n",
-            " 1 0 1\n",
-            "  Coverage: 7 glyph_a\n",
-            "  FCoverage: 7 glyph_b\n",
-            " 1\n",
-            "  SeqLookup: 0 \"Empty Lookup\"\n",
-            "EndFPST\n",
-            "Lookup: 1 0 0 \"Empty Lookup\" {\"empty-sub\"} [ ]\n",
-            "BeginChars: 2 2\n",
-            "StartChar: glyph_a\n",
-            "Encoding: 97 97 0\n",
-            "Width: 250\n",
-            "EndChar\n",
-            "StartChar: glyph_b\n",
-            "Encoding: 98 98 1\n",
-            "Width: 250\n",
-            "EndChar\n",
-            "EndChars\n",
-            "EndSplineFont\n"
-        );
-
-        let font = load_str(data).expect("Failed to parse coverage FPST SFD");
-        let fea = font.features.to_fea();
-
-        assert!(
-            fea.contains("ignore sub glyph_a' glyph_b;"),
-            "A call to an empty lookup should leave an ignore rule, not a dangling \
-             reference and not a dropped rule:\n{fea}"
-        );
-        assert!(
-            !fea.contains("lookup Empty_Lookup"),
-            "The empty lookup must not be referenced or defined:\n{fea}"
-        );
-    }
-
-    #[test]
-    fn test_seqlookup_index_past_the_last_position_drops_the_rule() {
-        // A rule that names lookups but lands none of them is neither the substitution
-        // the section asked for nor an `ignore`, and fea-rs cannot represent it.
-        let data = concat!(
-            "SplineFontDB: 3.0\n",
-            "Lookup: 6 0 0 \"Chain Lookup\" {\"chain-sub-1\"} ['calt' ('DFLT' <'dflt'>)]\n",
-            "ChainSub2: glyph \"chain-sub-1\"  0 0 0 1\n",
-            " String: 7 glyph_a\n",
-            " BString: 0 \n",
-            " FString: 0 \n",
-            " 1\n",
-            "  SeqLookup: 5 \"Other Lookup\"\n",
-            "EndFPST\n",
-            "Lookup: 1 0 0 \"Other Lookup\" {\"other-sub\"} [ ]\n",
-            "BeginChars: 1 1\n",
-            "StartChar: glyph_a\n",
-            "Encoding: 97 97 0\n",
-            "Width: 250\n",
-            "EndChar\n",
-            "EndChars\n",
-            "EndSplineFont\n"
-        );
-
-        let font = load_str(data).expect("Failed to parse glyph FPST SFD");
-        let fea = font.features.to_fea();
-
-        assert!(
-            !fea.contains("glyph_a'"),
-            "A rule whose lookups all miss must not be emitted:\n{fea}"
-        );
-    }
-
-    #[test]
-    fn test_reference_resolves_to_the_lookup_that_was_defined() {
-        // Two SFD lookup names can sanitize alike; the second is defined as `_2`. A
-        // reference that just re-sanitizes would resolve to the first one.
-        let data = concat!(
-            "SplineFontDB: 3.0\n",
-            "Lookup: 1 0 0 \"My Lookup\" {\"first-sub\"} [ ]\n",
-            "Lookup: 1 0 0 \"My-Lookup\" {\"second-sub\"} [ ]\n",
-            "Lookup: 6 0 0 \"Chain Lookup\" {\"chain-sub-1\"} ['calt' ('DFLT' <'dflt'>)]\n",
-            "ChainSub2: glyph \"chain-sub-1\"  0 0 0 1\n",
-            " String: 7 glyph_a\n",
-            " BString: 0 \n",
-            " FString: 0 \n",
-            " 1\n",
-            "  SeqLookup: 0 \"My-Lookup\"\n",
-            "EndFPST\n",
-            "BeginChars: 1 1\n",
-            "StartChar: glyph_a\n",
-            "Encoding: 97 97 0\n",
-            "Width: 250\n",
-            "Substitution2: \"first-sub\" glyph_a\n",
-            "Substitution2: \"second-sub\" glyph_a\n",
-            "EndChar\n",
-            "EndChars\n",
-            "EndSplineFont\n"
-        );
-
-        let font = load_str(data).expect("Failed to parse glyph FPST SFD");
-        let fea = font.features.to_fea();
-
-        assert!(
-            fea.contains("sub glyph_a' lookup My_Lookup_2;"),
-            "The rule names the second lookup, so it must resolve to My_Lookup_2:\n{fea}"
-        );
-    }
-
-    #[test]
-    fn test_generated_suffix_names_cannot_be_taken_twice() {
-        // "My Lookup" and "My-Lookup" sanitize alike, so the second is assigned
-        // My_Lookup_2. A third lookup literally NAMED "My Lookup 2" also sanitizes
-        // to My_Lookup_2; if generated names were not registered as taken, it would
-        // silently replace the second lookup wholesale.
-        let data = concat!(
-            "SplineFontDB: 3.0\n",
-            "Lookup: 1 0 0 \"My Lookup\" {\"first-sub\"} ['calt' ('DFLT' <'dflt'>)]\n",
-            "Lookup: 1 0 0 \"My-Lookup\" {\"second-sub\"} ['calt' ('DFLT' <'dflt'>)]\n",
-            "Lookup: 1 0 0 \"My Lookup 2\" {\"third-sub\"} ['calt' ('DFLT' <'dflt'>)]\n",
-            "BeginChars: 2 2\n",
-            "StartChar: glyph_a\n",
-            "Encoding: 97 97 0\n",
-            "Width: 250\n",
-            "Substitution2: \"first-sub\" glyph_b\n",
-            "Substitution2: \"second-sub\" glyph_b\n",
-            "Substitution2: \"third-sub\" glyph_b\n",
-            "EndChar\n",
-            "StartChar: glyph_b\n",
-            "Encoding: 98 98 1\n",
-            "Width: 250\n",
-            "EndChar\n",
-            "EndChars\n",
-            "EndSplineFont\n"
-        );
-
-        let font = load_str(data).expect("Failed to parse SFD");
-        let fea = font.features.to_fea();
-
-        for name in ["My_Lookup {", "My_Lookup_2 {", "My_Lookup_2_2 {"] {
-            assert!(
-                fea.contains(name),
-                "All three lookups must survive with distinct names, missing {name:?}:\n{fea}"
-            );
-        }
-    }
-
-    #[test]
-    fn test_keyword_and_digit_lookup_names_get_safe_labels() {
-        // A lookup literally named "sub" or "2 Alternates" produced a label that
-        // fails to parse ("Expected LABEL found SubKw" / "Expected ID found NUM"),
-        // aborting the whole conversion rather than one lookup.
-        let data = concat!(
-            "SplineFontDB: 3.0\n",
-            "Lookup: 1 0 0 \"sub\" {\"first-sub\"} ['calt' ('DFLT' <'dflt'>)]\n",
-            "Lookup: 1 0 0 \"2 Alternates\" {\"second-sub\"} ['calt' ('DFLT' <'dflt'>)]\n",
-            "BeginChars: 2 2\n",
-            "StartChar: glyph_a\n",
-            "Encoding: 97 97 0\n",
-            "Width: 250\n",
-            "Substitution2: \"first-sub\" glyph_b\n",
-            "Substitution2: \"second-sub\" glyph_b\n",
-            "EndChar\n",
-            "StartChar: glyph_b\n",
-            "Encoding: 98 98 1\n",
-            "Width: 250\n",
-            "EndChar\n",
-            "EndChars\n",
-            "EndSplineFont\n"
-        );
-
-        let font = load_str(data).expect("Failed to parse SFD");
-        let fea = font.features.to_fea();
-
-        assert!(
-            fea.contains("lookup sub_ {"),
-            "A keyword name takes a trailing underscore:\n{fea}"
-        );
-        assert!(
-            fea.contains("lookup _2_Alternates {"),
-            "A digit-leading name takes a leading underscore:\n{fea}"
-        );
-    }
-
-    #[test]
-    fn test_utf7_escaped_lookup_and_subtable_names_still_match() {
-        // FontForge escapes names as UTF-7, where `+-` is a literal `+`. Decoding the
-        // reference but not the definition, or the section key but not the subtable
-        // name, loses the rule.
-        let data = concat!(
-            "SplineFontDB: 3.0\n",
-            "Lookup: 6 0 0 \"calt+-probe\" {\"calt+-sub-1\"} ['calt' ('DFLT' <'dflt'>)]\n",
-            "ChainSub2: glyph \"calt+-sub-1\"  0 0 0 1\n",
-            " String: 7 glyph_a\n",
-            " BString: 0 \n",
-            " FString: 0 \n",
-            " 1\n",
-            "  SeqLookup: 0 \"Other+-Lookup\"\n",
-            "EndFPST\n",
-            "Lookup: 1 0 0 \"Other+-Lookup\" {\"other-sub\"} [ ]\n",
-            "BeginChars: 1 1\n",
-            "StartChar: glyph_a\n",
-            "Encoding: 97 97 0\n",
-            "Width: 250\n",
-            "Substitution2: \"other-sub\" glyph_a\n",
-            "EndChar\n",
-            "EndChars\n",
-            "EndSplineFont\n"
-        );
-
-        let font = load_str(data).expect("Failed to parse glyph FPST SFD");
-        let fea = font.features.to_fea();
-
-        assert!(
-            fea.contains("sub glyph_a' lookup Other_Lookup;"),
-            "A UTF-7 escaped name must match on both sides:\n{fea}"
-        );
-    }
-
-    #[test]
-    fn test_utf7_escaped_subtable_name_still_finds_its_oneline_rules() {
-        // A Ligature2/Substitution2 line names its subtable too. Decoding the name on
-        // the Lookup: line but not here leaves the rule unable to find its subtable,
-        // and the whole lookup is lost.
-        let data = concat!(
-            "SplineFontDB: 3.0\n",
-            "Lookup: 4 0 0 \"liga+-lookup\" {\"liga+-sub-1\"} ['liga' ('DFLT' <'dflt'>)]\n",
-            "BeginChars: 3 3\n",
-            "StartChar: f\n",
-            "Encoding: 102 102 0\n",
-            "Width: 250\n",
-            "EndChar\n",
-            "StartChar: i\n",
-            "Encoding: 105 105 1\n",
-            "Width: 250\n",
-            "EndChar\n",
-            "StartChar: f_i\n",
-            "Encoding: -1 -1 2\n",
-            "Width: 250\n",
-            "Ligature2: \"liga+-sub-1\" f i\n",
-            "EndChar\n",
-            "EndChars\n",
-            "EndSplineFont\n"
-        );
-
-        let font = load_str(data).expect("Failed to parse SFD");
-        let fea = font.features.to_fea();
-
-        assert!(
-            fea.contains("sub f i by f_i;"),
-            "A one-line rule must find its subtable through the decoded name:\n{fea}"
-        );
-    }
-
-    #[test]
-    fn test_fpst_drops_glyphs_the_font_does_not_have() {
-        // An SFD keeps the class lists of glyphs that were later deleted. Writing those
-        // names into the feature file gives the compiler a glyph it cannot resolve, so
-        // a class position drops the absent names and keeps the rest.
-        let data = concat!(
-            "SplineFontDB: 3.0\n",
-            "Lookup: 6 0 0 \"Chain Lookup\" {\"chain-sub-1\"} ['calt' ('DFLT' <'dflt'>)]\n",
-            "ChainSub2: class \"chain-sub-1\" 2 1 1 1\n",
-            "  Class: 23 glyph_a glyph_gone\n",
-            " 1 0 0\n",
-            "  ClsList: 1\n",
-            "  BClsList:\n",
-            "  FClsList:\n",
-            " 1\n",
-            "  SeqLookup: 0 \"Other Lookup\"\n",
-            "EndFPST\n",
-            "Lookup: 1 0 0 \"Other Lookup\" {\"other-sub\"} [ ]\n",
-            "BeginChars: 2 2\n",
-            "StartChar: glyph_a\n",
-            "Encoding: 97 97 0\n",
-            "Width: 250\n",
-            "Substitution2: \"other-sub\" glyph_b\n",
-            "EndChar\n",
-            "StartChar: glyph_b\n",
-            "Encoding: 98 98 1\n",
-            "Width: 250\n",
-            "EndChar\n",
-            "EndChars\n",
-            "EndSplineFont\n"
-        );
-
-        let font = load_str(data).expect("Failed to parse class FPST SFD");
-        let fea = font.features.to_fea();
-
-        assert!(
-            !fea.contains("glyph_gone"),
-            "A glyph the font does not have must not reach the feature file:\n{fea}"
-        );
-        assert!(
-            fea.contains("sub glyph_a' lookup Other_Lookup;"),
-            "The rest of the class should survive:\n{fea}"
-        );
-    }
-
-    #[test]
-    fn test_glyph_kind_rule_with_a_missing_glyph_is_dropped() {
-        // In a glyph-kind rule each glyph is a position that SeqLookup indices count,
-        // so an absent one cannot simply be removed: that would move the lookup onto
-        // its neighbour. The rule goes instead.
-        let data = concat!(
-            "SplineFontDB: 3.0\n",
-            "Lookup: 6 0 0 \"Chain Lookup\" {\"chain-sub-1\"} ['calt' ('DFLT' <'dflt'>)]\n",
-            "ChainSub2: glyph \"chain-sub-1\"  0 0 0 1\n",
-            " String: 23 glyph_gone glyph_a\n",
-            " BString: 0 \n",
-            " FString: 0 \n",
-            " 1\n",
-            "  SeqLookup: 0 \"Other Lookup\"\n",
-            "EndFPST\n",
-            "Lookup: 1 0 0 \"Other Lookup\" {\"other-sub\"} [ ]\n",
-            "BeginChars: 2 2\n",
-            "StartChar: glyph_a\n",
-            "Encoding: 97 97 0\n",
-            "Width: 250\n",
-            "EndChar\n",
-            "StartChar: glyph_b\n",
-            "Encoding: 98 98 1\n",
-            "Width: 250\n",
-            "EndChar\n",
-            "EndChars\n",
-            "EndSplineFont\n"
-        );
-
-        let font = load_str(data).expect("Failed to parse glyph FPST SFD");
-        let fea = font.features.to_fea();
-
-        assert!(
-            !fea.contains("glyph_gone"),
-            "A glyph the font does not have must not reach the feature file:\n{fea}"
-        );
-        assert!(
-            !fea.contains("glyph_a'"),
-            "Pruning the position would move the lookup onto glyph_a, so the rule \
-             must be dropped whole:\n{fea}"
-        );
-    }
-
-    #[test]
-    fn test_coverage_kind_backtrack_is_turned_round() {
-        // A coverage section stores BCoverage the way OpenType does, nearest the input
-        // first, unlike a class section whose BClsList is already in feature-file
-        // order. Donegal One's ordinals are the real case: BCoverage period, then the
-        // digits, and FontForge's own build puts period nearest the input, so the text
-        // reads "digit period o".
-        let data = concat!(
-            "SplineFontDB: 3.0\n",
-            "Lookup: 6 0 0 \"Chain Lookup\" {\"chain-sub-1\"} [\n",
-            "ChainSub2: coverage \"chain-sub-1\"  0 0 0 1\n",
-            " 1 2 0\n",
-            "  Coverage: 7 glyph_c\n",
-            "  BCoverage: 7 glyph_a\n",
-            "  BCoverage: 7 glyph_b\n",
-            " 1\n",
-            "  SeqLookup: 0 \"Other Lookup\"\n",
-            "EndFPST\n",
-            "Lookup: 1 0 0 \"Other Lookup\" {\"other-sub\"} [ ]\n",
-            "BeginChars: 3 3\n",
-            "StartChar: glyph_a\n",
-            "Encoding: 97 97 0\n",
-            "Width: 250\n",
-            "Substitution2: \"other-sub\" glyph_b\n",
-            "EndChar\n",
-            "StartChar: glyph_b\n",
-            "Encoding: 98 98 1\n",
-            "Width: 250\n",
-            "EndChar\n",
-            "StartChar: glyph_c\n",
-            "Encoding: 99 99 2\n",
-            "Width: 250\n",
-            "EndChar\n",
-            "EndChars\n",
-            "EndSplineFont\n"
-        );
-
-        let font = load_str(data).expect("Failed to parse coverage FPST SFD");
-        let fea = font.features.to_fea();
-
-        assert!(
-            fea.contains("sub glyph_b glyph_a glyph_c' lookup Other_Lookup;"),
-            "BCoverage is nearest-first and must be reversed for the feature file:\n{fea}"
-        );
-    }
-
-    #[test]
-    fn test_coverage_section_with_two_rules_keeps_them_apart() {
-        // A rule opens with its bare `<ninput> <nbacktrack> <nlookahead>` line, so a
-        // section holds as many rules as its header declares. Reading the whole body
-        // as one rule concatenates the inputs and stacks every lookup on position 0.
-        let data = concat!(
-            "SplineFontDB: 3.0\n",
-            "Lookup: 6 0 0 \"Chain Lookup\" {\"chain-sub-1\"} ['calt' ('DFLT' <'dflt'>)]\n",
-            "ChainSub2: coverage \"chain-sub-1\"  0 0 0 2\n",
-            " 1 0 1\n",
-            "  Coverage: 7 glyph_a\n",
-            "  FCoverage: 7 glyph_b\n",
-            " 1\n",
-            "  SeqLookup: 0 \"Lookup One\"\n",
-            " 1 0 1\n",
-            "  Coverage: 7 glyph_c\n",
-            "  FCoverage: 7 glyph_d\n",
-            " 1\n",
-            "  SeqLookup: 0 \"Lookup Two\"\n",
-            "EndFPST\n",
-            "Lookup: 1 0 0 \"Lookup One\" {\"one-sub\"} [ ]\n",
-            "Lookup: 1 0 0 \"Lookup Two\" {\"two-sub\"} [ ]\n",
-            "BeginChars: 4 4\n",
-            "StartChar: glyph_a\n",
-            "Encoding: 97 97 0\n",
-            "Width: 250\n",
-            "Substitution2: \"one-sub\" glyph_b\n",
-            "Substitution2: \"two-sub\" glyph_b\n",
-            "EndChar\n",
-            "StartChar: glyph_b\n",
-            "Encoding: 98 98 1\n",
-            "Width: 250\n",
-            "EndChar\n",
-            "StartChar: glyph_c\n",
-            "Encoding: 99 99 2\n",
-            "Width: 250\n",
-            "EndChar\n",
-            "StartChar: glyph_d\n",
-            "Encoding: 100 100 3\n",
-            "Width: 250\n",
-            "EndChar\n",
-            "EndChars\n",
-            "EndSplineFont\n"
-        );
-
-        let font = load_str(data).expect("Failed to parse coverage FPST SFD");
-        let fea = font.features.to_fea();
-
-        assert!(
-            fea.contains("sub glyph_a' lookup Lookup_One glyph_b;"),
-            "The first rule should carry only its own positions and lookup:\n{fea}"
-        );
-        assert!(
-            fea.contains("sub glyph_c' lookup Lookup_Two glyph_d;"),
-            "The second rule should be its own statement:\n{fea}"
-        );
-    }
-
-    #[test]
-    fn test_glyph_kind_backtrack_is_one_position_per_glyph() {
-        // A glyph-kind BString spells one glyph per backtrack position, the same way
-        // its String: spells the input. Treating the line as a single position turns a
-        // two-glyph sequence into a class matching either glyph.
-        let data = concat!(
-            "SplineFontDB: 3.0\n",
-            "Lookup: 6 0 0 \"Chain Lookup\" {\"chain-sub-1\"} [\n",
-            "ChainSub2: glyph \"chain-sub-1\"  0 0 0 1\n",
-            " String: 7 glyph_c\n",
-            " BString: 15 glyph_a glyph_b\n",
-            " FString: 0 \n",
-            " 1\n",
-            "  SeqLookup: 0 \"Other Lookup\"\n",
-            "EndFPST\n",
-            "Lookup: 1 0 0 \"Other Lookup\" {\"other-sub\"} [ ]\n",
-            "BeginChars: 3 3\n",
-            "StartChar: glyph_a\n",
-            "Encoding: 97 97 0\n",
-            "Width: 250\n",
-            "Substitution2: \"other-sub\" glyph_b\n",
-            "EndChar\n",
-            "StartChar: glyph_b\n",
-            "Encoding: 98 98 1\n",
-            "Width: 250\n",
-            "EndChar\n",
-            "StartChar: glyph_c\n",
-            "Encoding: 99 99 2\n",
-            "Width: 250\n",
-            "EndChar\n",
-            "EndChars\n",
-            "EndSplineFont\n"
-        );
-
-        let font = load_str(data).expect("Failed to parse glyph FPST SFD");
-        let fea = font.features.to_fea();
-
-        assert!(
-            fea.contains("sub glyph_b glyph_a glyph_c' lookup Other_Lookup;"),
-            "Each BString glyph is its own position, nearest the input first:\n{fea}"
-        );
-        assert!(
-            !fea.contains("[glyph_a glyph_b]"),
-            "A backtrack sequence must not collapse into one glyph class:\n{fea}"
-        );
-    }
-
-    #[test]
-    fn test_glyph_kind_lookups_follow_their_position() {
-        // A glyph-kind section spells its input as one `String:` line, but each glyph
-        // is a separate input position and SeqLookup indices count positions. Keying
-        // the lookups off the group instead puts position 0's lookups on every glyph.
-        let data = concat!(
-            "SplineFontDB: 3.0\n",
-            "Lookup: 6 0 0 \"Chain Lookup\" {\"chain-sub-1\"} [\n",
-            "ChainSub2: glyph \"chain-sub-1\"  0 0 0 1\n",
-            " String: 15 glyph_a glyph_b\n",
-            " BString: 0 \n",
-            " FString: 0 \n",
-            " 2\n",
-            "  SeqLookup: 0 \"Lookup One\"\n",
-            "  SeqLookup: 1 \"Lookup Two\"\n",
-            "EndFPST\n",
-            "Lookup: 1 0 0 \"Lookup One\" {\"one-sub\"} [ ]\n",
-            "Lookup: 1 0 0 \"Lookup Two\" {\"two-sub\"} [ ]\n",
-            "BeginChars: 2 2\n",
-            "StartChar: glyph_a\n",
-            "Encoding: 97 97 0\n",
-            "Width: 250\n",
-            "Substitution2: \"one-sub\" glyph_b\n",
-            "Substitution2: \"two-sub\" glyph_b\n",
-            "EndChar\n",
-            "StartChar: glyph_b\n",
-            "Encoding: 98 98 1\n",
-            "Width: 250\n",
-            "EndChar\n",
-            "EndChars\n",
-            "EndSplineFont\n"
-        );
-
-        let font = load_str(data).expect("Failed to parse glyph FPST SFD");
-        let fea = font.features.to_fea();
-
-        assert!(
-            fea.contains("sub glyph_a' lookup Lookup_One glyph_b' lookup Lookup_Two;"),
-            "Each glyph should carry the lookups of its own position:\n{fea}"
-        );
-    }
-
-    #[test]
-    fn test_class_fpst_lookup_at_a_later_position() {
-        // SeqLookup indices count input positions. A lookup attached to position 1
-        // must land on the second glyph, not the first: a rule that resolved a
-        // position away, or keyed the map wrongly, would silently move it.
-        let data = concat!(
-            "SplineFontDB: 3.0\n",
-            "Lookup: 6 0 0 \"Chain Lookup\" {\"chain-sub-1\"} [\n",
-            "ChainSub2: class \"chain-sub-1\" 3 1 1 1\n",
-            "  Class: 7 glyph_a\n",
-            "  Class: 7 glyph_b\n",
-            " 2 0 0\n",
-            "  ClsList: 1 2\n",
-            "  BClsList:\n",
-            "  FClsList:\n",
-            " 1\n",
-            "  SeqLookup: 1 \"Other Lookup\"\n",
-            "EndFPST\n",
-            "Lookup: 1 0 0 \"Other Lookup\" {\"other-sub\"} [ ]\n",
-            "BeginChars: 2 2\n",
-            "StartChar: glyph_a\n",
-            "Encoding: 97 97 0\n",
-            "Width: 250\n",
-            "Substitution2: \"other-sub\" glyph_b\n",
-            "EndChar\n",
-            "StartChar: glyph_b\n",
-            "Encoding: 98 98 1\n",
-            "Width: 250\n",
-            "EndChar\n",
-            "EndChars\n",
-            "EndSplineFont\n"
-        );
-
-        let font = load_str(data).expect("Failed to parse class FPST SFD");
-        let fea = font.features.to_fea();
-
-        assert!(
-            fea.contains("sub glyph_a' glyph_b' lookup Other_Lookup;"),
-            "The lookup belongs on the second position, not the first:\n{fea}"
-        );
-    }
-
-    #[test]
-    fn test_class_fpst_emission_order_is_stable() {
-        // The lookup ordering list is seeded from a map's iteration order, so that
-        // map must be ordered: converting one unchanged file twice has to emit the
-        // same lookups in the same order. Ponomar exercises it because all of its
-        // contextual lookups feed that map.
-        let sfd_path =
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/fontforge/Ponomar.sfd");
-        let data = String::from_utf8_lossy(&fs::read(&sfd_path).expect("Missing SFD")).into_owned();
-
-        let first = load_str(&data)
-            .expect("Failed to parse Ponomar SFD")
-            .features
-            .to_fea();
-        let second = load_str(&data)
-            .expect("Failed to parse Ponomar SFD")
-            .features
-            .to_fea();
-
-        assert_eq!(
-            first, second,
-            "Converting the same SFD twice must produce the same feature file"
-        );
-    }
-
-    #[test]
-    fn test_fpst_header_counts_detect_a_misread_body() {
-        use super::layout::{FpstBodyCounts, FpstHeaderCounts};
-
-        // Monomakh's calt header: 5 classes each way, 3 rules, and a body holding
-        // four `Class:` lines, because class 0 is implicit.
-        let header = FpstHeaderCounts {
-            classes: 5,
-            backtrack_classes: 5,
-            lookahead_classes: 5,
-            rules: 3,
-        };
-        let good = FpstBodyCounts {
-            classes: 4,
-            backtrack_classes: 4,
-            lookahead_classes: 4,
-            rules: 3,
-        };
-        assert!(
-            header.mismatches(&good).is_empty(),
-            "A consistent section must not warn: {:?}",
-            header.mismatches(&good)
-        );
-
-        // A section declaring nothing has no classes at all, not "minus one".
-        let empty = FpstHeaderCounts {
-            classes: 0,
-            backtrack_classes: 0,
-            lookahead_classes: 0,
-            rules: 0,
-        };
-        let nothing = FpstBodyCounts {
-            classes: 0,
-            backtrack_classes: 0,
-            lookahead_classes: 0,
-            rules: 0,
-        };
-        assert!(empty.mismatches(&nothing).is_empty());
-
-        // A rule the parser failed to see is exactly what this catches.
-        let short = FpstBodyCounts { rules: 2, ..good };
-        assert_eq!(header.mismatches(&short).len(), 1);
-        assert!(header.mismatches(&short)[0].contains("declares 3 rules"));
-    }
-
-    #[test]
-    fn test_class_fpst_ponomar_contextual_kerning() {
-        // Ponomar's two ContextPos2 sections are class-kind contextual kerning. They
-        // exercise the positioning half of the parser, which the substitution tests
-        // never reach.
-        let sfd_path =
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/fontforge/Ponomar.sfd");
-        let data = String::from_utf8_lossy(&fs::read(&sfd_path).expect("Missing SFD")).into_owned();
-        let font = load_str(&data).expect("Failed to parse Ponomar SFD");
-        let fea = font.features.to_fea();
-
-        let rule = fea
-            .lines()
-            .find(|l| l.contains("lookup Combining_Letter_Kerning") && l.contains('\''))
-            .expect("Ponomar's contextual kerning rule should be emitted");
-        assert!(
-            rule.trim_start().starts_with("pos "),
-            "A ContextPos2 rule must be emitted as `pos`, not `sub`:\n{rule}"
-        );
-    }
-
-    #[test]
-    fn test_class_fpst_ignore_rule() {
-        // A rule with a SeqLookup count of zero matches in order to stop a later,
-        // broader rule from firing. FontForge's own SFD -> FEA export writes those
-        // as `ignore sub`; a rule with no action at all means something else.
-        let data = concat!(
-            "SplineFontDB: 3.0\n",
-            "Lookup: 6 0 0 \"Chain Lookup\" {\"chain-sub-1\"} [\n",
-            "ChainSub2: class \"chain-sub-1\" 2 1 2 1\n",
-            "  Class: 7 glyph_a\n",
-            "  FClass: 7 glyph_b\n",
-            " 1 0 1\n",
-            "  ClsList: 1\n",
-            "  BClsList:\n",
-            "  FClsList: 1\n",
-            " 0\n",
-            "EndFPST\n",
-            "BeginChars: 2 2\n",
-            "StartChar: glyph_a\n",
-            "Encoding: 97 97 0\n",
-            "Width: 250\n",
-            "EndChar\n",
-            "StartChar: glyph_b\n",
-            "Encoding: 98 98 1\n",
-            "Width: 250\n",
-            "EndChar\n",
-            "EndChars\n",
-            "EndSplineFont\n"
-        );
-
-        let font = load_str(data).expect("Failed to parse class FPST SFD");
-        let fea = font.features.to_fea();
-
-        assert!(
-            fea.contains("ignore sub glyph_a' glyph_b;"),
-            "A rule calling no lookup should be an `ignore` rule:\n{fea}"
-        );
-    }
-
-    #[test]
-    fn test_class_fpst_unsatisfiable_position_drops_the_rule_and_its_reference() {
-        // "All_Others" is empty when its sibling classes cover the whole font. No
-        // glyph can occupy that position, so the rule can never fire. Leaving the
-        // position out instead would silently widen the rule, and writing it as `[]`
-        // is not feature-file syntax -- so the rule goes. When that empties the whole
-        // lookup, the feature must not go on referencing it either, or the FEA names
-        // a lookup that is never defined and fontc rejects the font.
-        let data = concat!(
-            "SplineFontDB: 3.0\n",
-            "Lookup: 6 0 0 \"Chain Lookup\" {\"chain-sub-1\"} ['calt' ('DFLT' <'dflt'>)]\n",
-            "ChainSub2: class \"chain-sub-1\" 2 1 3 1\n",
-            "  Class: 7 glyph_a\n",
-            "  FClass: 7 glyph_a\n",
-            "  FClass: 7 glyph_b\n",
-            " 1 0 1\n",
-            "  ClsList: 1\n",
-            "  BClsList:\n",
-            "  FClsList: 0\n",
-            " 1\n",
-            "  SeqLookup: 0 \"Other Lookup\"\n",
-            "EndFPST\n",
-            "Lookup: 1 0 0 \"Other Lookup\" {\"other-sub\"} [ ]\n",
-            "BeginChars: 2 2\n",
-            "StartChar: glyph_a\n",
-            "Encoding: 97 97 0\n",
-            "Width: 250\n",
-            "EndChar\n",
-            "StartChar: glyph_b\n",
-            "Encoding: 98 98 1\n",
-            "Width: 250\n",
-            "EndChar\n",
-            "EndChars\n",
-            "EndSplineFont\n"
-        );
-
-        let font = load_str(data).expect("Failed to parse class FPST SFD");
-        let fea = font.features.to_fea();
-
-        assert!(
-            !fea.contains("[]"),
-            "An empty All_Others must not be written as an empty glyph class:\n{fea}"
-        );
-        assert!(
-            !fea.contains("glyph_a'"),
-            "The rule can never match, so it must not be emitted:\n{fea}"
-        );
-        assert!(
-            !fea.contains("lookup Chain_Lookup;"),
-            "A lookup left with no rules must not still be referenced by its feature:\n{fea}"
-        );
-    }
-
-    #[test]
-    fn test_reverse_chain_is_not_emitted_as_a_forward_rule() {
-        // Reverse chaining substitutes inline from a replacement list; a feature
-        // file spells it `rsub ... by ...`. Emitting it as a forward `sub` gives a
-        // rule with no action, and an actionless rule is an `ignore` -- which would
-        // suppress substitutions in exactly the context that wanted one.
-        let data = concat!(
-            "SplineFontDB: 3.0\n",
-            "Lookup: 0 0 0 \"rev probe\" {\"rev-sub-1\"} [\n",
-            "ReverseChain2: coverage \"rev-sub-1\"  0 0 0 1\n",
-            " 1 0 1\n",
-            "  Coverage: 2 glyph_a glyph_b\n",
-            "  FCoverage: 1 glyph_c\n",
-            "  Replace: 2 glyph_x glyph_y\n",
-            "EndFPST\n",
-            "BeginChars: 3 3\n",
-            "StartChar: glyph_a\n",
-            "Encoding: 97 97 0\n",
-            "Width: 250\n",
-            "EndChar\n",
-            "StartChar: glyph_b\n",
-            "Encoding: 98 98 1\n",
-            "Width: 250\n",
-            "EndChar\n",
-            "StartChar: glyph_c\n",
-            "Encoding: 99 99 2\n",
-            "Width: 250\n",
-            "EndChar\n",
-            "EndChars\n",
-            "EndSplineFont\n"
-        );
-
-        let font = load_str(data).expect("Failed to parse reverse chain SFD");
-        let fea = font.features.to_fea();
-
-        assert!(
-            !fea.contains("ignore"),
-            "A reverse chaining lookup must not become an ignore rule:\n{fea}"
-        );
-        assert!(
-            !fea.contains("glyph_a"),
-            "It must not be emitted as a forward contextual rule either:\n{fea}"
-        );
-    }
-}
-
-#[allow(clippy::unwrap_used, clippy::expect_used)]
-#[cfg(test)]
-mod vendor_tag_tests {
-    use crate::convertors::fontforge;
-
-    /// FontForge pads a short vendor to four bytes with NULs and writes them
-    /// inside the quotes, so an SFD can carry `OS2Vendor: 'STC\0'`. A NUL is not
-    /// legal in an OpenType tag, and the compiler rejects the entire font with
-    /// "Invalid tag": 22 of 100 Google Fonts families whose upstream source is
-    /// an SFD failed to build on this alone.
-    #[test]
-    fn nul_padded_vendor_ids_are_accepted() {
-        let cases = [
-            ("'STC\u{0}'", "STC "),
-            ("'LTT\u{0}'", "LTT "),
-            ("'TT\u{0}\u{0}'", "TT  "),
-            ("'PYRS'", "PYRS"),
-        ];
-        for (raw, want) in cases {
-            let sfd = format!(
-                "SplineFontDB: 3.0\nFontName: Test\nOS2Vendor: {raw}\nBeginChars: 1 1\nEndChars\nEndSplineFont\n"
-            );
-            let dir = std::env::temp_dir().join("babelfont_vendor_test");
-            std::fs::create_dir_all(&dir).unwrap();
-            let path = dir.join("t.sfd");
-            std::fs::write(&path, &sfd).unwrap();
-            let font = fontforge::load(path.clone()).expect("SFD should load");
-            let tag = font
-                .custom_ot_values
-                .os2_vendor_id
-                .unwrap_or_else(|| panic!("no vendor id for {raw}"));
-            assert_eq!(tag.to_string(), want, "vendor {raw}");
-            let _ = std::fs::remove_file(&path);
-        }
-    }
-}
-
-#[allow(clippy::unwrap_used, clippy::expect_used)]
-#[cfg(test)]
-mod fsselection_tests {
-    use crate::convertors::fontforge;
-
-    /// `OS2_UseTypoMetrics` and `OS2_WeightWidthSlopeOnly` are fsSelection bits
-    /// 7 and 8. They used to be OR'd into `os2_fs_type`, which meant a source
-    /// declaring `FSType: 0` came out announcing fsType 128 -- bit 7 of fsType
-    /// is reserved, so the value was not merely wrong but meaningless.
-    ///
-    /// Measured when this was found: of 100 Google Fonts families whose upstream
-    /// source is an SFD, 81 declare `OS2_UseTypoMetrics`, and every one of them
-    /// ships fsType 0.
-    #[test]
-    fn use_typo_metrics_goes_to_fsselection_not_fstype() {
-        let sfd = "\
-SplineFontDB: 3.0
-FontName: Test
-FSType: 0
-OS2Version: 2
-OS2_UseTypoMetrics: 1
-OS2_WeightWidthSlopeOnly: 1
-BeginChars: 1 1
-EndChars
-EndSplineFont
-";
-        let dir = std::env::temp_dir().join("babelfont_fsselection_test");
-        std::fs::create_dir_all(&dir).unwrap();
-        let path = dir.join("t.sfd");
-        std::fs::write(&path, sfd).unwrap();
-
-        let font = fontforge::load(path.clone()).expect("SFD should load");
-        let ot = &font.custom_ot_values;
-
-        assert_eq!(
-            ot.os2_fs_type,
-            Some(0),
-            "fsType must stay what the SFD said"
-        );
-        let fs_selection = ot.os2_fs_selection.expect("fsSelection should be set");
-        assert!(fs_selection & (1 << 7) != 0, "USE_TYPO_METRICS is bit 7");
-        assert!(fs_selection & (1 << 8) != 0, "WWS is bit 8");
-
-        let _ = std::fs::remove_file(&path);
-    }
-}
-
-#[allow(clippy::unwrap_used, clippy::expect_used)]
-#[cfg(test)]
-mod aalt_tests {
-    use super::is_single_or_alternate_sub;
-
-    #[test]
-    fn only_single_and_alternate_subs_may_go_in_aalt() {
-        // These are what aalt is allowed to contain.
-        assert!(is_single_or_alternate_sub("sub i by i.alt;"));
-        assert!(is_single_or_alternate_sub("    sub a by a.sc;"));
-        assert!(is_single_or_alternate_sub("sub a from [a.alt1 a.alt2];"));
-        assert!(is_single_or_alternate_sub("substitute i by i.alt;"));
-
-        // These are not: a ligature, a multiple, a class-to-class rule, and a
-        // contextual rule. Letting any of them through would produce feature
-        // code the compiler rejects outright.
-        assert!(!is_single_or_alternate_sub("sub f i by f_i;"));
-        assert!(!is_single_or_alternate_sub("sub f_i by f i;"));
-        assert!(!is_single_or_alternate_sub("sub [a b] by [a.alt b.alt];"));
-        assert!(!is_single_or_alternate_sub("sub a' lookup foo b;"));
-        assert!(!is_single_or_alternate_sub("sub @CLASS by @OTHER;"));
-        assert!(!is_single_or_alternate_sub("lookup _aalt_lookup_0;"));
-        assert!(!is_single_or_alternate_sub("script DFLT;"));
-        assert!(!is_single_or_alternate_sub("language dflt;"));
-        assert!(!is_single_or_alternate_sub(""));
+        Some(fea_rs_ast::ValueRecord::new(
+            x_placement,
+            y_placement,
+            x_advance,
+            y_advance,
+            None,
+            None,
+            None,
+            None,
+            false,
+            0..0,
+            None,
+        ))
     }
 }
