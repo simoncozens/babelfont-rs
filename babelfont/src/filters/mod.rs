@@ -3,6 +3,7 @@ use fontdrasil::coords::{DesignCoord, DesignLocation};
 use smol_str::SmolStr;
 
 mod curve_filter_common;
+mod fontforge_standard_height;
 
 /// Parse a comma-separated list of glyph names from a string argument.
 /// Returns an empty `Vec` if the string is empty, indicating that all glyphs
@@ -111,6 +112,11 @@ declare_filters! {
         DropSparseMasters(dropsparsemasters) => "dropsparsemasters",
         DropIncompatiblePaths(dropincompatiblepaths) => "dropincompatiblepaths",
         RetainGlyphs(retainglyphs) => "retainglyphs",
+    }
+    group "Filters for reproducing a legacy FontForge export" {
+        FontForgeUnderlinePosition(fontforgeunderlineposition) => "fontforgeunderlineposition",
+        FontForgeHeightGlyphCountMean(fontforgeheightglyphcountmean) => "fontforgeheightglyphcountmean",
+        FontForgeOs2Defaults(fontforgeos2defaults) => "fontforgeos2defaults",
     }
     group "Filters for manipulating outlines" {
         DecomposeComponentReferences(decomposecomponentreferences) => "decomposecomponents",
