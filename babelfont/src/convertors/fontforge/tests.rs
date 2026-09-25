@@ -290,6 +290,74 @@ fn test_blank_script_tag_becomes_dflt() {
 }
 
 #[test]
+fn test_language_does_not_inherit_default_lookups() {
+    // FontForge registers each lookup for exactly the languages it names. `fi`
+    // is registered for latn/dflt and latn/DEU but not latn/TRK, so Turkish must
+    // not get it; a feature-file `language` statement would inherit it from dflt
+    // unless it says exclude_dflt.
+    let data = concat!(
+        "SplineFontDB: 3.0\n",
+        "Ascent: 800\n",
+        "Descent: 200\n",
+        "LayerCount: 2\n",
+        "Layer: 0 0 \"Back\" 1\n",
+        "Layer: 1 0 \"Fore\" 0\n",
+        "Lookup: 4 0 1 \"fi\" {\"fi-1\"} [ 'liga' ('latn' <'DEU ' 'dflt' > ) ]\n",
+        "Lookup: 4 0 1 \"ff\" {\"ff-1\"} [ 'liga' ('latn' <'DEU ' 'TRK ' 'dflt' > ) ]\n",
+        "BeginChars: 4 4\n",
+        "StartChar: f\n",
+        "Encoding: 102 102 0\n",
+        "Width: 300\n",
+        "Fore\n",
+        "EndChar\n",
+        "StartChar: i\n",
+        "Encoding: 105 105 1\n",
+        "Width: 300\n",
+        "Fore\n",
+        "EndChar\n",
+        "StartChar: f_i\n",
+        "Encoding: -1 -1 2\n",
+        "Width: 600\n",
+        "Ligature2: \"fi-1\" f i\n",
+        "Fore\n",
+        "EndChar\n",
+        "StartChar: f_f\n",
+        "Encoding: -1 -1 3\n",
+        "Width: 600\n",
+        "Ligature2: \"ff-1\" f f\n",
+        "Fore\n",
+        "EndChar\n",
+        "EndChars\n",
+        "EndSplineFont\n"
+    );
+    let font = load_str(data).expect("Failed to parse language SFD");
+    // FontForge pads a language tag to four characters ("TRK "); compare words
+    let fea = font
+        .features
+        .to_fea()
+        .lines()
+        .map(|l| l.split_whitespace().collect::<Vec<_>>().join(" "))
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(fea.contains("language TRK exclude_dflt;"), "{}", fea);
+    assert!(fea.contains("language DEU exclude_dflt;"), "{}", fea);
+    assert!(fea.contains("language dflt;"), "{}", fea);
+    assert!(!fea.contains("language TRK;"), "{}", fea);
+    assert!(!fea.contains("language DEU;"), "{}", fea);
+    assert!(!fea.contains("language dflt exclude_dflt;"), "{}", fea);
+    // Both lookups are registered for DEU and dflt; each language is named once
+    // per feature, since what a repeated `language` statement does to lookups
+    // already registered for that language is not specified.
+    assert_eq!(
+        fea.matches("language DEU exclude_dflt;").count(),
+        1,
+        "{}",
+        fea
+    );
+    assert_eq!(fea.matches("language dflt;").count(), 1, "{}", fea);
+}
+
+#[test]
 fn test_load_sfdir() {
     // An SFDir is an exploded SFD: font.props holds the header and each
     // glyph is a standalone StartChar block in its own *.glyph file

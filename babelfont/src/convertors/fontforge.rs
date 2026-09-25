@@ -3700,15 +3700,28 @@ impl SfdParser {
             } else {
                 let mut featureblock =
                     fea_rs_ast::FeatureBlock::new(feature.clone(), vec![], false, 0..0);
+                // Name each language system once, followed by all of its lookups,
+                // as FontForge's own export does: what a repeated `language`
+                // statement does to the lookups already registered for that
+                // language is not specified.
+                let mut by_system: IndexMap<(SmolStr, SmolStr), Vec<SmolStr>> = IndexMap::new();
                 for (lang, lookupname) in langs_lookup.into_iter() {
+                    by_system
+                        .entry((lang.script, lang.language))
+                        .or_default()
+                        .push(lookupname);
+                }
+                for ((script, language), lookupnames) in by_system {
                     featureblock
                         .statements
-                        .extend(make_langsys(lang.script.clone(), lang.language.clone()));
-                    featureblock
-                        .statements
-                        .push(fea_rs_ast::Statement::LookupReference(
-                            fea_rs_ast::LookupReferenceStatement::new(lookupname.into(), 0..0),
-                        ));
+                        .extend(make_langsys(script, language));
+                    for lookupname in lookupnames {
+                        featureblock
+                            .statements
+                            .push(fea_rs_ast::Statement::LookupReference(
+                                fea_rs_ast::LookupReferenceStatement::new(lookupname.into(), 0..0),
+                            ));
+                    }
                 }
                 // And now pop the featureblock into the feature
                 // minus its wrapper
