@@ -143,13 +143,15 @@ impl std::fmt::Display for DuplicateLookupHandling {
 #[cfg_attr(feature = "cli", derive(clap::Args))]
 #[cfg_attr(feature = "cli", command(next_help_heading = "Specialist fixups"))]
 pub struct Fixups {
-    /// Merge anchors if both fonts contain a dotted circle glyph
-    #[cfg_attr(feature = "cli", arg(long, default_value = "true", action = clap::ArgAction::Set))]
-    pub dotted_circle: bool,
+    /// Don't merge anchors even if both fonts contain a dotted circle glyph
+    #[cfg_attr(feature = "cli", arg(long, action = clap::ArgAction::SetTrue))]
+    pub no_dotted_circle: bool,
 
-    /// Don't add in additional masters to maintain differences between avar mappings
-    #[cfg_attr(feature = "cli", arg(long, default_value = "false", action = clap::ArgAction::Set))]
-    pub skip_avar_masters: bool,
+    /// Add intermediate layers to reproduce the donor font's avar mappings in the host font's
+    /// design space. Off by default, because it introduces layers at locations which do not
+    /// correspond to any master in the host font.
+    #[cfg_attr(feature = "cli", arg(long, action = clap::ArgAction::SetTrue))]
+    pub avar_masters: bool,
 }
 
 /// Parse a single codepoint from a string

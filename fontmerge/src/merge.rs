@@ -3,7 +3,9 @@ use fontdrasil::types::Axes;
 use indexmap::IndexSet;
 
 use crate::{
-    designspace::{Strategy, convert_between_designspaces, fontdrasil_axes, within_bounds},
+    designspace::{
+        Strategy, convert_between_designspaces, fontdrasil_axes, nearest_master_id, within_bounds,
+    },
     error::FontmergeError,
 };
 
@@ -127,37 +129,41 @@ pub(crate) fn merge_glyph(
         remaining_layers.len(),
         drop_layers.len()
     );
-    // These layers all have locations; if they're within the bounds of font1's designspace, and
-    // if they are at the default location for any axes we don't have in font1 just
-    // shove them in as intermediate layers.
+    // These layers all have locations. If, once translated into font1's design space, they
+    // lie within its bounds, shove them on as intermediate (non-master) layers.
     let mut remaining_layers = remaining_layers
         .into_iter()
-        .filter(|l| {
-            l.location
-                .as_ref()
-                .is_some_and(|l| within_bounds(&font1_axes, l))
-        })
+        .filter(|l| l.location.is_some())
         .collect::<Vec<_>>();
-    let first_master = font1.masters.first();
-    #[allow(clippy::unwrap_used)] // We check above
+    #[allow(clippy::unwrap_used)] // We filtered out layers without a location above
     for layer in remaining_layers.iter_mut() {
-        // Set to associated with master
-        if let Some(master) = first_master {
-            layer.master = LayerType::AssociatedWithMaster(master.id.clone());
-        } else {
-            layer.master = LayerType::FreeFloating;
-        }
         // These locations are in the design space of font2. We're going to move them into font1, so what
         // we need to do is:
         // * Convert them to user space,
         // * Then fill in any missing axes with defaults from font1 and remove any axes not in font1,
         // * Then convert to design space of font1.
+        // We don't clamp here, because we want to drop layers which fall outside font 1's designspace.
         let (loc_in_font1, _) = convert_between_designspaces(
             layer.location.as_ref().unwrap(),
             font2_axes,
             &font1_axes,
-            true,
+            false,
         )?;
+        if !within_bounds(&font1_axes, &loc_in_font1) {
+            log::debug!(
+                "Not adding remaining layer at location {:?} to glyph '{}' because it is outside font 1's designspace",
+                layer.location.as_ref().unwrap(),
+                glyph.name
+            );
+            continue;
+        }
+
+        // This is an intermediate layer, not a master, so associate it with the nearest
+        // real master in font1.
+        layer.master = match nearest_master_id(&font1.masters, &font1_axes, &loc_in_font1) {
+            Some(id) => LayerType::AssociatedWithMaster(id),
+            None => LayerType::FreeFloating,
+        };
 
         // Make double double sure there isn't a font master at this location already in font1
         let user_loc_in_font1 = loc_in_font1.to_user(&font1_axes)?;

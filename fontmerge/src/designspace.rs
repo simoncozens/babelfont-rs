@@ -239,8 +239,13 @@ pub(crate) fn add_needed_masters(
         .filter(|m| !m.is_sparse(font2))
         .map(|m| m.location.clone())
         .collect::<HashSet<_>>();
+    // Masters which we create here purely to reproduce font 2's avar mapping. They exist
+    // so that we can interpolate layers at these locations, but they must *not* be added to
+    // font 1 as masters; instead their layers are re-homed as intermediate (associated)
+    // layers during glyph merging.
+    let mut avar_intermediate_master_ids: HashSet<String> = HashSet::new();
     for (tag, design) in intermediate_mappings {
-        log::info!(
+        log::warn!(
             "Adding intermediate masters to font 2 for axis '{}' at design value {} to satisfy avar table change",
             tag,
             design.to_f64()
@@ -252,6 +257,11 @@ pub(crate) fn add_needed_masters(
             .filter(|m| !m.is_sparse(font2))
             .filter_map(|m| {
                 let mut new_m = m.clone();
+                // A clone shares its source's ID, but masters must have unique IDs: the
+                // interpolated layers we create below are associated with the new master by
+                // ID, and reusing an existing ID would make them resolve to the wrong master
+                // (and make the source master look like an avar intermediate).
+                new_m.id = uuid::Uuid::new_v4().to_string();
                 new_m.location.insert(tag, *design);
                 // Only add if we don't already have one at this location
                 if already_added.contains(&new_m.location) {
@@ -279,6 +289,9 @@ pub(crate) fn add_needed_masters(
             }
         }
 
+        for new_master in new_masters.iter() {
+            avar_intermediate_master_ids.insert(new_master.id.clone());
+        }
         font2.masters.extend(new_masters);
     }
     log::debug!(
@@ -300,6 +313,19 @@ pub(crate) fn add_needed_masters(
         if f2_master.is_sparse(font2) {
             continue;
         } // Well thank goodness for that
+
+        // Avar intermediate masters are deliberately *not* added to font 1 as masters. Their
+        // interpolated layers are carried across during glyph merging and added to the merged
+        // glyphs as intermediate layers associated with the nearest real master, which avoids
+        // forcing every existing host glyph to have a layer at this location.
+        if avar_intermediate_master_ids.contains(&f2_master.id) {
+            log::debug!(
+                "Not adding avar intermediate master '{}' at location {:?} to font 1 as a master; its layers will be added as intermediate layers instead",
+                f2_master.name.get_default().unwrap_or(&f2_master.id),
+                f2_master.location
+            );
+            continue;
+        }
 
         // if this is non-default for an axis we don't have in f1, ignore it
         #[allow(clippy::unwrap_used)] // We know these axes are in ds2
@@ -347,15 +373,20 @@ pub(crate) fn add_needed_masters(
             if font1.masters.iter().any(|m| m.location == loc1_design) {
                 continue;
             }
+            let user_location = loc1_design.to_user(&ds1)?;
+            let master_name = user_location
+                .iter()
+                .map(|(tag, value)| format!("{}={}", tag, value.to_f64()))
+                .join(", ");
             let master = babelfont::Master::new(
-                format!("{:?}", loc1_design.to_user(&ds1)),
+                master_name.clone(),
                 uuid::Uuid::new_v4().to_string(),
                 loc1_design.clone(),
             );
             log::info!(
                 "Added new master '{}' at location {:?} (font2 location {:?}) to font 1",
-                master.name.get_default().unwrap_or(&master.id),
-                loc1_design.to_user(&ds1),
+                master_name,
+                user_location,
                 f2_master.location
             );
             font1.masters.push(master);
@@ -368,6 +399,40 @@ pub(crate) fn add_needed_masters(
     );
 
     Ok(())
+}
+
+/// Find the ID of the master whose location is nearest to `location`.
+///
+/// Distance is measured as a Euclidean distance in user (rather than design) coordinates,
+/// so that an axis mapping (avar) does not distort the result.
+pub(crate) fn nearest_master_id(
+    masters: &[babelfont::Master],
+    axes: &fontdrasil::types::Axes,
+    location: &Location<DesignSpace>,
+) -> Option<String> {
+    let target = location.to_user(axes).ok()?;
+    let mut best: Option<(f64, String)> = None;
+    for master in masters.iter() {
+        let Ok(master_user) = master.location.to_user(axes) else {
+            continue;
+        };
+        let mut distance = 0.0f64;
+        for axis in axes.iter() {
+            let Some(target_value) = target.get(axis.tag) else {
+                continue;
+            };
+            let master_value = master_user.get(axis.tag).unwrap_or(target_value);
+            let delta = target_value.to_f64() - master_value.to_f64();
+            distance += delta * delta;
+        }
+        if best
+            .as_ref()
+            .is_none_or(|(best_distance, _)| distance < *best_distance)
+        {
+            best = Some((distance, master.id.clone()));
+        }
+    }
+    best.map(|(_, id)| id)
 }
 
 pub(crate) fn sanity_check(font: &Font) -> bool {

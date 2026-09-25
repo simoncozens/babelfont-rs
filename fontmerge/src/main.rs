@@ -68,8 +68,8 @@ fn main() {
         glyphset_filter,
         args.layout_handling,
         args.duplicate_lookups,
-        !args.fixups.skip_avar_masters,
-        args.fixups.dotted_circle,
+        args.fixups.avar_masters,
+        !args.fixups.no_dotted_circle,
     ) {
         Ok(result) => {
             log::info!("Saving merged font to {}", args.output);
