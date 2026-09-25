@@ -111,15 +111,22 @@ declare_filters! {
         DropSparseMasters(dropsparsemasters) => "dropsparsemasters",
         DropIncompatiblePaths(dropincompatiblepaths) => "dropincompatiblepaths",
         RetainGlyphs(retainglyphs) => "retainglyphs",
+        DropAlternateUnicodes(dropalternateunicodes) => "dropalternateunicodes",
+    }
+    group "Filters for keeping what the source states" {
+        KeepSourceGlyphNames(keepsourceglyphnames) => "keepsourceglyphnames",
+        KeepSourceAdvances(keepsourceadvances) => "keepsourceadvances",
     }
     group "Filters for manipulating outlines" {
         DecomposeComponentReferences(decomposecomponentreferences) => "decomposecomponents",
+        SnapComponentTransforms(snapcomponenttransforms) => "snapcomponenttransforms",
         CubicToQuadratic(cubic2quadratic) => "cubic2quadratic",
         QuadraticToCubic(quadratic2cubic) => "quadratic2cubic",
         CleanupPaths(cleanuppaths) => "cleanuppaths",
         #[cfg(feature = "linesweeper")]
         RemoveOverlaps(removeoverlaps) => "removeoverlaps",
         CorrectPathDirection(correctpathdirection) => "correctpathdirection",
+        ReversePathDirection(reversepathdirection) => "reversepathdirection",
         MakeCompatible(makecompatible) => "makecompatible",
         Recompose(recomposition) => "recompose",
     }

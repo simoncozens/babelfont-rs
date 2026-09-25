@@ -392,6 +392,40 @@ fn test_altuni_adds_alternate_codepoints() {
 }
 
 #[test]
+fn test_drop_alternate_unicodes_keeps_the_primary_encoding() {
+    use crate::filters::{DropAlternateUnicodes, FontFilter};
+
+    let data = concat!(
+        "SplineFontDB: 3.0\n",
+        "BeginChars: 2 2\n",
+        "StartChar: space\n",
+        "Encoding: 32 32 0\n",
+        "Width: 200\n",
+        "AltUni2: 0000a0.ffffffff.0\n",
+        "EndChar\n",
+        "StartChar: mu\n",
+        "Encoding: 181 181 1\n",
+        "Width: 500\n",
+        "AltUni2: 0003bc.ffffffff.0 000041.0000fe00.0\n",
+        "EndChar\n",
+        "EndChars\n",
+        "EndSplineFont\n"
+    );
+
+    let mut font = load_str(data).expect("Failed to parse SFD with AltUni2");
+    assert_eq!(font.glyphs[0].codepoints, vec![0x0020, 0x00A0]);
+    assert_eq!(font.glyphs[1].codepoints, vec![0x00B5, 0x03BC]);
+
+    DropAlternateUnicodes::new()
+        .apply(&mut font)
+        .expect("filter failed");
+
+    // Only the Encoding codepoint survives; the AltUni alternates are gone.
+    assert_eq!(font.glyphs[0].codepoints, vec![0x0020]);
+    assert_eq!(font.glyphs[1].codepoints, vec![0x00B5]);
+}
+
+#[test]
 fn test_oneline_glyph_rules_are_added_to_lookups() {
     let data = concat!(
         "SplineFontDB: 3.0\n",
