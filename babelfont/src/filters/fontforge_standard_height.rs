@@ -151,7 +151,7 @@ fn standard_height(
     which: StandardHeight,
     mean: CurveMean,
 ) -> Option<f64> {
-    let by_codepoint = glyphs_by_primary_codepoint(font);
+    let by_codepoint = glyphs_by_codepoint(font);
     let mut flats: Vec<Occurrence> = vec![];
     let mut curves: Vec<Occurrence> = vec![];
     for codepoint in expand(which.chars()) {
@@ -213,11 +213,12 @@ fn expand(list: &[u32]) -> Vec<u32> {
     out
 }
 
-/// A glyph looked up by codepoint is the first glyph whose primary codepoint it is.
-fn glyphs_by_primary_codepoint(font: &Font) -> HashMap<u32, String> {
+/// A glyph looked up by codepoint is the first glyph mapped to it, whether as its
+/// own codepoint or as an alternate one (`SFFindGID` matches either).
+fn glyphs_by_codepoint(font: &Font) -> HashMap<u32, String> {
     let mut map = HashMap::new();
     for glyph in font.glyphs.iter() {
-        if let Some(cp) = glyph.codepoints.first() {
+        for cp in glyph.codepoints.iter() {
             map.entry(*cp).or_insert_with(|| glyph.name.to_string());
         }
     }
@@ -852,6 +853,24 @@ mod tests {
         );
         // em 1000, so a zone must be closer than 10 units.
         assert_eq!(height(&font, StandardHeight::XHeight), 489);
+    }
+
+    #[test]
+    fn test_a_glyph_is_found_by_an_alternate_codepoint() {
+        // U+03BC is one of the x-height letters. Here it is only an alternate
+        // codepoint of the glyph whose own codepoint is U+00B5, so that glyph is
+        // measured too: (600 + 612) / 3 glyphs = 404.
+        let mut font = font_with_glyphs(vec![
+            ('o', arched(0.0, 400.0, 600.0)),
+            ('e', arched(0.0, 400.0, 612.0)),
+            ('\u{b5}', arched(0.0, 400.0, 600.0)),
+        ]);
+        font.glyphs[2].codepoints.push(0x3bc);
+        let m = &font.masters[0];
+        assert_eq!(
+            exported_height(&font, m, StandardHeight::XHeight, CurveMean::GlyphCount),
+            404
+        );
     }
 
     #[test]
