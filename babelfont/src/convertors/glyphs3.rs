@@ -438,10 +438,10 @@ fn load_properties(
                     names.license_url = I18NDictionary::from(value)
                 }
                 glyphs3::SingularPropertyKey::PostscriptFullName => {
-                    names.postscript_name = I18NDictionary::from(value)
+                    names.full_name = I18NDictionary::from(value)
                 }
                 glyphs3::SingularPropertyKey::PostscriptFontName => {
-                    names.postscript_cid_name = I18NDictionary::from(value)
+                    names.postscript_name = I18NDictionary::from(value)
                 }
                 glyphs3::SingularPropertyKey::WwsFamilyName => {
                     names.wws_family_name = I18NDictionary::from(value)
@@ -481,9 +481,7 @@ fn load_properties(
                     glyphs3::LocalizedPropertyKey::StyleNames => {
                         names.typographic_subfamily = value;
                     }
-                    glyphs3::LocalizedPropertyKey::PostscriptFullNames => {
-                        names.postscript_name = value
-                    }
+                    glyphs3::LocalizedPropertyKey::PostscriptFullNames => names.full_name = value,
                 }
             }
             glyphs3::Property::Junk(plist) => {
@@ -565,12 +563,15 @@ fn save_properties(names: &Names, custom_ot_values: &CustomOTValues) -> Vec<glyp
         names.manufacturer_url,
         glyphs3::SingularPropertyKey::ManufacturerUrl
     );
+    // Glyphs stores the full name as postscriptFullName and the PostScript
+    // name (name ID 6) as postscriptFontName. It has no property for the
+    // PostScript CID findfont name (name ID 20).
     push_singular!(
-        names.postscript_name,
+        names.full_name,
         glyphs3::SingularPropertyKey::PostscriptFullName
     );
     push_singular!(
-        names.postscript_cid_name,
+        names.postscript_name,
         glyphs3::SingularPropertyKey::PostscriptFontName
     );
     push_singular!(
@@ -1633,6 +1634,102 @@ mod tests {
                 "missing singular property {key}: got {singulars:?}"
             );
         }
+    }
+
+    fn singular_property(
+        props: &[glyphslib::glyphs3::Property],
+        wanted: glyphslib::glyphs3::SingularPropertyKey,
+    ) -> Option<&str> {
+        props.iter().find_map(|p| match p {
+            glyphslib::glyphs3::Property::SingularProperty { key, value } if *key == wanted => {
+                Some(value.as_str())
+            }
+            _ => None,
+        })
+    }
+
+    #[test]
+    fn postscript_names_are_written_to_their_glyphs_properties() {
+        // postscriptFontName holds the PostScript name (name ID 6) and
+        // postscriptFullName the full name, at font and instance level.
+        // Name ID 20 has no Glyphs property and is not written.
+        use glyphslib::glyphs3::SingularPropertyKey::{PostscriptFontName, PostscriptFullName};
+        let mut font = crate::Font::new();
+        font.names.postscript_name.set_default("Test".to_string());
+        font.names.full_name.set_default("Test Font".to_string());
+        font.names
+            .postscript_cid_name
+            .set_default("TestCID".to_string());
+        let mut inst = crate::Instance::default();
+        inst.name.set_default("Bold".to_string());
+        inst.custom_names
+            .postscript_name
+            .set_default("Test-Bold".to_string());
+        inst.custom_names
+            .full_name
+            .set_default("Test Font Bold".to_string());
+        font.instances.push(inst);
+        let g = super::as_glyphs3(&font).unwrap();
+
+        assert_eq!(
+            singular_property(&g.properties, PostscriptFontName),
+            Some("Test")
+        );
+        assert_eq!(
+            singular_property(&g.properties, PostscriptFullName),
+            Some("Test Font")
+        );
+        assert!(!format!("{:?}", g.properties).contains("TestCID"));
+        let inst_props = &g.instances[0].properties;
+        assert_eq!(
+            singular_property(inst_props, PostscriptFontName),
+            Some("Test-Bold")
+        );
+        assert_eq!(
+            singular_property(inst_props, PostscriptFullName),
+            Some("Test Font Bold")
+        );
+    }
+
+    #[test]
+    fn postscript_names_are_read_from_their_glyphs_properties() {
+        use glyphslib::glyphs3::{
+            LocalizedPropertyKey, LocalizedValue, Property, SingularPropertyKey,
+        };
+        let mut names = crate::names::Names::new();
+        super::load_properties(
+            &mut names,
+            &mut crate::CustomOTValues::default(),
+            &[
+                Property::SingularProperty {
+                    key: SingularPropertyKey::PostscriptFontName,
+                    value: "Test".to_string(),
+                },
+                Property::SingularProperty {
+                    key: SingularPropertyKey::PostscriptFullName,
+                    value: "Test Font".to_string(),
+                },
+            ],
+        );
+        assert_eq!(names.postscript_name.get_default().unwrap(), "Test");
+        assert_eq!(names.full_name.get_default().unwrap(), "Test Font");
+        assert!(names.postscript_cid_name.is_empty());
+
+        // The localized form of postscriptFullName is also the full name.
+        let mut names = crate::names::Names::new();
+        super::load_properties(
+            &mut names,
+            &mut crate::CustomOTValues::default(),
+            &[Property::LocalizedProperty {
+                key: LocalizedPropertyKey::PostscriptFullNames,
+                values: vec![LocalizedValue {
+                    language: "ENG".to_string(),
+                    value: "Test Font".to_string(),
+                }],
+            }],
+        );
+        assert_eq!(names.full_name.0.get("ENG").unwrap(), "Test Font");
+        assert!(names.postscript_name.is_empty());
     }
 
     #[test]
