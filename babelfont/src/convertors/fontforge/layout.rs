@@ -259,12 +259,21 @@ pub(crate) struct ChainPosSubEntry {
     pub(crate) lookups: IndexMap<usize, Vec<String>>,
 }
 
+/// The `script` and `language` statements that register the next lookup for one
+/// language system.
+///
+/// A FontForge lookup applies only to the scripts and languages it names: a
+/// lookup registered for `latn/dflt` and not for `latn/TRK` does not run for
+/// Turkish. In a feature file a `language` statement inherits the lookups
+/// already registered for the script's default language unless it says
+/// `exclude_dflt`, so every language other than `dflt` excludes them.
 pub(crate) fn make_langsys(script: SmolStr, language: SmolStr) -> Vec<fea_rs_ast::Statement> {
+    let include_dflt = language == "dflt";
     vec![
         fea_rs_ast::Statement::Script(fea_rs_ast::ScriptStatement::new(script.into())),
         fea_rs_ast::Statement::Language(fea_rs_ast::LanguageStatement::new(
             language.into(),
-            true,
+            include_dflt,
             false,
         )),
     ]
