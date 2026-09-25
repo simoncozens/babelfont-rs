@@ -139,6 +139,95 @@ fn test_copyright_line_break_escapes_are_decoded_and_survive_a_roundtrip() {
     assert_eq!(emitted_line, escaped);
 }
 
+fn sfd_with_header(header: &str) -> String {
+    format!(
+        "SplineFontDB: 3.0\nFontName: T\n{header}Ascent: 800\nDescent: 200\n\
+         BeginChars: 1 1\nStartChar: .notdef\nEncoding: 0 -1 0\nWidth: 500\n\
+         EndChar\nEndChars\nEndSplineFont\n"
+    )
+}
+
+fn version_of(header: &str) -> (u16, u16) {
+    load_str(&sfd_with_header(header))
+        .expect("SFD should load")
+        .version
+}
+
+#[test]
+fn test_sfnt_revision_overrides_the_version() {
+    // FontForge exports head.fontRevision from sfntRevision when it is set,
+    // and derives it from the version string only when it is not.
+    assert_eq!(version_of("Version: 1.001\n"), (1, 1));
+    assert_eq!(
+        version_of("Version: 1.001\nsfntRevision: 0x00010000\n"),
+        (1, 0)
+    );
+    assert_eq!(
+        version_of("Version: 1.001\nsfntRevision: 0x00010083\n"),
+        (1, 2)
+    );
+    // Whichever order the header states them in.
+    assert_eq!(
+        version_of("sfntRevision: 0x00010000\nVersion: 1.001\n"),
+        (1, 0)
+    );
+    // Name ID 5 still says what Version says.
+    let font = load_str(&sfd_with_header(
+        "Version: 1.001\nsfntRevision: 0x00010000\n",
+    ))
+    .expect("SFD should load");
+    assert_eq!(
+        font.names.version.get_default().map(String::as_str),
+        Some("Version 1.001")
+    );
+    // The line is written back as it was read.
+    assert!(to_str(&font)
+        .expect("SFD should emit")
+        .contains("\nsfntRevision: 0x00010000\n"));
+    // A negative revision has no version; Version is used instead.
+    assert_eq!(
+        version_of("Version: 1.001\nsfntRevision: 0xffff0000\n"),
+        (1, 1)
+    );
+}
+
+#[test]
+fn test_sfnt_revision_is_read_to_the_nearest_thousandth() {
+    // FontForge stores a revision given as a decimal as rint(65536 * value).
+    for major in [0u16, 1, 2] {
+        for minor in 0u16..1000 {
+            let decimal: f64 = format!("{major}.{minor:03}").parse().unwrap();
+            let fixed = (decimal * 65536.0).round() as u32;
+            assert_eq!(
+                version_of(&format!("Version: 9.999\nsfntRevision: 0x{fixed:08x}\n")),
+                (major, minor),
+                "sfntRevision 0x{fixed:08x}"
+            );
+        }
+    }
+    // Just below a whole number rounds up to it.
+    assert_eq!(version_of("sfntRevision: 0x0001ffff\n"), (2, 0));
+}
+
+#[cfg(feature = "fontir")]
+#[test]
+fn test_sfnt_revision_is_the_compiled_font_revision() {
+    use crate::convertors::fontir::{BabelfontIrSource, CompilationOptions};
+    use write_fonts::read::{FontRef, TableProvider};
+
+    for fixed in [0x0001_0000, 0x0001_0083, 0x0002_028f] {
+        let header = format!("Version: 1.001\nsfntRevision: 0x{fixed:08x}\n");
+        let font = load_str(&sfd_with_header(&header)).expect("SFD should load");
+        let bytes = BabelfontIrSource::compile(font, CompilationOptions::default())
+            .expect("font should compile");
+        let head = FontRef::new(&bytes)
+            .expect("compiled font should parse")
+            .head()
+            .expect("compiled font should have a head table");
+        assert_eq!(head.font_revision().to_bits(), fixed);
+    }
+}
+
 #[test]
 fn test_weight_suffix_of_family_name() {
     let split = |family: &str, weight: &str| {
