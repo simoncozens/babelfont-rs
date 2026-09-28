@@ -339,6 +339,14 @@ fn load_instance(font: &Font, instance: &glyphs3::Instance) -> crate::Instance {
         &mut custom_ot_values, // XXX
         &instance.properties,
     );
+    // There may be a familyName custom parameter
+    if names.family_name.is_empty() {
+        if let Some(family_name) =
+            enabled_cp_value(&format_specific, "familyName").and_then(|x| x.as_str())
+        {
+            names.family_name = family_name.to_string().into();
+        }
+    }
     crate::Instance {
         id: instance.name.clone(),
         name: I18NDictionary::from(&instance.name),
