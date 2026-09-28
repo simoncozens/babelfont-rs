@@ -1061,6 +1061,23 @@ mod tests {
     }
 
     #[test]
+    fn test_afdko_short_featurenames_survive_subsetting() {
+        // Glyphs sources often write `name 1 "..."; name 3 "...";` (platform only).
+        let mut font = dummy_font_with_glyphs(vec!["a", "b", "c"]);
+        font.features = Features::from_fea(
+            "feature ss01 {\n  featureNames {\n    name 1 \"Geometric a g\";\n    name 3 \"Geometric a g\";\n  };\n  sub a by c;\n} ss01;\n",
+        );
+        SubsetLayout::new(vec!["a", "c"])
+            .apply(&mut font)
+            .expect("Feature subsetting failed");
+        let fea = font.features.to_fea();
+        assert!(
+            fea.contains("featureNames") && fea.contains("Geometric a g"),
+            "short-form featureNames must survive subsetting:\n{fea}"
+        );
+    }
+
+    #[test]
     fn test_filter_range() {
         let visitor = SubsetVisitor::new(vec!["a", "b", "g"].into_iter().collect());
         let mut container = fea_rs_ast::GlyphContainer::GlyphRange(fea_rs_ast::GlyphRange::new(
