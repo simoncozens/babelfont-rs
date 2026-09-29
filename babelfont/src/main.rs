@@ -99,7 +99,6 @@ fn main() {
         })
         .init();
     let input_name = PathBuf::from(args.get_one::<String>("font_path").unwrap());
-    let output_name = PathBuf::from(args.get_one::<String>("output").unwrap());
     let input_extension = input_name.extension().unwrap().to_str().unwrap();
     if !SUPPORTED_EXTENSIONS.contains(&input_extension) {
         log::error!(
@@ -109,11 +108,13 @@ fn main() {
         );
         std::process::exit(1);
     }
+    let to_stdout = PathBuf::from("-");
+    let output_name = PathBuf::from(args.get_one::<String>("output").unwrap());
     let output_extension = output_name
         .extension()
         .and_then(|x| x.to_str())
         .unwrap_or("");
-    if !SUPPORTED_EXTENSIONS.contains(&output_extension) {
+    if !SUPPORTED_EXTENSIONS.contains(&output_extension) && output_name != to_stdout {
         log::error!(
             "Output extension {:?} is not in the list of supported extensions: {}",
             output_extension,
@@ -191,6 +192,10 @@ fn main() {
     }
 
     log::info!("Saving {}", output_name.display());
+    if output_name == to_stdout {
+        println!("{}", serde_json::to_string_pretty(&input).unwrap());
+        return;
+    }
     if compiling {
         #[cfg(feature = "fontir")]
         {
