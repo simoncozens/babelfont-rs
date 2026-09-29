@@ -58,23 +58,3 @@ jobs:
         name: Set up Rust for caching
       - name: Lint for warnings
         run: cargo clippy --all-targets --all-features -- -D warnings
-
-  check-for-release:
-    name: Create release if needed
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      id-token: write
-    steps:
-      - uses: actions/checkout@v3
-      - if: contains(github.ref, 'refs/tags/v')
-        run: python3 scripts/check_versions.py
-        env:
-          CRATE_PATTERN: ${{ env.CRATE_PATTERN }}
-      - if: contains(github.ref, 'refs/tags/v')
-        name: Check for release
-        id: create_release
-        run: |
-          if ! gh release view ${{ github.ref_name }}; then
-          git show -s --format=%B ${{ github.ref_name }} | tail -n +4 | gh release create ${{ github.ref_name }} -t ${{ github.ref_name }} -F -
-          fi
