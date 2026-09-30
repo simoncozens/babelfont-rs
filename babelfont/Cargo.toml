@@ -68,7 +68,7 @@ cli = [
     "dep:clap-verbosity-flag",
     "rayon",
 ]
-rayon = ["norad/rayon"]
+rayon = ["norad/rayon", "fontc/rayon" ]
 types = ["dep:typeshare"]
 reactive = ["dep:reactive_stores"]
 
