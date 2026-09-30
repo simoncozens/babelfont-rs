@@ -121,6 +121,8 @@ struct SfdParser {
     /// class sequence, unlike `coverage`/`glyph` which have exactly one.
     chain_pos_sub: IndexMap<String, Vec<layout::ChainPosSubEntry>>,
     anchor_class_decls: Vec<(String, String)>,
+    /// Whether `sfntRevision` has set `font.version`, which `Version` must then keep.
+    has_sfnt_revision: bool,
     content: Option<String>, // Optional pre-loaded content for load_str()
 }
 
@@ -178,6 +180,26 @@ fn space_before_italic(style: &str) -> String {
     }
 }
 
+/// The (major, minor) version an SFD `sfntRevision` stands for.
+///
+/// The value is `head.fontRevision` as a hexadecimal 16.16 fixed-point number.
+/// The minor is three decimal digits, so this takes the nearest thousandth,
+/// which gives back the same fixed-point number for any revision rounded from
+/// three decimal places. A negative revision has no such version.
+fn sfnt_revision_version(value: &str) -> Option<(u16, u16)> {
+    let hex = value.trim();
+    let hex = hex
+        .strip_prefix("0x")
+        .or_else(|| hex.strip_prefix("0X"))
+        .unwrap_or(hex);
+    let fixed = i64::from(i32::try_from(u32::from_str_radix(hex, 16).ok()?).ok()?);
+    let thousandths = (fixed * 1000 + 0x8000) >> 16;
+    Some((
+        u16::try_from(thousandths / 1000).ok()?,
+        u16::try_from(thousandths % 1000).ok()?,
+    ))
+}
+
 impl SfdParser {
     fn new(path: PathBuf) -> Self {
         Self {
@@ -193,6 +215,7 @@ impl SfdParser {
             assigned_lookup_names: HashMap::new(),
             chain_pos_sub: IndexMap::new(),
             anchor_class_decls: Vec::new(),
+            has_sfnt_revision: false,
             content: None,
         }
     }
@@ -211,6 +234,7 @@ impl SfdParser {
             assigned_lookup_names: HashMap::new(),
             chain_pos_sub: IndexMap::new(),
             anchor_class_decls: Vec::new(),
+            has_sfnt_revision: false,
             content: Some(content),
         }
     }
@@ -581,14 +605,31 @@ impl SfdParser {
                         // whatever the contents. `version_line` strips the
                         // prefix again on write, so an SFD round trip is stable.
                         self.font.names.version = format!("Version {v}").into();
-                        // head.fontRevision must agree with name ID 5. The minor
-                        // is the fractional digits padded to three, not a float
-                        // fraction scaled by 100 -- that turned 1.002 into 1.000.
+                        // Without an sfntRevision, head.fontRevision must agree
+                        // with name ID 5. The minor is the fractional digits
+                        // padded to three, not a float fraction scaled by 100 --
+                        // that turned 1.002 into 1.000.
                         if let Some(first_word) = v.split_whitespace().next() {
                             if let Some(parts) = crate::common::version_major_minor(first_word) {
-                                self.font.version = parts;
+                                if !self.has_sfnt_revision {
+                                    self.font.version = parts;
+                                }
                             }
                         }
+                    }
+                }
+                "sfntRevision" => {
+                    // head.fontRevision, which FontForge exports in preference
+                    // to one derived from Version. The raw value is also kept,
+                    // as the SFD writer emits the line from it.
+                    if let Some(v) = &value {
+                        if let Some(version) = sfnt_revision_version(v) {
+                            self.font.version = version;
+                            self.has_sfnt_revision = true;
+                        }
+                        self.font
+                            .format_specific
+                            .insert(key.clone(), serde_json::Value::String(v.clone()));
                     }
                 }
                 "UniqueID" => {
@@ -841,8 +882,8 @@ impl SfdParser {
                 // Fontforge GUI things we don't care about; just store them in
                 // formatspecific
                 "DisplayLayer" | "DisplaySize" | "AntiAlias" | "FitToEm" | "WinInfo"
-                | "Encoding" | "sfntRevision" | "WidthSeparation" | "ModificationTime"
-                | "PfmFamily" | "OS2Version" | "XUID" | "UnicodeInterp" | "NameList" | "DEI"
+                | "Encoding" | "WidthSeparation" | "ModificationTime" | "PfmFamily"
+                | "OS2Version" | "XUID" | "UnicodeInterp" | "NameList" | "DEI"
                 | "NeedsXUIDChange" | "TeXData" | "InvalidEm" | "woffMajor" | "woffMinor" => {
                     if let Some(v) = &value {
                         self.font
