@@ -42,7 +42,6 @@ default = [
     "fontforge",
     "fontra",
     "fontir",
-    "rayon",
     "types",
     "robocjk",
     "ttf",
