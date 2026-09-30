@@ -12,12 +12,12 @@ use std::{
 use crate::filters::FontFilter;
 
 /// A filter that subsets the layout features of a font to only include specified glyphs
-pub struct SubsetLayout(Vec<SmolStr>);
+pub struct SubsetLayout(pub(crate) HashSet<SmolStr>);
 
 impl SubsetLayout {
     /// Create a new SubsetLayout filter
     pub fn new<T: Into<SmolStr>>(glyphs: Vec<T>) -> Self {
-        SubsetLayout(glyphs.into_iter().map(|g| g.into()).collect())
+        SubsetLayout(glyphs.into_iter().map(|g| g.into()).collect::<HashSet<_>>())
     }
 }
 

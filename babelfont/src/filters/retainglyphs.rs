@@ -8,12 +8,17 @@ use std::collections::HashSet;
 /// are decomposed. Masters that become sparse as a result are removed, and their associated layers
 /// are converted to associated layers of a non-sparse master. Features are also subsetted
 /// to only reference the retained glyphs.
-pub struct RetainGlyphs(Vec<SmolStr>);
+pub struct RetainGlyphs(HashSet<SmolStr>);
 
 impl RetainGlyphs {
     /// Create a new RetainGlyphs filter
     pub fn new(glyph_names: Vec<String>) -> Self {
-        RetainGlyphs(glyph_names.into_iter().map(SmolStr::from).collect())
+        RetainGlyphs(
+            glyph_names
+                .into_iter()
+                .map(SmolStr::from)
+                .collect::<HashSet<_>>(),
+        )
     }
 }
 
@@ -21,7 +26,7 @@ impl FontFilter for RetainGlyphs {
     fn apply(&self, font: &mut crate::Font) -> Result<(), crate::BabelfontError> {
         log::info!("Retaining glyphs: {:?}", self.0);
         // Filter features
-        SubsetLayout::new(self.0.clone()).apply(font)?;
+        SubsetLayout(self.0.clone()).apply(font)?;
 
         // Find components referenced by retained glyphs that will be dropped
         let mut components_to_decompose = HashSet::new();
