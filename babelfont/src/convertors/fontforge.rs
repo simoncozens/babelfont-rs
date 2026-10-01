@@ -3815,7 +3815,7 @@ impl SfdParser {
                 || feature == "mark"
                 || feature == "mkmk"
             {
-                statements.insert(0, "# Automatic code start".to_string());
+                statements.insert(0, "# Automatic Code".to_string());
             }
             self.font.features.features.push((
                 feature,
