@@ -132,6 +132,7 @@ declare_filters! {
     group "Filters for Glyphs font sources" {
         CorrectConjunctCategory(correctconjunctcategory) => "correctconjunctcategory",
         InferMarkCategory(infermarkcategory) => "infermarkcategory",
+        KeepSourceAdvances(keepsourceadvances) => "keepsourceadvances",
         #[cfg(feature = "glyphs")]
         GlyphsData(glyphsdata) => "glyphsdata",
         GlyphsNumberValue(glyphsnumbervalue) => "glyphsnumbervalue",
