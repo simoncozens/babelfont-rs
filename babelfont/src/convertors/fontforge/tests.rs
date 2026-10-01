@@ -2166,3 +2166,46 @@ fn test_reference_matrix_snaps_near_integers() {
     let slanted = coeffs("slanted");
     assert_eq!(slanted[..4], [0.999, 0.0, 0.0, 1.0]);
 }
+
+#[test]
+fn test_pair_held_by_an_earlier_subtable_is_dropped() {
+    // `A V` is in both subtables of one lookup; only the first one applies.
+    // `A W` is only in the second, so it stays.
+    let data = concat!(
+        "SplineFontDB: 3.0\n",
+        "FontName: T\n",
+        "Ascent: 800\n",
+        "Descent: 200\n",
+        "Lookup: 258 0 0 \"kern\" {\"kern-1\" \"kern-2\"} ['kern' ('DFLT' <'dflt' > ) ]\n",
+        "BeginChars: 3 3\n",
+        "StartChar: A\n",
+        "Encoding: 65 65 0\n",
+        "Width: 600\n",
+        "Kerns2: 1 -50 \"kern-1\" 1 -70 \"kern-2\"\n",
+        "PairPos2: \"kern-2\" V dx=0 dy=0 dh=-80 dv=0 dx=0 dy=0 dh=0 dv=0\n",
+        "PairPos2: \"kern-2\" W dx=0 dy=0 dh=-30 dv=0 dx=0 dy=0 dh=0 dv=0\n",
+        "EndChar\n",
+        "StartChar: V\n",
+        "Encoding: 86 86 1\n",
+        "Width: 600\n",
+        "EndChar\n",
+        "StartChar: W\n",
+        "Encoding: 87 87 2\n",
+        "Width: 800\n",
+        "EndChar\n",
+        "EndChars\n",
+        "EndSplineFont\n"
+    );
+    let font = load_str(data).expect("SFD should load");
+    let kerning = &font.masters[0].kerning;
+    assert_eq!(kerning.get(&("A".into(), "V".into())), Some(&-50));
+    let fea = font.features.to_fea();
+    assert!(
+        !fea.contains("> V <"),
+        "a shadowed pair must be dropped:\n{fea}"
+    );
+    assert!(
+        fea.contains("> W <"),
+        "an unshadowed pair must stay:\n{fea}"
+    );
+}
