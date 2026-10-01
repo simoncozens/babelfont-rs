@@ -2344,7 +2344,12 @@ impl SfdParser {
         // Convert the matrix [xx, xy, yx, yy, tx, ty] into a kurbo::Affine
         // kurbo::Affine coefficients are [xx, xy, yx, yy, tx, ty]
         let matrix_arr = [
-            matrix[0], matrix[1], matrix[2], matrix[3], matrix[4], matrix[5],
+            snap_matrix_entry(matrix[0]),
+            snap_matrix_entry(matrix[1]),
+            snap_matrix_entry(matrix[2]),
+            snap_matrix_entry(matrix[3]),
+            matrix[4],
+            matrix[5],
         ];
         let affine = kurbo::Affine::new(matrix_arr);
         let transform = DecomposedAffine::from(affine);
@@ -3915,5 +3920,17 @@ impl SfdParser {
             0..0,
             None,
         ))
+    }
+}
+
+/// FontForge prints a reference's matrix to six digits, so a mirror can read
+/// -0.999939 (-16383/16384); its exporter writes -1.
+fn snap_matrix_entry(value: f64) -> f64 {
+    const TOLERANCE: f64 = 1.5 / 16384.0;
+    let nearest = value.round();
+    if (-2.0..2.0).contains(&nearest) && (value - nearest).abs() <= TOLERANCE {
+        nearest
+    } else {
+        value
     }
 }
