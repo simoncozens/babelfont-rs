@@ -2066,6 +2066,12 @@ impl SfdParser {
             "sfd.gdef_class".to_string(),
             serde_json::Value::Number(gdef_class.into()),
         );
+        if explicit_class.is_some_and(|class| class != 0) {
+            glyph.format_specific.insert(
+                "sfd.gdef_class_explicit".to_string(),
+                serde_json::Value::Bool(true),
+            );
+        }
 
         glyph.codepoints = codepoints;
         Ok(glyph)

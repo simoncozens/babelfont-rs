@@ -11,6 +11,10 @@ use crate::filters::FontFilter;
 /// same table: it has no way to say "base" for a glyph without anchors, and may make
 /// an unclassed accent a mark by its name.
 ///
+/// FontForge writes no class table when no glyph has an explicit class and every glyph
+/// is a base (a font without `.notdef`); neither does this filter. Glyphs whose names
+/// FEA cannot spell are left out.
+///
 /// The classes come from the SFD reader, so this does nothing for other sources.
 /// It is opt-in because the table is fixed: glyphs added later must be added to it.
 #[derive(Default)]
@@ -30,6 +34,7 @@ impl FontFilter for FontForgeGdefClasses {
         let mut mark = vec![];
         let mut component = vec![];
         let mut recorded = false;
+        let mut needs_class = false;
         for glyph in font.glyphs.iter().filter(|g| g.exported) {
             let Some(class) = glyph
                 .format_specific
@@ -39,7 +44,13 @@ impl FontFilter for FontForgeGdefClasses {
                 continue;
             };
             recorded = true;
+            if class != 1 || glyph.format_specific.contains_key("sfd.gdef_class_explicit") {
+                needs_class = true;
+            }
             let name = glyph.name.as_str();
+            if !fea_can_name(name) {
+                continue;
+            }
             match class {
                 1 => base.push(name),
                 2 => ligature.push(name),
@@ -50,6 +61,9 @@ impl FontFilter for FontForgeGdefClasses {
         }
         if !recorded {
             log::warn!("No FontForge glyph classes were recorded; not writing a GDEF table");
+            return Ok(());
+        }
+        if !needs_class {
             return Ok(());
         }
         let class = |names: &[&str]| {
@@ -99,6 +113,19 @@ impl FontFilter for FontForgeGdefClasses {
     }
 }
 
+/// Whether a feature file can spell the glyph name (the OpenType feature file syntax,
+/// plus `.null`).
+fn fea_can_name(name: &str) -> bool {
+    if name == ".notdef" || name == ".null" {
+        return true;
+    }
+    let mut bytes = name.bytes();
+    bytes
+        .next()
+        .is_some_and(|first| first == b'_' || first.is_ascii_alphabetic())
+        && bytes.all(|b| b.is_ascii_alphanumeric() || b"._*+:^|~-".contains(&b))
+}
+
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 #[cfg(all(test, feature = "fontforge"))]
 mod tests {
@@ -145,6 +172,40 @@ mod tests {
             font.features.prefixes["FontForgeGlyphClasses"].code,
             "table GDEF {\n    GlyphClassDef [dieresiscomb a gravecomb], [f_i], \
              [acutecomb tickcomb ring], ;\n} GDEF;"
+        );
+    }
+
+    #[test]
+    fn test_no_table_when_everything_is_a_base() {
+        let sfd = [
+            "SplineFontDB: 3.0\nFontName: T\nAscent: 800\nDescent: 200\n".to_string(),
+            "BeginChars: 2 2\n".to_string(),
+            glyph("a", 0, ""),
+            glyph("dieresiscomb", 1, ""),
+            "EndChars\nEndSplineFont\n".to_string(),
+        ]
+        .concat();
+        let mut font = crate::convertors::fontforge::load_str(&sfd).unwrap();
+        FontForgeGdefClasses::new().apply(&mut font).unwrap();
+        assert!(!font.features.prefixes.contains_key("FontForgeGlyphClasses"));
+    }
+
+    #[test]
+    fn test_names_fea_cannot_spell_are_left_out() {
+        let sfd = [
+            "SplineFontDB: 3.0\nFontName: T\nAscent: 800\nDescent: 200\n".to_string(),
+            "BeginChars: 3 3\n".to_string(),
+            glyph(".notdef", 0, ""),
+            glyph("a", 1, ""),
+            glyph(".ttfautohint", 2, ""),
+            "EndChars\nEndSplineFont\n".to_string(),
+        ]
+        .concat();
+        let mut font = crate::convertors::fontforge::load_str(&sfd).unwrap();
+        FontForgeGdefClasses::new().apply(&mut font).unwrap();
+        assert_eq!(
+            font.features.prefixes["FontForgeGlyphClasses"].code,
+            "table GDEF {\n    GlyphClassDef [a], , , ;\n} GDEF;"
         );
     }
 }
