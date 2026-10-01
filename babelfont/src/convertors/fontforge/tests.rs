@@ -2121,3 +2121,48 @@ fn only_single_and_alternate_subs_may_go_in_aalt() {
     assert!(!is_single_or_alternate_sub("language dflt;"));
     assert!(!is_single_or_alternate_sub(""));
 }
+
+#[test]
+fn test_reference_matrix_snaps_near_integers() {
+    let data = concat!(
+        "SplineFontDB: 3.0\n",
+        "Ascent: 800\n",
+        "Descent: 200\n",
+        "LayerCount: 2\n",
+        "Layer: 0 0 \"Back\" 1\n",
+        "Layer: 1 0 \"Fore\" 0\n",
+        "BeginChars: 3 3\n",
+        "StartChar: parenleft\n",
+        "Encoding: 40 40 0\n",
+        "Width: 300\n",
+        "Fore\n",
+        "EndChar\n",
+        "StartChar: parenright\n",
+        "Encoding: 41 41 1\n",
+        "Width: 300\n",
+        "Fore\n",
+        "Refer: 0 40 N -0.999939 0 0 1 855.948 0 2\n",
+        "EndChar\n",
+        "StartChar: slanted\n",
+        "Encoding: 65536 -1 2\n",
+        "Width: 300\n",
+        "Fore\n",
+        "Refer: 0 40 N 0.999 0.000061 0 1 0 0 2\n",
+        "EndChar\n",
+        "EndChars\n",
+        "EndSplineFont\n"
+    );
+    let font = load_str(data).expect("Failed to parse reference SFD");
+    let coeffs = |name: &str| {
+        let glyph = font.glyphs.get(name).expect("missing glyph");
+        match &glyph.layers[0].shapes[0] {
+            Shape::Component(component) => component.transform.as_affine().as_coeffs(),
+            Shape::Path(_) => panic!("expected a component"),
+        }
+    };
+    let mirrored = coeffs("parenright");
+    assert_eq!(mirrored[..4], [-1.0, 0.0, 0.0, 1.0]);
+    assert!((mirrored[4] - 855.948).abs() < 1e-9, "{mirrored:?}");
+    let slanted = coeffs("slanted");
+    assert_eq!(slanted[..4], [0.999, 0.0, 0.0, 1.0]);
+}
