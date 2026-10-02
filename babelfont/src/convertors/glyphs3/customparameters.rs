@@ -19,6 +19,7 @@ pub(crate) fn export_font_level_cps(
     export_variable_font_origin(custom_parameters, font)?;
     export_use_typo_metrics(custom_parameters, font)?;
     export_os2_values(custom_parameters, font)?;
+    export_post_values(custom_parameters, font);
     Ok(())
 }
 
@@ -288,6 +289,20 @@ fn export_os2_values(
         );
     }
     Ok(())
+}
+
+/// Write the `post` values a source recorded out as custom parameters.
+fn export_post_values(custom_parameters: &mut Vec<CustomParameter>, font: &Font) {
+    if let Some(fixed) = font.custom_ot_values.post_is_fixed_pitch {
+        find_or_insert(
+            custom_parameters,
+            CustomParameter {
+                name: "isFixedPitch".to_string(),
+                value: Plist::Integer(i64::from(fixed)),
+                disabled: false,
+            },
+        );
+    }
 }
 
 fn export_use_typo_metrics(

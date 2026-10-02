@@ -103,6 +103,10 @@ pub struct CustomOTValues {
     /// A bit field; see OpenType spec for bit meanings
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub os2_code_page_range2: Option<u32>,
+    // post table
+    /// post table isFixedPitch field: whether the font is not proportionally spaced
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub post_is_fixed_pitch: Option<bool>,
     // CFF table
     /// CFF table BlueValues field
     #[serde(default, skip_serializing_if = "Option::is_none")]

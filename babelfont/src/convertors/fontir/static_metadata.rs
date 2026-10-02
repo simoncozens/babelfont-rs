@@ -271,7 +271,7 @@ impl Work<Context, WorkId, Error> for StaticMetadataWork {
         // // Default per <https://github.com/googlefonts/glyphsLib/blob/cb8a4a914b0a33431f0a77f474bf57eec2f19bcc/Lib/glyphsLib/builder/custom_params.py#L1117-L1119>
         // static_metadata.misc.fs_type = font.custom_parameters.fs_type.or(Some(1 << 3));
 
-        // static_metadata.misc.is_fixed_pitch = font.custom_parameters.is_fixed_pitch;
+        static_metadata.misc.is_fixed_pitch = font.custom_ot_values.post_is_fixed_pitch;
 
         // static_metadata.misc.unicode_range_bits = font
         //     .custom_parameters
