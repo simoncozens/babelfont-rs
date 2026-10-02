@@ -2166,3 +2166,50 @@ fn test_reference_matrix_snaps_near_integers() {
     let slanted = coeffs("slanted");
     assert_eq!(slanted[..4], [0.999, 0.0, 0.0, 1.0]);
 }
+
+#[test]
+fn test_ligature_anchors_are_numbered_by_component() {
+    // A `baselig <n>` anchor attaches marks to component n of a ligature (from 0).
+    // Glyphs names it <class>_<n+1>, which is what a Glyphs compiler builds
+    // mark-to-ligature from; the bare class name twice would be one anchor.
+    let data = concat!(
+        "SplineFontDB: 3.0\n",
+        "Lookup: 262 0 0 \"MarkLig\" {\"MarkLig-1\"} ['mark' ('arab' <'dflt' > ) ]\n",
+        "AnchorClass2: \"Above\" \"MarkLig-1\"\n",
+        "BeginChars: 2 2\n",
+        "StartChar: lam_alef\n",
+        "Encoding: 0 -1 0\n",
+        "Width: 700\n",
+        "GlyphClass: 3\n",
+        "AnchorPoint: \"Above\" 500 800 baselig 0\n",
+        "AnchorPoint: \"Above\" 150 750 baselig 1\n",
+        "Fore\n",
+        "EndChar\n",
+        "StartChar: fatha\n",
+        "Encoding: 1 -1 1\n",
+        "Width: 0\n",
+        "GlyphClass: 4\n",
+        "AnchorPoint: \"Above\" 100 600 mark 0\n",
+        "Fore\n",
+        "EndChar\n",
+        "EndChars\n",
+        "EndSplineFont\n"
+    );
+    let font = load_str(data).expect("Failed to parse ligature-anchor SFD");
+    let master = font.masters[0].id.clone();
+    let lig = font.glyphs.get("lam_alef").expect("missing lam_alef");
+    let layer = emit::glyph_foreground_layer(lig, &master).expect("lam_alef layer");
+    let names: Vec<&str> = layer.anchors.iter().map(|a| a.name.as_str()).collect();
+    assert_eq!(names, vec!["Above_1", "Above_2"]);
+
+    // ...and the SFD writer gives the class its own name back.
+    let sfd = to_str(&font).expect("Failed to write SFD");
+    assert!(
+        sfd.contains("AnchorPoint: \"Above\" 500 800 baselig 0"),
+        "{sfd}"
+    );
+    assert!(
+        sfd.contains("AnchorPoint: \"Above\" 150 750 baselig 1"),
+        "{sfd}"
+    );
+}
