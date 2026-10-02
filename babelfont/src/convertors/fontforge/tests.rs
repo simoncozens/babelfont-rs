@@ -233,6 +233,52 @@ fn test_sfnt_revision_is_the_compiled_font_revision() {
 }
 
 #[test]
+fn test_kerning_is_written_next_to_a_fea_kern_lookup() {
+    use crate::convertors::fontir::{BabelfontIrSource, CompilationOptions};
+    use write_fonts::read::{FontRef, TableProvider};
+
+    // `A V` is in the kerning model and `V A` in an FEA lookup of the same feature;
+    // the compiler only adds the model's kerning to a `kern` block with its marker.
+    let data = concat!(
+        "SplineFontDB: 3.0\n",
+        "FontName: T\n",
+        "Ascent: 800\n",
+        "Descent: 200\n",
+        "Lookup: 258 0 0 \"kern pairs\" {\"kern pairs-1\"} ['kern' ('DFLT' <'dflt' > ) ]\n",
+        "Lookup: 258 0 0 \"kern rules\" {\"kern rules-1\"} ['kern' ('DFLT' <'dflt' > ) ]\n",
+        "BeginChars: 3 3\n",
+        "StartChar: .notdef\n",
+        "Encoding: 0 -1 0\n",
+        "Width: 500\n",
+        "EndChar\n",
+        "StartChar: A\n",
+        "Encoding: 65 65 1\n",
+        "Width: 600\n",
+        "Kerns2: 2 -50 \"kern pairs-1\"\n",
+        "EndChar\n",
+        "StartChar: V\n",
+        "Encoding: 86 86 2\n",
+        "Width: 600\n",
+        "PairPos2: \"kern rules-1\" A dx=0 dy=0 dh=-40 dv=0 dx=0 dy=0 dh=0 dv=0\n",
+        "EndChar\n",
+        "EndChars\n",
+        "EndSplineFont\n"
+    );
+    let font = load_str(data).expect("SFD should load");
+    let bytes = BabelfontIrSource::compile(font, CompilationOptions::default())
+        .expect("font should compile");
+    let gpos = FontRef::new(&bytes)
+        .expect("compiled font should parse")
+        .gpos()
+        .expect("compiled font should have a GPOS table");
+    let lookups = gpos.lookup_list().expect("GPOS lookup list").lookup_count();
+    assert_eq!(
+        lookups, 2,
+        "the kerning lookup must sit next to the FEA one"
+    );
+}
+
+#[test]
 fn test_weight_suffix_of_family_name() {
     let split = |family: &str, weight: &str| {
         let mut parser = SfdParser::new(PathBuf::from("test.sfd"));
