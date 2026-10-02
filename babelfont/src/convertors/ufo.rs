@@ -594,6 +594,7 @@ pub(crate) fn save_info(info: &mut norad::FontInfo, font: &Font, master_ix: usiz
     info.open_type_os2_vendor_id = font.custom_ot_values.os2_vendor_id.map(|x| x.to_string());
     info.open_type_os2_win_ascent = get_metric(MetricType::WinAscent).map(|x| x as u32);
     info.open_type_os2_win_descent = get_metric(MetricType::WinDescent).map(|x| x as u32);
+    info.postscript_is_fixed_pitch = font.custom_ot_values.post_is_fixed_pitch;
     info.postscript_underline_position = get_metric(MetricType::UnderlinePosition);
     info.postscript_underline_thickness = get_metric(MetricType::UnderlineThickness);
     info.postscript_other_blues = font.custom_ot_values.cff_other_blues.clone();
@@ -798,6 +799,7 @@ pub(crate) fn load_font_info(
         font.custom_ot_values.os2_unicode_range3 = Some(ur3);
         font.custom_ot_values.os2_unicode_range4 = Some(ur4);
     }
+    font.custom_ot_values.post_is_fixed_pitch = info.postscript_is_fixed_pitch;
     font.custom_ot_values.cff_blue_values = info.postscript_blue_values.clone();
     font.custom_ot_values.cff_other_blues = info.postscript_other_blues.clone();
     font.custom_ot_values.cff_family_blues = info.postscript_family_blues.clone();
