@@ -694,8 +694,37 @@ const LANGUAGE_ID_TO_LAYOUT_TAG: &[(u16, &str)] = &[
 
 /// Convert an OpenType language ID to a OpenType Layout language tag string, if known.
 pub fn ot_lang_id_to_layout_tag(lang_id: u16) -> Option<&'static str> {
+    // The table is in tag order, not language ID order.
     LANGUAGE_ID_TO_LAYOUT_TAG
-        .binary_search_by_key(&lang_id, |&(id, _)| id)
-        .ok()
-        .map(|idx| LANGUAGE_ID_TO_LAYOUT_TAG[idx].1)
+        .iter()
+        .find(|&&(id, _)| id == lang_id)
+        .map(|&(_, tag)| tag)
+}
+
+/// The language key of a Windows name record's language ID: its OpenType Layout
+/// language tag, or, for a language ID that has none of its own, its BCP-47 tag.
+pub fn ot_lang_id_to_name_language(lang_id: u16) -> Option<&'static str> {
+    ot_lang_id_to_layout_tag(lang_id).or_else(|| ot_lang_id_to_iso_tag(lang_id))
+}
+
+#[cfg(test)]
+mod language_id_tests {
+    use super::*;
+
+    #[test]
+    fn test_every_layout_tag_is_found_by_its_language_id() {
+        for &(id, tag) in LANGUAGE_ID_TO_LAYOUT_TAG {
+            assert_eq!(ot_lang_id_to_layout_tag(id), Some(tag), "0x{id:04X}");
+        }
+    }
+
+    #[test]
+    fn test_a_language_id_without_a_layout_tag_keeps_its_bcp47_tag() {
+        // Spanish (Mexico) and French (Canada) share their layout tags' languages
+        // but not their language IDs.
+        assert_eq!(ot_lang_id_to_name_language(0x0403), Some("CAT"));
+        assert_eq!(ot_lang_id_to_name_language(0x080A), Some("es-MX"));
+        assert_eq!(ot_lang_id_to_name_language(0x0C0C), Some("fr-CA"));
+        assert_eq!(ot_lang_id_to_name_language(0xFFFF), None);
+    }
 }

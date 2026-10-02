@@ -35,7 +35,7 @@ use crate::{
         utf7::decode_utf7,
     },
     features::PossiblyAutomaticCode,
-    names::ot_lang_id_to_layout_tag,
+    names::ot_lang_id_to_name_language,
     BabelfontError, Component, Font, FormatSpecific, Glyph, GlyphCategory, Guide, Layer, LayerType,
     MetricType, NameId, Shape,
 };
@@ -1180,11 +1180,11 @@ impl SfdParser {
         let lang = if lang_id == 0x409 {
             crate::i18ndictionary::DFLT.to_string()
         } else {
-            let Some(otl_tag) = ot_lang_id_to_layout_tag(lang_id) else {
+            let Some(language) = ot_lang_id_to_name_language(lang_id) else {
                 log::warn!("Unknown OpenType language ID: {}", lang_id);
                 return;
             };
-            otl_tag.to_string()
+            language.to_string()
         };
 
         // Process each quoted string

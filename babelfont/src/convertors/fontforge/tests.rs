@@ -2386,3 +2386,27 @@ fn test_fontforge_style_name() {
         );
     }
 }
+
+#[test]
+fn test_lang_names_keep_every_windows_language() {
+    // Catalan has a layout tag; Spanish (Mexico) and French (Canada) have only
+    // BCP-47 tags. Each record stays under a key of its own.
+    let sfd = "SplineFontDB: 3.2\nFontName: T\nFullName: T\nFamilyName: T\n\
+               Weight: Regular\nAscent: 800\nDescent: 200\n\
+               LangName: 1027 \"\" \"\" \"Normal\"\n\
+               LangName: 2058 \"\" \"\" \"Normal MX\"\n\
+               LangName: 3084 \"\" \"\" \"Normal CA\"\n\
+               BeginChars: 1 1\nStartChar: .notdef\n\
+               Encoding: 0 -1 0\nWidth: 500\nEndChar\nEndChars\nEndSplineFont\n";
+    let font = load_str(sfd).expect("SFD should load");
+    let subfamily = &font.names.preferred_subfamily_name.0;
+    assert_eq!(subfamily.get("CAT").map(String::as_str), Some("Normal"));
+    assert_eq!(
+        subfamily.get("es-MX").map(String::as_str),
+        Some("Normal MX")
+    );
+    assert_eq!(
+        subfamily.get("fr-CA").map(String::as_str),
+        Some("Normal CA")
+    );
+}
