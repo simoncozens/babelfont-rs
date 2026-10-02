@@ -692,6 +692,24 @@ const LANGUAGE_ID_TO_LAYOUT_TAG: &[(u16, &str)] = &[
     (0x0404, "ZHT"),
 ];
 
+/// The Windows language ID of a name language key: an OpenType Layout language
+/// tag or a BCP-47 tag.
+pub fn name_language_to_ot_lang_id(language: &str) -> Option<u16> {
+    LANGUAGE_ID_TO_LAYOUT_TAG
+        .iter()
+        .chain(LANGUAGE_ID_TO_BCP47.iter())
+        .find(|&&(_, tag)| tag == language)
+        .map(|&(id, _)| id)
+}
+
+/// Whether a name language key is an OpenType Layout language tag, the
+/// language codes Glyphs uses for localized properties.
+pub fn is_layout_language_tag(language: &str) -> bool {
+    LANGUAGE_ID_TO_LAYOUT_TAG
+        .iter()
+        .any(|&(_, tag)| tag == language)
+}
+
 /// Convert an OpenType language ID to a OpenType Layout language tag string, if known.
 pub fn ot_lang_id_to_layout_tag(lang_id: u16) -> Option<&'static str> {
     LANGUAGE_ID_TO_LAYOUT_TAG
