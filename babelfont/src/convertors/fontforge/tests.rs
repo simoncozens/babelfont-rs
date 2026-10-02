@@ -450,6 +450,84 @@ fn test_language_does_not_inherit_default_lookups() {
     assert_eq!(fea.matches("language dflt;").count(), 1, "{}", fea);
 }
 
+/// An `.sfd` whose `aalt` lookup is registered for latn/dflt only, while `liga`
+/// is also registered for latn/SRB; `kerns2` is spliced into `f`.
+fn aalt_narrower_than_liga_sfd(gpos_lookup: &str, kerns2: &str) -> String {
+    format!(
+        concat!(
+            "SplineFontDB: 3.0\n",
+            "Ascent: 800\n",
+            "Descent: 200\n",
+            "LayerCount: 2\n",
+            "Layer: 0 0 \"Back\" 1\n",
+            "Layer: 1 0 \"Fore\" 0\n",
+            "Lookup: 1 0 0 \"alt\" {{\"alt-1\"}} ['aalt' ('latn' <'dflt' > ) ]\n",
+            "Lookup: 4 0 1 \"ff\" {{\"ff-1\"}} ['liga' ('latn' <'SRB ' 'dflt' > ) ]\n",
+            "{}",
+            "BeginChars: 3 3\n",
+            "StartChar: f\n",
+            "Encoding: 102 102 0\n",
+            "Width: 300\n",
+            "Substitution2: \"alt-1\" f_f\n",
+            "{}",
+            "Fore\n",
+            "EndChar\n",
+            "StartChar: i\n",
+            "Encoding: 105 105 1\n",
+            "Width: 300\n",
+            "Fore\n",
+            "EndChar\n",
+            "StartChar: f_f\n",
+            "Encoding: -1 -1 2\n",
+            "Width: 600\n",
+            "Ligature2: \"ff-1\" f f\n",
+            "Fore\n",
+            "EndChar\n",
+            "EndChars\n",
+            "EndSplineFont\n"
+        ),
+        gpos_lookup, kerns2
+    )
+}
+
+fn words_of_fea(font: &Font) -> String {
+    font.features
+        .to_fea()
+        .lines()
+        .map(|l| l.split_whitespace().collect::<Vec<_>>().join(" "))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+#[test]
+fn test_aalt_keeps_its_own_language_systems() {
+    // A feature file registers aalt under every languagesystem, so latn/SRB must
+    // not be declared; liga still reaches SRB through its language statement.
+    let font = load_str(&aalt_narrower_than_liga_sfd("", "")).expect("Failed to parse aalt SFD");
+    let fea = words_of_fea(&font);
+    assert!(fea.contains("languagesystem latn dflt;"), "{}", fea);
+    assert!(!fea.contains("languagesystem latn SRB;"), "{}", fea);
+    assert!(fea.contains("language SRB exclude_dflt;"), "{}", fea);
+}
+
+#[test]
+fn test_aalt_language_systems_are_not_narrowed_when_kerning_needs_them() {
+    // A compiler registers the kerning it generates under every languagesystem,
+    // so all of them stay declared.
+    let font = load_str(&aalt_narrower_than_liga_sfd(
+        "Lookup: 258 0 0 \"kern\" {\"kern-1\"} ['kern' ('latn' <'SRB ' 'dflt' > ) ]\n",
+        "Kerns2: 1 -20 \"kern-1\"\n",
+    ))
+    .expect("Failed to parse aalt SFD");
+    assert!(
+        font.masters.iter().any(|m| !m.kerning.is_empty()),
+        "the fixture should carry kerning"
+    );
+    let fea = words_of_fea(&font);
+    assert!(fea.contains("languagesystem latn dflt;"), "{}", fea);
+    assert!(fea.contains("languagesystem latn SRB;"), "{}", fea);
+}
+
 #[test]
 fn test_quoted_glyph_name_is_decoded_and_trimmed() {
     // A quoted name is modified UTF-7, and FontForge can leave whitespace after
