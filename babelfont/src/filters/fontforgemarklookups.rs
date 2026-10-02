@@ -254,16 +254,37 @@ impl LookupWriter<'_> {
     }
 }
 
-/// The `lookupflag` statement for an SFD lookup flag, if it sets any of the four
-/// named bits.
-fn lookup_flag(name: &str, flag: u16) -> Option<String> {
-    if flag & !0x000F != 0 {
+/// The `lookupflag` statement for an anchor lookup's flag, if it sets anything: the
+/// four named bits, the mark attachment class of the high byte and the mark
+/// filtering set, each class written out as its glyphs.
+fn lookup_flag(lookup: &AnchorLookup, glyphs: &HashSet<String>) -> Option<String> {
+    let flag = lookup.flag;
+    let class = |kind: &str, list: &Option<Vec<String>>| -> Option<String> {
+        let list = list.as_ref()?;
+        let kept: Vec<&str> = list
+            .iter()
+            .filter(|glyph| glyphs.contains(glyph.as_str()))
+            .map(String::as_str)
+            .collect();
+        if kept.len() != list.len() {
+            log::warn!(
+                "lookup {:?}: {kind} glyphs that are not in the font are left out",
+                lookup.name
+            );
+        }
+        Some(format!("{kind} [{}]", kept.join(" ")))
+    };
+    let attachment = class("MarkAttachmentType", &lookup.mark_attachment_class);
+    let filtering = class("UseMarkFilteringSet", &lookup.mark_filtering_set);
+    if (flag & 0xFF00 != 0 && attachment.is_none()) || (flag & 0x10 != 0 && filtering.is_none())
+    {
         log::warn!(
-            "lookup {name:?}: flag {flag:#06x} carries bits (mark-attachment class or \
-             filtering set) that are not converted"
+            "lookup {:?}: flag {flag:#06x} names a mark class or set the font does not \
+             define; it is not converted",
+            lookup.name
         );
     }
-    let names: Vec<&str> = [
+    let mut parts: Vec<String> = [
         (0x1, "RightToLeft"),
         (0x2, "IgnoreBaseGlyphs"),
         (0x4, "IgnoreLigatures"),
@@ -271,9 +292,11 @@ fn lookup_flag(name: &str, flag: u16) -> Option<String> {
     ]
     .iter()
     .filter(|(bit, _)| flag & bit != 0)
-    .map(|(_, flag_name)| *flag_name)
+    .map(|(_, flag_name)| flag_name.to_string())
     .collect();
-    (!names.is_empty()).then(|| format!("lookupflag {};", names.join(" ")))
+    parts.extend(attachment);
+    parts.extend(filtering);
+    (!parts.is_empty()).then(|| format!("lookupflag {};", parts.join(" ")))
 }
 
 /// Whether a feature file can spell the glyph name.
@@ -374,10 +397,12 @@ impl FontFilter for FontForgeMarkLookups {
         }
         let master_id = font.masters[0].id.clone();
         let mut anchors = vec![];
+        let mut nameable = HashSet::new();
         for glyph in font.glyphs.iter().filter(|g| g.exported) {
             if !fea_can_name(&glyph.name) {
                 continue;
             }
+            nameable.insert(glyph.name.to_string());
             let Some(layer) = glyph.layers.iter().find(|layer| {
                 layer.master == crate::LayerType::DefaultForMaster(master_id.clone())
             }) else {
@@ -434,7 +459,7 @@ impl FontFilter for FontForgeMarkLookups {
             if body.is_empty() {
                 continue;
             }
-            if let Some(flag) = lookup_flag(&lookup.name, lookup.flag) {
+            if let Some(flag) = lookup_flag(lookup, &nameable) {
                 body.insert(0, flag);
             }
             let mut code = mark_class_lines;
@@ -643,6 +668,47 @@ mod tests {
         assert_eq!(
             writers,
             &serde_json::json!([{"class": "KernFeatureWriter"}, {"class": "GdefFeatureWriter"}])
+        );
+    }
+
+    #[test]
+    fn test_anchor_lookup_flags_keep_mark_classes_and_sets() {
+        // Flag 0x0101 is RightToLeft with mark attachment class 1; flag 0x10010 uses
+        // mark filtering set 1.
+        let data = [
+            "SplineFontDB: 3.0\nFontName: T\nAscent: 800\nDescent: 200\n",
+            "Lookup: 260 257 0 \"above\" {\"above-1\"} ['mark' ('arab' <'dflt' > ) ]\n",
+            "Lookup: 262 65552 0 \"mkmk\" {\"mkmk-1\"} ['mkmk' ('arab' <'dflt' > ) ]\n",
+            "MarkAttachClasses: 2\n\"Above\" 11 fatha ghost\n",
+            "MarkAttachSets: 2\n\"Other\" 5 kasra\n\"Tops\" 5 fatha\n",
+            "AnchorClass2: \"Top\" \"above-1\" \"MarkTop\" \"mkmk-1\"\n",
+            "BeginChars: 2 2\n",
+            &glyph("beh", 0, "AnchorPoint: \"Top\" 250 600 basechar 0\n"),
+            &glyph(
+                "fatha",
+                1,
+                "AnchorPoint: \"Top\" 100 500 mark 0\nAnchorPoint: \"MarkTop\" 100 500 mark 0\n\
+                 AnchorPoint: \"MarkTop\" 100 800 basemark 0\n",
+            ),
+            "EndChars\nEndSplineFont\n",
+        ]
+        .concat();
+        let mut font = crate::convertors::fontforge::load_str(&data).unwrap();
+        FontForgeMarkLookups::new().apply(&mut font).unwrap();
+        let prefixes = &font.features.prefixes;
+        assert!(
+            prefixes["above"]
+                .code
+                .contains("lookupflag RightToLeft MarkAttachmentType [fatha];"),
+            "{}",
+            prefixes["above"].code
+        );
+        assert!(
+            prefixes["mkmk"]
+                .code
+                .contains("lookupflag UseMarkFilteringSet [fatha];"),
+            "{}",
+            prefixes["mkmk"].code
         );
     }
 }

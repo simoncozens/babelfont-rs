@@ -121,6 +121,10 @@ struct SfdParser {
     /// class sequence, unlike `coverage`/`glyph` which have exactly one.
     chain_pos_sub: IndexMap<String, Vec<layout::ChainPosSubEntry>>,
     anchor_class_decls: Vec<(String, String)>,
+    /// `MarkAttachClasses` glyph lists, indexed by class number (0 is no class).
+    mark_attach_classes: Vec<Vec<String>>,
+    /// `MarkAttachSets` glyph lists, indexed by set number.
+    mark_attach_sets: Vec<Vec<String>>,
     /// Whether `sfntRevision` has set `font.version`, which `Version` must then keep.
     has_sfnt_revision: bool,
     content: Option<String>, // Optional pre-loaded content for load_str()
@@ -215,6 +219,8 @@ impl SfdParser {
             assigned_lookup_names: HashMap::new(),
             chain_pos_sub: IndexMap::new(),
             anchor_class_decls: Vec::new(),
+            mark_attach_classes: Vec::new(),
+            mark_attach_sets: Vec::new(),
             has_sfnt_revision: false,
             content: None,
         }
@@ -234,6 +240,8 @@ impl SfdParser {
             assigned_lookup_names: HashMap::new(),
             chain_pos_sub: IndexMap::new(),
             anchor_class_decls: Vec::new(),
+            mark_attach_classes: Vec::new(),
+            mark_attach_sets: Vec::new(),
             has_sfnt_revision: false,
             content: Some(content),
         }
@@ -531,6 +539,27 @@ impl SfdParser {
                     } else if let Some(v) = &value {
                         if key == "AnchorClass" || key == "AnchorClass2" {
                             self.register_anchor_classes(v);
+                        }
+                        // `MarkAttachClasses: <n>` is followed by classes 1 to n-1 and
+                        // `MarkAttachSets: <n>` by sets 0 to n-1, one per line:
+                        // `"<name>" <length> <glyph names>`.
+                        if key == "MarkAttachClasses" || key == "MarkAttachSets" {
+                            let count: usize = v.parse().unwrap_or(0);
+                            let mut lists = vec![];
+                            if key == "MarkAttachClasses" && count > 0 {
+                                lists.push(vec![]);
+                            }
+                            while lists.len() < count
+                                && data.get(i).is_some_and(|l| l.trim_start().starts_with('"'))
+                            {
+                                lists.push(Self::mark_attach_glyphs(&data[i]));
+                                i += 1;
+                            }
+                            if key == "MarkAttachClasses" {
+                                self.mark_attach_classes = lists;
+                            } else {
+                                self.mark_attach_sets = lists;
+                            }
                         }
                         self.font
                             .format_specific
@@ -2163,6 +2192,16 @@ impl SfdParser {
 // ===========================================================================
 
 impl SfdParser {
+    /// The glyph names of a `"<name>" <length> <glyph names>` line.
+    fn mark_attach_glyphs(line: &str) -> Vec<String> {
+        let line = line.trim_start();
+        let rest = line[1..].find('"').map_or("", |end| &line[end + 2..]);
+        rest.split_whitespace()
+            .skip(1)
+            .map(str::to_string)
+            .collect()
+    }
+
     fn register_anchor_classes(&mut self, v: &str) {
         let tokens = tokenize_preserving_quotes(v);
         let mut i = 0;
@@ -2677,7 +2716,11 @@ impl SfdParser {
         let head = data[..head_end].trim();
         let mut it = head.split_whitespace();
         let kind: u16 = it.next().and_then(|s| s.parse().ok()).unwrap_or(0);
-        let flag: u16 = it.next().and_then(|s| s.parse().ok()).unwrap_or(0);
+        // The low 16 bits are the OpenType lookup flag; with UseMarkFilteringSet
+        // (0x10) the high 16 bits are the set's index.
+        let bits: u32 = it.next().and_then(|s| s.parse().ok()).unwrap_or(0);
+        let flag = (bits & 0xFFFF) as u16;
+        let mark_filtering_set = (bits & 0x10 != 0).then_some((bits >> 16) as u16);
         // let _save_afm: u16 = it.next().and_then(|s| s.parse().ok()).unwrap_or(0);
 
         // Lookup name between quotes. Decoded, because SeqLookup references to it are
@@ -2734,6 +2777,7 @@ impl SfdParser {
         let info = layout::LookupInfo {
             lookup_type,
             flag,
+            mark_filtering_set,
             features,
             block: fea_rs_ast::LookupBlock::new(sanitized_name.clone().into(), vec![], false, 0..0),
             subtables,
@@ -3542,6 +3586,12 @@ impl SfdParser {
                 name: lookup.block.name.to_string(),
                 kind,
                 flag: lookup.flag,
+                mark_attachment_class: Some(usize::from(lookup.flag >> 8))
+                    .filter(|class| *class != 0)
+                    .and_then(|class| self.mark_attach_classes.get(class).cloned()),
+                mark_filtering_set: lookup
+                    .mark_filtering_set
+                    .and_then(|set| self.mark_attach_sets.get(usize::from(set)).cloned()),
                 subtables,
                 registrations: lookup
                     .features

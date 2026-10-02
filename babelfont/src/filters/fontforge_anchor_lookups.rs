@@ -40,6 +40,12 @@ pub(crate) struct AnchorLookup {
     pub(crate) kind: AnchorLookupKind,
     /// The SFD lookup flags.
     pub(crate) flag: u16,
+    /// The glyphs of the mark attachment class the flag names, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) mark_attachment_class: Option<Vec<String>>,
+    /// The glyphs of the mark filtering set the flag names, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) mark_filtering_set: Option<Vec<String>>,
     /// The anchor classes of each subtable, in order.
     pub(crate) subtables: Vec<Vec<String>>,
     pub(crate) registrations: Vec<LookupRegistration>,
