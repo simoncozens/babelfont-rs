@@ -2040,6 +2040,15 @@ impl SfdParser {
             );
         }
 
+        // A mark that advances is a spacing combining mark: a Glyphs compiler gives a
+        // Nonspacing mark no advance.
+        if glyph.category == GlyphCategory::Mark && width.unwrap_or(0.0) != 0.0 {
+            glyph.format_specific.insert(
+                "subcategory".to_string(),
+                serde_json::Value::String("Spacing Combining".to_string()),
+            );
+        }
+
         glyph.codepoints = codepoints;
         Ok(glyph)
     }
@@ -2247,9 +2256,14 @@ impl SfdParser {
             }
             if has_mark_anchor && !has_base_anchor {
                 glyph.category = GlyphCategory::Mark;
+                let subcategory = if glyph.layers.iter().any(|layer| layer.width != 0.0) {
+                    "Spacing Combining"
+                } else {
+                    "Nonspacing"
+                };
                 glyph.format_specific.insert(
                     "subcategory".to_string(),
-                    serde_json::Value::String("Nonspacing".to_string()),
+                    serde_json::Value::String(subcategory.to_string()),
                 );
             }
         }

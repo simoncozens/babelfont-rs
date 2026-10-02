@@ -2166,3 +2166,39 @@ fn test_reference_matrix_snaps_near_integers() {
     let slanted = coeffs("slanted");
     assert_eq!(slanted[..4], [0.999, 0.0, 0.0, 1.0]);
 }
+
+#[test]
+fn test_an_advancing_mark_is_spacing_combining() {
+    // GlyphClass 4 with a width: still a GDEF mark, but one that advances, which a
+    // Glyphs compiler keeps only for a Spacing Combining mark.
+    let data = concat!(
+        "SplineFontDB: 3.0\n",
+        "BeginChars: 2 2\n",
+        "StartChar: u0BC1\n",
+        "Encoding: 0 3009 0\n",
+        "Width: 532\n",
+        "GlyphClass: 4\n",
+        "Fore\n",
+        "EndChar\n",
+        "StartChar: u0BCD\n",
+        "Encoding: 1 3021 1\n",
+        "Width: 0\n",
+        "GlyphClass: 4\n",
+        "Fore\n",
+        "EndChar\n",
+        "EndChars\n",
+        "EndSplineFont\n"
+    );
+    let font = load_str(data).expect("Failed to parse spacing-mark SFD");
+    let subcategory = |name: &str| {
+        let glyph = font.glyphs.get(name).expect("glyph exists");
+        assert_eq!(glyph.category, GlyphCategory::Mark);
+        glyph
+            .format_specific
+            .get("subcategory")
+            .and_then(|v| v.as_str())
+            .map(str::to_string)
+    };
+    assert_eq!(subcategory("u0BC1").as_deref(), Some("Spacing Combining"));
+    assert_eq!(subcategory("u0BCD").as_deref(), Some("Nonspacing"));
+}
