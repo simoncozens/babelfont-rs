@@ -1504,6 +1504,7 @@ impl SfdParser {
         let mut current_layer_idx: Option<usize> = None;
         let mut layer_map: HashMap<usize, usize> = HashMap::new();
         let mut width: Option<f32> = None;
+        let mut lig_caret_cnt_fixed = false;
 
         let mut idx = 1usize;
         while idx < data.len() {
@@ -1747,6 +1748,10 @@ impl SfdParser {
                             serde_json::Value::String(v.to_string()),
                         );
                     }
+                }
+                "LigCaretCntFixed" => {
+                    lig_caret_cnt_fixed =
+                        value.and_then(|v| v.trim().parse::<i64>().ok()) == Some(1);
                 }
                 "LCarets2" => {
                     if let Some(v) = value {
@@ -2040,8 +2045,55 @@ impl SfdParser {
             );
         }
 
+        if let Some(lcarets) = glyph
+            .format_specific
+            .get("sfd.lcarets")
+            .and_then(|v| v.as_str())
+        {
+            let carets = Self::ligature_carets(lcarets, lig_caret_cnt_fixed, &codepoints);
+            for layer in glyph.layers.iter_mut().filter(|l| !l.is_background) {
+                for (i, x) in carets.iter().enumerate() {
+                    let mut format_specific = FormatSpecific::default();
+                    format_specific.insert("sfd.lcaret".to_string(), serde_json::Value::Bool(true));
+                    layer.anchors.push(crate::Anchor {
+                        name: format!("caret_{}", i + 1),
+                        x: *x as f64,
+                        y: 0.0,
+                        format_specific,
+                    });
+                }
+            }
+        }
+
         glyph.codepoints = codepoints;
         Ok(glyph)
+    }
+
+    /// The ligature carets of an `LCarets2: <count> <x>...` line, in the order the
+    /// GDEF LigCaretList states them: zero carets are omitted unless
+    /// `LigCaretCntFixed: 1`, and the carets of a right-to-left glyph decrease.
+    fn ligature_carets(value: &str, count_fixed: bool, codepoints: &[u32]) -> Vec<i32> {
+        let mut numbers = value
+            .split_whitespace()
+            .filter_map(|t| t.parse::<i32>().ok());
+        let count = usize::try_from(numbers.next().unwrap_or(0)).unwrap_or(0);
+        let mut carets: Vec<i32> = numbers
+            .take(count)
+            .filter(|x| count_fixed || *x != 0)
+            .collect();
+        let right_to_left = codepoints.iter().any(|&c| {
+            (0x0590..=0x08FF).contains(&c)
+                || (0xFB1D..=0xFDFF).contains(&c)
+                || (0xFE70..=0xFEFF).contains(&c)
+                || (0x10800..=0x10FFF).contains(&c)
+                || (0x1E800..=0x1EFFF).contains(&c)
+        });
+        if right_to_left {
+            carets.sort_by(|a, b| b.cmp(a));
+        } else {
+            carets.sort();
+        }
+        carets
     }
 
     fn looks_like_spline_line(line: &str) -> bool {
