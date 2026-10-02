@@ -2244,3 +2244,51 @@ fn test_reference_matrix_snaps_near_integers() {
     let slanted = coeffs("slanted");
     assert_eq!(slanted[..4], [0.999, 0.0, 0.0, 1.0]);
 }
+
+#[test]
+fn test_english_lang_names_are_the_default_names() {
+    let data = concat!(
+        "SplineFontDB: 3.0\n",
+        "FontName: Lekton-Bold\n",
+        "FullName: Lekton Bold\n",
+        "FamilyName: Lekton\n",
+        "Weight: Bold\n",
+        "LangName: 1033 \"\" \"\" \"\" \"\" \"Lekton-Bold\"\n",
+        "Ascent: 800\n",
+        "Descent: 200\n",
+        "LayerCount: 2\n",
+        "Layer: 0 0 \"Back\" 1\n",
+        "Layer: 1 0 \"Fore\" 0\n",
+        "BeginChars: 0 0\n",
+        "EndChars\n",
+        "EndSplineFont\n"
+    );
+    let font = load_str(data).expect("Failed to parse SFD");
+    assert_eq!(font.names.full_name.get_default().unwrap(), "Lekton-Bold");
+    assert_eq!(
+        font.names.preferred_subfamily_name.get_default().unwrap(),
+        "Bold"
+    );
+}
+
+#[test]
+fn test_fontforge_style_name() {
+    for (font_name, family, weight, expected) in [
+        ("Lekton-Bold", Some("Lekton"), Some("Bold"), "Bold"),
+        ("NovaCut", Some("Nova Cut"), Some("Book"), "Book"),
+        ("Megrim", Some("Megrim"), Some("Medium"), "Medium"),
+        ("PuritanBoldItal", Some("Puritan"), None, "BoldItalic"),
+        (
+            "Overlock-BlackItalic",
+            Some("Overlock"),
+            Some("Black"),
+            "BlackItalic",
+        ),
+    ] {
+        assert_eq!(
+            super::fontforge_style_name(font_name, family, weight),
+            expected,
+            "{font_name}"
+        );
+    }
+}
