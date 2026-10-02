@@ -2202,6 +2202,10 @@ impl SfdParser {
             "sfd.index".to_string(),
             serde_json::Value::Number(index.into()),
         );
+        format_specific.insert(
+            crate::filters::fontforge_anchor_lookups::ANCHOR_CLASS_KEY.to_string(),
+            serde_json::Value::String(name.clone()),
+        );
         if kind == "mark" {
             name = "_".to_string() + &name;
         }
@@ -3495,6 +3499,67 @@ impl SfdParser {
         })
     }
 
+    /// Record the anchor lookups, which have no rules to write out here, for
+    /// `--fontforge-mark-lookups` (see `filters::fontforge_anchor_lookups`).
+    /// `ordered_names` is the order lookups are defined in the feature file.
+    fn record_anchor_lookups(&mut self, ordered_names: &[String]) {
+        use crate::filters::fontforge_anchor_lookups::{
+            AnchorLookup, AnchorLookupKind, LookupRegistration, KEY,
+        };
+        let mut records = vec![];
+        for (position, name) in ordered_names.iter().enumerate() {
+            let Some(lookup) = self.gpos_lookups.0.get(name) else {
+                continue;
+            };
+            let kind = match lookup.lookup_type {
+                layout::LookupType::CursivePosition => AnchorLookupKind::Cursive,
+                layout::LookupType::MarkToBasePosition => AnchorLookupKind::MarkToBase,
+                layout::LookupType::MarkToLigaturePosition => AnchorLookupKind::MarkToLigature,
+                layout::LookupType::MarkToMarkPosition => AnchorLookupKind::MarkToMark,
+                _ => continue,
+            };
+            // Anchor classes name their subtable in lower case.
+            let subtables = lookup
+                .subtables
+                .keys()
+                .map(|subtable| {
+                    let subtable = subtable.to_lowercase();
+                    self.anchor_class_decls
+                        .iter()
+                        .filter(|(_, owner)| *owner == subtable)
+                        .map(|(class, _)| class.clone())
+                        .collect()
+                })
+                .collect();
+            let before = ordered_names[position + 1..]
+                .iter()
+                .find(|later| {
+                    self.gpos_lookups.0.contains_key(*later)
+                        && self.font.features.prefixes.contains_key(later.as_str())
+                })
+                .cloned();
+            records.push(AnchorLookup {
+                name: lookup.block.name.to_string(),
+                kind,
+                flag: lookup.flag,
+                subtables,
+                registrations: lookup
+                    .features
+                    .iter()
+                    .map(|fls| LookupRegistration {
+                        feature: fls.feature.to_string(),
+                        script: fls.script.to_string(),
+                        language: fls.language.to_string(),
+                    })
+                    .collect(),
+                before,
+            });
+        }
+        if !records.is_empty() {
+            self.font.format_specific.insert_json(KEY, &records);
+        }
+    }
+
     fn insert_gtables(&mut self) {
         // Needed to expand FontForge's implicit "All_Others" class (class 0), which is
         // every glyph not named by a sibling class. Glyphs are fully parsed by now.
@@ -3723,6 +3788,7 @@ impl SfdParser {
                     .collect(),
             );
         }
+        self.record_anchor_lookups(&ordered_names);
 
         // Register each emitted lookup with its features in declaration order. The
         // compiled font ignores this order -- it applies lookups by LookupList
