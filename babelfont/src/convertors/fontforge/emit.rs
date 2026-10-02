@@ -1056,7 +1056,12 @@ pub(crate) fn glyph_foreground_layer<'a>(
 // ===========================================================================
 
 fn emit_layer_anchors(out: &mut Vec<String>, layer: &Layer) {
-    for anchor in &layer.anchors {
+    // A ligature caret is an LCarets2 entry in SFD, not an anchor point.
+    for anchor in layer
+        .anchors
+        .iter()
+        .filter(|a| !a.format_specific.contains_key("sfd.lcaret"))
+    {
         let kind = anchor
             .format_specific
             .get("sfd.kind")

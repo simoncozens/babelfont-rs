@@ -2166,3 +2166,79 @@ fn test_reference_matrix_snaps_near_integers() {
     let slanted = coeffs("slanted");
     assert_eq!(slanted[..4], [0.999, 0.0, 0.0, 1.0]);
 }
+
+#[test]
+fn test_ligature_carets_become_caret_anchors() {
+    // LCarets2 lists a ligature's carets. The GDEF LigCaretList holds the non-zero
+    // ones (all of them with LigCaretCntFixed: 1), increasing, or decreasing for a
+    // right-to-left glyph. Glyphs states a caret as an anchor caret_<n>.
+    let data = concat!(
+        "SplineFontDB: 3.0\n",
+        "BeginChars: 4 4\n",
+        "StartChar: f_f_i\n",
+        "Encoding: 0 64259 0\n",
+        "Width: 1500\n",
+        "GlyphClass: 3\n",
+        "Fore\n",
+        "LCarets2: 3 1117 0 557\n",
+        "EndChar\n",
+        "StartChar: f_l\n",
+        "Encoding: 1 64258 1\n",
+        "Width: 1000\n",
+        "GlyphClass: 3\n",
+        "Fore\n",
+        "LigCaretCntFixed: 1\n",
+        "LCarets2: 2 0 500\n",
+        "EndChar\n",
+        "StartChar: lam_alef\n",
+        "Encoding: 2 65275 2\n",
+        "Width: 700\n",
+        "GlyphClass: 3\n",
+        "Fore\n",
+        "LCarets2: 1 350\n",
+        "EndChar\n",
+        "StartChar: shin_dagesh\n",
+        "Encoding: 3 64329 3\n",
+        "Width: 700\n",
+        "GlyphClass: 3\n",
+        "Fore\n",
+        "LCarets2: 2 200 450\n",
+        "EndChar\n",
+        "EndChars\n",
+        "EndSplineFont\n"
+    );
+    let font = load_str(data).expect("Failed to parse ligature-caret SFD");
+    let master = font.masters[0].id.clone();
+    let carets = |name: &str| -> Vec<(String, f64)> {
+        let glyph = font.glyphs.get(name).expect("glyph exists");
+        emit::glyph_foreground_layer(glyph, &master)
+            .expect("foreground layer")
+            .anchors
+            .iter()
+            .map(|a| (a.name.clone(), a.x))
+            .collect()
+    };
+    assert_eq!(
+        carets("f_f_i"),
+        vec![
+            ("caret_1".to_string(), 557.0),
+            ("caret_2".to_string(), 1117.0)
+        ]
+    );
+    assert_eq!(
+        carets("f_l"),
+        vec![("caret_1".to_string(), 0.0), ("caret_2".to_string(), 500.0)]
+    );
+    assert_eq!(carets("lam_alef"), vec![("caret_1".to_string(), 350.0)]);
+    assert_eq!(
+        carets("shin_dagesh"),
+        vec![
+            ("caret_1".to_string(), 450.0),
+            ("caret_2".to_string(), 200.0)
+        ]
+    );
+
+    // A caret is not an SFD anchor point.
+    let sfd = to_str(&font).expect("Failed to write SFD");
+    assert!(!sfd.contains("caret_"), "{sfd}");
+}
