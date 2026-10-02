@@ -2629,6 +2629,9 @@ impl SfdParser {
 // 8. OpenType features
 // ===========================================================================
 
+/// The features a compiler's feature writers generate lookups for.
+const GENERATED_FEATURES: [&str; 6] = ["abvm", "blwm", "kern", "dist", "mark", "mkmk"];
+
 /// Is this FEA line a rule that may appear directly inside `aalt`?
 ///
 /// The spec allows only feature references and single or alternate substitutions
@@ -3535,6 +3538,21 @@ impl SfdParser {
         let chain_referenced: HashSet<String> =
             deps_by_lookup.values().flatten().cloned().collect();
 
+        // A lookup that belongs to exactly one feature the compiler also generates
+        // lookups for is defined inside that feature, after the insertion marker, so
+        // the generated lookups come before it.
+        let in_feature_block = |lookup: &layout::LookupInfo, name: &str| -> bool {
+            lookup.features.first().is_some_and(|first| {
+                GENERATED_FEATURES.contains(&first.feature.as_str())
+                    && lookup
+                        .features
+                        .iter()
+                        .all(|fls| fls.feature == first.feature)
+                    && !chain_referenced.contains(name)
+            })
+        };
+        let mut defined_in_feature: HashMap<String, String> = HashMap::new();
+
         let mut is_chain: HashMap<String, bool> = HashMap::new();
         for (name, lookup) in self.gsub_lookups.0.iter().chain(self.gpos_lookups.0.iter()) {
             let has_chain = lookup
@@ -3702,7 +3720,9 @@ impl SfdParser {
             let only_aalt = !lookup.features.is_empty()
                 && lookup.features.iter().all(|fls| fls.feature == "aalt")
                 && !chain_referenced.contains(name);
-            if !only_aalt {
+            if in_feature_block(lookup, name) {
+                defined_in_feature.insert(lookup.block.name.to_string(), lookup.block.as_fea(""));
+            } else if !only_aalt {
                 self.font.features.prefixes.insert(
                     SmolStr::from(name.as_str()),
                     crate::features::PossiblyAutomaticCode {
@@ -3800,21 +3820,21 @@ impl SfdParser {
                     }
                 }
                 // And now pop the featureblock into the feature
-                // minus its wrapper
+                // minus its wrapper; a lookup defined in this feature is defined at
+                // its first reference.
                 featureblock
                     .statements
                     .iter()
-                    .map(|x| x.as_fea(""))
+                    .map(|x| match x {
+                        fea_rs_ast::Statement::LookupReference(reference) => defined_in_feature
+                            .remove(reference.lookup_name.as_str())
+                            .unwrap_or_else(|| x.as_fea("")),
+                        _ => x.as_fea(""),
+                    })
                     .collect()
             };
             // Add automatic code markers for anything which would have feature writers
-            if feature == "abvm"
-                || feature == "blwm"
-                || feature == "kern"
-                || feature == "dist"
-                || feature == "mark"
-                || feature == "mkmk"
-            {
+            if GENERATED_FEATURES.contains(&feature.as_str()) {
                 statements.insert(0, "# Automatic code start".to_string());
             }
             self.font.features.features.push((

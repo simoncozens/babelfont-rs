@@ -2166,3 +2166,53 @@ fn test_reference_matrix_snaps_near_integers() {
     let slanted = coeffs("slanted");
     assert_eq!(slanted[..4], [0.999, 0.0, 0.0, 1.0]);
 }
+
+#[test]
+fn test_a_feature_writers_feature_defines_its_own_lookups_after_the_marker() {
+    // The compiler inserts the lookups it generates for mark, mkmk, abvm, blwm, kern
+    // and dist at the feature's insertion marker. A lookup only that feature uses is
+    // defined there, after the marker, so the generated lookups come first; a lookup
+    // another feature also uses stays a prefix.
+    let data = concat!(
+        "SplineFontDB: 3.0\n",
+        "Lookup: 260 0 0 \"MarkBase\" {\"MarkBase-1\"} ['mark' ('hebr' <'dflt' > ) ]\n",
+        "Lookup: 257 0 0 \"MarkOnly\" {\"MarkOnly-1\"} ['mark' ('hebr' <'dflt' > ) ]\n",
+        "Lookup: 257 0 0 \"Shared\" {\"Shared-1\"} ['mark' ('hebr' <'dflt' > ) 'mkmk' ('hebr' <'dflt' > ) ]\n",
+        "AnchorClass2: \"Above\" \"MarkBase-1\"\n",
+        "BeginChars: 2 2\n",
+        "StartChar: alef\n",
+        "Encoding: 0 1488 0\n",
+        "Width: 600\n",
+        "AnchorPoint: \"Above\" 300 700 basechar 0\n",
+        "Position2: \"MarkOnly-1\" dx=0 dy=10 dh=0 dv=0\n",
+        "Position2: \"Shared-1\" dx=0 dy=20 dh=0 dv=0\n",
+        "EndChar\n",
+        "StartChar: qamats\n",
+        "Encoding: 1 1464 1\n",
+        "Width: 0\n",
+        "GlyphClass: 4\n",
+        "AnchorPoint: \"Above\" 0 500 mark 0\n",
+        "EndChar\n",
+        "EndChars\n",
+        "EndSplineFont\n"
+    );
+    let font = load_str(data).expect("Failed to parse lookup-precedence SFD");
+    let prefixes: Vec<&str> = font.features.prefixes.keys().map(|k| k.as_str()).collect();
+    assert!(prefixes.contains(&"Shared"), "{prefixes:?}");
+    assert!(!prefixes.contains(&"MarkOnly"), "{prefixes:?}");
+
+    let mark = &font
+        .features
+        .features
+        .iter()
+        .find(|(tag, _)| tag == "mark")
+        .expect("mark feature")
+        .1
+        .code;
+    let marker = mark.find("# Automatic").expect("insertion marker");
+    let definition = mark
+        .find("lookup MarkOnly {")
+        .expect("MarkOnly defined in mark");
+    assert!(marker < definition, "{mark}");
+    assert!(mark.contains("lookup Shared;"), "{mark}");
+}
