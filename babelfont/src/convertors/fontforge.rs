@@ -3593,6 +3593,7 @@ impl SfdParser {
         let mut feature_map: IndexMap<SmolStr, Vec<(layout::FeatureLangSys, SmolStr)>> =
             IndexMap::new();
         let mut used_script_language_pairs = HashSet::new();
+        let mut aalt_script_language_pairs = HashSet::new();
 
         for name in &ordered_names {
             // Look up in GSUB first, then GPOS
@@ -3755,6 +3756,9 @@ impl SfdParser {
                     .or_default()
                     .push((fls.clone(), lookup.block.name.clone()));
                 used_script_language_pairs.insert((fls.script.clone(), fls.language.clone()));
+                if fls.feature == "aalt" {
+                    aalt_script_language_pairs.insert((fls.script.clone(), fls.language.clone()));
+                }
             }
         }
         // Now insert a feature reference for each feature
@@ -3824,6 +3828,33 @@ impl SfdParser {
                     ..Default::default()
                 },
             ));
+        }
+        // A feature file registers `aalt` under every `languagesystem` and allows
+        // no script or language statement inside it, while FontForge registers it
+        // only for the language systems its lookups name. Every other lookup is
+        // written above with explicit script and language statements, so the
+        // declarations matter only to `aalt` and to the features a compiler
+        // generates from kerning and anchors. When there are none of the latter,
+        // declaring just `aalt`'s language systems registers every feature where
+        // FontForge did.
+        let compiler_generates_features = self.font.masters.iter().any(|m| !m.kerning.is_empty())
+            || self
+                .font
+                .glyphs
+                .iter()
+                .any(|g| g.layers.iter().any(|l| !l.anchors.is_empty()));
+        if !aalt_script_language_pairs.is_empty()
+            && aalt_script_language_pairs != used_script_language_pairs
+        {
+            if compiler_generates_features {
+                log::warn!(
+                    "aalt is registered for fewer language systems than the other features, \
+                     but kerning or anchors need them all declared; aalt will be registered \
+                     for all of them"
+                );
+            } else {
+                used_script_language_pairs = aalt_script_language_pairs;
+            }
         }
         if !used_script_language_pairs.is_empty() {
             // These must be arranged DFLT/dflt first if it exists, then <script>/dflt before <script>/<language>
