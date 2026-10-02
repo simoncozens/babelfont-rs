@@ -233,6 +233,52 @@ fn test_sfnt_revision_is_the_compiled_font_revision() {
 }
 
 #[test]
+fn test_kerning_is_written_next_to_a_fea_kern_lookup() {
+    use crate::convertors::fontir::{BabelfontIrSource, CompilationOptions};
+    use write_fonts::read::{FontRef, TableProvider};
+
+    // `A V` is in the kerning model and `V A` in an FEA lookup of the same feature;
+    // the compiler only adds the model's kerning to a `kern` block with its marker.
+    let data = concat!(
+        "SplineFontDB: 3.0\n",
+        "FontName: T\n",
+        "Ascent: 800\n",
+        "Descent: 200\n",
+        "Lookup: 258 0 0 \"kern pairs\" {\"kern pairs-1\"} ['kern' ('DFLT' <'dflt' > ) ]\n",
+        "Lookup: 258 0 0 \"kern rules\" {\"kern rules-1\"} ['kern' ('DFLT' <'dflt' > ) ]\n",
+        "BeginChars: 3 3\n",
+        "StartChar: .notdef\n",
+        "Encoding: 0 -1 0\n",
+        "Width: 500\n",
+        "EndChar\n",
+        "StartChar: A\n",
+        "Encoding: 65 65 1\n",
+        "Width: 600\n",
+        "Kerns2: 2 -50 \"kern pairs-1\"\n",
+        "EndChar\n",
+        "StartChar: V\n",
+        "Encoding: 86 86 2\n",
+        "Width: 600\n",
+        "PairPos2: \"kern rules-1\" A dx=0 dy=0 dh=-40 dv=0 dx=0 dy=0 dh=0 dv=0\n",
+        "EndChar\n",
+        "EndChars\n",
+        "EndSplineFont\n"
+    );
+    let font = load_str(data).expect("SFD should load");
+    let bytes = BabelfontIrSource::compile(font, CompilationOptions::default())
+        .expect("font should compile");
+    let gpos = FontRef::new(&bytes)
+        .expect("compiled font should parse")
+        .gpos()
+        .expect("compiled font should have a GPOS table");
+    let lookups = gpos.lookup_list().expect("GPOS lookup list").lookup_count();
+    assert_eq!(
+        lookups, 2,
+        "the kerning lookup must sit next to the FEA one"
+    );
+}
+
+#[test]
 fn test_weight_suffix_of_family_name() {
     let split = |family: &str, weight: &str| {
         let mut parser = SfdParser::new(PathBuf::from("test.sfd"));
@@ -448,6 +494,84 @@ fn test_language_does_not_inherit_default_lookups() {
         fea
     );
     assert_eq!(fea.matches("language dflt;").count(), 1, "{}", fea);
+}
+
+/// An `.sfd` whose `aalt` lookup is registered for latn/dflt only, while `liga`
+/// is also registered for latn/SRB; `kerns2` is spliced into `f`.
+fn aalt_narrower_than_liga_sfd(gpos_lookup: &str, kerns2: &str) -> String {
+    format!(
+        concat!(
+            "SplineFontDB: 3.0\n",
+            "Ascent: 800\n",
+            "Descent: 200\n",
+            "LayerCount: 2\n",
+            "Layer: 0 0 \"Back\" 1\n",
+            "Layer: 1 0 \"Fore\" 0\n",
+            "Lookup: 1 0 0 \"alt\" {{\"alt-1\"}} ['aalt' ('latn' <'dflt' > ) ]\n",
+            "Lookup: 4 0 1 \"ff\" {{\"ff-1\"}} ['liga' ('latn' <'SRB ' 'dflt' > ) ]\n",
+            "{}",
+            "BeginChars: 3 3\n",
+            "StartChar: f\n",
+            "Encoding: 102 102 0\n",
+            "Width: 300\n",
+            "Substitution2: \"alt-1\" f_f\n",
+            "{}",
+            "Fore\n",
+            "EndChar\n",
+            "StartChar: i\n",
+            "Encoding: 105 105 1\n",
+            "Width: 300\n",
+            "Fore\n",
+            "EndChar\n",
+            "StartChar: f_f\n",
+            "Encoding: -1 -1 2\n",
+            "Width: 600\n",
+            "Ligature2: \"ff-1\" f f\n",
+            "Fore\n",
+            "EndChar\n",
+            "EndChars\n",
+            "EndSplineFont\n"
+        ),
+        gpos_lookup, kerns2
+    )
+}
+
+fn words_of_fea(font: &Font) -> String {
+    font.features
+        .to_fea()
+        .lines()
+        .map(|l| l.split_whitespace().collect::<Vec<_>>().join(" "))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+#[test]
+fn test_aalt_keeps_its_own_language_systems() {
+    // A feature file registers aalt under every languagesystem, so latn/SRB must
+    // not be declared; liga still reaches SRB through its language statement.
+    let font = load_str(&aalt_narrower_than_liga_sfd("", "")).expect("Failed to parse aalt SFD");
+    let fea = words_of_fea(&font);
+    assert!(fea.contains("languagesystem latn dflt;"), "{}", fea);
+    assert!(!fea.contains("languagesystem latn SRB;"), "{}", fea);
+    assert!(fea.contains("language SRB exclude_dflt;"), "{}", fea);
+}
+
+#[test]
+fn test_aalt_language_systems_are_not_narrowed_when_kerning_needs_them() {
+    // A compiler registers the kerning it generates under every languagesystem,
+    // so all of them stay declared.
+    let font = load_str(&aalt_narrower_than_liga_sfd(
+        "Lookup: 258 0 0 \"kern\" {\"kern-1\"} ['kern' ('latn' <'SRB ' 'dflt' > ) ]\n",
+        "Kerns2: 1 -20 \"kern-1\"\n",
+    ))
+    .expect("Failed to parse aalt SFD");
+    assert!(
+        font.masters.iter().any(|m| !m.kerning.is_empty()),
+        "the fixture should carry kerning"
+    );
+    let fea = words_of_fea(&font);
+    assert!(fea.contains("languagesystem latn dflt;"), "{}", fea);
+    assert!(fea.contains("languagesystem latn SRB;"), "{}", fea);
 }
 
 #[test]
@@ -2208,4 +2332,52 @@ fn test_pair_held_by_an_earlier_subtable_is_dropped() {
         fea.contains("> W <"),
         "an unshadowed pair must stay:\n{fea}"
     );
+}
+
+#[test]
+fn test_english_lang_names_are_the_default_names() {
+    let data = concat!(
+        "SplineFontDB: 3.0\n",
+        "FontName: Lekton-Bold\n",
+        "FullName: Lekton Bold\n",
+        "FamilyName: Lekton\n",
+        "Weight: Bold\n",
+        "LangName: 1033 \"\" \"\" \"\" \"\" \"Lekton-Bold\"\n",
+        "Ascent: 800\n",
+        "Descent: 200\n",
+        "LayerCount: 2\n",
+        "Layer: 0 0 \"Back\" 1\n",
+        "Layer: 1 0 \"Fore\" 0\n",
+        "BeginChars: 0 0\n",
+        "EndChars\n",
+        "EndSplineFont\n"
+    );
+    let font = load_str(data).expect("Failed to parse SFD");
+    assert_eq!(font.names.full_name.get_default().unwrap(), "Lekton-Bold");
+    assert_eq!(
+        font.names.preferred_subfamily_name.get_default().unwrap(),
+        "Bold"
+    );
+}
+
+#[test]
+fn test_fontforge_style_name() {
+    for (font_name, family, weight, expected) in [
+        ("Lekton-Bold", Some("Lekton"), Some("Bold"), "Bold"),
+        ("NovaCut", Some("Nova Cut"), Some("Book"), "Book"),
+        ("Megrim", Some("Megrim"), Some("Medium"), "Medium"),
+        ("PuritanBoldItal", Some("Puritan"), None, "BoldItalic"),
+        (
+            "Overlock-BlackItalic",
+            Some("Overlock"),
+            Some("Black"),
+            "BlackItalic",
+        ),
+    ] {
+        assert_eq!(
+            super::fontforge_style_name(font_name, family, weight),
+            expected,
+            "{font_name}"
+        );
+    }
 }
