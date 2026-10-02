@@ -1022,9 +1022,47 @@ impl SfdParser {
             None => style_from_font_name,
         };
 
+        let stated_style = self
+            .font
+            .names
+            .preferred_subfamily_name
+            .get_default()
+            .cloned();
+        if self
+            .font
+            .names
+            .preferred_subfamily_name
+            .get_default()
+            .is_none()
+        {
+            let derived = fontforge_style_name(
+                self.font
+                    .names
+                    .postscript_name
+                    .get_default()
+                    .map(String::as_str)
+                    .unwrap_or(""),
+                self.font
+                    .names
+                    .family_name
+                    .get_default()
+                    .map(String::as_str),
+                self.font
+                    .format_specific
+                    .get("postscript_weight_name")
+                    .and_then(|v| v.as_str()),
+            );
+            self.font
+                .names
+                .preferred_subfamily_name
+                .set_default(derived);
+        }
+
         // Set master name based on width/weight
         if let Some(master) = self.font.masters.get_mut(0) {
-            if let Some(style) = style_from_font_name {
+            if let Some(style) = stated_style {
+                master.name = style.into();
+            } else if let Some(style) = style_from_font_name {
                 master.name = style.into();
             } else if let Some(weight) = self.font.custom_ot_values.os2_us_weight_class {
                 let weight_name = crate::constants::OS2_WEIGHT_TO_NAME_MAP
@@ -1137,10 +1175,16 @@ impl SfdParser {
             Err(_) => return,
         };
 
-        // Convert OpenType language ID to OT layout tag
-        let Some(otl_tag) = ot_lang_id_to_layout_tag(lang_id) else {
-            log::warn!("Unknown OpenType language ID: {}", lang_id);
-            return;
+        // FontForge exports US English from these strings in preference to
+        // FullName, FamilyName and FontName, so they are the default names.
+        let lang = if lang_id == 0x409 {
+            crate::i18ndictionary::DFLT.to_string()
+        } else {
+            let Some(otl_tag) = ot_lang_id_to_layout_tag(lang_id) else {
+                log::warn!("Unknown OpenType language ID: {}", lang_id);
+                return;
+            };
+            otl_tag.to_string()
         };
 
         // Process each quoted string
@@ -1160,7 +1204,7 @@ impl SfdParser {
 
             // Get the appropriate name field by OpenType Name ID (index)
             if let Some(name_dict) = self.font.names.get_mut(NameId::new(ix as u16)) {
-                name_dict.insert(otl_tag.to_string(), decoded);
+                name_dict.insert(lang.clone(), decoded);
             }
         }
     }
@@ -3593,6 +3637,7 @@ impl SfdParser {
         let mut feature_map: IndexMap<SmolStr, Vec<(layout::FeatureLangSys, SmolStr)>> =
             IndexMap::new();
         let mut used_script_language_pairs = HashSet::new();
+        let mut aalt_script_language_pairs = HashSet::new();
 
         for name in &ordered_names {
             // Look up in GSUB first, then GPOS
@@ -3753,6 +3798,9 @@ impl SfdParser {
                     .or_default()
                     .push((fls.clone(), lookup.block.name.clone()));
                 used_script_language_pairs.insert((fls.script.clone(), fls.language.clone()));
+                if fls.feature == "aalt" {
+                    aalt_script_language_pairs.insert((fls.script.clone(), fls.language.clone()));
+                }
             }
         }
         // Now insert a feature reference for each feature
@@ -3813,7 +3861,7 @@ impl SfdParser {
                 || feature == "mark"
                 || feature == "mkmk"
             {
-                statements.insert(0, "# Automatic code start".to_string());
+                statements.insert(0, "# Automatic Code".to_string());
             }
             self.font.features.features.push((
                 feature,
@@ -3822,6 +3870,33 @@ impl SfdParser {
                     ..Default::default()
                 },
             ));
+        }
+        // A feature file registers `aalt` under every `languagesystem` and allows
+        // no script or language statement inside it, while FontForge registers it
+        // only for the language systems its lookups name. Every other lookup is
+        // written above with explicit script and language statements, so the
+        // declarations matter only to `aalt` and to the features a compiler
+        // generates from kerning and anchors. When there are none of the latter,
+        // declaring just `aalt`'s language systems registers every feature where
+        // FontForge did.
+        let compiler_generates_features = self.font.masters.iter().any(|m| !m.kerning.is_empty())
+            || self
+                .font
+                .glyphs
+                .iter()
+                .any(|g| g.layers.iter().any(|l| !l.anchors.is_empty()));
+        if !aalt_script_language_pairs.is_empty()
+            && aalt_script_language_pairs != used_script_language_pairs
+        {
+            if compiler_generates_features {
+                log::warn!(
+                    "aalt is registered for fewer language systems than the other features, \
+                     but kerning or anchors need them all declared; aalt will be registered \
+                     for all of them"
+                );
+            } else {
+                used_script_language_pairs = aalt_script_language_pairs;
+            }
         }
         if !used_script_language_pairs.is_empty() {
             // These must be arranged DFLT/dflt first if it exists, then <script>/dflt before <script>/<language>
@@ -3930,5 +4005,92 @@ fn snap_matrix_entry(value: f64) -> f64 {
         nearest
     } else {
         value
+    }
+}
+
+/// The style name FontForge's TrueType export writes as name ID 2 when the
+/// font states none (splinefont.c `_GetModifiers`).
+fn fontforge_style_name(
+    font_name: &str,
+    family_name: Option<&str>,
+    weight: Option<&str>,
+) -> String {
+    const WEIGHTS: [(&str, &str); 19] = [
+        ("Demi", "Demi"),
+        ("Bold", "Bold"),
+        ("Regu", "Regular"),
+        ("Medi", "Medium"),
+        ("Book", "Book"),
+        ("Thin", "Thin"),
+        ("Ligh", "Light"),
+        ("Heav", "Heavy"),
+        ("Blac", "Black"),
+        ("Ultr", "Ultra"),
+        ("Nord", "Nord"),
+        ("Norm", "Normal"),
+        ("Gras", "Gras"),
+        ("Stan", "Standard"),
+        ("Halb", "Halbfett"),
+        ("Fett", "Fett"),
+        ("Mage", "Mager"),
+        ("Mitt", "Mittel"),
+        ("Buch", "Buchschrift"),
+    ];
+    const MODIFIERS: [(&str, &str); 7] = [
+        ("Ital", "Italic"),
+        ("Obli", "Oblique"),
+        ("Kursive", "Kursive"),
+        ("Cursive", "Cursive"),
+        ("Slanted", "Slanted"),
+        ("Expa", "Expanded"),
+        ("Cond", "Condensed"),
+    ];
+    let after_family = || {
+        let family: Vec<char> = family_name?.chars().collect();
+        let font: Vec<char> = font_name.chars().collect();
+        let (mut fp, mut pt) = (0, 0);
+        while fp < family.len() && pt < font.len() {
+            if family[fp] == font[pt] {
+                fp += 1;
+                pt += 1;
+            } else if family[fp] == ' ' {
+                fp += 1;
+            } else if font[pt] == ' ' {
+                pt += 1;
+            } else if "aeiou".contains(family[fp]) {
+                fp += 1;
+            } else {
+                break;
+            }
+        }
+        (fp == family.len() && pt < font.len()).then(|| font[pt..].iter().collect::<String>())
+    };
+    let first_modifier = || {
+        WEIGHTS
+            .iter()
+            .chain(MODIFIERS.iter())
+            .filter_map(|(short, _)| font_name.find(short))
+            .min()
+            .map(|i| font_name[i..].to_string())
+    };
+    let suffix = match font_name.split_once('-') {
+        Some((_, suffix)) => (!suffix.is_empty()).then(|| suffix.to_string()),
+        None => after_family(),
+    }
+    .or_else(first_modifier);
+    let Some(suffix) = suffix else {
+        return weight.unwrap_or("Regular").to_string();
+    };
+    if let Some((_, full)) = WEIGHTS
+        .iter()
+        .chain(MODIFIERS.iter())
+        .find(|(short, _)| *short == suffix)
+    {
+        return full.to_string();
+    }
+    match suffix.as_str() {
+        "BoldItal" => "BoldItalic".to_string(),
+        "BoldObli" => "BoldOblique".to_string(),
+        _ => suffix,
     }
 }
