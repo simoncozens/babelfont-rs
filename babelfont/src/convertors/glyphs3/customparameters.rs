@@ -19,7 +19,64 @@ pub(crate) fn export_font_level_cps(
     export_variable_font_origin(custom_parameters, font)?;
     export_use_typo_metrics(custom_parameters, font)?;
     export_os2_values(custom_parameters, font)?;
+    export_name_table_entries(custom_parameters, font);
     Ok(())
+}
+
+/// The names a single-style font states that Glyphs would derive differently
+/// from its family and style name. Glyphs has no property for name IDs 2 and 4
+/// (`postscriptFullName` is the CFF full name), so they go in "Name Table
+/// Entry" parameters, which apply to every instance.
+fn export_name_table_entries(custom_parameters: &mut Vec<CustomParameter>, font: &Font) {
+    let style = match (font.masters.as_slice(), font.instances.as_slice()) {
+        ([_], [instance]) => instance.name.get_default(),
+        ([master], []) => master.name.get_default(),
+        _ => None,
+    };
+    let (Some(style), Some(family)) = (style, font.names.family_name.get_default()) else {
+        return;
+    };
+    let (derived_family, derived_style) = style_map_names(family, style);
+    let mut entries = vec![];
+    if let Some(stated_style) = font.names.preferred_subfamily_name.get_default() {
+        if (family.as_str(), stated_style.as_str())
+            != (derived_family.as_str(), derived_style.as_str())
+        {
+            entries.push((1, family.clone()));
+            entries.push((2, stated_style.clone()));
+        }
+    }
+    if let Some(full_name) = font.names.full_name.get_default() {
+        if *full_name != format!("{family} {style}") {
+            entries.push((4, full_name.clone()));
+        }
+    }
+    for (name_id, value) in entries {
+        custom_parameters.push(CustomParameter {
+            name: "Name Table Entry".to_string(),
+            value: format!("{name_id}; {value}").into(),
+            disabled: false,
+        });
+    }
+}
+
+/// Name IDs 1 and 2 as Glyphs derives them from a family and style name:
+/// the four style-linked styles keep the family; any other style joins it.
+fn style_map_names(family: &str, style: &str) -> (String, String) {
+    let (rest, italic) = match style.strip_suffix("Italic") {
+        Some(rest) => (rest.trim(), true),
+        None => (style, false),
+    };
+    match (rest, italic) {
+        ("" | "Regular", false) => (family.to_string(), "Regular".to_string()),
+        ("" | "Regular", true) => (family.to_string(), "Italic".to_string()),
+        ("Bold", false) => (family.to_string(), "Bold".to_string()),
+        ("Bold", true) => (family.to_string(), "Bold Italic".to_string()),
+        (rest, italic) => (
+            format!("{family} {rest}"),
+            if italic { "Italic" } else { "Regular" }.to_string(),
+        ),
+    }
 }
 
 /// The metrics Glyphs keeps in `customParameters` rather than in the `metrics`
@@ -311,6 +368,64 @@ fn export_use_typo_metrics(
         }
     }
     Ok(())
+}
+
+#[allow(clippy::unwrap_used)]
+#[cfg(test)]
+mod name_table_entry_tests {
+    use super::*;
+    use crate::{Instance, Master};
+
+    fn single_style_font(family: &str, style: &str) -> Font {
+        let mut font = Font::new();
+        font.names.family_name.set_default(family.to_string());
+        let mut master = Master::new(style, "m01", Default::default());
+        master.name.set_default(style.to_string());
+        font.masters.push(master);
+        font
+    }
+
+    fn entries(font: &Font) -> Vec<String> {
+        let mut cps = vec![];
+        export_name_table_entries(&mut cps, font);
+        cps.iter()
+            .map(|cp| cp.value.as_str().unwrap().to_string())
+            .collect()
+    }
+
+    #[test]
+    fn test_names_glyphs_derives_need_no_entry() {
+        let mut font = single_style_font("Lekton", "Bold");
+        font.names.full_name.set_default("Lekton Bold".to_string());
+        font.names
+            .preferred_subfamily_name
+            .set_default("Bold".to_string());
+        assert!(entries(&font).is_empty());
+    }
+
+    #[test]
+    fn test_names_glyphs_cannot_derive_become_entries() {
+        let mut font = single_style_font("Nova Cut", "Regular");
+        font.names.full_name.set_default("Nova Cut".to_string());
+        font.names
+            .preferred_subfamily_name
+            .set_default("Book".to_string());
+        assert_eq!(
+            entries(&font),
+            vec!["1; Nova Cut", "2; Book", "4; Nova Cut"]
+        );
+    }
+
+    #[test]
+    fn test_no_entries_for_several_styles() {
+        let mut font = single_style_font("Lekton", "Regular");
+        font.names
+            .full_name
+            .set_default("Lekton-Regular".to_string());
+        font.instances.push(Instance::default());
+        font.instances.push(Instance::default());
+        assert!(entries(&font).is_empty());
+    }
 }
 
 #[allow(clippy::unwrap_used)]
