@@ -2248,6 +2248,10 @@ impl SfdParser {
         );
         if kind == "mark" {
             name = "_".to_string() + &name;
+        } else if kind == "baselig" {
+            // A ligature carries one anchor of the class per component; Glyphs names
+            // the anchor for component n (counting from 1) <class>_<n>.
+            name = format!("{}_{}", name, index + 1);
         }
         Some(crate::Anchor {
             name,
