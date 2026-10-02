@@ -3660,31 +3660,6 @@ impl SfdParser {
                 // below keeps the feature registration from referencing a lookup
                 // that is never defined.
                 if !rules.is_empty() {
-                    // Only the four low bits have feature-file names; the high byte
-                    // is a mark-attachment class this convertor does not model yet,
-                    // and asserting `lookupflag 0` for it would claim the opposite
-                    // of what the SFD said.
-                    if lookup.flag & !0x000F != 0 {
-                        log::warn!(
-                            "lookup {:?}: flag {:#06x} carries bits (mark-attachment \
-                             class or filtering set) that are not converted",
-                            lookup.block.name,
-                            lookup.flag
-                        );
-                    }
-                    if lookup.flag & 0x000F != 0 {
-                        lookup
-                            .block
-                            .statements
-                            .push(fea_rs_ast::Statement::LookupFlag(
-                                fea_rs_ast::LookupFlagStatement::new(
-                                    lookup.flag & 0x000F,
-                                    None,
-                                    None,
-                                    0..0,
-                                ),
-                            ));
-                    }
                     lookup.block.statements.extend(namer.definitions());
                     lookup.block.statements.extend(rules);
                 }
@@ -3692,6 +3667,29 @@ impl SfdParser {
             if lookup.block.statements.is_empty() {
                 // No statements: skip this lookup
                 continue;
+            }
+            // Every lookup keeps its flags. Only the four low bits have feature-file
+            // names; the high byte is a mark-attachment class this convertor does not
+            // model yet, and asserting `lookupflag 0` for it would claim the opposite
+            // of what the SFD said.
+            if lookup.flag & !0x000F != 0 {
+                log::warn!(
+                    "lookup {:?}: flag {:#06x} carries bits (mark-attachment \
+                     class or filtering set) that are not converted",
+                    lookup.block.name,
+                    lookup.flag
+                );
+            }
+            if lookup.flag & 0x000F != 0 {
+                lookup.block.statements.insert(
+                    0,
+                    fea_rs_ast::Statement::LookupFlag(fea_rs_ast::LookupFlagStatement::new(
+                        lookup.flag & 0x000F,
+                        None,
+                        None,
+                        0..0,
+                    )),
+                );
             }
             emitted_lookups.insert(name.clone());
             // A lookup used only by `aalt` has its single and alternate substitutions

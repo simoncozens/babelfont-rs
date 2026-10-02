@@ -2166,3 +2166,51 @@ fn test_reference_matrix_snaps_near_integers() {
     let slanted = coeffs("slanted");
     assert_eq!(slanted[..4], [0.999, 0.0, 0.0, 1.0]);
 }
+
+#[test]
+fn test_every_lookup_keeps_its_flags() {
+    // Lookup flags belong to the lookup, whatever its type: a ligature lookup with
+    // flag 9 (RightToLeft | IgnoreMarks) forms the ligature across marks.
+    let data = concat!(
+        "SplineFontDB: 3.0\n",
+        "Lookup: 4 9 0 \"LamAlef\" {\"LamAlef-1\"} ['liga' ('arab' <'dflt' > ) ]\n",
+        "Lookup: 1 0 0 \"Plain\" {\"Plain-1\"} ['salt' ('arab' <'dflt' > ) ]\n",
+        "BeginChars: 3 3\n",
+        "StartChar: lam\n",
+        "Encoding: 0 -1 0\n",
+        "Width: 500\n",
+        "Substitution2: \"Plain-1\" alef\n",
+        "EndChar\n",
+        "StartChar: alef\n",
+        "Encoding: 1 -1 1\n",
+        "Width: 300\n",
+        "EndChar\n",
+        "StartChar: lam_alef\n",
+        "Encoding: 2 -1 2\n",
+        "Width: 700\n",
+        "Ligature2: \"LamAlef-1\" lam alef\n",
+        "EndChar\n",
+        "EndChars\n",
+        "EndSplineFont\n"
+    );
+    let font = load_str(data).expect("Failed to parse lookup-flag SFD");
+    let fea = font.features.to_fea();
+    let lam_alef = fea
+        .split("lookup LamAlef {")
+        .nth(1)
+        .and_then(|rest| rest.split('}').next())
+        .expect("LamAlef lookup is defined");
+    assert!(
+        lam_alef.contains("lookupflag RightToLeft IgnoreMarks;"),
+        "a non-contextual lookup keeps its flags:\n{fea}"
+    );
+    let plain = fea
+        .split("lookup Plain {")
+        .nth(1)
+        .and_then(|rest| rest.split('}').next())
+        .expect("Plain lookup is defined");
+    assert!(
+        !plain.contains("lookupflag"),
+        "a lookup with flag 0 states none:\n{fea}"
+    );
+}
