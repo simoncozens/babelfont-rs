@@ -33,6 +33,8 @@ pub(crate) struct FeatureLangSys {
 pub(crate) struct LookupInfo {
     pub(crate) lookup_type: LookupType,
     pub(crate) flag: u16, // This will become a fea_rs::LookupFlagStatement once we build the lookup
+    /// The mark filtering set index, when the flag uses one.
+    pub(crate) mark_filtering_set: Option<u16>,
     pub(crate) features: Vec<FeatureLangSys>,
     pub(crate) block: fea_rs_ast::LookupBlock,
     pub(crate) subtables: IndexMap<SmolStr, Vec<fea_rs_ast::Statement>>,
