@@ -244,6 +244,7 @@ impl SfdParser {
         self.parse()?;
         self.resolve_component_references()?;
         self.resolve_offset_metrics()?;
+        self.drop_shadowed_glyph_pairs();
         self.process_kerning()?;
         self.insert_gtables();
         Ok(self.font)
@@ -2502,6 +2503,41 @@ impl SfdParser {
         let entry = groups.entry(group.clone()).or_default();
         if !entry.contains(&glyph) {
             entry.push(glyph);
+        }
+    }
+
+    /// Drop the glyph pairs (`Kerns2` or `PairPos2`) that an earlier subtable of the
+    /// same lookup already holds: the first subtable to cover a pair positions it, so
+    /// a later one never applies.
+    fn drop_shadowed_glyph_pairs(&mut self) {
+        let glyph_order: Vec<SmolStr> = self.font.glyphs.iter().map(|g| g.name.clone()).collect();
+        for lookup in self.gpos_lookups.0.values_mut() {
+            if !matches!(lookup.lookup_type, layout::LookupType::PairPosition) {
+                continue;
+            }
+            let mut held: HashSet<(SmolStr, SmolStr)> = HashSet::new();
+            for (subtable, statements) in lookup.subtables.iter_mut() {
+                if let Some(pairs) = self.kern_pairs.get_mut(subtable.as_str()) {
+                    for (left, entries) in pairs.iter_mut() {
+                        entries.retain(|(gid, _)| match glyph_order.get(*gid) {
+                            Some(right) => held.insert((left.as_str().into(), right.clone())),
+                            None => true,
+                        });
+                    }
+                }
+                statements.retain(|statement| match statement {
+                    fea_rs_ast::Statement::PairPos(pair) => {
+                        match (&pair.glyphs_1, &pair.glyphs_2) {
+                            (
+                                fea_rs_ast::GlyphContainer::GlyphName(left),
+                                fea_rs_ast::GlyphContainer::GlyphName(right),
+                            ) => held.insert((left.name.clone(), right.name.clone())),
+                            _ => true,
+                        }
+                    }
+                    _ => true,
+                });
+            }
         }
     }
 
