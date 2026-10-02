@@ -1,7 +1,11 @@
 use glyphslib::{common::CustomParameter, Plist};
 
 use crate::{
-    common::FormatSpecific, convertors::glyphs3::get_cp, BabelfontError, Font, MetricType,
+    common::FormatSpecific,
+    convertors::glyphs3::get_cp,
+    i18ndictionary::DFLT,
+    names::{is_layout_language_tag, name_language_to_ot_lang_id},
+    BabelfontError, Font, MetricType, NameId,
 };
 
 /// A set of paired functions to interpret/export font-level custom parameters
@@ -19,7 +23,69 @@ pub(crate) fn export_font_level_cps(
     export_variable_font_origin(custom_parameters, font)?;
     export_use_typo_metrics(custom_parameters, font)?;
     export_os2_values(custom_parameters, font)?;
+    export_localized_name_table_entries(custom_parameters, font);
     Ok(())
+}
+
+/// The name IDs Glyphs 3 stores in a localized font property (`copyrights`,
+/// `familyNames`, `trademarks`, `manufacturers`, `designers`, `descriptions`,
+/// `licenses`, `compatibleFullNames`, `sampleTexts`). Such a property takes only
+/// the languages Glyphs has a code for.
+const LOCALIZED_PROPERTY_NAME_IDS: [NameId; 9] = [
+    NameId::COPYRIGHT_NOTICE,
+    NameId::FAMILY_NAME,
+    NameId::TRADEMARK,
+    NameId::MANUFACTURER,
+    NameId::DESIGNER,
+    NameId::DESCRIPTION,
+    NameId::LICENSE_DESCRIPTION,
+    NameId::COMPATIBLE_FULL_NAME,
+    NameId::SAMPLE_TEXT,
+];
+
+/// The Windows Unicode BMP encoding of a name record.
+const WINDOWS_PLATFORM: u16 = 3;
+const WINDOWS_UNICODE_BMP: u16 = 1;
+const ENGLISH_US: u16 = 0x0409;
+
+/// The localized names of a single-style font that no Glyphs property can hold:
+/// a name ID with no localized property (such as 2, the subfamily), or a
+/// language Glyphs has no code for. Each becomes a "Name Table Entry"
+/// `<name ID> 3 1 <language ID>; <value>`, a Windows record. A "Name Table
+/// Entry" applies to every instance, so a font with several styles gets none.
+/// US English is the default record, which the properties carry.
+fn export_localized_name_table_entries(custom_parameters: &mut Vec<CustomParameter>, font: &Font) {
+    let single_style = matches!(
+        (font.masters.as_slice(), font.instances.as_slice()),
+        ([_], [] | [_])
+    );
+    if !single_style {
+        return;
+    }
+    for (name_id, names) in font.names.iter() {
+        let in_property = LOCALIZED_PROPERTY_NAME_IDS.contains(&name_id);
+        for (language, value) in names.0.iter() {
+            if language == DFLT || (in_property && is_layout_language_tag(language)) {
+                continue;
+            }
+            let Some(language_id) = name_language_to_ot_lang_id(language) else {
+                log::warn!("No Windows language ID for name language {language}; dropped");
+                continue;
+            };
+            if language_id == ENGLISH_US {
+                continue;
+            }
+            custom_parameters.push(CustomParameter {
+                name: "Name Table Entry".to_string(),
+                value: format!(
+                    "{} {WINDOWS_PLATFORM} {WINDOWS_UNICODE_BMP} 0x{language_id:04X}; {value}",
+                    name_id.to_u16()
+                )
+                .into(),
+                disabled: false,
+            });
+        }
+    }
 }
 
 /// The metrics Glyphs keeps in `customParameters` rather than in the `metrics`
@@ -311,6 +377,76 @@ fn export_use_typo_metrics(
         }
     }
     Ok(())
+}
+
+#[allow(clippy::unwrap_used)]
+#[cfg(test)]
+mod localized_name_table_entry_tests {
+    use super::*;
+    use crate::{Instance, Master};
+
+    fn single_style_font() -> Font {
+        let mut font = Font::new();
+        font.names
+            .family_name
+            .set_default("Comic Relief".to_string());
+        font.masters
+            .push(Master::new("Regular", "m01", Default::default()));
+        font
+    }
+
+    fn entries(font: &Font) -> Vec<String> {
+        let mut cps = vec![];
+        export_localized_name_table_entries(&mut cps, font);
+        cps.iter()
+            .map(|cp| cp.value.as_str().unwrap().to_string())
+            .collect()
+    }
+
+    #[test]
+    fn test_a_localized_subfamily_becomes_an_entry() {
+        let mut font = single_style_font();
+        let subfamily = &mut font.names.preferred_subfamily_name;
+        subfamily.set_default("Regular".to_string());
+        subfamily.insert("CAT".to_string(), "Normal".to_string());
+        subfamily.insert("es-MX".to_string(), "Normal".to_string());
+        assert_eq!(
+            entries(&font),
+            vec!["2 3 1 0x0403; Normal", "2 3 1 0x080A; Normal"]
+        );
+    }
+
+    #[test]
+    fn test_a_property_keeps_the_languages_glyphs_has_a_code_for() {
+        let mut font = single_style_font();
+        font.names
+            .family_name
+            .insert("DEU".to_string(), "Komisch".to_string());
+        font.names
+            .family_name
+            .insert("fr-CA".to_string(), "Comique".to_string());
+        assert_eq!(entries(&font), vec!["1 3 1 0x0C0C; Comique"]);
+    }
+
+    #[test]
+    fn test_english_is_left_to_the_properties() {
+        let mut font = single_style_font();
+        font.names
+            .preferred_subfamily_name
+            .insert("ENG".to_string(), "Regular".to_string());
+        assert!(entries(&font).is_empty());
+    }
+
+    #[test]
+    fn test_no_entries_for_several_styles() {
+        let mut font = single_style_font();
+        font.names
+            .preferred_subfamily_name
+            .insert("CAT".to_string(), "Normal".to_string());
+        font.instances.push(Instance::default());
+        font.instances.push(Instance::default());
+        assert!(entries(&font).is_empty());
+    }
 }
 
 #[allow(clippy::unwrap_used)]
