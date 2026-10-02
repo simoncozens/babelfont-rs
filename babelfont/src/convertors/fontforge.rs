@@ -1504,6 +1504,9 @@ impl SfdParser {
         let mut current_layer_idx: Option<usize> = None;
         let mut layer_map: HashMap<usize, usize> = HashMap::new();
         let mut width: Option<f32> = None;
+        let mut explicit_class: Option<usize> = None;
+        let mut first_anchor_kind: Option<String> = None;
+        let mut is_ligature = false;
 
         let mut idx = 1usize;
         while idx < data.len() {
@@ -1623,6 +1626,7 @@ impl SfdParser {
                 }
                 "GlyphClass" => {
                     if let Some(v) = value.and_then(|v| v.parse::<usize>().ok()) {
+                        explicit_class = Some(v);
                         glyph.category = match v {
                             2 => GlyphCategory::Base,
                             3 => GlyphCategory::Ligature,
@@ -1832,6 +1836,14 @@ impl SfdParser {
                                 serde_json::Value::String(decl.1.clone()),
                             );
                         }
+                        let kind = anchor
+                            .format_specific
+                            .get("sfd.kind")
+                            .and_then(|k| k.as_str());
+                        // Cursive anchors are skipped when FontForge classes a glyph.
+                        if first_anchor_kind.is_none() && !matches!(kind, Some("entry" | "exit")) {
+                            first_anchor_kind = kind.map(String::from);
+                        }
                         glyph.layers[layer_pos].anchors.push(anchor);
                     }
                 }
@@ -1864,6 +1876,7 @@ impl SfdParser {
                 }
                 // One-line layout rules
                 "Ligature2" => {
+                    is_ligature = true;
                     // Split off the (quoted) name and the rest
                     if let Some((subtable_name, glyphs)) = self.parse_oneline_layout(value) {
                         let Some(subtable) = self.gsub_lookups.find_subtable_mut(&subtable_name)
@@ -2037,6 +2050,26 @@ impl SfdParser {
                 width.unwrap_or(0.0),
                 self.layer_defs.get(1).and_then(|d| d.as_ref()),
                 master_id,
+            );
+        }
+
+        // The GDEF class FontForge's exporter gives the glyph: 0 none, 1 base,
+        // 2 ligature, 3 mark, 4 component.
+        let gdef_class = match explicit_class {
+            Some(class) if class != 0 => class - 1,
+            _ if glyph_name == ".notdef" => 0,
+            _ if matches!(first_anchor_kind.as_deref(), Some("mark" | "basemark")) => 3,
+            _ if is_ligature => 2,
+            _ => 1,
+        };
+        glyph.format_specific.insert(
+            "sfd.gdef_class".to_string(),
+            serde_json::Value::Number(gdef_class.into()),
+        );
+        if explicit_class.is_some_and(|class| class != 0) {
+            glyph.format_specific.insert(
+                "sfd.gdef_class_explicit".to_string(),
+                serde_json::Value::Bool(true),
             );
         }
 
