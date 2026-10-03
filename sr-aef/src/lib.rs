@@ -33,9 +33,10 @@ use std::collections::{HashMap, HashSet};
 /// The return value of uncompile() will be a [fea_rs_ast::FeatureFile]; you will probably want to call `.as_fea()` on it.
 pub use fea_rs_ast;
 use fea_rs_ast::{
-    Anchor, GlyphClass, GlyphClassDefStatement, GlyphClassDefinition, GlyphContainer, GlyphName,
-    LanguageSystemStatement, LookupBlock, LookupFlagStatement, LookupReferenceStatement, MarkClass,
-    MarkClassDefinition, Pos, Statement, SubOrPos, Subst, ToplevelItem,
+    Anchor, GdefStatement, GlyphClass, GlyphClassDefStatement, GlyphClassDefinition,
+    GlyphContainer, GlyphName, LanguageSystemStatement, LookupBlock, LookupFlagStatement,
+    LookupReferenceStatement, MarkClass, MarkClassDefinition, Pos, Statement, SubOrPos, Subst,
+    Table, ToplevelItem,
 };
 use indexmap::{IndexMap, IndexSet};
 /// A handle to the version of Skrifa that sr-eaf is using. Pass a skrifa::FontRef to uncompile()
@@ -343,7 +344,7 @@ impl<'a> UncompileContext<'a> {
     }
 
     fn uncompile_gdef(&mut self) -> Result<Vec<ToplevelItem>, ReadError> {
-        let mut items = vec![];
+        let mut statements = vec![];
         let mut base_glyphs = vec![];
         let mut mark_glyphs = vec![];
         let mut ligature_glyphs = vec![];
@@ -363,7 +364,7 @@ impl<'a> UncompileContext<'a> {
                         _ => {}
                     }
                 }
-                items.push(ToplevelItem::GdefClassDef(GlyphClassDefStatement::new(
+                statements.push(GdefStatement::GlyphClassDef(GlyphClassDefStatement::new(
                     make_class(base_glyphs),
                     make_class(ligature_glyphs),
                     make_class(mark_glyphs),
@@ -372,7 +373,10 @@ impl<'a> UncompileContext<'a> {
                 )));
             }
         }
-        Ok(items)
+        if statements.is_empty() {
+            return Ok(vec![]);
+        }
+        Ok(vec![ToplevelItem::Gdef(Table { statements })])
     }
 
     fn uncompile_feature_table(&mut self) -> Result<(), ReadError> {
@@ -549,7 +553,10 @@ mod tests {
         assert_eq!(
             ff.as_fea(""),
             "\
+table GDEF {
 GlyphClassDef [A], [], [grave acute dotbelowcomb], [];
+} GDEF;
+
 markClass grave <anchor 200 150> @bottomleft;
 markClass acute <anchor 350 0> @bottomleft;
 markClass dotbelowcomb <anchor 200 -200> @mark_class_1_1;
