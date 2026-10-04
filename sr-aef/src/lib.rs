@@ -103,7 +103,7 @@ pub struct UncompileContext<'a> {
         feature = "cli",
         serde(serialize_with = "crate::serialize::serialize_features")
     )]
-    pub features: IndexMap<SmolStr, Vec<LookupReferenceStatement>>,
+    pub features: IndexMap<SmolStr, Vec<Statement>>,
     #[cfg_attr(feature = "cli", serde(skip))]
     symbols: IndexMap<SmolStr, usize>,
     #[cfg_attr(feature = "cli", serde(skip))]
@@ -359,7 +359,10 @@ impl<'a> UncompileContext<'a> {
             .features
             .values()
             .flatten()
-            .map(|reference| SmolStr::new(&reference.lookup_name))
+            .filter_map(|statement| match statement {
+                Statement::LookupReference(reference) => Some(SmolStr::new(&reference.lookup_name)),
+                _ => None,
+            })
             .collect();
         let calls: HashMap<SmolStr, Vec<SmolStr>> = self
             .lookups
@@ -483,19 +486,14 @@ impl<'a> UncompileContext<'a> {
                     feature_tag.to_string().into(),
                     lookup_indices
                         .iter()
-                        .map(|i| {
-                            LookupReferenceStatement::new(
-                                self.get_lookup_name(i.get(), Subst).into(),
-                                0..0,
-                            )
-                        })
+                        .map(|i| lookup_reference(&self.get_lookup_name(i.get(), Subst)))
                         .collect(),
                 );
             }
         }
 
         if let Some(feature_list) = self.gpos.as_ref().and_then(|gpos| gpos.feature_list().ok()) {
-            let mut features: IndexMap<SmolStr, Vec<LookupReferenceStatement>> = IndexMap::new();
+            let mut features: IndexMap<SmolStr, Vec<Statement>> = IndexMap::new();
             for feature_record in feature_list.feature_records() {
                 let feature_tag = feature_record.feature_tag();
                 let feature = feature_record.feature(feature_list.offset_data())?;
@@ -504,12 +502,7 @@ impl<'a> UncompileContext<'a> {
                     feature_tag.to_string().into(),
                     lookup_indices
                         .iter()
-                        .map(|i| {
-                            LookupReferenceStatement::new(
-                                self.get_lookup_name(i.get(), Pos).into(),
-                                0..0,
-                            )
-                        })
+                        .map(|i| lookup_reference(&self.get_lookup_name(i.get(), Pos)))
                         .collect(),
                 );
             }
@@ -570,6 +563,10 @@ impl<'a> UncompileContext<'a> {
             )),
         );
     }
+}
+
+fn lookup_reference(name: &SmolStr) -> Statement {
+    Statement::LookupReference(LookupReferenceStatement::new(name.to_string(), 0..0))
 }
 
 fn called_lookups(lookup: &LookupBlock) -> Vec<SmolStr> {
@@ -645,10 +642,7 @@ pub fn uncompile(
         ff.statements
             .push(ToplevelItem::Feature(fea_rs_ast::FeatureBlock::new(
                 feature_name.clone(),
-                lookup_refs
-                    .iter()
-                    .map(|lr| Statement::LookupReference(lr.clone()))
-                    .collect(),
+                lookup_refs.clone(),
                 false,
                 0..0,
             )));
