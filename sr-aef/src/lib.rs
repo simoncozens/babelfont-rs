@@ -244,6 +244,13 @@ impl<'a> UncompileContext<'a> {
                 }
             }
         }
+        if let Some(index) = systems.get_index_of(&Tag::new(b"DFLT")) {
+            systems.move_index(index, 0);
+            let languages = &mut systems[0];
+            if let Some(index) = languages.get_index_of(&Tag::new(b"dflt")) {
+                languages.move_index(index, 0);
+            }
+        }
         self.language_systems = systems;
         Ok(())
     }
