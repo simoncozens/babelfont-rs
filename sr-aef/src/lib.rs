@@ -696,10 +696,11 @@ impl<'a> UncompileContext<'a> {
                 .and_then(|mgss| mgss.coverages().get(set as usize).ok())
                 .map(|coverage| self.resolve_coverage_to_class(&coverage, false))
         });
-        let mark_attachment_class = flags.mark_attachment_class().and_then(|class| {
-            mark_attachment_classes
+        let mark_attachment_class = flags.mark_attachment_class().map(|class| {
+            let classes = mark_attachment_classes
                 .and_then(|mac| self.resolve_classes(Some(&mac)).get(&class).cloned())
-                .map(|classes| GlyphContainer::GlyphClass(GlyphClass::new(classes, 0..0)))
+                .unwrap_or_default();
+            GlyphContainer::GlyphClass(GlyphClass::new(classes, 0..0))
         });
 
         lookupblock.statements.insert(
@@ -1066,6 +1067,26 @@ LigatureCaretByPos a 100 200;
 LigatureCaretByIndex b 3;
 } GDEF;
 
+"
+        );
+    }
+
+    #[test]
+    fn test_uncompile_empty_mark_attachment_class() {
+        let data = std::fs::read("resources/markattach.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+languagesystem DFLT dflt;
+lookup gsub_single_1 {
+    lookupflag MarkAttachmentType [];
+    sub a by b;
+} gsub_single_1;
+feature ss01 {
+lookup gsub_single_1;
+} ss01;
 "
         );
     }
