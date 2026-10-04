@@ -22,10 +22,11 @@ use skrifa::raw::{
 use smol_str::SmolStr;
 impl<'a> UncompileContext<'a> {
     pub(crate) fn uncompile_gpos_lookups(&mut self) -> Result<(), ReadError> {
-        let gpos_lookup_list: LookupList<PositionLookup> = match self.gpos.as_ref() {
-            Some(gpos) => gpos.lookup_list()?,
-            None => return Ok(()),
-        };
+        let gpos_lookup_list: LookupList<PositionLookup> =
+            match self.gpos.as_ref().and_then(|gpos| gpos.lookup_list().ok()) {
+                Some(lookup_list) => lookup_list,
+                None => return Ok(()),
+            };
         for (i, lookup) in gpos_lookup_list.lookups().iter().flatten().enumerate() {
             let prefix = match lookup.subtables()? {
                 PositionSubtables::Single(_) => "gpos_single",

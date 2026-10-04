@@ -467,10 +467,10 @@ impl<'a> UncompileContext<'a> {
     }
 
     fn uncompile_feature_table(&mut self) -> Result<(), ReadError> {
-        if let Some(gsub) = &self.gsub {
-            for feature_record in gsub.feature_list()?.feature_records() {
+        if let Some(feature_list) = self.gsub.as_ref().and_then(|gsub| gsub.feature_list().ok()) {
+            for feature_record in feature_list.feature_records() {
                 let feature_tag = feature_record.feature_tag();
-                let feature = feature_record.feature(gsub.feature_list()?.offset_data())?;
+                let feature = feature_record.feature(feature_list.offset_data())?;
                 let lookup_indices = feature.lookup_list_indices();
                 self.features.insert(
                     feature_tag.to_string().into(),
@@ -487,10 +487,10 @@ impl<'a> UncompileContext<'a> {
             }
         }
 
-        if let Some(gpos) = &self.gpos {
-            for feature_record in gpos.feature_list()?.feature_records() {
+        if let Some(feature_list) = self.gpos.as_ref().and_then(|gpos| gpos.feature_list().ok()) {
+            for feature_record in feature_list.feature_records() {
                 let feature_tag = feature_record.feature_tag();
-                let feature = feature_record.feature(gpos.feature_list()?.offset_data())?;
+                let feature = feature_record.feature(feature_list.offset_data())?;
                 let lookup_indices = feature.lookup_list_indices();
                 self.features.insert(
                     feature_tag.to_string().into(),

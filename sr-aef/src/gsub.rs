@@ -17,10 +17,11 @@ use skrifa::{
 };
 impl<'a> UncompileContext<'a> {
     pub(crate) fn uncompile_gsub_lookups(&mut self) -> Result<(), ReadError> {
-        let gsub_lookup_list: LookupList<SubstitutionLookup> = match self.gsub.as_ref() {
-            Some(gsub) => gsub.lookup_list()?,
-            None => return Ok(()),
-        };
+        let gsub_lookup_list: LookupList<SubstitutionLookup> =
+            match self.gsub.as_ref().and_then(|gsub| gsub.lookup_list().ok()) {
+                Some(lookup_list) => lookup_list,
+                None => return Ok(()),
+            };
         for (i, lookup) in gsub_lookup_list.lookups().iter().flatten().enumerate() {
             let prefix = match lookup.subtables()? {
                 SubstitutionSubtables::Single(_) => "gsub_single",
