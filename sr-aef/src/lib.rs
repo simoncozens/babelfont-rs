@@ -495,11 +495,12 @@ impl<'a> UncompileContext<'a> {
         }
 
         if let Some(feature_list) = self.gpos.as_ref().and_then(|gpos| gpos.feature_list().ok()) {
+            let mut features: IndexMap<SmolStr, Vec<LookupReferenceStatement>> = IndexMap::new();
             for feature_record in feature_list.feature_records() {
                 let feature_tag = feature_record.feature_tag();
                 let feature = feature_record.feature(feature_list.offset_data())?;
                 let lookup_indices = feature.lookup_list_indices();
-                self.features.insert(
+                features.insert(
                     feature_tag.to_string().into(),
                     lookup_indices
                         .iter()
@@ -511,6 +512,12 @@ impl<'a> UncompileContext<'a> {
                         })
                         .collect(),
                 );
+            }
+            for (feature_tag, lookups) in features {
+                self.features
+                    .entry(feature_tag)
+                    .or_default()
+                    .extend(lookups);
             }
         }
 
@@ -681,6 +688,7 @@ mod tests {
         assert_eq!(
             ff.as_fea(""),
             "\
+languagesystem DFLT dflt;
 table GDEF {
 GlyphClassDef [A], [], [grave acute dotbelowcomb], [];
 } GDEF;
@@ -736,6 +744,9 @@ lookup gsub_single_5 {
 lookup gsub_reverse_1 {
     rsub one two [a b]' c by [d e];
 } gsub_reverse_1;
+lookup gsub_single_6 {
+    sub one by two;
+} gsub_single_6;
 lookup gpos_mark_to_base_1 {
     pos base A
         <anchor 150 100> mark @bottomleft
@@ -761,6 +772,13 @@ lookup gpos_single_4 {
     pos a -50;
     pos b -60;
 } gpos_single_4;
+lookup gpos_single_5 {
+    pos one 30;
+} gpos_single_5;
+feature ss01 {
+lookup gsub_single_6;
+    lookup gpos_single_5;
+} ss01;
 "
         );
     }
