@@ -33,7 +33,7 @@ use std::collections::{HashMap, HashSet};
 /// The return value of uncompile() will be a [fea_rs_ast::FeatureFile]; you will probably want to call `.as_fea()` on it.
 pub use fea_rs_ast;
 use fea_rs_ast::{
-    Anchor, AsFea, Comment, GdefStatement, GlyphClass, GlyphClassDefStatement,
+    Anchor, AsFea, AttachStatement, Comment, GdefStatement, GlyphClass, GlyphClassDefStatement,
     GlyphClassDefinition, GlyphContainer, GlyphName, LanguageStatement, LanguageSystemStatement,
     LigatureCaretByIndexStatement, LigatureCaretByPosStatement, LookupBlock, LookupFlagStatement,
     LookupReferenceStatement, MarkClass, MarkClassDefinition, Pos, ScriptStatement, Statement,
@@ -469,6 +469,23 @@ impl<'a> UncompileContext<'a> {
                     make_class(component_glyphs),
                     0..0,
                 )));
+            }
+            if let Some(Ok(attach_list)) = gdef.attach_list() {
+                let coverage = attach_list.coverage()?;
+                for (gid, attach_point) in coverage.iter().zip(attach_list.attach_points().iter()) {
+                    let point_indices: Vec<usize> = attach_point?
+                        .point_indices()
+                        .iter()
+                        .map(|index| index.get() as usize)
+                        .collect();
+                    if !point_indices.is_empty() {
+                        statements.push(GdefStatement::Attach(AttachStatement::new(
+                            GlyphContainer::GlyphName(self.get_name(gid)),
+                            point_indices,
+                            0..0,
+                        )));
+                    }
+                }
             }
             if let Some(Ok(lig_caret_list)) = gdef.lig_caret_list() {
                 let coverage = lig_caret_list.coverage()?;
@@ -1087,6 +1104,23 @@ lookup gsub_single_1 {
 feature ss01 {
 lookup gsub_single_1;
 } ss01;
+"
+        );
+    }
+
+    #[test]
+    fn test_uncompile_attachment_points() {
+        let data = std::fs::read("resources/attach.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+table GDEF {
+Attach a 1 2;
+Attach b 3;
+} GDEF;
+
 "
         );
     }
