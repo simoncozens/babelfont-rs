@@ -710,6 +710,14 @@ lookup gsub_chain_contextual_2 {
 lookup gsub_multiple_2 {
     sub e by NULL;
 } gsub_multiple_2;
+lookup gsub_chain_contextual_3 {
+    ignore sub one a' b;
+    sub a' lookup gsub_single_1;
+} gsub_chain_contextual_3;
+lookup gsub_contextual_2 {
+    ignore sub a' b';
+    sub a' lookup gsub_single_1 c';
+} gsub_contextual_2;
 lookup gpos_mark_to_base_1 {
     pos base A
         <anchor 150 100> mark @bottomleft
@@ -721,6 +729,13 @@ lookup gpos_single_1 {
 lookup gpos_chain_contextual_1 {
     pos one A' lookup gpos_single_1;
 } gpos_chain_contextual_1;
+lookup gpos_single_2 {
+    pos A 20;
+} gpos_single_2;
+lookup gpos_chain_contextual_2 {
+    ignore pos one A';
+    pos A' lookup gpos_single_2;
+} gpos_chain_contextual_2;
 "
         );
     }

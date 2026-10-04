@@ -2,9 +2,10 @@ use std::collections::HashMap;
 
 use crate::UncompileContext;
 use fea_rs_ast::{
-    Anchor as FeaAnchor, CursivePosStatement, GlyphClass, GlyphContainer, LookupBlock,
-    MarkBasePosStatement, MarkClass, MarkLigPosStatement, MarkMarkPosStatement, Metric,
-    PairPosStatement, Pos, SinglePosStatement, Statement, ValueRecord as FeaValueRecord,
+    Anchor as FeaAnchor, ChainedContextStatement, CursivePosStatement, GlyphClass, GlyphContainer,
+    IgnoreStatement, LookupBlock, MarkBasePosStatement, MarkClass, MarkLigPosStatement,
+    MarkMarkPosStatement, Metric, PairPosStatement, Pos, SinglePosStatement, Statement,
+    ValueRecord as FeaValueRecord,
 };
 use indexmap::IndexMap;
 use skrifa::raw::{
@@ -104,7 +105,7 @@ impl<'a> UncompileContext<'a> {
                         lookupblock.statements.extend(
                             self.uncompile_sequence_context(subtable, Pos)?
                                 .into_iter()
-                                .map(Statement::ChainedContextPos),
+                                .map(to_context_statement),
                         );
                     }
                     lookupblock
@@ -115,7 +116,7 @@ impl<'a> UncompileContext<'a> {
                         lookupblock.statements.extend(
                             self.uncompile_chain_sequence_context(subtable, Pos)?
                                 .into_iter()
-                                .map(Statement::ChainedContextPos),
+                                .map(to_context_statement),
                         );
                     }
                     lookupblock
@@ -749,4 +750,16 @@ fn majority_in_quadrant(xs: &[f32], ys: &[f32]) -> Option<&'static str> {
             None
         }
     })
+}
+
+fn to_context_statement(statement: ChainedContextStatement<Pos>) -> Statement {
+    if statement.lookups.iter().all(Vec::is_empty) {
+        Statement::IgnorePos(IgnoreStatement::new(
+            vec![(statement.prefix, statement.glyphs, statement.suffix)],
+            0..0,
+            Pos,
+        ))
+    } else {
+        Statement::ChainedContextPos(statement)
+    }
 }

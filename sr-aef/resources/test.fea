@@ -32,6 +32,14 @@ lookup gsub6_inline {
 lookup gsub2_null {
     sub e by NULL;
 } gsub2_null;
+lookup gsub6_ignore {
+    ignore sub one a' b;
+    sub a' lookup gsub1;
+} gsub6_ignore;
+lookup gsub5_ignore {
+    ignore sub a' b';
+    sub a' lookup gsub1 c';
+} gsub5_ignore;
 
 lookup gpos4 {
     pos base A <anchor 150 100> mark @TOP_MARKS <anchor -200 -200> mark @BOTTOM_MARKS;
@@ -40,3 +48,7 @@ lookup gpos4 {
 lookup gpos8_inline {
     pos one A' 10;
 } gpos8_inline;
+lookup gpos8_ignore {
+    ignore pos one A';
+    pos A' 20;
+} gpos8_ignore;

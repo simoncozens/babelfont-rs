@@ -1,7 +1,8 @@
 use crate::UncompileContext;
 use fea_rs_ast::{
-    AlternateSubstStatement, GlyphClass, GlyphContainer, GlyphName, LigatureSubstStatement,
-    LookupBlock, MultipleSubstStatement, SingleSubstStatement, Statement, Subst,
+    AlternateSubstStatement, ChainedContextStatement, GlyphClass, GlyphContainer, GlyphName,
+    IgnoreStatement, LigatureSubstStatement, LookupBlock, MultipleSubstStatement,
+    SingleSubstStatement, Statement, Subst,
 };
 use skrifa::{
     GlyphId16,
@@ -77,7 +78,7 @@ impl<'a> UncompileContext<'a> {
                         lookupblock.statements.extend(
                             self.uncompile_sequence_context(subtable, Subst)?
                                 .into_iter()
-                                .map(Statement::ChainedContextSubst),
+                                .map(to_context_statement),
                         );
                     }
                     lookupblock
@@ -88,7 +89,7 @@ impl<'a> UncompileContext<'a> {
                         lookupblock.statements.extend(
                             self.uncompile_chain_sequence_context(subtable, Subst)?
                                 .into_iter()
-                                .map(Statement::ChainedContextSubst),
+                                .map(to_context_statement),
                         );
                     }
                     lookupblock
@@ -248,5 +249,17 @@ impl<'a> UncompileContext<'a> {
         _gsub7: ReverseChainSingleSubstFormat1,
     ) -> Result<(), ReadError> {
         todo!()
+    }
+}
+
+fn to_context_statement(statement: ChainedContextStatement<Subst>) -> Statement {
+    if statement.lookups.iter().all(Vec::is_empty) {
+        Statement::IgnoreSubst(IgnoreStatement::new(
+            vec![(statement.prefix, statement.glyphs, statement.suffix)],
+            0..0,
+            Subst,
+        ))
+    } else {
+        Statement::ChainedContextSubst(statement)
     }
 }
