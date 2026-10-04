@@ -20,6 +20,12 @@ lookup gsub5 {
 lookup gsub6_f1 {
     sub one two three a' lookup gsub1 b' c' lookup gsub2 x y z;
 } gsub6_f1;
+lookup gsub1_f1 {
+    sub [a b] by [b c];
+} gsub1_f1;
+lookup gsub1_f2 {
+    sub [a b] by [d c];
+} gsub1_f2;
 
 lookup gpos4 {
     pos base A <anchor 150 100> mark @TOP_MARKS <anchor -200 -200> mark @BOTTOM_MARKS;

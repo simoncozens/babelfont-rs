@@ -578,6 +578,12 @@ lookup gsub_contextual_1 {
 lookup gsub_chain_contextual_1 {
     sub one two three a' lookup gsub_single_1 b' c' lookup gsub_multiple_1 x y z;
 } gsub_chain_contextual_1;
+lookup gsub_single_2 {
+    sub [a b] by [b c];
+} gsub_single_2;
+lookup gsub_single_3 {
+    sub [a b] by [d c];
+} gsub_single_3;
 lookup gpos_mark_to_base_1 {
     pos base A
         <anchor 150 100> mark @bottomleft

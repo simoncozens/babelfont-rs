@@ -7,7 +7,10 @@ use skrifa::raw::{
 use std::collections::HashMap;
 
 impl<'a> UncompileContext<'a> {
-    fn class_members_to_container(&self, members: Vec<GlyphContainer>) -> GlyphContainer {
+    pub(crate) fn class_members_to_container(
+        &self,
+        members: Vec<GlyphContainer>,
+    ) -> GlyphContainer {
         if members.len() == 1 {
             members.into_iter().next().unwrap()
         } else {

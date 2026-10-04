@@ -122,7 +122,14 @@ impl<'a> UncompileContext<'a> {
             .map(|g| GlyphId16::new(g.to_u16().saturating_add_signed(delta)))
             .map(|g| GlyphContainer::GlyphName(self.get_name(g)))
             .collect::<Vec<GlyphContainer>>();
-        let subst = SingleSubstStatement::new(inputs, replacements, vec![], vec![], 0..0, false);
+        let subst = SingleSubstStatement::new(
+            vec![self.class_members_to_container(inputs)],
+            vec![self.class_members_to_container(replacements)],
+            vec![],
+            vec![],
+            0..0,
+            false,
+        );
         lookupblock.statements.push(Statement::SingleSubst(subst));
 
         Ok(())
@@ -138,7 +145,14 @@ impl<'a> UncompileContext<'a> {
             .iter()
             .map(|g| GlyphContainer::GlyphName(self.get_name(g.get())))
             .collect();
-        let subst = SingleSubstStatement::new(inputs, replacements, vec![], vec![], 0..0, false);
+        let subst = SingleSubstStatement::new(
+            vec![self.class_members_to_container(inputs)],
+            vec![self.class_members_to_container(replacements)],
+            vec![],
+            vec![],
+            0..0,
+            false,
+        );
         lookupblock.statements.push(Statement::SingleSubst(subst));
         Ok(())
     }
