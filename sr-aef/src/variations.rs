@@ -12,6 +12,7 @@ use skrifa::{
             gpos::DeviceOrVariationIndex,
             variations::{DeltaSetIndex, ItemVariationStore},
         },
+        types::F2Dot14,
     },
 };
 
@@ -97,17 +98,19 @@ impl<'a> UncompileContext<'a> {
             .transpose()
     }
 
-    fn interesting_locations(
-        &self,
-    ) -> Result<BTreeSet<(UserLocation, NormalizedLocation)>, ReadError> {
-        let mut master_locations: BTreeSet<(UserLocation, NormalizedLocation)> = BTreeSet::new();
+    fn interesting_locations(&self) -> Result<BTreeSet<(UserLocation, Vec<F2Dot14>)>, ReadError> {
+        let mut master_locations: BTreeSet<(UserLocation, Vec<F2Dot14>)> = BTreeSet::new();
         let variations = self.variation_store()?.unwrap();
         let regions = variations.variation_region_list()?;
         for region in regions.variation_regions().iter().flatten() {
-            let location: NormalizedLocation = region
+            let coords: Vec<F2Dot14> = region
                 .region_axes()
                 .iter()
-                .map(|x| NormalizedCoord::new(x.peak_coord().to_f32() as f64))
+                .map(|x| x.peak_coord())
+                .collect();
+            let location: NormalizedLocation = coords
+                .iter()
+                .map(|coord| NormalizedCoord::new(coord.to_f32() as f64))
                 .zip(self.axis_tags.iter())
                 .map(|(coord, tag)| (to_fd_tag(*tag), coord))
                 .collect();
@@ -116,7 +119,7 @@ impl<'a> UncompileContext<'a> {
                     location.convert(axes).map_err(|_e| {
                         ReadError::MalformedData("Failed to convert variation location")
                     })?,
-                    location,
+                    coords,
                 ));
             }
         }
@@ -131,7 +134,7 @@ impl<'a> UncompileContext<'a> {
                 location.convert(axes).map_err(|_e| {
                     ReadError::MalformedData("Failed to convert variation location")
                 })?,
-                location,
+                vec![F2Dot14::ZERO; self.axis_tags.len()],
             ));
         }
         Ok(master_locations)
@@ -149,25 +152,14 @@ impl<'a> UncompileContext<'a> {
             variations = self
                 .interesting_locations()?
                 .iter()
-                .map(|(user_loc, norm_loc)| {
-                    let coords = norm_loc
-                        .iter()
-                        .map(|(_tag, coord)| {
-                            // to_f2dot14() returns write-fonts' F2Dot14; compute_delta
-                            // expects read-fonts' F2Dot14 (different font-types version).
-                            // Convert via raw bits since both are [u16; 1] wrappers.
-                            // Use skrifa::raw::types instead of direct read-fonts dep.
-                            let wf = coord.to_f2dot14();
-                            skrifa::raw::types::F2Dot14::from_bits(wf.to_bits())
-                        })
-                        .collect::<Vec<_>>();
+                .map(|(user_loc, coords)| {
                     let delta = ivs
                         .compute_delta(
                             DeltaSetIndex {
                                 outer: varix.delta_set_outer_index(),
                                 inner: varix.delta_set_inner_index(),
                             },
-                            &coords,
+                            coords,
                         )
                         .unwrap_or_default();
                     let simple_user_loc: SimpleUserLocation = user_loc
