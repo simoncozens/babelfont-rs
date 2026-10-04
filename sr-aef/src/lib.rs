@@ -35,8 +35,9 @@ pub use fea_rs_ast;
 use fea_rs_ast::{
     Anchor, AsFea, Comment, GdefStatement, GlyphClass, GlyphClassDefStatement,
     GlyphClassDefinition, GlyphContainer, GlyphName, LanguageStatement, LanguageSystemStatement,
-    LookupBlock, LookupFlagStatement, LookupReferenceStatement, MarkClass, MarkClassDefinition,
-    Pos, ScriptStatement, Statement, SubOrPos, Subst, Table, ToplevelItem,
+    LigatureCaretByIndexStatement, LigatureCaretByPosStatement, LookupBlock, LookupFlagStatement,
+    LookupReferenceStatement, MarkClass, MarkClassDefinition, Pos, ScriptStatement, Statement,
+    SubOrPos, Subst, Table, ToplevelItem,
 };
 use indexmap::{IndexMap, IndexSet};
 /// A handle to the version of Skrifa that sr-eaf is using. Pass a skrifa::FontRef to uncompile()
@@ -48,7 +49,7 @@ use skrifa::{
     raw::{
         ReadError, TableProvider,
         tables::{
-            gdef::Gdef,
+            gdef::{CaretValue, Gdef},
             gpos::Gpos,
             gsub::{ClassDef, Gsub},
             layout::{CoverageTable, LookupFlag, ScriptList},
@@ -468,6 +469,33 @@ impl<'a> UncompileContext<'a> {
                     make_class(component_glyphs),
                     0..0,
                 )));
+            }
+            if let Some(Ok(lig_caret_list)) = gdef.lig_caret_list() {
+                let coverage = lig_caret_list.coverage()?;
+                for (gid, lig_glyph) in coverage.iter().zip(lig_caret_list.lig_glyphs().iter()) {
+                    let mut positions = vec![];
+                    let mut point_indices = vec![];
+                    for caret in lig_glyph?.caret_values().iter() {
+                        match caret? {
+                            CaretValue::Format1(caret) => positions.push(caret.coordinate()),
+                            CaretValue::Format2(caret) => {
+                                point_indices.push(caret.caret_value_point_index() as usize)
+                            }
+                            CaretValue::Format3(caret) => positions.push(caret.coordinate()),
+                        }
+                    }
+                    let glyph = GlyphContainer::GlyphName(self.get_name(gid));
+                    if !positions.is_empty() {
+                        statements.push(GdefStatement::LigatureCaretByPos(
+                            LigatureCaretByPosStatement::new(glyph.clone(), positions, 0..0),
+                        ));
+                    }
+                    if !point_indices.is_empty() {
+                        statements.push(GdefStatement::LigatureCaretByIndex(
+                            LigatureCaretByIndexStatement::new(glyph, point_indices, 0..0),
+                        ));
+                    }
+                }
             }
         }
         if statements.is_empty() {
@@ -1021,6 +1049,23 @@ script DFLT;
     language dflt required;
     lookup gsub_single_1;
 } rlig;
+"
+        );
+    }
+
+    #[test]
+    fn test_uncompile_ligature_carets() {
+        let data = std::fs::read("resources/carets.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+table GDEF {
+LigatureCaretByPos a 100 200;
+LigatureCaretByIndex b 3;
+} GDEF;
+
 "
         );
     }
