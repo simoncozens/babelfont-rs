@@ -477,6 +477,7 @@ impl<'a> UncompileContext<'a> {
     }
 
     fn uncompile_feature_table(&mut self) -> Result<(), ReadError> {
+        let mut registered_features = vec![];
         let mut unregistered_features = vec![];
         if let Some(feature_list) = self.gsub.as_ref().and_then(|gsub| gsub.feature_list().ok()) {
             let systems =
@@ -489,8 +490,8 @@ impl<'a> UncompileContext<'a> {
                     .iter()
                     .map(|i| lookup_reference(&self.get_lookup_name(i.get(), Subst)))
                     .collect();
-                if systems.contains_key(&(index as u16)) {
-                    self.add_feature_lookups(feature_tag, lookups);
+                if let Some(language_systems) = systems.get(&(index as u16)) {
+                    registered_features.push((feature_tag, language_systems.clone(), lookups));
                 } else {
                     unregistered_features.push((feature_tag, lookups));
                 }
@@ -508,13 +509,14 @@ impl<'a> UncompileContext<'a> {
                     .iter()
                     .map(|i| lookup_reference(&self.get_lookup_name(i.get(), Pos)))
                     .collect();
-                if systems.contains_key(&(index as u16)) {
-                    self.add_feature_lookups(feature_tag, lookups);
+                if let Some(language_systems) = systems.get(&(index as u16)) {
+                    registered_features.push((feature_tag, language_systems.clone(), lookups));
                 } else {
                     unregistered_features.push((feature_tag, lookups));
                 }
             }
         }
+        self.add_registered_features(registered_features);
 
         let referenced_lookups: Vec<Statement> = self
             .features
@@ -538,6 +540,31 @@ impl<'a> UncompileContext<'a> {
         }
 
         Ok(())
+    }
+
+    fn add_registered_features(&mut self, features: Vec<(Tag, Vec<(Tag, Tag)>, Vec<Statement>)>) {
+        let mut registrations: IndexMap<Tag, IndexMap<(Tag, Tag), Vec<Statement>>> =
+            IndexMap::new();
+        for (feature_tag, language_systems, lookups) in features {
+            for language_system in language_systems {
+                let registered = registrations
+                    .entry(feature_tag)
+                    .or_default()
+                    .entry(language_system)
+                    .or_default();
+                for lookup in &lookups {
+                    if !registered.contains(lookup) {
+                        registered.push(lookup.clone());
+                    }
+                }
+            }
+        }
+
+        for (feature_tag, systems) in registrations {
+            for lookups in systems.into_values() {
+                self.add_feature_lookups(feature_tag, lookups);
+            }
+        }
     }
 
     fn add_feature_lookups(&mut self, feature_tag: Tag, lookups: Vec<Statement>) {
