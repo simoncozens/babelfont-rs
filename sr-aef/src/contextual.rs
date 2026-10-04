@@ -126,7 +126,7 @@ impl<'a> UncompileContext<'a> {
                     .coverages()
                     .iter()
                     .flatten()
-                    .map(|coverage| self.resolve_coverage_to_class(&coverage))
+                    .map(|coverage| self.resolve_coverage_to_class(&coverage, true))
                     .collect();
                 let mut lookups = vec![vec![]; input.len()];
                 for lookup_record in table_ref.seq_lookup_records() {
@@ -301,20 +301,20 @@ impl<'a> UncompileContext<'a> {
                     .input_coverages()
                     .iter()
                     .flatten()
-                    .map(|coverage| self.resolve_coverage_to_class(&coverage))
+                    .map(|coverage| self.resolve_coverage_to_class(&coverage, true))
                     .collect();
                 let mut pre: Vec<GlyphContainer> = table_ref
                     .backtrack_coverages()
                     .iter()
                     .flatten()
-                    .map(|coverage| self.resolve_coverage_to_class(&coverage))
+                    .map(|coverage| self.resolve_coverage_to_class(&coverage, true))
                     .collect();
                 pre.reverse();
                 let post: Vec<GlyphContainer> = table_ref
                     .lookahead_coverages()
                     .iter()
                     .flatten()
-                    .map(|coverage| self.resolve_coverage_to_class(&coverage))
+                    .map(|coverage| self.resolve_coverage_to_class(&coverage, true))
                     .collect();
 
                 let mut lookups = vec![vec![]; input.len()];

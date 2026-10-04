@@ -40,6 +40,10 @@ lookup gsub5_ignore {
     ignore sub a' b';
     sub a' lookup gsub1 c';
 } gsub5_ignore;
+lookup gsub1_filter {
+    lookupflag UseMarkFilteringSet [acute];
+    sub b by c;
+} gsub1_filter;
 
 lookup gpos4 {
     pos base A <anchor 150 100> mark @TOP_MARKS <anchor -200 -200> mark @BOTTOM_MARKS;

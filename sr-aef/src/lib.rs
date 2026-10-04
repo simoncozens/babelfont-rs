@@ -266,9 +266,13 @@ impl<'a> UncompileContext<'a> {
             .map(|g| GlyphContainer::GlyphName(self.get_name(g)))
             .collect()
     }
-    fn resolve_coverage_to_class(&mut self, coverage: &CoverageTable) -> GlyphContainer {
+    fn resolve_coverage_to_class(
+        &mut self,
+        coverage: &CoverageTable,
+        collapse_single: bool,
+    ) -> GlyphContainer {
         let glyphs = self.resolve_coverage(coverage);
-        if glyphs.len() == 1 {
+        if collapse_single && glyphs.len() == 1 {
             return glyphs.into_iter().next().unwrap();
         }
         let glyphclass = GlyphClass::new(glyphs.clone(), 0..0);
@@ -534,7 +538,7 @@ impl<'a> UncompileContext<'a> {
         let set = mark_filtering_set.and_then(|set| {
             mark_glyph_sets
                 .and_then(|mgss| mgss.coverages().get(set as usize).ok())
-                .map(|coverage| self.resolve_coverage_to_class(&coverage))
+                .map(|coverage| self.resolve_coverage_to_class(&coverage, false))
         });
         let mark_attachment_class = flags.mark_attachment_class().and_then(|class| {
             mark_attachment_classes
@@ -718,6 +722,10 @@ lookup gsub_contextual_2 {
     ignore sub a' b';
     sub a' lookup gsub_single_1 c';
 } gsub_contextual_2;
+lookup gsub_single_5 {
+    lookupflag UseMarkFilteringSet [acute];
+    sub b by c;
+} gsub_single_5;
 lookup gpos_mark_to_base_1 {
     pos base A
         <anchor 150 100> mark @bottomleft
