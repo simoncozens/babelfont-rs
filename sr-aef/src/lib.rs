@@ -177,6 +177,7 @@ impl<'a> UncompileContext<'a> {
         slf.uncompile_gsub_lookups()?;
         slf.uncompile_gpos_lookups()?;
         slf.uncompile_feature_table()?;
+        slf.order_lookups();
         Ok(slf)
     }
 
@@ -324,16 +325,13 @@ impl<'a> UncompileContext<'a> {
         name
     }
 
-    fn create_next_lookup_block<T: SubOrPos>(
-        &mut self,
-        prefix: &str,
-        index: u16,
-        phase: T,
-    ) -> LookupBlock {
+    fn assign_lookup_name<T: SubOrPos>(&mut self, prefix: &str, index: u16, phase: T) {
         let name = self.gensym(prefix);
-        self.lookup_map
-            .insert((phase.to_string(), index), name.clone());
-        LookupBlock::new(name.clone(), vec![], false, 0..0)
+        self.lookup_map.insert((phase.to_string(), index), name);
+    }
+
+    fn create_lookup_block<T: SubOrPos>(&self, index: u16, phase: T) -> LookupBlock {
+        LookupBlock::new(self.get_lookup_name(index, phase), vec![], false, 0..0)
     }
 
     fn get_lookup_name<T: SubOrPos>(&self, lookup_list_index: u16, phase: T) -> SmolStr {
@@ -341,6 +339,91 @@ impl<'a> UncompileContext<'a> {
             .get(&(phase.to_string(), lookup_list_index))
             .cloned()
             .unwrap_or_else(|| format!("{}_lookup_{}", phase, lookup_list_index).into())
+    }
+
+    /// Feature files require lookups to be defined before use. Reorder them while
+    /// keeping the original order where possible.
+    fn order_lookups(&mut self) {
+        let used_by_features: HashSet<SmolStr> = self
+            .features
+            .values()
+            .flatten()
+            .map(|reference| SmolStr::new(&reference.lookup_name))
+            .collect();
+        let calls: HashMap<SmolStr, Vec<SmolStr>> = self
+            .lookups
+            .iter()
+            .map(|(name, lookup)| (name.clone(), called_lookups(lookup)))
+            .collect();
+        let contextual_only: HashSet<SmolStr> = calls
+            .values()
+            .flatten()
+            .filter(|name| !used_by_features.contains(*name))
+            .cloned()
+            .collect();
+        let feature_dependencies: HashMap<SmolStr, Vec<SmolStr>> = calls
+            .keys()
+            .map(|name| {
+                (
+                    name.clone(),
+                    feature_dependencies(name, &calls, &contextual_only),
+                )
+            })
+            .collect();
+        let count_pending_dependencies =
+            |name: &SmolStr, pending: &IndexMap<SmolStr, LookupBlock>| {
+                feature_dependencies[name]
+                    .iter()
+                    .filter(|dependency| pending.contains_key(*dependency))
+                    .count()
+            };
+
+        let mut pending = std::mem::take(&mut self.lookups);
+        let mut deferred: Vec<SmolStr> = vec![];
+        let names: Vec<SmolStr> = pending.keys().cloned().collect();
+        for name in names {
+            if !pending.contains_key(&name) {
+                continue;
+            }
+            let pending_dependencies = count_pending_dependencies(&name, &pending);
+            if contextual_only.contains(&name) {
+                if pending_dependencies == 0 {
+                    self.place_lookup(&name, &mut pending, &calls);
+                }
+                continue;
+            }
+            if pending_dependencies > 1 {
+                deferred.push(name);
+                continue;
+            }
+            self.place_lookup(&name, &mut pending, &calls);
+            while let Some(index) = deferred
+                .iter()
+                .position(|name| count_pending_dependencies(name, &pending) == 0)
+            {
+                let name = deferred.remove(index);
+                self.place_lookup(&name, &mut pending, &calls);
+            }
+        }
+        let remaining: Vec<SmolStr> = pending.keys().cloned().collect();
+        for name in deferred.into_iter().chain(remaining) {
+            self.place_lookup(&name, &mut pending, &calls);
+        }
+    }
+
+    fn place_lookup(
+        &mut self,
+        name: &SmolStr,
+        pending: &mut IndexMap<SmolStr, LookupBlock>,
+        calls: &HashMap<SmolStr, Vec<SmolStr>>,
+    ) {
+        let Some(lookup) = pending.shift_remove(name) else {
+            return;
+        };
+        for dependency in calls.get(name).into_iter().flatten() {
+            self.place_lookup(dependency, pending, calls);
+        }
+        self.lookups.insert(name.clone(), lookup);
     }
 
     fn uncompile_gdef(&mut self) -> Result<Vec<ToplevelItem>, ReadError> {
@@ -471,6 +554,40 @@ impl<'a> UncompileContext<'a> {
     }
 }
 
+fn called_lookups(lookup: &LookupBlock) -> Vec<SmolStr> {
+    lookup
+        .statements
+        .iter()
+        .flat_map(|statement| match statement {
+            Statement::ChainedContextSubst(statement) => statement.lookups.concat(),
+            Statement::ChainedContextPos(statement) => statement.lookups.concat(),
+            _ => vec![],
+        })
+        .collect()
+}
+
+/// Find dependencies used by features, following calls through lookups unused by features.
+fn feature_dependencies(
+    name: &SmolStr,
+    calls: &HashMap<SmolStr, Vec<SmolStr>>,
+    contextual_only: &HashSet<SmolStr>,
+) -> Vec<SmolStr> {
+    let mut dependencies = vec![];
+    let mut seen = HashSet::new();
+    let mut stack: Vec<&SmolStr> = calls.get(name).into_iter().flatten().collect();
+    while let Some(dependency) = stack.pop() {
+        if !seen.insert(dependency) {
+            continue;
+        }
+        if contextual_only.contains(dependency) {
+            stack.extend(calls.get(dependency).into_iter().flatten());
+        } else {
+            dependencies.push(dependency.clone());
+        }
+    }
+    dependencies
+}
+
 /// Uncompile a TTF font into a fea file.
 ///
 /// If do_gdef is true, also uncompile the GDEF table and include it in the output.
@@ -584,11 +701,23 @@ lookup gsub_single_2 {
 lookup gsub_single_3 {
     sub [a b] by [d c];
 } gsub_single_3;
+lookup gsub_single_4 {
+    sub a by c;
+} gsub_single_4;
+lookup gsub_chain_contextual_2 {
+    sub one a' lookup gsub_single_4;
+} gsub_chain_contextual_2;
 lookup gpos_mark_to_base_1 {
     pos base A
         <anchor 150 100> mark @bottomleft
         <anchor -200 -200> mark @mark_class_1_1;
 } gpos_mark_to_base_1;
+lookup gpos_single_1 {
+    pos A 10;
+} gpos_single_1;
+lookup gpos_chain_contextual_1 {
+    pos one A' lookup gpos_single_1;
+} gpos_chain_contextual_1;
 "
         );
     }

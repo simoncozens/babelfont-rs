@@ -26,8 +26,14 @@ lookup gsub1_f1 {
 lookup gsub1_f2 {
     sub [a b] by [d c];
 } gsub1_f2;
+lookup gsub6_inline {
+    sub one a' by c;
+} gsub6_inline;
 
 lookup gpos4 {
     pos base A <anchor 150 100> mark @TOP_MARKS <anchor -200 -200> mark @BOTTOM_MARKS;
 
 } gpos4;
+lookup gpos8_inline {
+    pos one A' 10;
+} gpos8_inline;
