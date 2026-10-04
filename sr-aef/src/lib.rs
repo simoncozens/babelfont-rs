@@ -34,9 +34,9 @@ use std::collections::{HashMap, HashSet};
 pub use fea_rs_ast;
 use fea_rs_ast::{
     Anchor, AsFea, Comment, GdefStatement, GlyphClass, GlyphClassDefStatement,
-    GlyphClassDefinition, GlyphContainer, GlyphName, LanguageSystemStatement, LookupBlock,
-    LookupFlagStatement, LookupReferenceStatement, MarkClass, MarkClassDefinition, Pos, Statement,
-    SubOrPos, Subst, Table, ToplevelItem,
+    GlyphClassDefinition, GlyphContainer, GlyphName, LanguageStatement, LanguageSystemStatement,
+    LookupBlock, LookupFlagStatement, LookupReferenceStatement, MarkClass, MarkClassDefinition,
+    Pos, ScriptStatement, Statement, SubOrPos, Subst, Table, ToplevelItem,
 };
 use indexmap::{IndexMap, IndexSet};
 /// A handle to the version of Skrifa that sr-eaf is using. Pass a skrifa::FontRef to uncompile()
@@ -560,10 +560,48 @@ impl<'a> UncompileContext<'a> {
             }
         }
 
+        let dflt = Tag::new(b"dflt");
+        let system_count: usize = self.language_systems.values().map(|l| l.len()).sum();
         for (feature_tag, systems) in registrations {
-            for lookups in systems.into_values() {
-                self.add_feature_lookups(feature_tag, lookups);
+            let first = &systems[0];
+            let everywhere = systems.len() == system_count
+                && systems.values().all(|lookups| {
+                    lookups.len() == first.len() && lookups.iter().all(|l| first.contains(l))
+                });
+            if everywhere || [Tag::new(b"aalt"), Tag::new(b"size")].contains(&feature_tag) {
+                for lookups in systems.into_values() {
+                    self.add_feature_lookups(feature_tag, lookups);
+                }
+                continue;
             }
+            let mut statements = vec![];
+            for (script_tag, languages) in &self.language_systems {
+                if !languages
+                    .iter()
+                    .any(|language| systems.contains_key(&(*script_tag, *language)))
+                {
+                    continue;
+                }
+                statements.push(Statement::Script(ScriptStatement::new(
+                    script_tag.to_string().trim_end().into(),
+                )));
+                if let Some(lookups) = systems.get(&(*script_tag, dflt)) {
+                    statements.extend(lookups.iter().cloned());
+                }
+                for language in languages.iter().filter(|language| **language != dflt) {
+                    let Some(lookups) = systems.get(&(*script_tag, *language)) else {
+                        continue;
+                    };
+                    statements.push(Statement::Language(LanguageStatement::new(
+                        language.to_string().trim_end().into(),
+                        false,
+                        false,
+                    )));
+                    statements.extend(lookups.iter().cloned());
+                }
+            }
+            self.features
+                .insert(feature_tag.to_string().into(), statements);
         }
     }
 
@@ -899,12 +937,17 @@ lookup gsub_single_3 {
     sub a by e;
 } gsub_single_3;
 feature calt {
-lookup gsub_single_2;
+script latn;
+    lookup gsub_single_2;
+    language TRK exclude_dflt;
+    lookup gsub_single_2;
     lookup gsub_single_3;
 } calt;
 feature locl {
-lookup gsub_single_3;
+script latn;
     lookup gsub_single_2;
+    language TRK exclude_dflt;
+    lookup gsub_single_3;
 } locl;
 feature ss01 {
 lookup gsub_single_1;
