@@ -297,10 +297,10 @@ impl<'a> UncompileContext<'a> {
         }
     }
 
-    fn resolve_classes(&self, class_def: &ClassDef) -> HashMap<u16, Vec<GlyphContainer>> {
+    fn resolve_classes(&self, class_def: Option<&ClassDef>) -> HashMap<u16, Vec<GlyphContainer>> {
         let mut classes: HashMap<u16, Vec<GlyphContainer>> = HashMap::new();
         let mut used_glyphs = HashSet::new();
-        for (glyph_id, class_id) in class_def.iter() {
+        for (glyph_id, class_id) in class_def.into_iter().flat_map(|class_def| class_def.iter()) {
             used_glyphs.insert(glyph_id.to_u16());
             classes
                 .entry(class_id)
@@ -542,7 +542,7 @@ impl<'a> UncompileContext<'a> {
         });
         let mark_attachment_class = flags.mark_attachment_class().and_then(|class| {
             mark_attachment_classes
-                .and_then(|mac| self.resolve_classes(&mac).get(&class).cloned())
+                .and_then(|mac| self.resolve_classes(Some(&mac)).get(&class).cloned())
                 .map(|classes| GlyphContainer::GlyphClass(GlyphClass::new(classes, 0..0)))
         });
 

@@ -68,7 +68,7 @@ impl<'a> UncompileContext<'a> {
             SequenceContext::Format2(_table_ref) => {
                 let table_ref = _table_ref;
                 let class_def = table_ref.class_def()?;
-                let classes = self.resolve_classes(&class_def);
+                let classes = self.resolve_classes(Some(&class_def));
 
                 let mut covered_input_classes: HashMap<u16, Vec<GlyphContainer>> = HashMap::new();
                 for gid in table_ref.coverage()?.iter() {
@@ -205,17 +205,19 @@ impl<'a> UncompileContext<'a> {
             }
             ChainedSequenceContext::Format2(_table_ref) => {
                 let table_ref = _table_ref;
-                let input_class_def = table_ref.input_class_def()?;
-                let backtrack_class_def = table_ref.backtrack_class_def()?;
-                let lookahead_class_def = table_ref.lookahead_class_def()?;
+                let input_class_def = table_ref.input_class_def().ok();
+                let backtrack_class_def = table_ref.backtrack_class_def().ok();
+                let lookahead_class_def = table_ref.lookahead_class_def().ok();
 
-                let input_classes = self.resolve_classes(&input_class_def);
-                let backtrack_classes = self.resolve_classes(&backtrack_class_def);
-                let lookahead_classes = self.resolve_classes(&lookahead_class_def);
+                let input_classes = self.resolve_classes(input_class_def.as_ref());
+                let backtrack_classes = self.resolve_classes(backtrack_class_def.as_ref());
+                let lookahead_classes = self.resolve_classes(lookahead_class_def.as_ref());
 
                 let mut covered_input_classes: HashMap<u16, Vec<GlyphContainer>> = HashMap::new();
                 for gid in table_ref.coverage()?.iter() {
-                    let class_id = input_class_def.get(gid);
+                    let class_id = input_class_def
+                        .as_ref()
+                        .map_or(0, |class_def| class_def.get(gid));
                     covered_input_classes
                         .entry(class_id)
                         .or_default()
