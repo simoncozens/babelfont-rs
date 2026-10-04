@@ -29,6 +29,9 @@ lookup gsub1_f2 {
 lookup gsub6_inline {
     sub one a' by c;
 } gsub6_inline;
+lookup gsub2_null {
+    sub e by NULL;
+} gsub2_null;
 
 lookup gpos4 {
     pos base A <anchor 150 100> mark @TOP_MARKS <anchor -200 -200> mark @BOTTOM_MARKS;

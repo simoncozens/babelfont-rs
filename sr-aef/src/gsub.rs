@@ -1,7 +1,7 @@
 use crate::UncompileContext;
 use fea_rs_ast::{
-    AlternateSubstStatement, GlyphClass, GlyphContainer, LigatureSubstStatement, LookupBlock,
-    MultipleSubstStatement, SingleSubstStatement, Statement, Subst,
+    AlternateSubstStatement, GlyphClass, GlyphContainer, GlyphName, LigatureSubstStatement,
+    LookupBlock, MultipleSubstStatement, SingleSubstStatement, Statement, Subst,
 };
 use skrifa::{
     GlyphId16,
@@ -167,11 +167,14 @@ impl<'a> UncompileContext<'a> {
     ) -> Result<(), ReadError> {
         let inputs = self.resolve_coverage(&gsub2.coverage()?);
         for (input, sequence) in inputs.iter().zip(gsub2.sequences().iter().flatten()) {
-            let replacements = sequence
+            let mut replacements: Vec<GlyphContainer> = sequence
                 .substitute_glyph_ids()
                 .iter()
                 .map(|g| GlyphContainer::GlyphName(self.get_name(g.get())))
                 .collect();
+            if replacements.is_empty() {
+                replacements.push(GlyphContainer::GlyphName(GlyphName::new("NULL")));
+            }
             let subst = MultipleSubstStatement::new(
                 input.clone(),
                 replacements,

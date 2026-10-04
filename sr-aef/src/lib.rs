@@ -707,6 +707,9 @@ lookup gsub_single_4 {
 lookup gsub_chain_contextual_2 {
     sub one a' lookup gsub_single_4;
 } gsub_chain_contextual_2;
+lookup gsub_multiple_2 {
+    sub e by NULL;
+} gsub_multiple_2;
 lookup gpos_mark_to_base_1 {
     pos base A
         <anchor 150 100> mark @bottomleft
