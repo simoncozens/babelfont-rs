@@ -157,8 +157,24 @@ impl<'a> UncompileContext<'a> {
                 )
             })
             .transpose()?;
-        let x_advance = value_record.x_advance().map(Metric::from);
-        let y_advance = value_record.y_advance().map(Metric::from);
+        let x_advance = value_record
+            .x_advance()
+            .map(|vr| {
+                self.resolve_pos_with_variations(
+                    vr,
+                    value_record.x_advance_device(parent_offset_data),
+                )
+            })
+            .transpose()?;
+        let y_advance = value_record
+            .y_advance()
+            .map(|vr| {
+                self.resolve_pos_with_variations(
+                    vr,
+                    value_record.y_advance_device(parent_offset_data),
+                )
+            })
+            .transpose()?;
         Ok(FeaValueRecord::new(
             x_placement,
             y_placement,

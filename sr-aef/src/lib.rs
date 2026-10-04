@@ -1124,4 +1124,23 @@ Attach b 3;
 "
         );
     }
+
+    #[test]
+    fn test_uncompile_variable_advances() {
+        let data = std::fs::read("resources/advances.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+languagesystem DFLT dflt;
+lookup gpos_single_1 {
+    pos a <0 0 (wght=100:-10 wght=400:0 wght=900:20) (wght=100:30 wght=400:0 wght=900:-40)>;
+} gpos_single_1;
+feature kern {
+lookup gpos_single_1;
+} kern;
+"
+        );
+    }
 }
