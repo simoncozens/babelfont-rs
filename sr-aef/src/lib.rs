@@ -726,6 +726,9 @@ lookup gsub_single_5 {
     lookupflag UseMarkFilteringSet [acute];
     sub b by c;
 } gsub_single_5;
+lookup gsub_reverse_1 {
+    rsub one two [a b]' c by [d e];
+} gsub_reverse_1;
 lookup gpos_mark_to_base_1 {
     pos base A
         <anchor 150 100> mark @bottomleft

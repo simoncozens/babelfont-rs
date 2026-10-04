@@ -2,7 +2,7 @@ use crate::UncompileContext;
 use fea_rs_ast::{
     AlternateSubstStatement, ChainedContextStatement, GlyphClass, GlyphContainer, GlyphName,
     IgnoreStatement, LigatureSubstStatement, LookupBlock, MultipleSubstStatement,
-    SingleSubstStatement, Statement, Subst,
+    ReverseChainSingleSubstStatement, SingleSubstStatement, Statement, Subst,
 };
 use skrifa::{
     GlyphId16,
@@ -245,11 +245,40 @@ impl<'a> UncompileContext<'a> {
     }
 
     fn uncompile_gsub7(
-        &self,
-        _lookupblock: &mut LookupBlock,
-        _gsub7: ReverseChainSingleSubstFormat1,
+        &mut self,
+        lookupblock: &mut LookupBlock,
+        gsub7: ReverseChainSingleSubstFormat1,
     ) -> Result<(), ReadError> {
-        todo!()
+        let inputs = self.resolve_coverage(&gsub7.coverage()?);
+        let replacements = gsub7
+            .substitute_glyph_ids()
+            .iter()
+            .map(|g| GlyphContainer::GlyphName(self.get_name(g.get())))
+            .collect();
+        let mut prefix: Vec<GlyphContainer> = gsub7
+            .backtrack_coverages()
+            .iter()
+            .flatten()
+            .map(|coverage| self.resolve_coverage_to_class(&coverage, true))
+            .collect();
+        prefix.reverse();
+        let suffix = gsub7
+            .lookahead_coverages()
+            .iter()
+            .flatten()
+            .map(|coverage| self.resolve_coverage_to_class(&coverage, true))
+            .collect();
+        let subst = ReverseChainSingleSubstStatement::new(
+            vec![self.class_members_to_container(inputs)],
+            vec![self.class_members_to_container(replacements)],
+            prefix,
+            suffix,
+            0..0,
+        );
+        lookupblock
+            .statements
+            .push(Statement::ReverseChainSubst(subst));
+        Ok(())
     }
 }
 

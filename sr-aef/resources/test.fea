@@ -44,6 +44,9 @@ lookup gsub1_filter {
     lookupflag UseMarkFilteringSet [acute];
     sub b by c;
 } gsub1_filter;
+lookup gsub8 {
+    rsub one two [a b]' c by [d e];
+} gsub8;
 
 lookup gpos4 {
     pos base A <anchor 150 100> mark @TOP_MARKS <anchor -200 -200> mark @BOTTOM_MARKS;
