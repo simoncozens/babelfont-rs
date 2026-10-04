@@ -585,19 +585,27 @@ impl<'a> UncompileContext<'a> {
                 statements.push(Statement::Script(ScriptStatement::new(
                     script_tag.to_string().trim_end().into(),
                 )));
-                if let Some(lookups) = systems.get(&(*script_tag, dflt)) {
-                    statements.extend(lookups.iter().cloned());
-                }
+                let default_lookups = systems
+                    .get(&(*script_tag, dflt))
+                    .cloned()
+                    .unwrap_or_default();
+                statements.extend(default_lookups.iter().cloned());
                 for language in languages.iter().filter(|language| **language != dflt) {
                     let Some(lookups) = systems.get(&(*script_tag, *language)) else {
                         continue;
                     };
+                    let include_dflt = default_lookups.iter().all(|l| lookups.contains(l));
                     statements.push(Statement::Language(LanguageStatement::new(
                         language.to_string().trim_end().into(),
-                        false,
+                        include_dflt,
                         false,
                     )));
-                    statements.extend(lookups.iter().cloned());
+                    statements.extend(
+                        lookups
+                            .iter()
+                            .filter(|l| !include_dflt || !default_lookups.contains(l))
+                            .cloned(),
+                    );
                 }
             }
             self.features
@@ -939,8 +947,7 @@ lookup gsub_single_3 {
 feature calt {
 script latn;
     lookup gsub_single_2;
-    language TRK exclude_dflt;
-    lookup gsub_single_2;
+    language TRK;
     lookup gsub_single_3;
 } calt;
 feature locl {
