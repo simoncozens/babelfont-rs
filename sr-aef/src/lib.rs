@@ -482,39 +482,40 @@ impl<'a> UncompileContext<'a> {
                 let feature_tag = feature_record.feature_tag();
                 let feature = feature_record.feature(feature_list.offset_data())?;
                 let lookup_indices = feature.lookup_list_indices();
-                self.features.insert(
-                    feature_tag.to_string().into(),
-                    lookup_indices
-                        .iter()
-                        .map(|i| lookup_reference(&self.get_lookup_name(i.get(), Subst)))
-                        .collect(),
-                );
+                let lookups = lookup_indices
+                    .iter()
+                    .map(|i| lookup_reference(&self.get_lookup_name(i.get(), Subst)))
+                    .collect();
+                self.add_feature_lookups(feature_tag, lookups);
             }
         }
 
         if let Some(feature_list) = self.gpos.as_ref().and_then(|gpos| gpos.feature_list().ok()) {
-            let mut features: IndexMap<SmolStr, Vec<Statement>> = IndexMap::new();
             for feature_record in feature_list.feature_records() {
                 let feature_tag = feature_record.feature_tag();
                 let feature = feature_record.feature(feature_list.offset_data())?;
                 let lookup_indices = feature.lookup_list_indices();
-                features.insert(
-                    feature_tag.to_string().into(),
-                    lookup_indices
-                        .iter()
-                        .map(|i| lookup_reference(&self.get_lookup_name(i.get(), Pos)))
-                        .collect(),
-                );
-            }
-            for (feature_tag, lookups) in features {
-                self.features
-                    .entry(feature_tag)
-                    .or_default()
-                    .extend(lookups);
+                let lookups = lookup_indices
+                    .iter()
+                    .map(|i| lookup_reference(&self.get_lookup_name(i.get(), Pos)))
+                    .collect();
+                self.add_feature_lookups(feature_tag, lookups);
             }
         }
 
         Ok(())
+    }
+
+    fn add_feature_lookups(&mut self, feature_tag: Tag, lookups: Vec<Statement>) {
+        let statements = self
+            .features
+            .entry(feature_tag.to_string().into())
+            .or_default();
+        for lookup in lookups {
+            if !statements.contains(&lookup) {
+                statements.push(lookup);
+            }
+        }
     }
 
     fn add_lookup_flags(
@@ -772,6 +773,41 @@ lookup gpos_single_5 {
 feature ss01 {
 lookup gsub_single_6;
     lookup gpos_single_5;
+} ss01;
+"
+        );
+    }
+
+    #[test]
+    fn test_uncompile_language_systems() {
+        let data = std::fs::read("resources/languages.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+languagesystem DFLT dflt;
+languagesystem latn dflt;
+languagesystem latn TRK;
+lookup gsub_single_1 {
+    sub b by c;
+} gsub_single_1;
+lookup gsub_single_2 {
+    sub a by d;
+} gsub_single_2;
+lookup gsub_single_3 {
+    sub a by e;
+} gsub_single_3;
+feature calt {
+lookup gsub_single_2;
+    lookup gsub_single_3;
+} calt;
+feature locl {
+lookup gsub_single_3;
+    lookup gsub_single_2;
+} locl;
+feature ss01 {
+lookup gsub_single_1;
 } ss01;
 "
         );
