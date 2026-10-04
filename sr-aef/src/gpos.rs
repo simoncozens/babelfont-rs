@@ -191,10 +191,7 @@ impl<'a> UncompileContext<'a> {
         let statement = SinglePosStatement::new(
             vec![],
             vec![],
-            input
-                .into_iter()
-                .map(|gid| (gid, Some(vr.clone())))
-                .collect(),
+            vec![(self.class_members_to_container(input), Some(vr))],
             false,
             0..0,
         );
@@ -208,24 +205,15 @@ impl<'a> UncompileContext<'a> {
     ) -> Result<(), ReadError> {
         let input = self.resolve_coverage(&gpos1f2.coverage()?);
         let offset_data = gpos1f2.offset_data();
-        let statement = SinglePosStatement::new(
-            vec![],
-            vec![],
-            input
-                .into_iter()
-                .zip(
-                    gpos1f2
-                        .value_records()
-                        .iter()
-                        .flatten()
-                        .map(|vr| self.resolve_value_record(&vr, offset_data)),
-                )
-                .map(|(gid, vr)| vr.map(|vr| (gid, Some(vr))))
-                .collect::<Result<_, _>>()?,
-            false,
-            0..0,
-        );
-        lookupblock.statements.push(Statement::SinglePos(statement));
+        for (glyph, vr) in input
+            .into_iter()
+            .zip(gpos1f2.value_records().iter().flatten())
+        {
+            let vr = self.resolve_value_record(&vr, offset_data)?;
+            let statement =
+                SinglePosStatement::new(vec![], vec![], vec![(glyph, Some(vr))], false, 0..0);
+            lookupblock.statements.push(Statement::SinglePos(statement));
+        }
         Ok(())
     }
 

@@ -747,6 +747,13 @@ lookup gpos_chain_contextual_2 {
     ignore pos one A';
     pos A' lookup gpos_single_2;
 } gpos_chain_contextual_2;
+lookup gpos_single_3 {
+    pos [a b] -50;
+} gpos_single_3;
+lookup gpos_single_4 {
+    pos a -50;
+    pos b -60;
+} gpos_single_4;
 "
         );
     }

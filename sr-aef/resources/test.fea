@@ -59,3 +59,10 @@ lookup gpos8_ignore {
     ignore pos one A';
     pos A' 20;
 } gpos8_ignore;
+lookup gpos1_f1 {
+    pos [a b] -50;
+} gpos1_f1;
+lookup gpos1_f2 {
+    pos a -50;
+    pos b -60;
+} gpos1_f2;
