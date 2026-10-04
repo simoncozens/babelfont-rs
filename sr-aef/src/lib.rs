@@ -33,10 +33,10 @@ use std::collections::{HashMap, HashSet};
 /// The return value of uncompile() will be a [fea_rs_ast::FeatureFile]; you will probably want to call `.as_fea()` on it.
 pub use fea_rs_ast;
 use fea_rs_ast::{
-    Anchor, GdefStatement, GlyphClass, GlyphClassDefStatement, GlyphClassDefinition,
-    GlyphContainer, GlyphName, LanguageSystemStatement, LookupBlock, LookupFlagStatement,
-    LookupReferenceStatement, MarkClass, MarkClassDefinition, Pos, Statement, SubOrPos, Subst,
-    Table, ToplevelItem,
+    Anchor, AsFea, Comment, GdefStatement, GlyphClass, GlyphClassDefStatement,
+    GlyphClassDefinition, GlyphContainer, GlyphName, LanguageSystemStatement, LookupBlock,
+    LookupFlagStatement, LookupReferenceStatement, MarkClass, MarkClassDefinition, Pos, Statement,
+    SubOrPos, Subst, Table, ToplevelItem,
 };
 use indexmap::{IndexMap, IndexSet};
 /// A handle to the version of Skrifa that sr-eaf is using. Pass a skrifa::FontRef to uncompile()
@@ -51,7 +51,7 @@ use skrifa::{
             gdef::Gdef,
             gpos::Gpos,
             gsub::{ClassDef, Gsub},
-            layout::{CoverageTable, LookupFlag},
+            layout::{CoverageTable, LookupFlag, ScriptList},
         },
     },
 };
@@ -477,8 +477,11 @@ impl<'a> UncompileContext<'a> {
     }
 
     fn uncompile_feature_table(&mut self) -> Result<(), ReadError> {
+        let mut unregistered_features = vec![];
         if let Some(feature_list) = self.gsub.as_ref().and_then(|gsub| gsub.feature_list().ok()) {
-            for feature_record in feature_list.feature_records() {
+            let systems =
+                feature_language_systems(self.gsub.as_ref().and_then(|g| g.script_list().ok()))?;
+            for (index, feature_record) in feature_list.feature_records().iter().enumerate() {
                 let feature_tag = feature_record.feature_tag();
                 let feature = feature_record.feature(feature_list.offset_data())?;
                 let lookup_indices = feature.lookup_list_indices();
@@ -486,12 +489,18 @@ impl<'a> UncompileContext<'a> {
                     .iter()
                     .map(|i| lookup_reference(&self.get_lookup_name(i.get(), Subst)))
                     .collect();
-                self.add_feature_lookups(feature_tag, lookups);
+                if systems.contains_key(&(index as u16)) {
+                    self.add_feature_lookups(feature_tag, lookups);
+                } else {
+                    unregistered_features.push((feature_tag, lookups));
+                }
             }
         }
 
         if let Some(feature_list) = self.gpos.as_ref().and_then(|gpos| gpos.feature_list().ok()) {
-            for feature_record in feature_list.feature_records() {
+            let systems =
+                feature_language_systems(self.gpos.as_ref().and_then(|g| g.script_list().ok()))?;
+            for (index, feature_record) in feature_list.feature_records().iter().enumerate() {
                 let feature_tag = feature_record.feature_tag();
                 let feature = feature_record.feature(feature_list.offset_data())?;
                 let lookup_indices = feature.lookup_list_indices();
@@ -499,8 +508,33 @@ impl<'a> UncompileContext<'a> {
                     .iter()
                     .map(|i| lookup_reference(&self.get_lookup_name(i.get(), Pos)))
                     .collect();
-                self.add_feature_lookups(feature_tag, lookups);
+                if systems.contains_key(&(index as u16)) {
+                    self.add_feature_lookups(feature_tag, lookups);
+                } else {
+                    unregistered_features.push((feature_tag, lookups));
+                }
             }
+        }
+
+        let referenced_lookups: Vec<Statement> = self
+            .features
+            .values()
+            .flatten()
+            .cloned()
+            .chain(
+                self.lookups
+                    .values()
+                    .flat_map(called_lookups)
+                    .map(|name| lookup_reference(&name)),
+            )
+            .collect();
+        for (feature_tag, lookups) in unregistered_features {
+            let lookups = lookups
+                .into_iter()
+                .filter(|lookup| !referenced_lookups.contains(lookup))
+                .map(comment_out)
+                .collect();
+            self.add_feature_lookups(feature_tag, lookups);
         }
 
         Ok(())
@@ -568,6 +602,45 @@ impl<'a> UncompileContext<'a> {
 
 fn lookup_reference(name: &SmolStr) -> Statement {
     Statement::LookupReference(LookupReferenceStatement::new(name.to_string(), 0..0))
+}
+
+fn comment_out(statement: Statement) -> Statement {
+    Statement::Comment(Comment::new(format!("# {}", statement.as_fea(""))))
+}
+
+fn feature_language_systems(
+    script_list: Option<ScriptList>,
+) -> Result<HashMap<u16, Vec<(Tag, Tag)>>, ReadError> {
+    let mut systems: HashMap<u16, Vec<(Tag, Tag)>> = HashMap::new();
+    let Some(script_list) = script_list else {
+        return Ok(systems);
+    };
+    for script_record in script_list.script_records() {
+        let script = script_record.script(script_list.offset_data())?;
+        let mut language_systems = vec![];
+        if let Some(lang_sys) = script.default_lang_sys() {
+            language_systems.push((Tag::new(b"dflt"), lang_sys?));
+        }
+        for lang_sys_record in script.lang_sys_records() {
+            language_systems.push((
+                lang_sys_record.lang_sys_tag(),
+                lang_sys_record.lang_sys(script.offset_data())?,
+            ));
+        }
+        for (lang_sys_tag, lang_sys) in language_systems {
+            let required_feature_index = lang_sys.required_feature_index();
+            let indices = lang_sys.feature_indices().iter().map(|index| index.get());
+            for index in
+                indices.chain((required_feature_index != 0xFFFF).then_some(required_feature_index))
+            {
+                systems
+                    .entry(index)
+                    .or_default()
+                    .push((script_record.script_tag(), lang_sys_tag));
+            }
+        }
+    }
+    Ok(systems)
 }
 
 fn called_lookups(lookup: &LookupBlock) -> Vec<SmolStr> {
@@ -809,6 +882,34 @@ lookup gsub_single_3;
 feature ss01 {
 lookup gsub_single_1;
 } ss01;
+"
+        );
+    }
+
+    #[test]
+    fn test_uncompile_unregistered_features() {
+        let data = std::fs::read("resources/unregistered.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+languagesystem DFLT dflt;
+lookup gsub_single_1 {
+    sub b by c;
+} gsub_single_1;
+lookup gsub_single_2 {
+    sub b by d;
+} gsub_single_2;
+feature ss01 {
+lookup gsub_single_1;
+} ss01;
+feature ss02 {
+# lookup gsub_single_2;
+} ss02;
+feature ss03 {
+
+} ss03;
 "
         );
     }
