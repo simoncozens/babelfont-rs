@@ -542,16 +542,20 @@ impl<'a> UncompileContext<'a> {
         Ok(())
     }
 
-    fn add_registered_features(&mut self, features: Vec<(Tag, Vec<(Tag, Tag)>, Vec<Statement>)>) {
-        let mut registrations: IndexMap<Tag, IndexMap<(Tag, Tag), Vec<Statement>>> =
+    fn add_registered_features(
+        &mut self,
+        features: Vec<(Tag, Vec<((Tag, Tag), bool)>, Vec<Statement>)>,
+    ) {
+        let mut registrations: IndexMap<Tag, IndexMap<(Tag, Tag), (bool, Vec<Statement>)>> =
             IndexMap::new();
         for (feature_tag, language_systems, lookups) in features {
-            for language_system in language_systems {
-                let registered = registrations
+            for (language_system, required) in language_systems {
+                let (is_required, registered) = registrations
                     .entry(feature_tag)
                     .or_default()
                     .entry(language_system)
                     .or_default();
+                *is_required |= required;
                 for lookup in &lookups {
                     if !registered.contains(lookup) {
                         registered.push(lookup.clone());
@@ -563,13 +567,15 @@ impl<'a> UncompileContext<'a> {
         let dflt = Tag::new(b"dflt");
         let system_count: usize = self.language_systems.values().map(|l| l.len()).sum();
         for (feature_tag, systems) in registrations {
-            let first = &systems[0];
+            let (_, first) = &systems[0];
             let everywhere = systems.len() == system_count
-                && systems.values().all(|lookups| {
-                    lookups.len() == first.len() && lookups.iter().all(|l| first.contains(l))
+                && systems.values().all(|(required, lookups)| {
+                    !required
+                        && lookups.len() == first.len()
+                        && lookups.iter().all(|l| first.contains(l))
                 });
             if everywhere || [Tag::new(b"aalt"), Tag::new(b"size")].contains(&feature_tag) {
-                for lookups in systems.into_values() {
+                for (_, lookups) in systems.into_values() {
                     self.add_feature_lookups(feature_tag, lookups);
                 }
                 continue;
@@ -585,20 +591,27 @@ impl<'a> UncompileContext<'a> {
                 statements.push(Statement::Script(ScriptStatement::new(
                     script_tag.to_string().trim_end().into(),
                 )));
-                let default_lookups = systems
+                let (default_required, default_lookups) = systems
                     .get(&(*script_tag, dflt))
                     .cloned()
                     .unwrap_or_default();
+                if default_required {
+                    statements.push(Statement::Language(LanguageStatement::new(
+                        dflt.to_string(),
+                        true,
+                        true,
+                    )));
+                }
                 statements.extend(default_lookups.iter().cloned());
                 for language in languages.iter().filter(|language| **language != dflt) {
-                    let Some(lookups) = systems.get(&(*script_tag, *language)) else {
+                    let Some((required, lookups)) = systems.get(&(*script_tag, *language)) else {
                         continue;
                     };
                     let include_dflt = default_lookups.iter().all(|l| lookups.contains(l));
                     statements.push(Statement::Language(LanguageStatement::new(
                         language.to_string().trim_end().into(),
                         include_dflt,
-                        false,
+                        *required,
                     )));
                     statements.extend(
                         lookups
@@ -683,8 +696,8 @@ fn comment_out(statement: Statement) -> Statement {
 
 fn feature_language_systems(
     script_list: Option<ScriptList>,
-) -> Result<HashMap<u16, Vec<(Tag, Tag)>>, ReadError> {
-    let mut systems: HashMap<u16, Vec<(Tag, Tag)>> = HashMap::new();
+) -> Result<HashMap<u16, Vec<((Tag, Tag), bool)>>, ReadError> {
+    let mut systems: HashMap<u16, Vec<((Tag, Tag), bool)>> = HashMap::new();
     let Some(script_list) = script_list else {
         return Ok(systems);
     };
@@ -706,10 +719,10 @@ fn feature_language_systems(
             for index in
                 indices.chain((required_feature_index != 0xFFFF).then_some(required_feature_index))
             {
-                systems
-                    .entry(index)
-                    .or_default()
-                    .push((script_record.script_tag(), lang_sys_tag));
+                systems.entry(index).or_default().push((
+                    (script_record.script_tag(), lang_sys_tag),
+                    index == required_feature_index,
+                ));
             }
         }
     }
@@ -987,6 +1000,27 @@ feature ss02 {
 feature ss03 {
 
 } ss03;
+"
+        );
+    }
+
+    #[test]
+    fn test_uncompile_required_features() {
+        let data = std::fs::read("resources/required.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+languagesystem DFLT dflt;
+lookup gsub_single_1 {
+    sub a by b;
+} gsub_single_1;
+feature rlig {
+script DFLT;
+    language dflt required;
+    lookup gsub_single_1;
+} rlig;
 "
         );
     }

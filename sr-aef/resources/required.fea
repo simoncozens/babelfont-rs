@@ -1,0 +1,11 @@
+languagesystem DFLT dflt;
+
+lookup gsub1 {
+    sub a by b;
+} gsub1;
+
+feature rlig {
+    script DFLT;
+    language dflt required;
+    lookup gsub1;
+} rlig;
