@@ -33,11 +33,12 @@ use std::collections::{HashMap, HashSet};
 /// The return value of uncompile() will be a [fea_rs_ast::FeatureFile]; you will probably want to call `.as_fea()` on it.
 pub use fea_rs_ast;
 use fea_rs_ast::{
-    Anchor, AsFea, AttachStatement, Comment, GdefStatement, GlyphClass, GlyphClassDefStatement,
-    GlyphClassDefinition, GlyphContainer, GlyphName, LanguageStatement, LanguageSystemStatement,
-    LigatureCaretByIndexStatement, LigatureCaretByPosStatement, LookupBlock, LookupFlagStatement,
-    LookupReferenceStatement, MarkClass, MarkClassDefinition, NameRecord, NameRecordKind,
-    NestedBlock, Pos, ScriptStatement, Statement, SubOrPos, Subst, Table, ToplevelItem,
+    Anchor, AsFea, AttachStatement, Comment, ConditionSet, GdefStatement, GlyphClass,
+    GlyphClassDefStatement, GlyphClassDefinition, GlyphContainer, GlyphName, LanguageStatement,
+    LanguageSystemStatement, LigatureCaretByIndexStatement, LigatureCaretByPosStatement,
+    LookupBlock, LookupFlagStatement, LookupReferenceStatement, MarkClass, MarkClassDefinition,
+    NameRecord, NameRecordKind, NestedBlock, Pos, ScriptStatement, Statement, SubOrPos, Subst,
+    Table, ToplevelItem, VariationBlock,
 };
 use indexmap::{IndexMap, IndexSet};
 /// A handle to the version of Skrifa that sr-eaf is using. Pass a skrifa::FontRef to uncompile()
@@ -52,7 +53,10 @@ use skrifa::{
             gdef::{CaretValue, Gdef},
             gpos::Gpos,
             gsub::{ClassDef, Gsub},
-            layout::{CoverageTable, FeatureParams, LookupFlag, ScriptList},
+            layout::{
+                Condition, CoverageTable, FeatureList, FeatureParams, FeatureVariations,
+                LookupFlag, ScriptList,
+            },
             name::{Name, NameId},
         },
     },
@@ -106,6 +110,8 @@ pub struct UncompileContext<'a> {
         serde(serialize_with = "crate::serialize::serialize_features")
     )]
     pub features: IndexMap<SmolStr, Vec<Statement>>,
+    /// Condition sets and their feature variation blocks.
+    pub feature_variations: Vec<(ConditionSet, Vec<VariationBlock>)>,
     #[cfg_attr(feature = "cli", serde(skip))]
     symbols: IndexMap<SmolStr, usize>,
     #[cfg_attr(feature = "cli", serde(skip))]
@@ -166,6 +172,7 @@ impl<'a> UncompileContext<'a> {
             mark_classes: IndexMap::new(),
             named_classes: IndexMap::new(),
             features: IndexMap::new(),
+            feature_variations: vec![],
             glyph_metrics,
             glyph_id_to_name,
             glyph_name_to_id,
@@ -182,6 +189,7 @@ impl<'a> UncompileContext<'a> {
         slf.uncompile_gsub_lookups()?;
         slf.uncompile_gpos_lookups()?;
         slf.uncompile_feature_table()?;
+        slf.uncompile_feature_variations()?;
         slf.order_lookups();
         Ok(slf)
     }
@@ -608,6 +616,87 @@ impl<'a> UncompileContext<'a> {
         Ok(())
     }
 
+    fn uncompile_feature_variations(&mut self) -> Result<(), ReadError> {
+        if let Some((feature_list, feature_variations)) = self
+            .gsub
+            .as_ref()
+            .and_then(|gsub| Some((gsub.feature_list().ok()?, gsub.feature_variations()?)))
+        {
+            self.add_feature_variations(feature_list, feature_variations?, Subst)?;
+        }
+        if let Some((feature_list, feature_variations)) = self
+            .gpos
+            .as_ref()
+            .and_then(|gpos| Some((gpos.feature_list().ok()?, gpos.feature_variations()?)))
+        {
+            self.add_feature_variations(feature_list, feature_variations?, Pos)?;
+        }
+        Ok(())
+    }
+
+    fn add_feature_variations<T: SubOrPos + Copy>(
+        &mut self,
+        feature_list: FeatureList,
+        feature_variations: FeatureVariations,
+        phase: T,
+    ) -> Result<(), ReadError> {
+        let data = feature_variations.offset_data();
+        for record in feature_variations.feature_variation_records() {
+            let (Some(condition_set), Some(substitution)) = (
+                record.condition_set(data),
+                record.feature_table_substitution(data),
+            ) else {
+                continue;
+            };
+            let Some(conditions) = condition_set?
+                .conditions()
+                .iter()
+                .map(|condition| match condition {
+                    Ok(Condition::Format1AxisRange(condition)) => {
+                        self.resolve_condition(&condition)
+                    }
+                    _ => None,
+                })
+                .collect::<Option<Vec<_>>>()
+            else {
+                continue;
+            };
+            let name = self.gensym("condition").to_string();
+            let substitution = substitution?;
+            let mut variations = vec![];
+            for substitution_record in substitution.substitutions() {
+                let Some(feature_record) = feature_list
+                    .feature_records()
+                    .get(substitution_record.feature_index() as usize)
+                else {
+                    continue;
+                };
+                let feature = feature_record.feature(feature_list.offset_data())?;
+                let alternate =
+                    substitution_record.alternate_feature(substitution.offset_data())?;
+                let Some(additional_lookups) = alternate
+                    .lookup_list_indices()
+                    .strip_prefix(feature.lookup_list_indices())
+                else {
+                    continue;
+                };
+                variations.push(VariationBlock::new(
+                    feature_record.feature_tag().to_string().into(),
+                    name.clone(),
+                    additional_lookups
+                        .iter()
+                        .map(|index| lookup_reference(&self.get_lookup_name(index.get(), phase)))
+                        .collect(),
+                    false,
+                    0..0,
+                ));
+            }
+            self.feature_variations
+                .push((ConditionSet::new(name, conditions, 0..0), variations));
+        }
+        Ok(())
+    }
+
     fn add_registered_features(
         &mut self,
         features: Vec<(Tag, Vec<((Tag, Tag), bool)>, Vec<Statement>)>,
@@ -901,6 +990,14 @@ pub fn uncompile(
                 false,
                 0..0,
             )));
+    }
+    for (condition_set, variations) in context.feature_variations.iter() {
+        ff.statements
+            .push(ToplevelItem::ConditionSet(condition_set.clone()));
+        for variation in variations {
+            ff.statements
+                .push(ToplevelItem::VariationBlock(variation.clone()));
+        }
     }
 
     Ok(ff)
@@ -1251,6 +1348,36 @@ feature ss01 {
 
     lookup gsub_single_1;
 } ss01;
+"
+        );
+    }
+
+    #[test]
+    fn test_uncompile_feature_variations() {
+        let data = std::fs::read("resources/variations.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+languagesystem DFLT dflt;
+lookup gsub_single_1 {
+    sub a by b;
+} gsub_single_1;
+lookup gsub_single_2 {
+    sub b by c;
+} gsub_single_2;
+feature rclt {
+lookup gsub_single_1;
+} rclt;
+conditionset condition_1 {
+\twght 700 900;
+} condition_1;
+
+variation rclt condition_1 {
+lookup gsub_single_2;
+} rclt;
+
 "
         );
     }

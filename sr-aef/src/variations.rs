@@ -10,6 +10,7 @@ use skrifa::{
         ReadError, TableProvider as _,
         tables::{
             gpos::DeviceOrVariationIndex,
+            layout::ConditionFormat1,
             variations::{DeltaSetIndex, ItemVariationStore},
         },
         types::F2Dot14,
@@ -138,6 +139,35 @@ impl<'a> UncompileContext<'a> {
             ));
         }
         Ok(master_locations)
+    }
+
+    pub(crate) fn resolve_condition(
+        &self,
+        condition: &ConditionFormat1,
+    ) -> Option<(String, f32, f32)> {
+        let tag = self.axis_tags.get(condition.axis_index() as usize)?;
+        let axis = self.axes.as_ref()?.get(&to_fd_tag(*tag))?;
+        let to_user = |value: F2Dot14| {
+            let user = NormalizedCoord::new(value.to_f32() as f64)
+                .to_user(&axis.converter)
+                .to_f64();
+            let rounded = UserCoord::new(user.round());
+            if rounded
+                .to_normalized(&axis.converter)
+                .to_f2dot14()
+                .to_bits()
+                == value.to_bits()
+            {
+                rounded.to_f64() as f32
+            } else {
+                user as f32
+            }
+        };
+        Some((
+            tag.to_string(),
+            to_user(condition.filter_range_min_value()),
+            to_user(condition.filter_range_max_value()),
+        ))
     }
 
     pub(crate) fn resolve_pos_with_variations(
