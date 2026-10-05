@@ -107,7 +107,9 @@ impl<'a> UncompileContext<'a> {
         let variations = self.variation_store()?.unwrap();
         let regions = variations.variation_region_list()?.variation_regions();
         let mut normalized_locations = vec![];
-        if let Some(data) = variations.item_variation_data().get(index.outer as usize) {
+        if index != DeltaSetIndex::NO_VARIATION_INDEX
+            && let Some(data) = variations.item_variation_data().get(index.outer as usize)
+        {
             let data = data?;
             for (region_index, delta) in data
                 .region_indexes()
