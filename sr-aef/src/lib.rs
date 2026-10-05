@@ -232,6 +232,9 @@ impl<'a> UncompileContext<'a> {
             .get(&GlyphId::new(id.to_u32()))
             .cloned()
             .unwrap_or_else(|| format!("gid{:04}", id.to_u32()).into());
+        if str == "NULL" {
+            return GlyphName::new("\\NULL");
+        }
         GlyphName::new(&str)
     }
 
@@ -1399,6 +1402,25 @@ lookup gpos_single_1 {
 feature kern {
 lookup gpos_single_1;
 } kern;
+"
+        );
+    }
+
+    #[test]
+    fn test_uncompile_null_glyph() {
+        let data = std::fs::read("resources/nullglyph.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+languagesystem DFLT dflt;
+lookup gsub_single_1 {
+    sub a by \\NULL;
+} gsub_single_1;
+feature ss01 {
+lookup gsub_single_1;
+} ss01;
 "
         );
     }
