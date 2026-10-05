@@ -37,8 +37,8 @@ use fea_rs_ast::{
     GlyphClassDefStatement, GlyphClassDefinition, GlyphContainer, GlyphName, LanguageStatement,
     LanguageSystemStatement, LigatureCaretByIndexStatement, LigatureCaretByPosStatement,
     LookupBlock, LookupFlagStatement, LookupReferenceStatement, MarkClass, MarkClassDefinition,
-    NameRecord, NameRecordKind, NestedBlock, Pos, ScriptStatement, Statement, SubOrPos, Subst,
-    SubtableStatement, Table, ToplevelItem, VariationBlock,
+    NameRecord, NameRecordKind, NestedBlock, Pos, ScriptStatement, SizeParameters, Statement,
+    SubOrPos, Subst, SubtableStatement, Table, ToplevelItem, VariationBlock,
 };
 use indexmap::{IndexMap, IndexSet};
 /// A handle to the version of Skrifa that sr-eaf is using. Pass a skrifa::FontRef to uncompile()
@@ -55,7 +55,7 @@ use skrifa::{
             gsub::{ClassDef, Gsub},
             layout::{
                 Condition, CoverageTable, FeatureList, FeatureParams, FeatureVariations,
-                LookupFlag, ScriptList,
+                LookupFlag, ScriptList, SizeParams,
             },
             name::{Name, NameId},
         },
@@ -542,6 +542,7 @@ impl<'a> UncompileContext<'a> {
         let mut registered_features = vec![];
         let mut unregistered_features = vec![];
         let mut feature_name_ids = IndexMap::new();
+        let mut size_params = None;
         if let Some(feature_list) = self.gsub.as_ref().and_then(|gsub| gsub.feature_list().ok()) {
             let systems =
                 feature_language_systems(self.gsub.as_ref().and_then(|g| g.script_list().ok()))?;
@@ -577,6 +578,9 @@ impl<'a> UncompileContext<'a> {
                         .entry(feature_tag)
                         .or_insert(params.ui_name_id());
                 }
+                if let Some(Ok(FeatureParams::Size(params))) = feature.feature_params() {
+                    size_params.get_or_insert(params);
+                }
                 let lookup_indices = feature.lookup_list_indices();
                 let lookups = lookup_indices
                     .iter()
@@ -594,6 +598,12 @@ impl<'a> UncompileContext<'a> {
             let names = self.uncompile_feature_names(name_id);
             if let Some(statements) = self.features.get_mut(feature_tag.to_string().as_str()) {
                 statements.insert(0, names);
+            }
+        }
+        if let Some(params) = size_params {
+            let parameters = self.uncompile_size_parameters(&params);
+            if let Some(statements) = self.features.get_mut("size") {
+                statements.splice(0..0, parameters);
             }
         }
 
@@ -812,6 +822,36 @@ impl<'a> UncompileContext<'a> {
             statements,
             pos: 0..0,
         })
+    }
+
+    fn uncompile_size_parameters(&self, params: &SizeParams) -> Vec<Statement> {
+        let mut statements = vec![Statement::SizeParameters(SizeParameters::new(
+            params.design_size() as f64 / 10.0,
+            params.identifier(),
+            params.range_start() as f64 / 10.0,
+            params.range_end() as f64 / 10.0,
+            0..0,
+        ))];
+        let name_id = NameId::new(params.name_entry());
+        if name_id != NameId::new(0) {
+            statements.extend(self.name.iter().flat_map(|name| {
+                name.name_record()
+                    .iter()
+                    .filter(move |record| record.name_id() == name_id)
+                    .filter_map(move |record| {
+                        let string = record.string(name.string_data()).ok()?;
+                        Some(Statement::SizeMenuName(NameRecord::new(
+                            record.platform_id(),
+                            record.encoding_id(),
+                            record.language_id(),
+                            string.to_string(),
+                            NameRecordKind::FeatureSizeMenuName,
+                            0..0,
+                        )))
+                    })
+            }));
+        }
+        statements
     }
 
     fn add_feature_lookups(&mut self, feature_tag: Tag, lookups: Vec<Statement>) {
@@ -1515,6 +1555,23 @@ lookup gsub_single_1;
 feature kern {
 lookup gpos_pair_1;
 } kern;
+"
+        );
+    }
+
+    #[test]
+    fn test_uncompile_size_feature() {
+        let data = std::fs::read("resources/size.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+languagesystem DFLT dflt;
+feature size {
+parameters 10.0 3 80 139;
+    sizemenuname \"Text\";
+} size;
 "
         );
     }

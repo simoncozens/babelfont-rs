@@ -1,0 +1,6 @@
+languagesystem DFLT dflt;
+
+feature size {
+    parameters 10.0 3 80 139;
+    sizemenuname "Text";
+} size;
