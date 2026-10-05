@@ -36,8 +36,8 @@ use fea_rs_ast::{
     Anchor, AsFea, AttachStatement, Comment, GdefStatement, GlyphClass, GlyphClassDefStatement,
     GlyphClassDefinition, GlyphContainer, GlyphName, LanguageStatement, LanguageSystemStatement,
     LigatureCaretByIndexStatement, LigatureCaretByPosStatement, LookupBlock, LookupFlagStatement,
-    LookupReferenceStatement, MarkClass, MarkClassDefinition, Pos, ScriptStatement, Statement,
-    SubOrPos, Subst, Table, ToplevelItem,
+    LookupReferenceStatement, MarkClass, MarkClassDefinition, NameRecord, NameRecordKind,
+    NestedBlock, Pos, ScriptStatement, Statement, SubOrPos, Subst, Table, ToplevelItem,
 };
 use indexmap::{IndexMap, IndexSet};
 /// A handle to the version of Skrifa that sr-eaf is using. Pass a skrifa::FontRef to uncompile()
@@ -52,7 +52,8 @@ use skrifa::{
             gdef::{CaretValue, Gdef},
             gpos::Gpos,
             gsub::{ClassDef, Gsub},
-            layout::{CoverageTable, LookupFlag, ScriptList},
+            layout::{CoverageTable, FeatureParams, LookupFlag, ScriptList},
+            name::{Name, NameId},
         },
     },
 };
@@ -114,6 +115,8 @@ pub struct UncompileContext<'a> {
     #[cfg_attr(feature = "cli", serde(skip))]
     gdef: Option<Gdef<'a>>,
     #[cfg_attr(feature = "cli", serde(skip))]
+    name: Option<Name<'a>>,
+    #[cfg_attr(feature = "cli", serde(skip))]
     glyph_metrics: GlyphMetrics<'a>,
     #[cfg_attr(feature = "cli", serde(skip))]
     glyph_id_to_name: HashMap<GlyphId, SmolStr>,
@@ -156,6 +159,7 @@ impl<'a> UncompileContext<'a> {
             gpos: font.gpos().ok(),
             gsub: font.gsub().ok(),
             gdef: font.gdef().ok(),
+            name: font.name().ok(),
             language_systems: IndexMap::new(),
             unnamed_anchors: IndexMap::new(),
             anchors: IndexMap::new(),
@@ -524,12 +528,18 @@ impl<'a> UncompileContext<'a> {
     fn uncompile_feature_table(&mut self) -> Result<(), ReadError> {
         let mut registered_features = vec![];
         let mut unregistered_features = vec![];
+        let mut feature_name_ids = IndexMap::new();
         if let Some(feature_list) = self.gsub.as_ref().and_then(|gsub| gsub.feature_list().ok()) {
             let systems =
                 feature_language_systems(self.gsub.as_ref().and_then(|g| g.script_list().ok()))?;
             for (index, feature_record) in feature_list.feature_records().iter().enumerate() {
                 let feature_tag = feature_record.feature_tag();
                 let feature = feature_record.feature(feature_list.offset_data())?;
+                if let Some(Ok(FeatureParams::StylisticSet(params))) = feature.feature_params() {
+                    feature_name_ids
+                        .entry(feature_tag)
+                        .or_insert(params.ui_name_id());
+                }
                 let lookup_indices = feature.lookup_list_indices();
                 let lookups = lookup_indices
                     .iter()
@@ -549,6 +559,11 @@ impl<'a> UncompileContext<'a> {
             for (index, feature_record) in feature_list.feature_records().iter().enumerate() {
                 let feature_tag = feature_record.feature_tag();
                 let feature = feature_record.feature(feature_list.offset_data())?;
+                if let Some(Ok(FeatureParams::StylisticSet(params))) = feature.feature_params() {
+                    feature_name_ids
+                        .entry(feature_tag)
+                        .or_insert(params.ui_name_id());
+                }
                 let lookup_indices = feature.lookup_list_indices();
                 let lookups = lookup_indices
                     .iter()
@@ -562,6 +577,12 @@ impl<'a> UncompileContext<'a> {
             }
         }
         self.add_registered_features(registered_features);
+        for (feature_tag, name_id) in feature_name_ids {
+            let names = self.uncompile_feature_names(name_id);
+            if let Some(statements) = self.features.get_mut(feature_tag.to_string().as_str()) {
+                statements.insert(0, names);
+            }
+        }
 
         let referenced_lookups: Vec<Statement> = self
             .features
@@ -669,6 +690,34 @@ impl<'a> UncompileContext<'a> {
             self.features
                 .insert(feature_tag.to_string().into(), statements);
         }
+    }
+
+    fn uncompile_feature_names(&self, name_id: NameId) -> Statement {
+        let statements = self
+            .name
+            .iter()
+            .flat_map(|name| {
+                name.name_record()
+                    .iter()
+                    .filter(move |record| record.name_id() == name_id)
+                    .filter_map(move |record| {
+                        let string = record.string(name.string_data()).ok()?;
+                        Some(Statement::FeatureNameStatement(NameRecord::new(
+                            record.platform_id(),
+                            record.encoding_id(),
+                            record.language_id(),
+                            string.to_string(),
+                            NameRecordKind::FeatureName,
+                            0..0,
+                        )))
+                    })
+            })
+            .collect();
+        Statement::NestedBlock(NestedBlock {
+            tag: "featureNames".into(),
+            statements,
+            pos: 0..0,
+        })
     }
 
     fn add_feature_lookups(&mut self, feature_tag: Tag, lookups: Vec<Statement>) {
@@ -1178,6 +1227,30 @@ lookup gpos_pair_1 {
 feature kern {
 lookup gpos_pair_1;
 } kern;
+"
+        );
+    }
+
+    #[test]
+    fn test_uncompile_feature_names() {
+        let data = std::fs::read("resources/featurenames.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+languagesystem DFLT dflt;
+lookup gsub_single_1 {
+    sub a by b;
+} gsub_single_1;
+feature ss01 {
+    featureNames {
+        name 1 \"Alternate a\";
+        name \"Alternate a\";
+    };
+
+    lookup gsub_single_1;
+} ss01;
 "
         );
     }
