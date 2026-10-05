@@ -99,16 +99,42 @@ impl<'a> UncompileContext<'a> {
             .transpose()
     }
 
-    fn interesting_locations(&self) -> Result<BTreeSet<(UserLocation, Vec<F2Dot14>)>, ReadError> {
-        let mut master_locations: BTreeSet<(UserLocation, Vec<F2Dot14>)> = BTreeSet::new();
+    fn variation_locations(
+        &self,
+        index: DeltaSetIndex,
+    ) -> Result<BTreeSet<(UserLocation, Vec<F2Dot14>)>, ReadError> {
+        let mut locations: BTreeSet<(UserLocation, Vec<F2Dot14>)> = BTreeSet::new();
         let variations = self.variation_store()?.unwrap();
-        let regions = variations.variation_region_list()?;
-        for region in regions.variation_regions().iter().flatten() {
-            let coords: Vec<F2Dot14> = region
-                .region_axes()
+        let regions = variations.variation_region_list()?.variation_regions();
+        let mut normalized_locations = vec![];
+        if let Some(data) = variations.item_variation_data().get(index.outer as usize) {
+            let data = data?;
+            for (region_index, delta) in data
+                .region_indexes()
                 .iter()
-                .map(|x| x.peak_coord())
-                .collect();
+                .zip(data.delta_set(index.inner))
+            {
+                if delta == 0 {
+                    continue;
+                }
+                let region_axes = regions.get(region_index.get() as usize)?.region_axes();
+                let peak: Vec<F2Dot14> = region_axes
+                    .iter()
+                    .map(|region_axis| region_axis.peak_coord())
+                    .collect();
+                for (axis, region_axis) in region_axes.iter().enumerate() {
+                    for bound in [region_axis.start_coord(), region_axis.end_coord()] {
+                        if bound != F2Dot14::ZERO && bound != region_axis.peak_coord() {
+                            let mut location = peak.clone();
+                            location[axis] = bound;
+                            normalized_locations.push(location);
+                        }
+                    }
+                }
+                normalized_locations.push(peak);
+            }
+        }
+        for coords in normalized_locations {
             let location: NormalizedLocation = coords
                 .iter()
                 .map(|coord| NormalizedCoord::new(coord.to_f32() as f64))
@@ -116,7 +142,7 @@ impl<'a> UncompileContext<'a> {
                 .map(|(coord, tag)| (to_fd_tag(*tag), coord))
                 .collect();
             if let Some(axes) = &self.axes {
-                master_locations.insert((
+                locations.insert((
                     location.convert(axes).map_err(|_e| {
                         ReadError::MalformedData("Failed to convert variation location")
                     })?,
@@ -131,14 +157,14 @@ impl<'a> UncompileContext<'a> {
                 .iter()
                 .map(|tag| (to_fd_tag(*tag), NormalizedCoord::new(0.0)))
                 .collect();
-            master_locations.insert((
+            locations.insert((
                 location.convert(axes).map_err(|_e| {
                     ReadError::MalformedData("Failed to convert variation location")
                 })?,
                 vec![F2Dot14::ZERO; self.axis_tags.len()],
             ));
         }
-        Ok(master_locations)
+        Ok(locations)
     }
 
     pub(crate) fn resolve_condition(
@@ -179,19 +205,15 @@ impl<'a> UncompileContext<'a> {
         if let Some(ivs) = self.variation_store()?
             && let Some(Ok(DeviceOrVariationIndex::VariationIndex(varix))) = device
         {
+            let index = DeltaSetIndex {
+                outer: varix.delta_set_outer_index(),
+                inner: varix.delta_set_inner_index(),
+            };
             variations = self
-                .interesting_locations()?
+                .variation_locations(index)?
                 .iter()
                 .map(|(user_loc, coords)| {
-                    let delta = ivs
-                        .compute_delta(
-                            DeltaSetIndex {
-                                outer: varix.delta_set_outer_index(),
-                                inner: varix.delta_set_inner_index(),
-                            },
-                            coords,
-                        )
-                        .unwrap_or_default();
+                    let delta = ivs.compute_delta(index, coords).unwrap_or_default();
                     let simple_user_loc: SimpleUserLocation = user_loc
                         .iter()
                         .map(|(tag, coord)| (tag.to_string().into(), coord.to_f64() as i16))
