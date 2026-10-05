@@ -71,6 +71,8 @@ mod serialize;
 mod variations;
 
 pub(crate) type SimpleUserLocation = IndexMap<SmolStr, i16>; // as used by fea-rs-ast metrics
+type LanguageSystem = (Tag, Tag); // script, language
+type FeatureLanguageSystems = Vec<(LanguageSystem, bool)>; // and whether the feature is required there
 
 const PROMOTE_TO_NAMED_CLASS_THRESHOLD: usize = 5;
 
@@ -702,9 +704,9 @@ impl<'a> UncompileContext<'a> {
 
     fn add_registered_features(
         &mut self,
-        features: Vec<(Tag, Vec<((Tag, Tag), bool)>, Vec<Statement>)>,
+        features: Vec<(Tag, FeatureLanguageSystems, Vec<Statement>)>,
     ) {
-        let mut registrations: IndexMap<Tag, IndexMap<(Tag, Tag), (bool, Vec<Statement>)>> =
+        let mut registrations: IndexMap<Tag, IndexMap<LanguageSystem, (bool, Vec<Statement>)>> =
             IndexMap::new();
         for (feature_tag, language_systems, lookups) in features {
             for (language_system, required) in language_systems {
@@ -883,8 +885,8 @@ fn comment_out(statement: Statement) -> Statement {
 
 fn feature_language_systems(
     script_list: Option<ScriptList>,
-) -> Result<HashMap<u16, Vec<((Tag, Tag), bool)>>, ReadError> {
-    let mut systems: HashMap<u16, Vec<((Tag, Tag), bool)>> = HashMap::new();
+) -> Result<HashMap<u16, FeatureLanguageSystems>, ReadError> {
+    let mut systems: HashMap<u16, FeatureLanguageSystems> = HashMap::new();
     let Some(script_list) = script_list else {
         return Ok(systems);
     };
