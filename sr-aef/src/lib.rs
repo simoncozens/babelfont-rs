@@ -1424,4 +1424,31 @@ lookup gsub_single_1;
 "
         );
     }
+
+    #[test]
+    fn test_uncompile_single_subst_modulo() {
+        let data = std::fs::read("resources/gsub1_1_modulo_f1.otf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+languagesystem latn dflt;
+lookup gsub_single_1 {
+    sub [g21 g22] by [gid32787 gid32788];
+    sub [g19 g20] by [gid32789 gid32790];
+} gsub_single_1;
+lookup gsub_single_2 {
+    sub gid32787 by g23;
+    sub gid32788 by g18;
+    sub gid32789 by g17;
+    sub gid32790 by g24;
+} gsub_single_2;
+feature test {
+lookup gsub_single_1;
+    lookup gsub_single_2;
+} test;
+"
+        );
+    }
 }

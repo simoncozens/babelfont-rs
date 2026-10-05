@@ -125,7 +125,7 @@ impl<'a> UncompileContext<'a> {
         let replacements = gsub1
             .coverage()?
             .iter()
-            .map(|g| GlyphId16::new(g.to_u16().saturating_add_signed(delta)))
+            .map(|g| GlyphId16::new(g.to_u16().wrapping_add_signed(delta)))
             .map(|g| GlyphContainer::GlyphName(self.get_name(g)))
             .collect::<Vec<GlyphContainer>>();
         let subst = SingleSubstStatement::new(
