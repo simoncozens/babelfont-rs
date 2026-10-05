@@ -272,12 +272,33 @@ impl<'a> UncompileContext<'a> {
         lookupblock: &mut LookupBlock,
         gpos2f2: PairPosFormat2,
     ) -> Result<(), ReadError> {
-        let classes1 = self.resolve_classes(Some(&gpos2f2.class_def1()?));
-        let classes2 = self.resolve_classes(Some(&gpos2f2.class_def2()?));
+        let class_def1 = gpos2f2.class_def1()?;
+        let mut classes1: HashMap<u16, Vec<GlyphContainer>> = HashMap::new();
+        for gid in gpos2f2.coverage()?.iter() {
+            classes1
+                .entry(class_def1.get(gid))
+                .or_default()
+                .push(GlyphContainer::GlyphName(self.get_name(gid)));
+        }
+        let mut classes2: HashMap<u16, Vec<GlyphContainer>> = HashMap::new();
+        for (gid, class) in gpos2f2.class_def2()?.iter() {
+            if class != 0 {
+                classes2
+                    .entry(class)
+                    .or_default()
+                    .push(GlyphContainer::GlyphName(self.get_name(gid)));
+            }
+        }
         let offset_data = gpos2f2.offset_data();
         for (class1, record) in gpos2f2.class1_records().iter().enumerate() {
             let Ok(record) = record else { continue };
+            if !classes1.contains_key(&(class1 as u16)) {
+                continue;
+            }
             for (class2, subrecord) in record.class2_records().iter().enumerate() {
+                if !classes2.contains_key(&(class2 as u16)) {
+                    continue;
+                }
                 let Ok(subrecord) = subrecord else { continue };
 
                 let vr1 = self.resolve_value_record(subrecord.value_record1(), offset_data)?;

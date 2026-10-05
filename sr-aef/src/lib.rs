@@ -1162,4 +1162,23 @@ lookup gpos_single_1;
 "
         );
     }
+
+    #[test]
+    fn test_uncompile_class_kerning() {
+        let data = std::fs::read("resources/kerning.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+languagesystem DFLT dflt;
+lookup gpos_pair_1 {
+    pos [a b] [c d] -10;
+} gpos_pair_1;
+feature kern {
+lookup gpos_pair_1;
+} kern;
+"
+        );
+    }
 }
