@@ -38,7 +38,7 @@ use fea_rs_ast::{
     LanguageSystemStatement, LigatureCaretByIndexStatement, LigatureCaretByPosStatement,
     LookupBlock, LookupFlagStatement, LookupReferenceStatement, MarkClass, MarkClassDefinition,
     NameRecord, NameRecordKind, NestedBlock, Pos, ScriptStatement, Statement, SubOrPos, Subst,
-    Table, ToplevelItem, VariationBlock,
+    SubtableStatement, Table, ToplevelItem, VariationBlock,
 };
 use indexmap::{IndexMap, IndexSet};
 /// A handle to the version of Skrifa that sr-eaf is using. Pass a skrifa::FontRef to uncompile()
@@ -879,6 +879,18 @@ fn lookup_reference(name: &SmolStr) -> Statement {
     Statement::LookupReference(LookupReferenceStatement::new(name.to_string(), 0..0))
 }
 
+pub(crate) fn add_subtable_break(lookupblock: &mut LookupBlock) {
+    if lookupblock
+        .statements
+        .last()
+        .is_some_and(|statement| !matches!(statement, Statement::Subtable(_)))
+    {
+        lookupblock
+            .statements
+            .push(Statement::Subtable(SubtableStatement::new()));
+    }
+}
+
 fn comment_out(statement: Statement) -> Statement {
     Statement::Comment(Comment::new(format!("# {}", statement.as_fea(""))))
 }
@@ -1438,12 +1450,16 @@ lookup gsub_single_1;
 languagesystem latn dflt;
 lookup gsub_single_1 {
     sub [g21 g22] by [gid32787 gid32788];
+    subtable;
     sub [g19 g20] by [gid32789 gid32790];
 } gsub_single_1;
 lookup gsub_single_2 {
     sub gid32787 by g23;
+    subtable;
     sub gid32788 by g18;
+    subtable;
     sub gid32789 by g17;
+    subtable;
     sub gid32790 by g24;
 } gsub_single_2;
 feature test {
@@ -1469,6 +1485,35 @@ lookup gpos_single_1 {
 } gpos_single_1;
 feature kern {
 lookup gpos_single_1;
+} kern;
+"
+        );
+    }
+
+    #[test]
+    fn test_uncompile_subtable_breaks() {
+        let data = std::fs::read("resources/subtables.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+languagesystem DFLT dflt;
+lookup gsub_single_1 {
+    sub a by b;
+    subtable;
+    sub c by d;
+} gsub_single_1;
+lookup gpos_pair_1 {
+    pos [a b] [c d] -40;
+    subtable;
+    pos [a b] [c d] 0;
+} gpos_pair_1;
+feature salt {
+lookup gsub_single_1;
+} salt;
+feature kern {
+lookup gpos_pair_1;
 } kern;
 "
         );

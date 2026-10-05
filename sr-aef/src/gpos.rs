@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::UncompileContext;
+use crate::{UncompileContext, add_subtable_break};
 use fea_rs_ast::{
     Anchor as FeaAnchor, ChainedContextStatement, CursivePosStatement, GlyphClass, GlyphContainer,
     IgnoreStatement, LookupBlock, MarkBasePosStatement, MarkClass, MarkLigPosStatement,
@@ -47,6 +47,7 @@ impl<'a> UncompileContext<'a> {
                 PositionSubtables::Single(subtables) => {
                     let mut lookupblock = self.create_lookup_block(i as u16, Pos);
                     for subtable in subtables.iter().flatten() {
+                        add_subtable_break(&mut lookupblock);
                         match subtable {
                             SinglePos::Format1(gpos1f1) => {
                                 self.uncompile_gpos1_format1(&mut lookupblock, gpos1f1)?;
@@ -61,6 +62,7 @@ impl<'a> UncompileContext<'a> {
                 PositionSubtables::Pair(subtables) => {
                     let mut lookupblock = self.create_lookup_block(i as u16, Pos);
                     for subtable in subtables.iter().flatten() {
+                        add_subtable_break(&mut lookupblock);
                         match subtable {
                             PairPos::Format1(table_ref) => {
                                 self.uncompile_gpos2_format1(&mut lookupblock, table_ref)?;
@@ -75,6 +77,7 @@ impl<'a> UncompileContext<'a> {
                 PositionSubtables::Cursive(subtables) => {
                     let mut lookupblock = self.create_lookup_block(i as u16, Pos);
                     for subtable in subtables.iter().flatten() {
+                        add_subtable_break(&mut lookupblock);
                         self.uncompile_gpos3(&mut lookupblock, subtable)?;
                     }
                     lookupblock
@@ -82,6 +85,7 @@ impl<'a> UncompileContext<'a> {
                 PositionSubtables::MarkToBase(subtables) => {
                     let mut lookupblock = self.create_lookup_block(i as u16, Pos);
                     for subtable in subtables.iter().flatten() {
+                        add_subtable_break(&mut lookupblock);
                         self.uncompile_gpos4(&mut lookupblock, subtable)?;
                     }
                     lookupblock
@@ -89,6 +93,7 @@ impl<'a> UncompileContext<'a> {
                 PositionSubtables::MarkToLig(subtables) => {
                     let mut lookupblock = self.create_lookup_block(i as u16, Pos);
                     for subtable in subtables.iter().flatten() {
+                        add_subtable_break(&mut lookupblock);
                         self.uncompile_gpos5(&mut lookupblock, subtable)?;
                     }
                     lookupblock
@@ -96,6 +101,7 @@ impl<'a> UncompileContext<'a> {
                 PositionSubtables::MarkToMark(subtables) => {
                     let mut lookupblock = self.create_lookup_block(i as u16, Pos);
                     for subtable in subtables.iter().flatten() {
+                        add_subtable_break(&mut lookupblock);
                         self.uncompile_gpos6(&mut lookupblock, subtable)?;
                     }
                     lookupblock
@@ -103,6 +109,7 @@ impl<'a> UncompileContext<'a> {
                 PositionSubtables::Contextual(subtables) => {
                     let mut lookupblock = self.create_lookup_block(i as u16, Pos);
                     for subtable in subtables.iter().flatten() {
+                        add_subtable_break(&mut lookupblock);
                         lookupblock.statements.extend(
                             self.uncompile_sequence_context(subtable, Pos)?
                                 .into_iter()
@@ -114,6 +121,7 @@ impl<'a> UncompileContext<'a> {
                 PositionSubtables::ChainContextual(subtables) => {
                     let mut lookupblock = self.create_lookup_block(i as u16, Pos);
                     for subtable in subtables.iter().flatten() {
+                        add_subtable_break(&mut lookupblock);
                         lookupblock.statements.extend(
                             self.uncompile_chain_sequence_context(subtable, Pos)?
                                 .into_iter()
@@ -124,6 +132,9 @@ impl<'a> UncompileContext<'a> {
                 }
                 PositionSubtables::EmptyExtension => self.create_lookup_block(i as u16, Pos),
             };
+            if let Some(Statement::Subtable(_)) = lookupblock.statements.last() {
+                lookupblock.statements.pop();
+            }
             self.add_lookup_flags(
                 &mut lookupblock,
                 lookup.lookup_flag(),
