@@ -20,8 +20,49 @@ lookup gsub5 {
 lookup gsub6_f1 {
     sub one two three a' lookup gsub1 b' c' lookup gsub2 x y z;
 } gsub6_f1;
+lookup gsub1_f1 {
+    sub [a b] by [b c];
+} gsub1_f1;
+lookup gsub1_f2 {
+    sub [a b] by [d c];
+} gsub1_f2;
+lookup gsub6_inline {
+    sub one a' by c;
+} gsub6_inline;
+lookup gsub2_null {
+    sub e by NULL;
+} gsub2_null;
+lookup gsub6_ignore {
+    ignore sub one a' b;
+    sub a' lookup gsub1;
+} gsub6_ignore;
+lookup gsub5_ignore {
+    ignore sub a' b';
+    sub a' lookup gsub1 c';
+} gsub5_ignore;
+lookup gsub1_filter {
+    lookupflag UseMarkFilteringSet [acute];
+    sub b by c;
+} gsub1_filter;
+lookup gsub8 {
+    rsub one two [a b]' c by [d e];
+} gsub8;
 
 lookup gpos4 {
     pos base A <anchor 150 100> mark @TOP_MARKS <anchor -200 -200> mark @BOTTOM_MARKS;
 
 } gpos4;
+lookup gpos8_inline {
+    pos one A' 10;
+} gpos8_inline;
+lookup gpos8_ignore {
+    ignore pos one A';
+    pos A' 20;
+} gpos8_ignore;
+lookup gpos1_f1 {
+    pos [a b] -50;
+} gpos1_f1;
+lookup gpos1_f2 {
+    pos a -50;
+    pos b -60;
+} gpos1_f2;

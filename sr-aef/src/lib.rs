@@ -33,9 +33,10 @@ use std::collections::{HashMap, HashSet};
 /// The return value of uncompile() will be a [fea_rs_ast::FeatureFile]; you will probably want to call `.as_fea()` on it.
 pub use fea_rs_ast;
 use fea_rs_ast::{
-    Anchor, GlyphClass, GlyphClassDefStatement, GlyphClassDefinition, GlyphContainer, GlyphName,
-    LanguageSystemStatement, LookupBlock, LookupFlagStatement, LookupReferenceStatement, MarkClass,
-    MarkClassDefinition, Pos, Statement, SubOrPos, Subst, ToplevelItem,
+    Anchor, GdefStatement, GlyphClass, GlyphClassDefStatement, GlyphClassDefinition,
+    GlyphContainer, GlyphName, LanguageSystemStatement, LookupBlock, LookupFlagStatement,
+    LookupReferenceStatement, MarkClass, MarkClassDefinition, Pos, Statement, SubOrPos, Subst,
+    Table, ToplevelItem,
 };
 use indexmap::{IndexMap, IndexSet};
 /// A handle to the version of Skrifa that sr-eaf is using. Pass a skrifa::FontRef to uncompile()
@@ -176,6 +177,7 @@ impl<'a> UncompileContext<'a> {
         slf.uncompile_gsub_lookups()?;
         slf.uncompile_gpos_lookups()?;
         slf.uncompile_feature_table()?;
+        slf.order_lookups();
         Ok(slf)
     }
 
@@ -242,6 +244,13 @@ impl<'a> UncompileContext<'a> {
                 }
             }
         }
+        if let Some(index) = systems.get_index_of(&Tag::new(b"DFLT")) {
+            systems.move_index(index, 0);
+            let languages = &mut systems[0];
+            if let Some(index) = languages.get_index_of(&Tag::new(b"dflt")) {
+                languages.move_index(index, 0);
+            }
+        }
         self.language_systems = systems;
         Ok(())
     }
@@ -264,9 +273,13 @@ impl<'a> UncompileContext<'a> {
             .map(|g| GlyphContainer::GlyphName(self.get_name(g)))
             .collect()
     }
-    fn resolve_coverage_to_class(&mut self, coverage: &CoverageTable) -> GlyphContainer {
+    fn resolve_coverage_to_class(
+        &mut self,
+        coverage: &CoverageTable,
+        collapse_single: bool,
+    ) -> GlyphContainer {
         let glyphs = self.resolve_coverage(coverage);
-        if glyphs.len() == 1 {
+        if collapse_single && glyphs.len() == 1 {
             return glyphs.into_iter().next().unwrap();
         }
         let glyphclass = GlyphClass::new(glyphs.clone(), 0..0);
@@ -291,10 +304,10 @@ impl<'a> UncompileContext<'a> {
         }
     }
 
-    fn resolve_classes(&self, class_def: &ClassDef) -> HashMap<u16, Vec<GlyphContainer>> {
+    fn resolve_classes(&self, class_def: Option<&ClassDef>) -> HashMap<u16, Vec<GlyphContainer>> {
         let mut classes: HashMap<u16, Vec<GlyphContainer>> = HashMap::new();
         let mut used_glyphs = HashSet::new();
-        for (glyph_id, class_id) in class_def.iter() {
+        for (glyph_id, class_id) in class_def.into_iter().flat_map(|class_def| class_def.iter()) {
             used_glyphs.insert(glyph_id.to_u16());
             classes
                 .entry(class_id)
@@ -323,16 +336,13 @@ impl<'a> UncompileContext<'a> {
         name
     }
 
-    fn create_next_lookup_block<T: SubOrPos>(
-        &mut self,
-        prefix: &str,
-        index: u16,
-        phase: T,
-    ) -> LookupBlock {
+    fn assign_lookup_name<T: SubOrPos>(&mut self, prefix: &str, index: u16, phase: T) {
         let name = self.gensym(prefix);
-        self.lookup_map
-            .insert((phase.to_string(), index), name.clone());
-        LookupBlock::new(name.clone(), vec![], false, 0..0)
+        self.lookup_map.insert((phase.to_string(), index), name);
+    }
+
+    fn create_lookup_block<T: SubOrPos>(&self, index: u16, phase: T) -> LookupBlock {
+        LookupBlock::new(self.get_lookup_name(index, phase), vec![], false, 0..0)
     }
 
     fn get_lookup_name<T: SubOrPos>(&self, lookup_list_index: u16, phase: T) -> SmolStr {
@@ -342,8 +352,93 @@ impl<'a> UncompileContext<'a> {
             .unwrap_or_else(|| format!("{}_lookup_{}", phase, lookup_list_index).into())
     }
 
+    /// Feature files require lookups to be defined before use. Reorder them while
+    /// keeping the original order where possible.
+    fn order_lookups(&mut self) {
+        let used_by_features: HashSet<SmolStr> = self
+            .features
+            .values()
+            .flatten()
+            .map(|reference| SmolStr::new(&reference.lookup_name))
+            .collect();
+        let calls: HashMap<SmolStr, Vec<SmolStr>> = self
+            .lookups
+            .iter()
+            .map(|(name, lookup)| (name.clone(), called_lookups(lookup)))
+            .collect();
+        let contextual_only: HashSet<SmolStr> = calls
+            .values()
+            .flatten()
+            .filter(|name| !used_by_features.contains(*name))
+            .cloned()
+            .collect();
+        let feature_dependencies: HashMap<SmolStr, Vec<SmolStr>> = calls
+            .keys()
+            .map(|name| {
+                (
+                    name.clone(),
+                    feature_dependencies(name, &calls, &contextual_only),
+                )
+            })
+            .collect();
+        let count_pending_dependencies =
+            |name: &SmolStr, pending: &IndexMap<SmolStr, LookupBlock>| {
+                feature_dependencies[name]
+                    .iter()
+                    .filter(|dependency| pending.contains_key(*dependency))
+                    .count()
+            };
+
+        let mut pending = std::mem::take(&mut self.lookups);
+        let mut deferred: Vec<SmolStr> = vec![];
+        let names: Vec<SmolStr> = pending.keys().cloned().collect();
+        for name in names {
+            if !pending.contains_key(&name) {
+                continue;
+            }
+            let pending_dependencies = count_pending_dependencies(&name, &pending);
+            if contextual_only.contains(&name) {
+                if pending_dependencies == 0 {
+                    self.place_lookup(&name, &mut pending, &calls);
+                }
+                continue;
+            }
+            if pending_dependencies > 1 {
+                deferred.push(name);
+                continue;
+            }
+            self.place_lookup(&name, &mut pending, &calls);
+            while let Some(index) = deferred
+                .iter()
+                .position(|name| count_pending_dependencies(name, &pending) == 0)
+            {
+                let name = deferred.remove(index);
+                self.place_lookup(&name, &mut pending, &calls);
+            }
+        }
+        let remaining: Vec<SmolStr> = pending.keys().cloned().collect();
+        for name in deferred.into_iter().chain(remaining) {
+            self.place_lookup(&name, &mut pending, &calls);
+        }
+    }
+
+    fn place_lookup(
+        &mut self,
+        name: &SmolStr,
+        pending: &mut IndexMap<SmolStr, LookupBlock>,
+        calls: &HashMap<SmolStr, Vec<SmolStr>>,
+    ) {
+        let Some(lookup) = pending.shift_remove(name) else {
+            return;
+        };
+        for dependency in calls.get(name).into_iter().flatten() {
+            self.place_lookup(dependency, pending, calls);
+        }
+        self.lookups.insert(name.clone(), lookup);
+    }
+
     fn uncompile_gdef(&mut self) -> Result<Vec<ToplevelItem>, ReadError> {
-        let mut items = vec![];
+        let mut statements = vec![];
         let mut base_glyphs = vec![];
         let mut mark_glyphs = vec![];
         let mut ligature_glyphs = vec![];
@@ -363,7 +458,7 @@ impl<'a> UncompileContext<'a> {
                         _ => {}
                     }
                 }
-                items.push(ToplevelItem::GdefClassDef(GlyphClassDefStatement::new(
+                statements.push(GdefStatement::GlyphClassDef(GlyphClassDefStatement::new(
                     make_class(base_glyphs),
                     make_class(ligature_glyphs),
                     make_class(mark_glyphs),
@@ -372,14 +467,17 @@ impl<'a> UncompileContext<'a> {
                 )));
             }
         }
-        Ok(items)
+        if statements.is_empty() {
+            return Ok(vec![]);
+        }
+        Ok(vec![ToplevelItem::Gdef(Table { statements })])
     }
 
     fn uncompile_feature_table(&mut self) -> Result<(), ReadError> {
-        if let Some(gsub) = &self.gsub {
-            for feature_record in gsub.feature_list()?.feature_records() {
+        if let Some(feature_list) = self.gsub.as_ref().and_then(|gsub| gsub.feature_list().ok()) {
+            for feature_record in feature_list.feature_records() {
                 let feature_tag = feature_record.feature_tag();
-                let feature = feature_record.feature(gsub.feature_list()?.offset_data())?;
+                let feature = feature_record.feature(feature_list.offset_data())?;
                 let lookup_indices = feature.lookup_list_indices();
                 self.features.insert(
                     feature_tag.to_string().into(),
@@ -396,10 +494,10 @@ impl<'a> UncompileContext<'a> {
             }
         }
 
-        if let Some(gpos) = &self.gpos {
-            for feature_record in gpos.feature_list()?.feature_records() {
+        if let Some(feature_list) = self.gpos.as_ref().and_then(|gpos| gpos.feature_list().ok()) {
+            for feature_record in feature_list.feature_records() {
                 let feature_tag = feature_record.feature_tag();
-                let feature = feature_record.feature(gpos.feature_list()?.offset_data())?;
+                let feature = feature_record.feature(feature_list.offset_data())?;
                 let lookup_indices = feature.lookup_list_indices();
                 self.features.insert(
                     feature_tag.to_string().into(),
@@ -447,11 +545,11 @@ impl<'a> UncompileContext<'a> {
         let set = mark_filtering_set.and_then(|set| {
             mark_glyph_sets
                 .and_then(|mgss| mgss.coverages().get(set as usize).ok())
-                .map(|coverage| self.resolve_coverage_to_class(&coverage))
+                .map(|coverage| self.resolve_coverage_to_class(&coverage, false))
         });
         let mark_attachment_class = flags.mark_attachment_class().and_then(|class| {
             mark_attachment_classes
-                .and_then(|mac| self.resolve_classes(&mac).get(&class).cloned())
+                .and_then(|mac| self.resolve_classes(Some(&mac)).get(&class).cloned())
                 .map(|classes| GlyphContainer::GlyphClass(GlyphClass::new(classes, 0..0)))
         });
 
@@ -465,6 +563,40 @@ impl<'a> UncompileContext<'a> {
             )),
         );
     }
+}
+
+fn called_lookups(lookup: &LookupBlock) -> Vec<SmolStr> {
+    lookup
+        .statements
+        .iter()
+        .flat_map(|statement| match statement {
+            Statement::ChainedContextSubst(statement) => statement.lookups.concat(),
+            Statement::ChainedContextPos(statement) => statement.lookups.concat(),
+            _ => vec![],
+        })
+        .collect()
+}
+
+/// Find dependencies used by features, following calls through lookups unused by features.
+fn feature_dependencies(
+    name: &SmolStr,
+    calls: &HashMap<SmolStr, Vec<SmolStr>>,
+    contextual_only: &HashSet<SmolStr>,
+) -> Vec<SmolStr> {
+    let mut dependencies = vec![];
+    let mut seen = HashSet::new();
+    let mut stack: Vec<&SmolStr> = calls.get(name).into_iter().flatten().collect();
+    while let Some(dependency) = stack.pop() {
+        if !seen.insert(dependency) {
+            continue;
+        }
+        if contextual_only.contains(dependency) {
+            stack.extend(calls.get(dependency).into_iter().flatten());
+        } else {
+            dependencies.push(dependency.clone());
+        }
+    }
+    dependencies
 }
 
 /// Uncompile a TTF font into a fea file.
@@ -548,7 +680,88 @@ mod tests {
         let ff = uncompile(&fontref, true).unwrap();
         assert_eq!(
             ff.as_fea(""),
-            "GlyphClassDef [A], [], [grave acute dotbelowcomb], [];\nmarkClass grave <anchor 200 150> @bottomleft;\nmarkClass acute <anchor 350 0> @bottomleft;\nmarkClass dotbelowcomb <anchor 200 -200> @mark_class_1_1;\nlookup gsub_single_1 {\n    sub a by b;\n} gsub_single_1;\nlookup gsub_multiple_1 {\n    sub a by b c;\n} gsub_multiple_1;\nlookup gsub_alternate_1 {\n    sub a from [b c d e f];\n} gsub_alternate_1;\nlookup gsub_ligature_1 {\n    sub b c by a;\n} gsub_ligature_1;\nlookup gsub_contextual_1 {\n    sub [one a]' lookup gsub_single_1 b' [two c]' lookup gsub_multiple_1;\n} gsub_contextual_1;\nlookup gsub_chain_contextual_1 {\n    sub one two three a' lookup gsub_single_1 b' c' lookup gsub_multiple_1 x y z;\n} gsub_chain_contextual_1;\nlookup gpos_mark_to_base_1 {\n    pos base A\n        <anchor 150 100> mark @bottomleft\n        <anchor -200 -200> mark @mark_class_1_1;\n} gpos_mark_to_base_1;\n"
+            "\
+table GDEF {
+GlyphClassDef [A], [], [grave acute dotbelowcomb], [];
+} GDEF;
+
+markClass grave <anchor 200 150> @bottomleft;
+markClass acute <anchor 350 0> @bottomleft;
+markClass dotbelowcomb <anchor 200 -200> @mark_class_1_1;
+lookup gsub_single_1 {
+    sub a by b;
+} gsub_single_1;
+lookup gsub_multiple_1 {
+    sub a by b c;
+} gsub_multiple_1;
+lookup gsub_alternate_1 {
+    sub a from [b c d e f];
+} gsub_alternate_1;
+lookup gsub_ligature_1 {
+    sub b c by a;
+} gsub_ligature_1;
+lookup gsub_contextual_1 {
+    sub [one a]' lookup gsub_single_1 b' [two c]' lookup gsub_multiple_1;
+} gsub_contextual_1;
+lookup gsub_chain_contextual_1 {
+    sub one two three a' lookup gsub_single_1 b' c' lookup gsub_multiple_1 x y z;
+} gsub_chain_contextual_1;
+lookup gsub_single_2 {
+    sub [a b] by [b c];
+} gsub_single_2;
+lookup gsub_single_3 {
+    sub [a b] by [d c];
+} gsub_single_3;
+lookup gsub_single_4 {
+    sub a by c;
+} gsub_single_4;
+lookup gsub_chain_contextual_2 {
+    sub one a' lookup gsub_single_4;
+} gsub_chain_contextual_2;
+lookup gsub_multiple_2 {
+    sub e by NULL;
+} gsub_multiple_2;
+lookup gsub_chain_contextual_3 {
+    ignore sub one a' b;
+    sub a' lookup gsub_single_1;
+} gsub_chain_contextual_3;
+lookup gsub_contextual_2 {
+    ignore sub a' b';
+    sub a' lookup gsub_single_1 c';
+} gsub_contextual_2;
+lookup gsub_single_5 {
+    lookupflag UseMarkFilteringSet [acute];
+    sub b by c;
+} gsub_single_5;
+lookup gsub_reverse_1 {
+    rsub one two [a b]' c by [d e];
+} gsub_reverse_1;
+lookup gpos_mark_to_base_1 {
+    pos base A
+        <anchor 150 100> mark @bottomleft
+        <anchor -200 -200> mark @mark_class_1_1;
+} gpos_mark_to_base_1;
+lookup gpos_single_1 {
+    pos A 10;
+} gpos_single_1;
+lookup gpos_chain_contextual_1 {
+    pos one A' lookup gpos_single_1;
+} gpos_chain_contextual_1;
+lookup gpos_single_2 {
+    pos A 20;
+} gpos_single_2;
+lookup gpos_chain_contextual_2 {
+    ignore pos one A';
+    pos A' lookup gpos_single_2;
+} gpos_chain_contextual_2;
+lookup gpos_single_3 {
+    pos [a b] -50;
+} gpos_single_3;
+lookup gpos_single_4 {
+    pos a -50;
+    pos b -60;
+} gpos_single_4;
+"
         );
     }
 }

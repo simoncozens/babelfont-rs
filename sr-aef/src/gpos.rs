@@ -2,9 +2,10 @@ use std::collections::HashMap;
 
 use crate::UncompileContext;
 use fea_rs_ast::{
-    Anchor as FeaAnchor, CursivePosStatement, GlyphClass, GlyphContainer, LookupBlock,
-    MarkBasePosStatement, MarkClass, MarkLigPosStatement, MarkMarkPosStatement, Metric,
-    PairPosStatement, Pos, SinglePosStatement, Statement, ValueRecord as FeaValueRecord,
+    Anchor as FeaAnchor, ChainedContextStatement, CursivePosStatement, GlyphClass, GlyphContainer,
+    IgnoreStatement, LookupBlock, MarkBasePosStatement, MarkClass, MarkLigPosStatement,
+    MarkMarkPosStatement, Metric, PairPosStatement, Pos, SinglePosStatement, Statement,
+    ValueRecord as FeaValueRecord,
 };
 use indexmap::IndexMap;
 use skrifa::raw::{
@@ -21,16 +22,30 @@ use skrifa::raw::{
 use smol_str::SmolStr;
 impl<'a> UncompileContext<'a> {
     pub(crate) fn uncompile_gpos_lookups(&mut self) -> Result<(), ReadError> {
-        let gpos_lookup_list: LookupList<PositionLookup> = match self.gpos.as_ref() {
-            Some(gpos) => gpos.lookup_list()?,
-            None => return Ok(()),
-        };
+        let gpos_lookup_list: LookupList<PositionLookup> =
+            match self.gpos.as_ref().and_then(|gpos| gpos.lookup_list().ok()) {
+                Some(lookup_list) => lookup_list,
+                None => return Ok(()),
+            };
+        for (i, lookup) in gpos_lookup_list.lookups().iter().flatten().enumerate() {
+            let prefix = match lookup.subtables()? {
+                PositionSubtables::Single(_) => "gpos_single",
+                PositionSubtables::Pair(_) => "gpos_pair",
+                PositionSubtables::Cursive(_) => "gpos_cursive",
+                PositionSubtables::MarkToBase(_) => "gpos_mark_to_base",
+                PositionSubtables::MarkToLig(_) => "gpos_mark_to_ligature",
+                PositionSubtables::MarkToMark(_) => "gpos_mark_to_mark",
+                PositionSubtables::Contextual(_) => "gpos_contextual",
+                PositionSubtables::ChainContextual(_) => "gpos_chain_contextual",
+                PositionSubtables::EmptyExtension => "gpos_extension",
+            };
+            self.assign_lookup_name(prefix, i as u16, Pos);
+        }
         for (i, lookup) in gpos_lookup_list.lookups().iter().flatten().enumerate() {
             let subtables = lookup.subtables()?;
             let mut lookupblock = match subtables {
                 PositionSubtables::Single(subtables) => {
-                    let mut lookupblock =
-                        self.create_next_lookup_block("gpos_single", i as u16, Pos);
+                    let mut lookupblock = self.create_lookup_block(i as u16, Pos);
                     for subtable in subtables.iter().flatten() {
                         match subtable {
                             SinglePos::Format1(gpos1f1) => {
@@ -44,7 +59,7 @@ impl<'a> UncompileContext<'a> {
                     lookupblock
                 }
                 PositionSubtables::Pair(subtables) => {
-                    let mut lookupblock = self.create_next_lookup_block("gpos_pair", i as u16, Pos);
+                    let mut lookupblock = self.create_lookup_block(i as u16, Pos);
                     for subtable in subtables.iter().flatten() {
                         match subtable {
                             PairPos::Format1(table_ref) => {
@@ -58,64 +73,56 @@ impl<'a> UncompileContext<'a> {
                     lookupblock
                 }
                 PositionSubtables::Cursive(subtables) => {
-                    let mut lookupblock =
-                        self.create_next_lookup_block("gpos_cursive", i as u16, Pos);
+                    let mut lookupblock = self.create_lookup_block(i as u16, Pos);
                     for subtable in subtables.iter().flatten() {
                         self.uncompile_gpos3(&mut lookupblock, subtable)?;
                     }
                     lookupblock
                 }
                 PositionSubtables::MarkToBase(subtables) => {
-                    let mut lookupblock =
-                        self.create_next_lookup_block("gpos_mark_to_base", i as u16, Pos);
+                    let mut lookupblock = self.create_lookup_block(i as u16, Pos);
                     for subtable in subtables.iter().flatten() {
                         self.uncompile_gpos4(&mut lookupblock, subtable)?;
                     }
                     lookupblock
                 }
                 PositionSubtables::MarkToLig(subtables) => {
-                    let mut lookupblock =
-                        self.create_next_lookup_block("gpos_mark_to_ligature", i as u16, Pos);
+                    let mut lookupblock = self.create_lookup_block(i as u16, Pos);
                     for subtable in subtables.iter().flatten() {
                         self.uncompile_gpos5(&mut lookupblock, subtable)?;
                     }
                     lookupblock
                 }
                 PositionSubtables::MarkToMark(subtables) => {
-                    let mut lookupblock =
-                        self.create_next_lookup_block("gpos_mark_to_mark", i as u16, Pos);
+                    let mut lookupblock = self.create_lookup_block(i as u16, Pos);
                     for subtable in subtables.iter().flatten() {
                         self.uncompile_gpos6(&mut lookupblock, subtable)?;
                     }
                     lookupblock
                 }
                 PositionSubtables::Contextual(subtables) => {
-                    let mut lookupblock =
-                        self.create_next_lookup_block("gpos_contextual", i as u16, Pos);
+                    let mut lookupblock = self.create_lookup_block(i as u16, Pos);
                     for subtable in subtables.iter().flatten() {
                         lookupblock.statements.extend(
                             self.uncompile_sequence_context(subtable, Pos)?
                                 .into_iter()
-                                .map(Statement::ChainedContextPos),
+                                .map(to_context_statement),
                         );
                     }
                     lookupblock
                 }
                 PositionSubtables::ChainContextual(subtables) => {
-                    let mut lookupblock =
-                        self.create_next_lookup_block("gpos_chain_contextual", i as u16, Pos);
+                    let mut lookupblock = self.create_lookup_block(i as u16, Pos);
                     for subtable in subtables.iter().flatten() {
                         lookupblock.statements.extend(
                             self.uncompile_chain_sequence_context(subtable, Pos)?
                                 .into_iter()
-                                .map(Statement::ChainedContextPos),
+                                .map(to_context_statement),
                         );
                     }
                     lookupblock
                 }
-                PositionSubtables::EmptyExtension => {
-                    self.create_next_lookup_block("gpos_extension", i as u16, Pos)
-                }
+                PositionSubtables::EmptyExtension => self.create_lookup_block(i as u16, Pos),
             };
             self.add_lookup_flags(
                 &mut lookupblock,
@@ -184,10 +191,7 @@ impl<'a> UncompileContext<'a> {
         let statement = SinglePosStatement::new(
             vec![],
             vec![],
-            input
-                .into_iter()
-                .map(|gid| (gid, Some(vr.clone())))
-                .collect(),
+            vec![(self.class_members_to_container(input), Some(vr))],
             false,
             0..0,
         );
@@ -201,24 +205,15 @@ impl<'a> UncompileContext<'a> {
     ) -> Result<(), ReadError> {
         let input = self.resolve_coverage(&gpos1f2.coverage()?);
         let offset_data = gpos1f2.offset_data();
-        let statement = SinglePosStatement::new(
-            vec![],
-            vec![],
-            input
-                .into_iter()
-                .zip(
-                    gpos1f2
-                        .value_records()
-                        .iter()
-                        .flatten()
-                        .map(|vr| self.resolve_value_record(&vr, offset_data)),
-                )
-                .map(|(gid, vr)| vr.map(|vr| (gid, Some(vr))))
-                .collect::<Result<_, _>>()?,
-            false,
-            0..0,
-        );
-        lookupblock.statements.push(Statement::SinglePos(statement));
+        for (glyph, vr) in input
+            .into_iter()
+            .zip(gpos1f2.value_records().iter().flatten())
+        {
+            let vr = self.resolve_value_record(&vr, offset_data)?;
+            let statement =
+                SinglePosStatement::new(vec![], vec![], vec![(glyph, Some(vr))], false, 0..0);
+            lookupblock.statements.push(Statement::SinglePos(statement));
+        }
         Ok(())
     }
 
@@ -261,8 +256,8 @@ impl<'a> UncompileContext<'a> {
         lookupblock: &mut LookupBlock,
         gpos2f2: PairPosFormat2,
     ) -> Result<(), ReadError> {
-        let classes1 = self.resolve_classes(&gpos2f2.class_def1()?);
-        let classes2 = self.resolve_classes(&gpos2f2.class_def2()?);
+        let classes1 = self.resolve_classes(Some(&gpos2f2.class_def1()?));
+        let classes2 = self.resolve_classes(Some(&gpos2f2.class_def2()?));
         let offset_data = gpos2f2.offset_data();
         for (class1, record) in gpos2f2.class1_records().iter().enumerate() {
             let Ok(record) = record else { continue };
@@ -744,4 +739,16 @@ fn majority_in_quadrant(xs: &[f32], ys: &[f32]) -> Option<&'static str> {
             None
         }
     })
+}
+
+fn to_context_statement(statement: ChainedContextStatement<Pos>) -> Statement {
+    if statement.lookups.iter().all(Vec::is_empty) {
+        Statement::IgnorePos(IgnoreStatement::new(
+            vec![(statement.prefix, statement.glyphs, statement.suffix)],
+            0..0,
+            Pos,
+        ))
+    } else {
+        Statement::ChainedContextPos(statement)
+    }
 }
