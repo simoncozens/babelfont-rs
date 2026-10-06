@@ -429,10 +429,13 @@ impl<'a> UncompileContext<'a> {
                         .transpose()
                 })
                 .collect::<Result<Vec<_>, ReadError>>()?;
+            // Keep NULL anchors for bases with no anchors and classes with no base anchors.
+            let no_anchors = base_anchors.iter().all(Option::is_none);
             let anchors_mark_classes = self.materialize_anchor_mark_classes(
                 &base_glyph.name,
                 &base_anchors,
                 &class_to_anchor_name,
+                |class| no_anchors || !mark_class_to_base_glyph_anchor.contains_key(&class),
             );
             let statement = Statement::MarkBasePos(MarkBasePosStatement::new(
                 GlyphContainer::GlyphName(base_glyph.clone()),
@@ -518,21 +521,24 @@ impl<'a> UncompileContext<'a> {
         mark_class_to_target_glyph_anchor
     }
 
+    /// Omit NULL anchors unless `keep_null` selects their class; compilers fill in the rest.
     fn materialize_anchor_mark_classes(
         &mut self,
         target_glyph_name: &SmolStr,
         class_anchors: &[Option<FeaAnchor>],
         class_to_anchor_name: &IndexMap<u16, SmolStr>,
-    ) -> Vec<(FeaAnchor, MarkClass)> {
+        keep_null: impl Fn(u16) -> bool,
+    ) -> Vec<(Option<FeaAnchor>, MarkClass)> {
         let mut anchors_mark_classes = vec![];
         for (class_number, anchor) in class_anchors.iter().enumerate() {
-            let Some(anchor) = anchor else {
-                continue;
-            };
             let Some(anchor_name) = class_to_anchor_name.get(&(class_number as u16)) else {
                 continue;
             };
-            self.register_anchor(target_glyph_name, anchor, Some(anchor_name));
+            match anchor {
+                Some(anchor) => self.register_anchor(target_glyph_name, anchor, Some(anchor_name)),
+                None if !keep_null(class_number as u16) => continue,
+                None => {}
+            }
             anchors_mark_classes.push((anchor.clone(), MarkClass::new(anchor_name)));
         }
         anchors_mark_classes
@@ -595,10 +601,13 @@ impl<'a> UncompileContext<'a> {
                             .transpose()
                     })
                     .collect::<Result<Vec<_>, ReadError>>()?;
+                // Keep NULL anchors for classes with no ligature anchors.
+                // Components with no anchors are written as a bare NULL anchor.
                 let anchors_mark_classes = self.materialize_anchor_mark_classes(
                     &ligature_glyph.name,
                     &class_anchors,
                     &class_to_anchor_name,
+                    |class| !mark_class_to_ligature_glyph_anchor.contains_key(&class),
                 );
                 components_anchors_mark_classes.push(anchors_mark_classes);
             }
@@ -666,10 +675,13 @@ impl<'a> UncompileContext<'a> {
                 })
                 .collect::<Result<Vec<_>, ReadError>>()?;
 
+            // Keep NULL anchors for target marks with no anchors and classes with no target anchors.
+            let no_anchors = class_anchors.iter().all(Option::is_none);
             let anchors_mark_classes = self.materialize_anchor_mark_classes(
                 &mark2_glyph.name,
                 &class_anchors,
                 &class_to_anchor_name,
+                |class| no_anchors || !mark_class_to_mark2_glyph_anchor.contains_key(&class),
             );
 
             let statement = Statement::MarkMarkPos(MarkMarkPosStatement::new(

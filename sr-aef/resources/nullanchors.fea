@@ -1,0 +1,27 @@
+languagesystem DFLT dflt;
+
+markClass c <anchor 0 500> @TOP;
+markClass d <anchor 0 0> @BOTTOM;
+
+feature mark {
+    lookup mark_base {
+        pos base a <anchor 250 500> mark @TOP;
+        pos base b <anchor NULL> mark @TOP;
+    } mark_base;
+
+    lookup mark_ligature {
+        pos ligature a
+                <anchor 100 500> mark @TOP
+                <anchor NULL> mark @BOTTOM
+            ligComponent
+                <anchor 400 500> mark @TOP
+                <anchor NULL> mark @BOTTOM;
+    } mark_ligature;
+} mark;
+
+feature mkmk {
+    lookup mark_mark {
+        pos mark c <anchor 0 800> mark @TOP;
+        pos mark d <anchor NULL> mark @TOP;
+    } mark_mark;
+} mkmk;
