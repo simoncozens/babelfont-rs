@@ -1720,4 +1720,52 @@ lookup gpos_single_1;
 "
         );
     }
+
+    #[test]
+    fn test_uncompile_null_anchors() {
+        let data = std::fs::read("resources/nullanchors.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+languagesystem DFLT dflt;
+table GDEF {
+GlyphClassDef [b], [a], [c d], [];
+} GDEF;
+
+markClass c <anchor 0 500> @left;
+markClass c <anchor 0 500> @mark_class_0_1;
+markClass d <anchor 0 0> @mark_class_1_1;
+markClass c <anchor 0 500> @topleft;
+lookup gpos_mark_to_base_1 {
+    pos base a
+        <anchor 250 500> mark @left;
+    pos base b
+        <anchor NULL> mark @left;
+} gpos_mark_to_base_1;
+lookup gpos_mark_to_ligature_1 {
+    pos ligature a
+        <anchor 100 500> mark @mark_class_0_1
+        <anchor NULL> mark @mark_class_1_1
+        ligComponent
+        <anchor 400 500> mark @mark_class_0_1
+        <anchor NULL> mark @mark_class_1_1;
+} gpos_mark_to_ligature_1;
+lookup gpos_mark_to_mark_1 {
+    pos mark c
+        <anchor 0 800> mark @topleft;
+    pos mark d
+        <anchor NULL> mark @topleft;
+} gpos_mark_to_mark_1;
+feature mark {
+lookup gpos_mark_to_base_1;
+    lookup gpos_mark_to_ligature_1;
+} mark;
+feature mkmk {
+lookup gpos_mark_to_mark_1;
+} mkmk;
+"
+        );
+    }
 }

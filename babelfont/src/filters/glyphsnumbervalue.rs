@@ -190,7 +190,7 @@ impl GlyphsNumberValueVisitor {
 
     fn visit_mark_base_pos(&mut self, mbp: &mut fea_rs_ast::MarkBasePosStatement) -> bool {
         for (anchor, _mark_class) in mbp.marks.iter_mut() {
-            self.convert_anchor(anchor);
+            self.convert_option_anchor(anchor);
         }
         true
     }
@@ -198,7 +198,7 @@ impl GlyphsNumberValueVisitor {
     fn visit_mark_lig_pos(&mut self, mlp: &mut fea_rs_ast::MarkLigPosStatement) -> bool {
         for level1 in mlp.marks.iter_mut() {
             for (anchor, _mark_class) in level1.iter_mut() {
-                self.convert_anchor(anchor);
+                self.convert_option_anchor(anchor);
             }
         }
         true
@@ -206,7 +206,7 @@ impl GlyphsNumberValueVisitor {
 
     fn visit_mark_mark_pos(&mut self, mmp: &mut fea_rs_ast::MarkMarkPosStatement) -> bool {
         for (anchor, _mark_class) in mmp.marks.iter_mut() {
-            self.convert_anchor(anchor);
+            self.convert_option_anchor(anchor);
         }
         true
     }
