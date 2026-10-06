@@ -90,6 +90,9 @@ impl LayoutClosureVisitor {
                         original_glyphs.push(glyph);
                     }
                 }
+                GlyphContainer::Cid(_) | GlyphContainer::CidRange(_) => {
+                    // No support, you don't deserve it
+                }
             }
         }
         original_glyphs

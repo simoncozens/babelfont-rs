@@ -21,7 +21,9 @@ impl GlyphRenamerVisitor {
             GlyphContainer::GlyphName(ref mut glyph_name) => {
                 *glyph_name = GlyphName::new(&self.rename(&glyph_name.name));
             }
-            GlyphContainer::GlyphClassName(_) => {
+            GlyphContainer::GlyphClassName(_)
+            | GlyphContainer::Cid(_)
+            | GlyphContainer::CidRange(_) => {
                 // Keep it
             }
             GlyphContainer::GlyphClass(ref mut glyph_class) => {

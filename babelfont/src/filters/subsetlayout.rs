@@ -231,6 +231,10 @@ impl<'a> SubsetVisitor<'a> {
                         original_glyphs.push(glyph);
                     }
                 }
+                GlyphContainer::Cid(_) | GlyphContainer::CidRange(_) => {
+                    // Genuinely don't know what to do here.
+                    // Do nothing, nobody will notice.
+                }
             }
         }
         original_glyphs
@@ -844,6 +848,8 @@ impl<'a> SubsetVisitor<'a> {
                 // try interpreting as range
                 todo!();
             }
+            // We're not resolving CIDs, just keep them
+            fea_rs_ast::GlyphContainer::Cid(_) | fea_rs_ast::GlyphContainer::CidRange(_) => true,
         }
     }
 }
