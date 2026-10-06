@@ -1618,4 +1618,23 @@ lookup gpos_single_1;
 "
         );
     }
+
+    #[test]
+    fn test_uncompile_empty_avar_map() {
+        let data = std::fs::read("resources/emptyavar.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+languagesystem DFLT dflt;
+lookup gpos_single_1 {
+    pos a (wght=100:-10 wght=400:0 wght=900:20);
+} gpos_single_1;
+feature kern {
+lookup gpos_single_1;
+} kern;
+"
+        );
+    }
 }

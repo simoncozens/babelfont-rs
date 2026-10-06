@@ -58,7 +58,10 @@ pub(crate) fn fontdrasil_axes(
                     max,
                     localized_names: HashMap::new(), // Let's not
                 };
-                if let Some(map) = per_axis_maps.get(ix) {
+                if let Some(map) = per_axis_maps
+                    .get(ix)
+                    .filter(|map| !map.axis_value_maps.is_empty())
+                {
                     let desired_mapping: Vec<(
                         fontdrasil::coords::Coord<fontdrasil::coords::UserSpace>,
                         fontdrasil::coords::Coord<fontdrasil::coords::DesignSpace>,
