@@ -7,6 +7,7 @@ use fontdrasil::{
 };
 use indexmap::IndexMap;
 use itertools::Itertools;
+use ordered_float::OrderedFloat;
 use skrifa::{
     outline::DrawSettings,
     prelude::{LocationRef, Size},
@@ -453,11 +454,21 @@ fn get_x_y_location_for_anchor(
     anchor: &sr_aef::fea_rs_ast::Anchor,
     axes: &Axes,
 ) -> Result<(f64, f64), BabelfontError> {
-    let user_loc = location.to_user(axes)?;
-    let simple_user_loc = user_loc
-        .iter()
-        .map(|(tag, coord)| (SmolStr::from(tag.to_string()), coord.to_f64() as i16))
-        .collect::<IndexMap<SmolStr, i16>>();
+    // sr-aef rounds user coordinates to as few digits as normalize to the same values, so
+    // compare the locations normalized
+    let normalized_loc = location.to_normalized(axes)?;
+    let is_location = |loc: &IndexMap<SmolStr, OrderedFloat<f64>>| {
+        normalized_loc.iter().all(|(tag, coord)| {
+            axes.get(tag).is_some_and(|axis| {
+                loc.get(tag.to_string().as_str()).is_some_and(|user_coord| {
+                    UserCoord::new(user_coord.0)
+                        .to_normalized(&axis.converter)
+                        .to_f2dot14()
+                        == coord.to_f2dot14()
+                })
+            })
+        })
+    };
 
     let x = match &anchor.x {
         fea_rs_ast::Metric::Scalar(x_scalar) => *x_scalar as f64,
@@ -466,7 +477,7 @@ fn get_x_y_location_for_anchor(
             items
                 .iter()
                 .find_map(|(loc, item)| {
-                    if loc == &simple_user_loc {
+                    if is_location(loc) {
                         Some(*item as f64)
                     } else {
                         None
@@ -484,7 +495,7 @@ fn get_x_y_location_for_anchor(
             items
                 .iter()
                 .find_map(|(loc, item)| {
-                    if loc == &simple_user_loc {
+                    if is_location(loc) {
                         Some(*item as f64)
                     } else {
                         None

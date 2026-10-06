@@ -1,6 +1,6 @@
 use std::collections::{BTreeSet, HashMap};
 
-use fea_rs_ast::Metric;
+use fea_rs_ast::{Metric, ordered_float::OrderedFloat};
 use fontdrasil::coords::{
     CoordConverter, DesignCoord, NormalizedCoord, NormalizedLocation, UserCoord, UserLocation,
 };
@@ -218,7 +218,22 @@ impl<'a> UncompileContext<'a> {
                     let delta = ivs.compute_delta(index, coords).unwrap_or_default();
                     let simple_user_loc: SimpleUserLocation = user_loc
                         .iter()
-                        .map(|(tag, coord)| (tag.to_string().into(), coord.to_f64() as i16))
+                        .map(|(tag, coord)| {
+                            let axis = self.axes.as_ref().and_then(|axes| axes.get(tag));
+                            let coord = (0..4)
+                                .map(|digits| {
+                                    let scale = 10f64.powi(digits);
+                                    UserCoord::new((coord.to_f64() * scale).round() / scale)
+                                })
+                                .find(|rounded| {
+                                    axis.is_some_and(|axis| {
+                                        rounded.to_normalized(&axis.converter).to_f2dot14()
+                                            == coord.to_normalized(&axis.converter).to_f2dot14()
+                                    })
+                                })
+                                .unwrap_or(*coord);
+                            (tag.to_string().into(), OrderedFloat(coord.to_f64()))
+                        })
                         .collect();
 
                     (simple_user_loc, (default as i32 + delta) as i16)

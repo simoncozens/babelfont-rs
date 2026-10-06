@@ -32,6 +32,7 @@ use std::collections::{HashMap, HashSet};
 ///
 /// The return value of uncompile() will be a [fea_rs_ast::FeatureFile]; you will probably want to call `.as_fea()` on it.
 pub use fea_rs_ast;
+use fea_rs_ast::ordered_float::OrderedFloat;
 use fea_rs_ast::{
     Anchor, AsFea, AttachStatement, Comment, ConditionSet, GdefStatement, GlyphClass,
     GlyphClassDefStatement, GlyphClassDefinition, GlyphContainer, GlyphName, LanguageStatement,
@@ -70,7 +71,7 @@ mod gsub;
 mod serialize;
 mod variations;
 
-pub(crate) type SimpleUserLocation = IndexMap<SmolStr, i16>; // as used by fea-rs-ast metrics
+pub(crate) type SimpleUserLocation = IndexMap<SmolStr, OrderedFloat<f64>>; // as used by fea-rs-ast metrics
 type LanguageSystem = (Tag, Tag); // script, language
 type FeatureLanguageSystems = Vec<(LanguageSystem, bool)>; // and whether the feature is required there
 
@@ -1595,6 +1596,25 @@ table GDEF {
 LigatureCaretByPos a (wght=100:100 wght=400:150 wght=900:200) 300;
 } GDEF;
 
+"
+        );
+    }
+
+    #[test]
+    fn test_uncompile_fractional_locations() {
+        let data = std::fs::read("resources/fraclocations.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+languagesystem DFLT dflt;
+lookup gpos_single_1 {
+    pos a (wdth=75:-10 wdth=85:-8 wdth=87.5:-6 wdth=112.5:0);
+} gpos_single_1;
+feature kern {
+lookup gpos_single_1;
+} kern;
 "
         );
     }

@@ -7,6 +7,7 @@ use crate::{
 };
 use fea_rs_ast::{AsFea, FeatureFile, LayoutVisitor};
 use indexmap::IndexMap;
+use ordered_float::OrderedFloat;
 use smol_str::SmolStr;
 
 #[derive(Default)]
@@ -44,16 +45,16 @@ impl FontFilter for GlyphsNumberValue {
             let axes = font.fontdrasil_axes()?;
             let mut variables: HashMap<String, fea_rs_ast::Metric> = HashMap::new();
             for (index, name) in names.iter().enumerate() {
-                let mut location_values: Vec<(IndexMap<SmolStr, i16>, i16)> = vec![];
+                let mut location_values: Vec<(IndexMap<SmolStr, OrderedFloat<f64>>, i16)> = vec![];
                 for master in font.masters.iter() {
                     let location_as_map = master
                         .location
                         .to_user(&axes)?
                         .iter()
                         .map(|(axis, value)| {
-                            (SmolStr::new(axis.to_string()), value.to_f64() as i16)
+                            (SmolStr::new(axis.to_string()), OrderedFloat(value.to_f64()))
                         })
-                        .collect::<IndexMap<SmolStr, i16>>();
+                        .collect::<IndexMap<SmolStr, OrderedFloat<f64>>>();
                     let number_values = master
                         .format_specific
                         .get(KEY_NUMBER_VALUES)
