@@ -1,0 +1,26 @@
+languagesystem DFLT dflt;
+languagesystem latn dflt;
+languagesystem grek dflt;
+
+lookup ALT {
+    sub space by exclam;
+} ALT;
+
+lookup KERN {
+    pos space exclam -10;
+} KERN;
+
+conditionset heavy {
+    wght 600 900;
+} heavy;
+
+variation rvrn heavy {
+    script DFLT;
+    lookup ALT;
+    script latn;
+    lookup ALT;
+} rvrn;
+
+feature kern {
+    lookup KERN;
+} kern;

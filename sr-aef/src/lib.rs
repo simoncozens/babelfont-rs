@@ -652,19 +652,27 @@ impl<'a> UncompileContext<'a> {
     }
 
     fn uncompile_feature_variations(&mut self) -> Result<(), ReadError> {
-        if let Some((feature_list, feature_variations)) = self
-            .gsub
-            .as_ref()
-            .and_then(|gsub| Some((gsub.feature_list().ok()?, gsub.feature_variations()?)))
+        if let Some((feature_list, feature_variations, script_list)) =
+            self.gsub.as_ref().and_then(|gsub| {
+                Some((
+                    gsub.feature_list().ok()?,
+                    gsub.feature_variations()?,
+                    gsub.script_list().ok(),
+                ))
+            })
         {
-            self.add_feature_variations(feature_list, feature_variations?, Subst)?;
+            self.add_feature_variations(feature_list, feature_variations?, script_list, Subst)?;
         }
-        if let Some((feature_list, feature_variations)) = self
-            .gpos
-            .as_ref()
-            .and_then(|gpos| Some((gpos.feature_list().ok()?, gpos.feature_variations()?)))
+        if let Some((feature_list, feature_variations, script_list)) =
+            self.gpos.as_ref().and_then(|gpos| {
+                Some((
+                    gpos.feature_list().ok()?,
+                    gpos.feature_variations()?,
+                    gpos.script_list().ok(),
+                ))
+            })
         {
-            self.add_feature_variations(feature_list, feature_variations?, Pos)?;
+            self.add_feature_variations(feature_list, feature_variations?, script_list, Pos)?;
         }
         Ok(())
     }
@@ -673,8 +681,10 @@ impl<'a> UncompileContext<'a> {
         &mut self,
         feature_list: FeatureList,
         feature_variations: FeatureVariations,
+        script_list: Option<ScriptList>,
         phase: T,
     ) -> Result<(), ReadError> {
+        let systems = feature_language_systems(script_list)?;
         let data = feature_variations.offset_data();
         for record in feature_variations.feature_variation_records() {
             let (Some(condition_set), Some(substitution)) = (
@@ -698,11 +708,13 @@ impl<'a> UncompileContext<'a> {
             };
             let name = self.gensym("condition").to_string();
             let substitution = substitution?;
-            let mut variations = vec![];
+            // Additional lookups by feature and language system.
+            let mut registrations: IndexMap<Tag, IndexMap<LanguageSystem, (bool, Vec<Statement>)>> =
+                IndexMap::new();
             for substitution_record in substitution.substitutions() {
-                let Some(feature_record) = feature_list
-                    .feature_records()
-                    .get(substitution_record.feature_index() as usize)
+                let feature_index = substitution_record.feature_index();
+                let Some(feature_record) =
+                    feature_list.feature_records().get(feature_index as usize)
                 else {
                     continue;
                 };
@@ -715,17 +727,38 @@ impl<'a> UncompileContext<'a> {
                 else {
                     continue;
                 };
-                variations.push(VariationBlock::new(
-                    feature_record.feature_tag().to_string().into(),
-                    name.clone(),
-                    additional_lookups
-                        .iter()
-                        .map(|index| lookup_reference(&self.get_lookup_name(index.get(), phase)))
-                        .collect(),
-                    false,
-                    0..0,
-                ));
+                let lookups: Vec<Statement> = additional_lookups
+                    .iter()
+                    .map(|index| lookup_reference(&self.get_lookup_name(index.get(), phase)))
+                    .collect();
+                for (language_system, _) in systems.get(&feature_index).into_iter().flatten() {
+                    let (_, registered_lookups) = registrations
+                        .entry(feature_record.feature_tag())
+                        .or_default()
+                        .entry(*language_system)
+                        .or_default();
+                    for lookup in &lookups {
+                        if !registered_lookups.contains(lookup) {
+                            registered_lookups.push(lookup.clone());
+                        }
+                    }
+                }
             }
+            let variations = registrations
+                .into_iter()
+                .map(|(feature_tag, systems)| {
+                    let statements = self
+                        .registration_statements(&systems)
+                        .unwrap_or_else(|| systems.into_values().next().unwrap_or_default().1);
+                    VariationBlock::new(
+                        feature_tag.to_string().into(),
+                        name.clone(),
+                        statements,
+                        false,
+                        0..0,
+                    )
+                })
+                .collect();
             self.feature_variations
                 .push((ConditionSet::new(name, conditions, 0..0), variations));
         }
@@ -754,66 +787,84 @@ impl<'a> UncompileContext<'a> {
             }
         }
 
-        let dflt = Tag::new(b"dflt");
-        let system_count: usize = self.language_systems.values().map(|l| l.len()).sum();
         for (feature_tag, systems) in registrations {
-            let (_, first) = &systems[0];
-            let everywhere = systems.len() == system_count
-                && systems.values().all(|(required, lookups)| {
-                    !required
-                        && lookups.len() == first.len()
-                        && lookups.iter().all(|l| first.contains(l))
-                });
-            if everywhere || [Tag::new(b"aalt"), Tag::new(b"size")].contains(&feature_tag) {
+            let statements = if [Tag::new(b"aalt"), Tag::new(b"size")].contains(&feature_tag) {
+                None
+            } else {
+                self.registration_statements(&systems)
+            };
+            if let Some(statements) = statements {
+                self.features
+                    .insert(feature_tag.to_string().into(), statements);
+            } else {
                 for (_, lookups) in systems.into_values() {
                     self.add_feature_lookups(feature_tag, lookups);
                 }
+            }
+        }
+    }
+
+    /// Build script, language, and lookup statements for feature registrations.
+    /// Return None when every language system in the font uses the same lookups
+    /// and none requires the feature.
+    fn registration_statements(
+        &self,
+        systems: &IndexMap<LanguageSystem, (bool, Vec<Statement>)>,
+    ) -> Option<Vec<Statement>> {
+        let dflt = Tag::new(b"dflt");
+        let system_count: usize = self.language_systems.values().map(|l| l.len()).sum();
+        let (_, first) = &systems[0];
+        let everywhere = systems.len() == system_count
+            && systems.values().all(|(required, lookups)| {
+                !required
+                    && lookups.len() == first.len()
+                    && lookups.iter().all(|l| first.contains(l))
+            });
+        if everywhere {
+            return None;
+        }
+        let mut statements = vec![];
+        for (script_tag, languages) in &self.language_systems {
+            if !languages
+                .iter()
+                .any(|language| systems.contains_key(&(*script_tag, *language)))
+            {
                 continue;
             }
-            let mut statements = vec![];
-            for (script_tag, languages) in &self.language_systems {
-                if !languages
-                    .iter()
-                    .any(|language| systems.contains_key(&(*script_tag, *language)))
-                {
-                    continue;
-                }
-                statements.push(Statement::Script(ScriptStatement::new(
-                    script_tag.to_string().trim_end().into(),
+            statements.push(Statement::Script(ScriptStatement::new(
+                script_tag.to_string().trim_end().into(),
+            )));
+            let (default_required, default_lookups) = systems
+                .get(&(*script_tag, dflt))
+                .cloned()
+                .unwrap_or_default();
+            if default_required {
+                statements.push(Statement::Language(LanguageStatement::new(
+                    dflt.to_string(),
+                    true,
+                    true,
                 )));
-                let (default_required, default_lookups) = systems
-                    .get(&(*script_tag, dflt))
-                    .cloned()
-                    .unwrap_or_default();
-                if default_required {
-                    statements.push(Statement::Language(LanguageStatement::new(
-                        dflt.to_string(),
-                        true,
-                        true,
-                    )));
-                }
-                statements.extend(default_lookups.iter().cloned());
-                for language in languages.iter().filter(|language| **language != dflt) {
-                    let Some((required, lookups)) = systems.get(&(*script_tag, *language)) else {
-                        continue;
-                    };
-                    let include_dflt = default_lookups.iter().all(|l| lookups.contains(l));
-                    statements.push(Statement::Language(LanguageStatement::new(
-                        language.to_string().trim_end().into(),
-                        include_dflt,
-                        *required,
-                    )));
-                    statements.extend(
-                        lookups
-                            .iter()
-                            .filter(|l| !include_dflt || !default_lookups.contains(l))
-                            .cloned(),
-                    );
-                }
             }
-            self.features
-                .insert(feature_tag.to_string().into(), statements);
+            statements.extend(default_lookups.iter().cloned());
+            for language in languages.iter().filter(|language| **language != dflt) {
+                let Some((required, lookups)) = systems.get(&(*script_tag, *language)) else {
+                    continue;
+                };
+                let include_dflt = default_lookups.iter().all(|l| lookups.contains(l));
+                statements.push(Statement::Language(LanguageStatement::new(
+                    language.to_string().trim_end().into(),
+                    include_dflt,
+                    *required,
+                )));
+                statements.extend(
+                    lookups
+                        .iter()
+                        .filter(|l| !include_dflt || !default_lookups.contains(l))
+                        .cloned(),
+                );
+            }
         }
+        Some(statements)
     }
 
     fn uncompile_feature_names(&self, tag: &str, name_id: NameId) -> Statement {
@@ -1794,6 +1845,45 @@ lookup gsub_single_1;
 feature kern {
 lookup gpos_pair_1;
 } kern;
+"
+        );
+    }
+
+    #[test]
+    fn test_uncompile_variation_scripts() {
+        let data = std::fs::read("resources/variationscripts.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+languagesystem DFLT dflt;
+languagesystem latn dflt;
+languagesystem grek dflt;
+lookup gsub_single_1 {
+    sub space by exclam;
+} gsub_single_1;
+lookup gpos_pair_1 {
+    pos space exclam -10;
+} gpos_pair_1;
+feature rvrn {
+script DFLT;
+    script latn;
+} rvrn;
+feature kern {
+lookup gpos_pair_1;
+} kern;
+conditionset condition_1 {
+\twght 600 900;
+} condition_1;
+
+variation rvrn condition_1 {
+script DFLT;
+lookup gsub_single_1;
+script latn;
+lookup gsub_single_1;
+} rvrn;
+
 "
         );
     }
