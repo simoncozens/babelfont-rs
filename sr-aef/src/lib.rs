@@ -1768,4 +1768,33 @@ lookup gpos_mark_to_mark_1;
 "
         );
     }
+
+    #[test]
+    fn test_uncompile_extension_lookups() {
+        let data = std::fs::read("resources/extension.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+languagesystem DFLT dflt;
+lookup gsub_single_1 useExtension {
+    sub a by b;
+} gsub_single_1;
+lookup gsub_single_2 {
+    sub c by d;
+} gsub_single_2;
+lookup gpos_pair_1 useExtension {
+    pos a b -10;
+} gpos_pair_1;
+feature ss01 {
+lookup gsub_single_1;
+    lookup gsub_single_2;
+} ss01;
+feature kern {
+lookup gpos_pair_1;
+} kern;
+"
+        );
+    }
 }

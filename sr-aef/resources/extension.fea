@@ -1,0 +1,22 @@
+languagesystem DFLT dflt;
+
+lookup SINGLE useExtension {
+    sub a by b;
+} SINGLE;
+
+lookup OTHER {
+    sub c by d;
+} OTHER;
+
+lookup PAIR useExtension {
+    pos a b -10;
+} PAIR;
+
+feature ss01 {
+    lookup SINGLE;
+    lookup OTHER;
+} ss01;
+
+feature kern {
+    lookup PAIR;
+} kern;
