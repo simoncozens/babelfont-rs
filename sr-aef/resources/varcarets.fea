@@ -1,0 +1,3 @@
+table GDEF {
+    LigatureCaretByPos a (wght=100:100 wght=400:150 wght=900:200) 300;
+} GDEF;

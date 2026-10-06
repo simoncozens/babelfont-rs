@@ -37,8 +37,8 @@ use fea_rs_ast::{
     GlyphClassDefStatement, GlyphClassDefinition, GlyphContainer, GlyphName, LanguageStatement,
     LanguageSystemStatement, LigatureCaretByIndexStatement, LigatureCaretByPosStatement,
     LookupBlock, LookupFlagStatement, LookupReferenceStatement, MarkClass, MarkClassDefinition,
-    NameRecord, NameRecordKind, NestedBlock, Pos, ScriptStatement, SizeParameters, Statement,
-    SubOrPos, Subst, SubtableStatement, Table, ToplevelItem, VariationBlock,
+    Metric, NameRecord, NameRecordKind, NestedBlock, Pos, ScriptStatement, SizeParameters,
+    Statement, SubOrPos, Subst, SubtableStatement, Table, ToplevelItem, VariationBlock,
 };
 use indexmap::{IndexMap, IndexSet};
 /// A handle to the version of Skrifa that sr-eaf is using. Pass a skrifa::FontRef to uncompile()
@@ -511,11 +511,18 @@ impl<'a> UncompileContext<'a> {
                     let mut point_indices = vec![];
                     for caret in lig_glyph?.caret_values().iter() {
                         match caret? {
-                            CaretValue::Format1(caret) => positions.push(caret.coordinate()),
+                            CaretValue::Format1(caret) => {
+                                positions.push(Metric::Scalar(caret.coordinate()))
+                            }
                             CaretValue::Format2(caret) => {
                                 point_indices.push(caret.caret_value_point_index() as usize)
                             }
-                            CaretValue::Format3(caret) => positions.push(caret.coordinate()),
+                            CaretValue::Format3(caret) => {
+                                positions.push(self.resolve_pos_with_variations(
+                                    caret.coordinate(),
+                                    Some(caret.device()),
+                                )?)
+                            }
                         }
                     }
                     let glyph = GlyphContainer::GlyphName(self.get_name(gid));
@@ -1572,6 +1579,22 @@ feature size {
 parameters 10.0 3 80 139;
     sizemenuname \"Text\";
 } size;
+"
+        );
+    }
+
+    #[test]
+    fn test_uncompile_variable_ligature_carets() {
+        let data = std::fs::read("resources/varcarets.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+table GDEF {
+LigatureCaretByPos a (wght=100:100 wght=400:150 wght=900:200) 300;
+} GDEF;
+
 "
         );
     }
