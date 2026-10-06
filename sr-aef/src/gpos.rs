@@ -135,6 +135,7 @@ impl<'a> UncompileContext<'a> {
             if let Some(Statement::Subtable(_)) = lookupblock.statements.last() {
                 lookupblock.statements.pop();
             }
+            lookupblock.use_extension = matches!(lookup, PositionLookup::Extension(_));
             self.add_lookup_flags(
                 &mut lookupblock,
                 lookup.lookup_flag(),
