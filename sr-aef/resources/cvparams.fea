@@ -1,0 +1,23 @@
+languagesystem DFLT dflt;
+
+feature cv01 {
+    cvParameters {
+        FeatUILabelNameID {
+            name "Alternate a";
+        };
+        FeatUITooltipTextNameID {
+            name "Alternate forms of a";
+        };
+        SampleTextNameID {
+            name "aaa";
+        };
+        ParamUILabelNameID {
+            name "Round";
+        };
+        ParamUILabelNameID {
+            name "Square";
+        };
+        Character 0x61;
+    };
+    sub a from [b c];
+} cv01;
