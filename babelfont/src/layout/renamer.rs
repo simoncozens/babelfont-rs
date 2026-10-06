@@ -38,6 +38,9 @@ impl GlyphRenamerVisitor {
                 range.start = self.rename(&range.start);
                 range.end = self.rename(&range.end);
             }
+            GlyphContainer::Cid(_) | GlyphContainer::CidRange(_) => {
+                // Not glyph names, keep them
+            }
         }
     }
 

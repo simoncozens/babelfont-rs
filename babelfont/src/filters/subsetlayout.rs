@@ -231,6 +231,10 @@ impl<'a> SubsetVisitor<'a> {
                         original_glyphs.push(glyph);
                     }
                 }
+                GlyphContainer::Cid(_) | GlyphContainer::CidRange(_) => {
+                    // CIDs can't be mapped to glyph names
+                    log::warn!("Warning: CIDs are not supported");
+                }
             }
         }
         original_glyphs
@@ -844,6 +848,8 @@ impl<'a> SubsetVisitor<'a> {
                 // try interpreting as range
                 todo!();
             }
+            // We can't tell which glyphs CIDs refer to, so keep them
+            fea_rs_ast::GlyphContainer::Cid(_) | fea_rs_ast::GlyphContainer::CidRange(_) => true,
         }
     }
 }

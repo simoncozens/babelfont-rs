@@ -90,6 +90,10 @@ impl LayoutClosureVisitor {
                         original_glyphs.push(glyph);
                     }
                 }
+                GlyphContainer::Cid(_) | GlyphContainer::CidRange(_) => {
+                    // CIDs can't be mapped to glyph names
+                    log::warn!("Warning: CIDs are not supported");
+                }
             }
         }
         original_glyphs

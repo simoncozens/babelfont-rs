@@ -761,14 +761,15 @@ dependencies = [
 
 [[package]]
 name = "fea-rs-ast"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f9381e48cfcc6efc4e3a23bf2899b748a85d66c83919af98a3e92df1abde6822"
+checksum = "8d56d5a1eaa2f5eb9c8fe51420fff7a2ee91eb272174511186b7f8cc89cdaa0f"
 dependencies = [
  "fea-rs",
  "indexmap 2.14.2",
  "itertools",
  "log",
+ "ordered-float",
  "read-fonts 0.36.0",
  "serde",
  "smol_str",
