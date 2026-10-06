@@ -1,4 +1,4 @@
-use fea_rs_ast::{AsFea, GlyphClass, LookupReferenceStatement};
+use fea_rs_ast::{AsFea, GlyphClass, Statement};
 use indexmap::{IndexMap, IndexSet};
 use serde::{Serializer, ser::SerializeMap};
 use skrifa::Tag;
@@ -37,7 +37,7 @@ where
 }
 
 pub(crate) fn serialize_features<S>(
-    features: &IndexMap<SmolStr, Vec<LookupReferenceStatement>>,
+    features: &IndexMap<SmolStr, Vec<Statement>>,
     serializer: S,
 ) -> Result<S::Ok, S::Error>
 where
@@ -49,7 +49,10 @@ where
             &feature_name.to_string(),
             &lookups
                 .iter()
-                .map(|l| l.lookup_name.to_string())
+                .map(|statement| match statement {
+                    Statement::LookupReference(reference) => reference.lookup_name.clone(),
+                    statement => statement.as_fea(""),
+                })
                 .collect::<Vec<String>>(),
         )?;
     }

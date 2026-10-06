@@ -1,0 +1,4 @@
+table GDEF {
+    LigatureCaretByPos a 100 200;
+    LigatureCaretByIndex b 3;
+} GDEF;

@@ -1,0 +1,9 @@
+languagesystem DFLT dflt;
+
+feature ss01 {
+    featureNames {
+        name "Alternate a";
+        name 1 "Alternate a";
+    };
+    sub a by b;
+} ss01;

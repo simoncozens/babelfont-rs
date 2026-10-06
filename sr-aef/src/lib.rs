@@ -33,10 +33,12 @@ use std::collections::{HashMap, HashSet};
 /// The return value of uncompile() will be a [fea_rs_ast::FeatureFile]; you will probably want to call `.as_fea()` on it.
 pub use fea_rs_ast;
 use fea_rs_ast::{
-    Anchor, GdefStatement, GlyphClass, GlyphClassDefStatement, GlyphClassDefinition,
-    GlyphContainer, GlyphName, LanguageSystemStatement, LookupBlock, LookupFlagStatement,
-    LookupReferenceStatement, MarkClass, MarkClassDefinition, Pos, Statement, SubOrPos, Subst,
-    Table, ToplevelItem,
+    Anchor, AsFea, AttachStatement, Comment, ConditionSet, GdefStatement, GlyphClass,
+    GlyphClassDefStatement, GlyphClassDefinition, GlyphContainer, GlyphName, LanguageStatement,
+    LanguageSystemStatement, LigatureCaretByIndexStatement, LigatureCaretByPosStatement,
+    LookupBlock, LookupFlagStatement, LookupReferenceStatement, MarkClass, MarkClassDefinition,
+    NameRecord, NameRecordKind, NestedBlock, Pos, ScriptStatement, SizeParameters, Statement,
+    SubOrPos, Subst, SubtableStatement, Table, ToplevelItem, VariationBlock,
 };
 use indexmap::{IndexMap, IndexSet};
 /// A handle to the version of Skrifa that sr-eaf is using. Pass a skrifa::FontRef to uncompile()
@@ -48,10 +50,14 @@ use skrifa::{
     raw::{
         ReadError, TableProvider,
         tables::{
-            gdef::Gdef,
+            gdef::{CaretValue, Gdef},
             gpos::Gpos,
             gsub::{ClassDef, Gsub},
-            layout::{CoverageTable, LookupFlag},
+            layout::{
+                Condition, CoverageTable, FeatureList, FeatureParams, FeatureVariations,
+                LookupFlag, ScriptList, SizeParams,
+            },
+            name::{Name, NameId},
         },
     },
 };
@@ -65,6 +71,8 @@ mod serialize;
 mod variations;
 
 pub(crate) type SimpleUserLocation = IndexMap<SmolStr, i16>; // as used by fea-rs-ast metrics
+type LanguageSystem = (Tag, Tag); // script, language
+type FeatureLanguageSystems = Vec<(LanguageSystem, bool)>; // and whether the feature is required there
 
 const PROMOTE_TO_NAMED_CLASS_THRESHOLD: usize = 5;
 
@@ -103,7 +111,9 @@ pub struct UncompileContext<'a> {
         feature = "cli",
         serde(serialize_with = "crate::serialize::serialize_features")
     )]
-    pub features: IndexMap<SmolStr, Vec<LookupReferenceStatement>>,
+    pub features: IndexMap<SmolStr, Vec<Statement>>,
+    /// Condition sets and their feature variation blocks.
+    pub feature_variations: Vec<(ConditionSet, Vec<VariationBlock>)>,
     #[cfg_attr(feature = "cli", serde(skip))]
     symbols: IndexMap<SmolStr, usize>,
     #[cfg_attr(feature = "cli", serde(skip))]
@@ -112,6 +122,8 @@ pub struct UncompileContext<'a> {
     gsub: Option<Gsub<'a>>,
     #[cfg_attr(feature = "cli", serde(skip))]
     gdef: Option<Gdef<'a>>,
+    #[cfg_attr(feature = "cli", serde(skip))]
+    name: Option<Name<'a>>,
     #[cfg_attr(feature = "cli", serde(skip))]
     glyph_metrics: GlyphMetrics<'a>,
     #[cfg_attr(feature = "cli", serde(skip))]
@@ -155,12 +167,14 @@ impl<'a> UncompileContext<'a> {
             gpos: font.gpos().ok(),
             gsub: font.gsub().ok(),
             gdef: font.gdef().ok(),
+            name: font.name().ok(),
             language_systems: IndexMap::new(),
             unnamed_anchors: IndexMap::new(),
             anchors: IndexMap::new(),
             mark_classes: IndexMap::new(),
             named_classes: IndexMap::new(),
             features: IndexMap::new(),
+            feature_variations: vec![],
             glyph_metrics,
             glyph_id_to_name,
             glyph_name_to_id,
@@ -177,6 +191,7 @@ impl<'a> UncompileContext<'a> {
         slf.uncompile_gsub_lookups()?;
         slf.uncompile_gpos_lookups()?;
         slf.uncompile_feature_table()?;
+        slf.uncompile_feature_variations()?;
         slf.order_lookups();
         Ok(slf)
     }
@@ -219,6 +234,9 @@ impl<'a> UncompileContext<'a> {
             .get(&GlyphId::new(id.to_u32()))
             .cloned()
             .unwrap_or_else(|| format!("gid{:04}", id.to_u32()).into());
+        if str == "NULL" {
+            return GlyphName::new("\\NULL");
+        }
         GlyphName::new(&str)
     }
 
@@ -359,7 +377,10 @@ impl<'a> UncompileContext<'a> {
             .features
             .values()
             .flatten()
-            .map(|reference| SmolStr::new(&reference.lookup_name))
+            .filter_map(|statement| match statement {
+                Statement::LookupReference(reference) => Some(SmolStr::new(&reference.lookup_name)),
+                _ => None,
+            })
             .collect();
         let calls: HashMap<SmolStr, Vec<SmolStr>> = self
             .lookups
@@ -466,6 +487,50 @@ impl<'a> UncompileContext<'a> {
                     0..0,
                 )));
             }
+            if let Some(Ok(attach_list)) = gdef.attach_list() {
+                let coverage = attach_list.coverage()?;
+                for (gid, attach_point) in coverage.iter().zip(attach_list.attach_points().iter()) {
+                    let point_indices: Vec<usize> = attach_point?
+                        .point_indices()
+                        .iter()
+                        .map(|index| index.get() as usize)
+                        .collect();
+                    if !point_indices.is_empty() {
+                        statements.push(GdefStatement::Attach(AttachStatement::new(
+                            GlyphContainer::GlyphName(self.get_name(gid)),
+                            point_indices,
+                            0..0,
+                        )));
+                    }
+                }
+            }
+            if let Some(Ok(lig_caret_list)) = gdef.lig_caret_list() {
+                let coverage = lig_caret_list.coverage()?;
+                for (gid, lig_glyph) in coverage.iter().zip(lig_caret_list.lig_glyphs().iter()) {
+                    let mut positions = vec![];
+                    let mut point_indices = vec![];
+                    for caret in lig_glyph?.caret_values().iter() {
+                        match caret? {
+                            CaretValue::Format1(caret) => positions.push(caret.coordinate()),
+                            CaretValue::Format2(caret) => {
+                                point_indices.push(caret.caret_value_point_index() as usize)
+                            }
+                            CaretValue::Format3(caret) => positions.push(caret.coordinate()),
+                        }
+                    }
+                    let glyph = GlyphContainer::GlyphName(self.get_name(gid));
+                    if !positions.is_empty() {
+                        statements.push(GdefStatement::LigatureCaretByPos(
+                            LigatureCaretByPosStatement::new(glyph.clone(), positions, 0..0),
+                        ));
+                    }
+                    if !point_indices.is_empty() {
+                        statements.push(GdefStatement::LigatureCaretByIndex(
+                            LigatureCaretByIndexStatement::new(glyph, point_indices, 0..0),
+                        ));
+                    }
+                }
+            }
         }
         if statements.is_empty() {
             return Ok(vec![]);
@@ -474,47 +539,331 @@ impl<'a> UncompileContext<'a> {
     }
 
     fn uncompile_feature_table(&mut self) -> Result<(), ReadError> {
+        let mut registered_features = vec![];
+        let mut unregistered_features = vec![];
+        let mut feature_name_ids = IndexMap::new();
+        let mut size_params = None;
         if let Some(feature_list) = self.gsub.as_ref().and_then(|gsub| gsub.feature_list().ok()) {
-            for feature_record in feature_list.feature_records() {
+            let systems =
+                feature_language_systems(self.gsub.as_ref().and_then(|g| g.script_list().ok()))?;
+            for (index, feature_record) in feature_list.feature_records().iter().enumerate() {
                 let feature_tag = feature_record.feature_tag();
                 let feature = feature_record.feature(feature_list.offset_data())?;
+                if let Some(Ok(FeatureParams::StylisticSet(params))) = feature.feature_params() {
+                    feature_name_ids
+                        .entry(feature_tag)
+                        .or_insert(params.ui_name_id());
+                }
                 let lookup_indices = feature.lookup_list_indices();
-                self.features.insert(
-                    feature_tag.to_string().into(),
-                    lookup_indices
-                        .iter()
-                        .map(|i| {
-                            LookupReferenceStatement::new(
-                                self.get_lookup_name(i.get(), Subst).into(),
-                                0..0,
-                            )
-                        })
-                        .collect(),
-                );
+                let lookups = lookup_indices
+                    .iter()
+                    .map(|i| lookup_reference(&self.get_lookup_name(i.get(), Subst)))
+                    .collect();
+                if let Some(language_systems) = systems.get(&(index as u16)) {
+                    registered_features.push((feature_tag, language_systems.clone(), lookups));
+                } else {
+                    unregistered_features.push((feature_tag, lookups));
+                }
             }
         }
 
         if let Some(feature_list) = self.gpos.as_ref().and_then(|gpos| gpos.feature_list().ok()) {
-            for feature_record in feature_list.feature_records() {
+            let systems =
+                feature_language_systems(self.gpos.as_ref().and_then(|g| g.script_list().ok()))?;
+            for (index, feature_record) in feature_list.feature_records().iter().enumerate() {
                 let feature_tag = feature_record.feature_tag();
                 let feature = feature_record.feature(feature_list.offset_data())?;
+                if let Some(Ok(FeatureParams::StylisticSet(params))) = feature.feature_params() {
+                    feature_name_ids
+                        .entry(feature_tag)
+                        .or_insert(params.ui_name_id());
+                }
+                if let Some(Ok(FeatureParams::Size(params))) = feature.feature_params() {
+                    size_params.get_or_insert(params);
+                }
                 let lookup_indices = feature.lookup_list_indices();
-                self.features.insert(
-                    feature_tag.to_string().into(),
-                    lookup_indices
-                        .iter()
-                        .map(|i| {
-                            LookupReferenceStatement::new(
-                                self.get_lookup_name(i.get(), Pos).into(),
-                                0..0,
-                            )
-                        })
-                        .collect(),
-                );
+                let lookups = lookup_indices
+                    .iter()
+                    .map(|i| lookup_reference(&self.get_lookup_name(i.get(), Pos)))
+                    .collect();
+                if let Some(language_systems) = systems.get(&(index as u16)) {
+                    registered_features.push((feature_tag, language_systems.clone(), lookups));
+                } else {
+                    unregistered_features.push((feature_tag, lookups));
+                }
+            }
+        }
+        self.add_registered_features(registered_features);
+        for (feature_tag, name_id) in feature_name_ids {
+            let names = self.uncompile_feature_names(name_id);
+            if let Some(statements) = self.features.get_mut(feature_tag.to_string().as_str()) {
+                statements.insert(0, names);
+            }
+        }
+        if let Some(params) = size_params {
+            let parameters = self.uncompile_size_parameters(&params);
+            if let Some(statements) = self.features.get_mut("size") {
+                statements.splice(0..0, parameters);
             }
         }
 
+        let referenced_lookups: Vec<Statement> = self
+            .features
+            .values()
+            .flatten()
+            .cloned()
+            .chain(
+                self.lookups
+                    .values()
+                    .flat_map(called_lookups)
+                    .map(|name| lookup_reference(&name)),
+            )
+            .collect();
+        for (feature_tag, lookups) in unregistered_features {
+            let lookups = lookups
+                .into_iter()
+                .filter(|lookup| !referenced_lookups.contains(lookup))
+                .map(comment_out)
+                .collect();
+            self.add_feature_lookups(feature_tag, lookups);
+        }
+
         Ok(())
+    }
+
+    fn uncompile_feature_variations(&mut self) -> Result<(), ReadError> {
+        if let Some((feature_list, feature_variations)) = self
+            .gsub
+            .as_ref()
+            .and_then(|gsub| Some((gsub.feature_list().ok()?, gsub.feature_variations()?)))
+        {
+            self.add_feature_variations(feature_list, feature_variations?, Subst)?;
+        }
+        if let Some((feature_list, feature_variations)) = self
+            .gpos
+            .as_ref()
+            .and_then(|gpos| Some((gpos.feature_list().ok()?, gpos.feature_variations()?)))
+        {
+            self.add_feature_variations(feature_list, feature_variations?, Pos)?;
+        }
+        Ok(())
+    }
+
+    fn add_feature_variations<T: SubOrPos + Copy>(
+        &mut self,
+        feature_list: FeatureList,
+        feature_variations: FeatureVariations,
+        phase: T,
+    ) -> Result<(), ReadError> {
+        let data = feature_variations.offset_data();
+        for record in feature_variations.feature_variation_records() {
+            let (Some(condition_set), Some(substitution)) = (
+                record.condition_set(data),
+                record.feature_table_substitution(data),
+            ) else {
+                continue;
+            };
+            let Some(conditions) = condition_set?
+                .conditions()
+                .iter()
+                .map(|condition| match condition {
+                    Ok(Condition::Format1AxisRange(condition)) => {
+                        self.resolve_condition(&condition)
+                    }
+                    _ => None,
+                })
+                .collect::<Option<Vec<_>>>()
+            else {
+                continue;
+            };
+            let name = self.gensym("condition").to_string();
+            let substitution = substitution?;
+            let mut variations = vec![];
+            for substitution_record in substitution.substitutions() {
+                let Some(feature_record) = feature_list
+                    .feature_records()
+                    .get(substitution_record.feature_index() as usize)
+                else {
+                    continue;
+                };
+                let feature = feature_record.feature(feature_list.offset_data())?;
+                let alternate =
+                    substitution_record.alternate_feature(substitution.offset_data())?;
+                let Some(additional_lookups) = alternate
+                    .lookup_list_indices()
+                    .strip_prefix(feature.lookup_list_indices())
+                else {
+                    continue;
+                };
+                variations.push(VariationBlock::new(
+                    feature_record.feature_tag().to_string().into(),
+                    name.clone(),
+                    additional_lookups
+                        .iter()
+                        .map(|index| lookup_reference(&self.get_lookup_name(index.get(), phase)))
+                        .collect(),
+                    false,
+                    0..0,
+                ));
+            }
+            self.feature_variations
+                .push((ConditionSet::new(name, conditions, 0..0), variations));
+        }
+        Ok(())
+    }
+
+    fn add_registered_features(
+        &mut self,
+        features: Vec<(Tag, FeatureLanguageSystems, Vec<Statement>)>,
+    ) {
+        let mut registrations: IndexMap<Tag, IndexMap<LanguageSystem, (bool, Vec<Statement>)>> =
+            IndexMap::new();
+        for (feature_tag, language_systems, lookups) in features {
+            for (language_system, required) in language_systems {
+                let (is_required, registered) = registrations
+                    .entry(feature_tag)
+                    .or_default()
+                    .entry(language_system)
+                    .or_default();
+                *is_required |= required;
+                for lookup in &lookups {
+                    if !registered.contains(lookup) {
+                        registered.push(lookup.clone());
+                    }
+                }
+            }
+        }
+
+        let dflt = Tag::new(b"dflt");
+        let system_count: usize = self.language_systems.values().map(|l| l.len()).sum();
+        for (feature_tag, systems) in registrations {
+            let (_, first) = &systems[0];
+            let everywhere = systems.len() == system_count
+                && systems.values().all(|(required, lookups)| {
+                    !required
+                        && lookups.len() == first.len()
+                        && lookups.iter().all(|l| first.contains(l))
+                });
+            if everywhere || [Tag::new(b"aalt"), Tag::new(b"size")].contains(&feature_tag) {
+                for (_, lookups) in systems.into_values() {
+                    self.add_feature_lookups(feature_tag, lookups);
+                }
+                continue;
+            }
+            let mut statements = vec![];
+            for (script_tag, languages) in &self.language_systems {
+                if !languages
+                    .iter()
+                    .any(|language| systems.contains_key(&(*script_tag, *language)))
+                {
+                    continue;
+                }
+                statements.push(Statement::Script(ScriptStatement::new(
+                    script_tag.to_string().trim_end().into(),
+                )));
+                let (default_required, default_lookups) = systems
+                    .get(&(*script_tag, dflt))
+                    .cloned()
+                    .unwrap_or_default();
+                if default_required {
+                    statements.push(Statement::Language(LanguageStatement::new(
+                        dflt.to_string(),
+                        true,
+                        true,
+                    )));
+                }
+                statements.extend(default_lookups.iter().cloned());
+                for language in languages.iter().filter(|language| **language != dflt) {
+                    let Some((required, lookups)) = systems.get(&(*script_tag, *language)) else {
+                        continue;
+                    };
+                    let include_dflt = default_lookups.iter().all(|l| lookups.contains(l));
+                    statements.push(Statement::Language(LanguageStatement::new(
+                        language.to_string().trim_end().into(),
+                        include_dflt,
+                        *required,
+                    )));
+                    statements.extend(
+                        lookups
+                            .iter()
+                            .filter(|l| !include_dflt || !default_lookups.contains(l))
+                            .cloned(),
+                    );
+                }
+            }
+            self.features
+                .insert(feature_tag.to_string().into(), statements);
+        }
+    }
+
+    fn uncompile_feature_names(&self, name_id: NameId) -> Statement {
+        let statements = self
+            .name
+            .iter()
+            .flat_map(|name| {
+                name.name_record()
+                    .iter()
+                    .filter(move |record| record.name_id() == name_id)
+                    .filter_map(move |record| {
+                        let string = record.string(name.string_data()).ok()?;
+                        Some(Statement::FeatureNameStatement(NameRecord::new(
+                            record.platform_id(),
+                            record.encoding_id(),
+                            record.language_id(),
+                            string.to_string(),
+                            NameRecordKind::FeatureName,
+                            0..0,
+                        )))
+                    })
+            })
+            .collect();
+        Statement::NestedBlock(NestedBlock {
+            tag: "featureNames".into(),
+            statements,
+            pos: 0..0,
+        })
+    }
+
+    fn uncompile_size_parameters(&self, params: &SizeParams) -> Vec<Statement> {
+        let mut statements = vec![Statement::SizeParameters(SizeParameters::new(
+            params.design_size() as f64 / 10.0,
+            params.identifier(),
+            params.range_start() as f64 / 10.0,
+            params.range_end() as f64 / 10.0,
+            0..0,
+        ))];
+        let name_id = NameId::new(params.name_entry());
+        if name_id != NameId::new(0) {
+            statements.extend(self.name.iter().flat_map(|name| {
+                name.name_record()
+                    .iter()
+                    .filter(move |record| record.name_id() == name_id)
+                    .filter_map(move |record| {
+                        let string = record.string(name.string_data()).ok()?;
+                        Some(Statement::SizeMenuName(NameRecord::new(
+                            record.platform_id(),
+                            record.encoding_id(),
+                            record.language_id(),
+                            string.to_string(),
+                            NameRecordKind::FeatureSizeMenuName,
+                            0..0,
+                        )))
+                    })
+            }));
+        }
+        statements
+    }
+
+    fn add_feature_lookups(&mut self, feature_tag: Tag, lookups: Vec<Statement>) {
+        let statements = self
+            .features
+            .entry(feature_tag.to_string().into())
+            .or_default();
+        for lookup in lookups {
+            if !statements.contains(&lookup) {
+                statements.push(lookup);
+            }
+        }
     }
 
     fn add_lookup_flags(
@@ -547,10 +896,11 @@ impl<'a> UncompileContext<'a> {
                 .and_then(|mgss| mgss.coverages().get(set as usize).ok())
                 .map(|coverage| self.resolve_coverage_to_class(&coverage, false))
         });
-        let mark_attachment_class = flags.mark_attachment_class().and_then(|class| {
-            mark_attachment_classes
+        let mark_attachment_class = flags.mark_attachment_class().map(|class| {
+            let classes = mark_attachment_classes
                 .and_then(|mac| self.resolve_classes(Some(&mac)).get(&class).cloned())
-                .map(|classes| GlyphContainer::GlyphClass(GlyphClass::new(classes, 0..0)))
+                .unwrap_or_default();
+            GlyphContainer::GlyphClass(GlyphClass::new(classes, 0..0))
         });
 
         lookupblock.statements.insert(
@@ -563,6 +913,61 @@ impl<'a> UncompileContext<'a> {
             )),
         );
     }
+}
+
+fn lookup_reference(name: &SmolStr) -> Statement {
+    Statement::LookupReference(LookupReferenceStatement::new(name.to_string(), 0..0))
+}
+
+pub(crate) fn add_subtable_break(lookupblock: &mut LookupBlock) {
+    if lookupblock
+        .statements
+        .last()
+        .is_some_and(|statement| !matches!(statement, Statement::Subtable(_)))
+    {
+        lookupblock
+            .statements
+            .push(Statement::Subtable(SubtableStatement::new()));
+    }
+}
+
+fn comment_out(statement: Statement) -> Statement {
+    Statement::Comment(Comment::new(format!("# {}", statement.as_fea(""))))
+}
+
+fn feature_language_systems(
+    script_list: Option<ScriptList>,
+) -> Result<HashMap<u16, FeatureLanguageSystems>, ReadError> {
+    let mut systems: HashMap<u16, FeatureLanguageSystems> = HashMap::new();
+    let Some(script_list) = script_list else {
+        return Ok(systems);
+    };
+    for script_record in script_list.script_records() {
+        let script = script_record.script(script_list.offset_data())?;
+        let mut language_systems = vec![];
+        if let Some(lang_sys) = script.default_lang_sys() {
+            language_systems.push((Tag::new(b"dflt"), lang_sys?));
+        }
+        for lang_sys_record in script.lang_sys_records() {
+            language_systems.push((
+                lang_sys_record.lang_sys_tag(),
+                lang_sys_record.lang_sys(script.offset_data())?,
+            ));
+        }
+        for (lang_sys_tag, lang_sys) in language_systems {
+            let required_feature_index = lang_sys.required_feature_index();
+            let indices = lang_sys.feature_indices().iter().map(|index| index.get());
+            for index in
+                indices.chain((required_feature_index != 0xFFFF).then_some(required_feature_index))
+            {
+                systems.entry(index).or_default().push((
+                    (script_record.script_tag(), lang_sys_tag),
+                    index == required_feature_index,
+                ));
+            }
+        }
+    }
+    Ok(systems)
 }
 
 fn called_lookups(lookup: &LookupBlock) -> Vec<SmolStr> {
@@ -638,13 +1043,18 @@ pub fn uncompile(
         ff.statements
             .push(ToplevelItem::Feature(fea_rs_ast::FeatureBlock::new(
                 feature_name.clone(),
-                lookup_refs
-                    .iter()
-                    .map(|lr| Statement::LookupReference(lr.clone()))
-                    .collect(),
+                lookup_refs.clone(),
                 false,
                 0..0,
             )));
+    }
+    for (condition_set, variations) in context.feature_variations.iter() {
+        ff.statements
+            .push(ToplevelItem::ConditionSet(condition_set.clone()));
+        for variation in variations {
+            ff.statements
+                .push(ToplevelItem::VariationBlock(variation.clone()));
+        }
     }
 
     Ok(ff)
@@ -681,6 +1091,7 @@ mod tests {
         assert_eq!(
             ff.as_fea(""),
             "\
+languagesystem DFLT dflt;
 table GDEF {
 GlyphClassDef [A], [], [grave acute dotbelowcomb], [];
 } GDEF;
@@ -736,6 +1147,9 @@ lookup gsub_single_5 {
 lookup gsub_reverse_1 {
     rsub one two [a b]' c by [d e];
 } gsub_reverse_1;
+lookup gsub_single_6 {
+    sub one by two;
+} gsub_single_6;
 lookup gpos_mark_to_base_1 {
     pos base A
         <anchor 150 100> mark @bottomleft
@@ -761,6 +1175,403 @@ lookup gpos_single_4 {
     pos a -50;
     pos b -60;
 } gpos_single_4;
+lookup gpos_single_5 {
+    pos one 30;
+} gpos_single_5;
+feature ss01 {
+lookup gsub_single_6;
+    lookup gpos_single_5;
+} ss01;
+"
+        );
+    }
+
+    #[test]
+    fn test_uncompile_language_systems() {
+        let data = std::fs::read("resources/languages.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+languagesystem DFLT dflt;
+languagesystem latn dflt;
+languagesystem latn TRK;
+lookup gsub_single_1 {
+    sub b by c;
+} gsub_single_1;
+lookup gsub_single_2 {
+    sub a by d;
+} gsub_single_2;
+lookup gsub_single_3 {
+    sub a by e;
+} gsub_single_3;
+feature calt {
+script latn;
+    lookup gsub_single_2;
+    language TRK;
+    lookup gsub_single_3;
+} calt;
+feature locl {
+script latn;
+    lookup gsub_single_2;
+    language TRK exclude_dflt;
+    lookup gsub_single_3;
+} locl;
+feature ss01 {
+lookup gsub_single_1;
+} ss01;
+"
+        );
+    }
+
+    #[test]
+    fn test_uncompile_unregistered_features() {
+        let data = std::fs::read("resources/unregistered.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+languagesystem DFLT dflt;
+lookup gsub_single_1 {
+    sub b by c;
+} gsub_single_1;
+lookup gsub_single_2 {
+    sub b by d;
+} gsub_single_2;
+feature ss01 {
+lookup gsub_single_1;
+} ss01;
+feature ss02 {
+# lookup gsub_single_2;
+} ss02;
+feature ss03 {
+
+} ss03;
+"
+        );
+    }
+
+    #[test]
+    fn test_uncompile_required_features() {
+        let data = std::fs::read("resources/required.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+languagesystem DFLT dflt;
+lookup gsub_single_1 {
+    sub a by b;
+} gsub_single_1;
+feature rlig {
+script DFLT;
+    language dflt required;
+    lookup gsub_single_1;
+} rlig;
+"
+        );
+    }
+
+    #[test]
+    fn test_uncompile_ligature_carets() {
+        let data = std::fs::read("resources/carets.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+table GDEF {
+LigatureCaretByPos a 100 200;
+LigatureCaretByIndex b 3;
+} GDEF;
+
+"
+        );
+    }
+
+    #[test]
+    fn test_uncompile_empty_mark_attachment_class() {
+        let data = std::fs::read("resources/markattach.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+languagesystem DFLT dflt;
+lookup gsub_single_1 {
+    lookupflag MarkAttachmentType [];
+    sub a by b;
+} gsub_single_1;
+feature ss01 {
+lookup gsub_single_1;
+} ss01;
+"
+        );
+    }
+
+    #[test]
+    fn test_uncompile_attachment_points() {
+        let data = std::fs::read("resources/attach.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+table GDEF {
+Attach a 1 2;
+Attach b 3;
+} GDEF;
+
+"
+        );
+    }
+
+    #[test]
+    fn test_uncompile_variable_advances() {
+        let data = std::fs::read("resources/advances.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+languagesystem DFLT dflt;
+lookup gpos_single_1 {
+    pos a <0 0 (wght=100:-10 wght=400:0 wght=900:20) (wght=100:30 wght=400:0 wght=900:-40)>;
+} gpos_single_1;
+feature kern {
+lookup gpos_single_1;
+} kern;
+"
+        );
+    }
+
+    #[test]
+    fn test_uncompile_axis_order() {
+        let data = std::fs::read("resources/axisorder.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+languagesystem DFLT dflt;
+lookup gpos_single_1 {
+    pos a (wdth=100,wght=100:-10 wdth=100,wght=400:0 wdth=100,wght=900:20);
+} gpos_single_1;
+feature kern {
+lookup gpos_single_1;
+} kern;
+"
+        );
+    }
+
+    #[test]
+    fn test_uncompile_class_kerning() {
+        let data = std::fs::read("resources/kerning.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+languagesystem DFLT dflt;
+lookup gpos_pair_1 {
+    pos [a b] [c d] -10;
+} gpos_pair_1;
+feature kern {
+lookup gpos_pair_1;
+} kern;
+"
+        );
+    }
+
+    #[test]
+    fn test_uncompile_feature_names() {
+        let data = std::fs::read("resources/featurenames.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+languagesystem DFLT dflt;
+lookup gsub_single_1 {
+    sub a by b;
+} gsub_single_1;
+feature ss01 {
+    featureNames {
+        name 1 \"Alternate a\";
+        name \"Alternate a\";
+    };
+
+    lookup gsub_single_1;
+} ss01;
+"
+        );
+    }
+
+    #[test]
+    fn test_uncompile_feature_variations() {
+        let data = std::fs::read("resources/variations.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+languagesystem DFLT dflt;
+lookup gsub_single_1 {
+    sub a by b;
+} gsub_single_1;
+lookup gsub_single_2 {
+    sub b by c;
+} gsub_single_2;
+feature rclt {
+lookup gsub_single_1;
+} rclt;
+conditionset condition_1 {
+\twght 700 900;
+} condition_1;
+
+variation rclt condition_1 {
+lookup gsub_single_2;
+} rclt;
+
+"
+        );
+    }
+
+    #[test]
+    fn test_uncompile_variation_regions() {
+        let data = std::fs::read("resources/regions.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+languagesystem DFLT dflt;
+lookup gpos_single_1 {
+    pos a (wght=100:-10 wght=400:0 wght=650:15 wght=900:20);
+    pos b (wght=100:-10 wght=400:0 wght=900:20);
+    pos c (wght=400:0 wght=650:0 wght=900:20);
+} gpos_single_1;
+feature kern {
+lookup gpos_single_1;
+} kern;
+"
+        );
+    }
+
+    #[test]
+    fn test_uncompile_null_glyph() {
+        let data = std::fs::read("resources/nullglyph.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+languagesystem DFLT dflt;
+lookup gsub_single_1 {
+    sub a by \\NULL;
+} gsub_single_1;
+feature ss01 {
+lookup gsub_single_1;
+} ss01;
+"
+        );
+    }
+
+    #[test]
+    fn test_uncompile_single_subst_modulo() {
+        let data = std::fs::read("resources/gsub1_1_modulo_f1.otf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+languagesystem latn dflt;
+lookup gsub_single_1 {
+    sub [g21 g22] by [gid32787 gid32788];
+    subtable;
+    sub [g19 g20] by [gid32789 gid32790];
+} gsub_single_1;
+lookup gsub_single_2 {
+    sub gid32787 by g23;
+    subtable;
+    sub gid32788 by g18;
+    subtable;
+    sub gid32789 by g17;
+    subtable;
+    sub gid32790 by g24;
+} gsub_single_2;
+feature test {
+lookup gsub_single_1;
+    lookup gsub_single_2;
+} test;
+"
+        );
+    }
+
+    #[test]
+    fn test_uncompile_no_variation_index() {
+        let data = std::fs::read("resources/novariation.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+languagesystem DFLT dflt;
+lookup gpos_single_1 {
+    pos a (wght=100:-10 wght=400:0);
+    pos b 10;
+} gpos_single_1;
+feature kern {
+lookup gpos_single_1;
+} kern;
+"
+        );
+    }
+
+    #[test]
+    fn test_uncompile_subtable_breaks() {
+        let data = std::fs::read("resources/subtables.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+languagesystem DFLT dflt;
+lookup gsub_single_1 {
+    sub a by b;
+    subtable;
+    sub c by d;
+} gsub_single_1;
+lookup gpos_pair_1 {
+    pos [a b] [c d] -40;
+    subtable;
+    pos [a b] [c d] 0;
+} gpos_pair_1;
+feature salt {
+lookup gsub_single_1;
+} salt;
+feature kern {
+lookup gpos_pair_1;
+} kern;
+"
+        );
+    }
+
+    #[test]
+    fn test_uncompile_size_feature() {
+        let data = std::fs::read("resources/size.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+languagesystem DFLT dflt;
+feature size {
+parameters 10.0 3 80 139;
+    sizemenuname \"Text\";
+} size;
 "
         );
     }

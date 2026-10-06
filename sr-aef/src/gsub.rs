@@ -1,4 +1,4 @@
-use crate::UncompileContext;
+use crate::{UncompileContext, add_subtable_break};
 use fea_rs_ast::{
     AlternateSubstStatement, ChainedContextStatement, GlyphClass, GlyphContainer, GlyphName,
     IgnoreStatement, LigatureSubstStatement, LookupBlock, MultipleSubstStatement,
@@ -41,6 +41,7 @@ impl<'a> UncompileContext<'a> {
                 SubstitutionSubtables::Single(subtables) => {
                     let mut lookupblock = self.create_lookup_block(i as u16, Subst);
                     for subtable in subtables.iter().flatten() {
+                        add_subtable_break(&mut lookupblock);
                         match subtable {
                             SingleSubst::Format1(table_ref) => {
                                 self.uncompile_gsub1_format1(&mut lookupblock, table_ref)?;
@@ -55,6 +56,7 @@ impl<'a> UncompileContext<'a> {
                 SubstitutionSubtables::Multiple(subtables) => {
                     let mut lookupblock = self.create_lookup_block(i as u16, Subst);
                     for subtable in subtables.iter().flatten() {
+                        add_subtable_break(&mut lookupblock);
                         self.uncompile_gsub2(&mut lookupblock, subtable)?;
                     }
                     lookupblock
@@ -62,6 +64,7 @@ impl<'a> UncompileContext<'a> {
                 SubstitutionSubtables::Alternate(subtables) => {
                     let mut lookupblock = self.create_lookup_block(i as u16, Subst);
                     for subtable in subtables.iter().flatten() {
+                        add_subtable_break(&mut lookupblock);
                         self.uncompile_gsub3(&mut lookupblock, subtable)?;
                     }
                     lookupblock
@@ -69,6 +72,7 @@ impl<'a> UncompileContext<'a> {
                 SubstitutionSubtables::Ligature(subtables) => {
                     let mut lookupblock = self.create_lookup_block(i as u16, Subst);
                     for subtable in subtables.iter().flatten() {
+                        add_subtable_break(&mut lookupblock);
                         self.uncompile_gsub4(&mut lookupblock, subtable)?;
                     }
                     lookupblock
@@ -76,6 +80,7 @@ impl<'a> UncompileContext<'a> {
                 SubstitutionSubtables::Contextual(subtables) => {
                     let mut lookupblock = self.create_lookup_block(i as u16, Subst);
                     for subtable in subtables.iter().flatten() {
+                        add_subtable_break(&mut lookupblock);
                         lookupblock.statements.extend(
                             self.uncompile_sequence_context(subtable, Subst)?
                                 .into_iter()
@@ -87,6 +92,7 @@ impl<'a> UncompileContext<'a> {
                 SubstitutionSubtables::ChainContextual(subtables) => {
                     let mut lookupblock = self.create_lookup_block(i as u16, Subst);
                     for subtable in subtables.iter().flatten() {
+                        add_subtable_break(&mut lookupblock);
                         lookupblock.statements.extend(
                             self.uncompile_chain_sequence_context(subtable, Subst)?
                                 .into_iter()
@@ -98,6 +104,7 @@ impl<'a> UncompileContext<'a> {
                 SubstitutionSubtables::Reverse(subtables) => {
                     let mut lookupblock = self.create_lookup_block(i as u16, Subst);
                     for subtable in subtables.iter().flatten() {
+                        add_subtable_break(&mut lookupblock);
                         self.uncompile_gsub7(&mut lookupblock, subtable)?;
                     }
                     lookupblock
@@ -105,6 +112,9 @@ impl<'a> UncompileContext<'a> {
 
                 SubstitutionSubtables::EmptyExtension => self.create_lookup_block(i as u16, Subst),
             };
+            if let Some(Statement::Subtable(_)) = lookupblock.statements.last() {
+                lookupblock.statements.pop();
+            }
             self.add_lookup_flags(
                 &mut lookupblock,
                 lookup.lookup_flag(),
@@ -125,7 +135,7 @@ impl<'a> UncompileContext<'a> {
         let replacements = gsub1
             .coverage()?
             .iter()
-            .map(|g| GlyphId16::new(g.to_u16().saturating_add_signed(delta)))
+            .map(|g| GlyphId16::new(g.to_u16().wrapping_add_signed(delta)))
             .map(|g| GlyphContainer::GlyphName(self.get_name(g)))
             .collect::<Vec<GlyphContainer>>();
         let subst = SingleSubstStatement::new(

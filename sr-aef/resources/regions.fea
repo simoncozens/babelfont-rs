@@ -1,0 +1,7 @@
+languagesystem DFLT dflt;
+
+feature kern {
+    pos a (wght=100:-10 wght=400:0 wght=650:15 wght=900:20);
+    pos b (wght=100:-10 wght=400:0 wght=900:20);
+    pos c (wght=100:0 wght=400:0 wght=650:0 wght=900:20);
+} kern;

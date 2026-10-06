@@ -1,0 +1,5 @@
+languagesystem DFLT dflt;
+
+feature kern {
+    pos [a b] [c d] -10;
+} kern;

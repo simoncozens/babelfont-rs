@@ -47,6 +47,9 @@ lookup gsub1_filter {
 lookup gsub8 {
     rsub one two [a b]' c by [d e];
 } gsub8;
+lookup gsub1_shared {
+    sub one by two;
+} gsub1_shared;
 
 lookup gpos4 {
     pos base A <anchor 150 100> mark @TOP_MARKS <anchor -200 -200> mark @BOTTOM_MARKS;
@@ -66,3 +69,11 @@ lookup gpos1_f2 {
     pos a -50;
     pos b -60;
 } gpos1_f2;
+lookup gpos1_shared {
+    pos one 30;
+} gpos1_shared;
+
+feature ss01 {
+    lookup gsub1_shared;
+    lookup gpos1_shared;
+} ss01;

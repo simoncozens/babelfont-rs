@@ -1,0 +1,5 @@
+languagesystem DFLT dflt;
+
+feature ss01 {
+    sub a by \NULL;
+} ss01;

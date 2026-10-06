@@ -1,0 +1,31 @@
+languagesystem DFLT dflt;
+languagesystem latn dflt;
+languagesystem latn TRK;
+
+lookup gsub1_all {
+    sub b by c;
+} gsub1_all;
+lookup gsub1_latn {
+    sub a by d;
+} gsub1_latn;
+lookup gsub1_trk {
+    sub a by e;
+} gsub1_trk;
+
+feature ss01 {
+    lookup gsub1_all;
+} ss01;
+
+feature locl {
+    script latn;
+    lookup gsub1_latn;
+    language TRK exclude_dflt;
+    lookup gsub1_trk;
+} locl;
+
+feature calt {
+    script latn;
+    lookup gsub1_latn;
+    language TRK;
+    lookup gsub1_trk;
+} calt;

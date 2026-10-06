@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::UncompileContext;
+use crate::{UncompileContext, add_subtable_break};
 use fea_rs_ast::{
     Anchor as FeaAnchor, ChainedContextStatement, CursivePosStatement, GlyphClass, GlyphContainer,
     IgnoreStatement, LookupBlock, MarkBasePosStatement, MarkClass, MarkLigPosStatement,
@@ -47,6 +47,7 @@ impl<'a> UncompileContext<'a> {
                 PositionSubtables::Single(subtables) => {
                     let mut lookupblock = self.create_lookup_block(i as u16, Pos);
                     for subtable in subtables.iter().flatten() {
+                        add_subtable_break(&mut lookupblock);
                         match subtable {
                             SinglePos::Format1(gpos1f1) => {
                                 self.uncompile_gpos1_format1(&mut lookupblock, gpos1f1)?;
@@ -61,6 +62,7 @@ impl<'a> UncompileContext<'a> {
                 PositionSubtables::Pair(subtables) => {
                     let mut lookupblock = self.create_lookup_block(i as u16, Pos);
                     for subtable in subtables.iter().flatten() {
+                        add_subtable_break(&mut lookupblock);
                         match subtable {
                             PairPos::Format1(table_ref) => {
                                 self.uncompile_gpos2_format1(&mut lookupblock, table_ref)?;
@@ -75,6 +77,7 @@ impl<'a> UncompileContext<'a> {
                 PositionSubtables::Cursive(subtables) => {
                     let mut lookupblock = self.create_lookup_block(i as u16, Pos);
                     for subtable in subtables.iter().flatten() {
+                        add_subtable_break(&mut lookupblock);
                         self.uncompile_gpos3(&mut lookupblock, subtable)?;
                     }
                     lookupblock
@@ -82,6 +85,7 @@ impl<'a> UncompileContext<'a> {
                 PositionSubtables::MarkToBase(subtables) => {
                     let mut lookupblock = self.create_lookup_block(i as u16, Pos);
                     for subtable in subtables.iter().flatten() {
+                        add_subtable_break(&mut lookupblock);
                         self.uncompile_gpos4(&mut lookupblock, subtable)?;
                     }
                     lookupblock
@@ -89,6 +93,7 @@ impl<'a> UncompileContext<'a> {
                 PositionSubtables::MarkToLig(subtables) => {
                     let mut lookupblock = self.create_lookup_block(i as u16, Pos);
                     for subtable in subtables.iter().flatten() {
+                        add_subtable_break(&mut lookupblock);
                         self.uncompile_gpos5(&mut lookupblock, subtable)?;
                     }
                     lookupblock
@@ -96,6 +101,7 @@ impl<'a> UncompileContext<'a> {
                 PositionSubtables::MarkToMark(subtables) => {
                     let mut lookupblock = self.create_lookup_block(i as u16, Pos);
                     for subtable in subtables.iter().flatten() {
+                        add_subtable_break(&mut lookupblock);
                         self.uncompile_gpos6(&mut lookupblock, subtable)?;
                     }
                     lookupblock
@@ -103,6 +109,7 @@ impl<'a> UncompileContext<'a> {
                 PositionSubtables::Contextual(subtables) => {
                     let mut lookupblock = self.create_lookup_block(i as u16, Pos);
                     for subtable in subtables.iter().flatten() {
+                        add_subtable_break(&mut lookupblock);
                         lookupblock.statements.extend(
                             self.uncompile_sequence_context(subtable, Pos)?
                                 .into_iter()
@@ -114,6 +121,7 @@ impl<'a> UncompileContext<'a> {
                 PositionSubtables::ChainContextual(subtables) => {
                     let mut lookupblock = self.create_lookup_block(i as u16, Pos);
                     for subtable in subtables.iter().flatten() {
+                        add_subtable_break(&mut lookupblock);
                         lookupblock.statements.extend(
                             self.uncompile_chain_sequence_context(subtable, Pos)?
                                 .into_iter()
@@ -124,6 +132,9 @@ impl<'a> UncompileContext<'a> {
                 }
                 PositionSubtables::EmptyExtension => self.create_lookup_block(i as u16, Pos),
             };
+            if let Some(Statement::Subtable(_)) = lookupblock.statements.last() {
+                lookupblock.statements.pop();
+            }
             self.add_lookup_flags(
                 &mut lookupblock,
                 lookup.lookup_flag(),
@@ -157,8 +168,24 @@ impl<'a> UncompileContext<'a> {
                 )
             })
             .transpose()?;
-        let x_advance = value_record.x_advance().map(Metric::from);
-        let y_advance = value_record.y_advance().map(Metric::from);
+        let x_advance = value_record
+            .x_advance()
+            .map(|vr| {
+                self.resolve_pos_with_variations(
+                    vr,
+                    value_record.x_advance_device(parent_offset_data),
+                )
+            })
+            .transpose()?;
+        let y_advance = value_record
+            .y_advance()
+            .map(|vr| {
+                self.resolve_pos_with_variations(
+                    vr,
+                    value_record.y_advance_device(parent_offset_data),
+                )
+            })
+            .transpose()?;
         Ok(FeaValueRecord::new(
             x_placement,
             y_placement,
@@ -256,12 +283,33 @@ impl<'a> UncompileContext<'a> {
         lookupblock: &mut LookupBlock,
         gpos2f2: PairPosFormat2,
     ) -> Result<(), ReadError> {
-        let classes1 = self.resolve_classes(Some(&gpos2f2.class_def1()?));
-        let classes2 = self.resolve_classes(Some(&gpos2f2.class_def2()?));
+        let class_def1 = gpos2f2.class_def1()?;
+        let mut classes1: HashMap<u16, Vec<GlyphContainer>> = HashMap::new();
+        for gid in gpos2f2.coverage()?.iter() {
+            classes1
+                .entry(class_def1.get(gid))
+                .or_default()
+                .push(GlyphContainer::GlyphName(self.get_name(gid)));
+        }
+        let mut classes2: HashMap<u16, Vec<GlyphContainer>> = HashMap::new();
+        for (gid, class) in gpos2f2.class_def2()?.iter() {
+            if class != 0 {
+                classes2
+                    .entry(class)
+                    .or_default()
+                    .push(GlyphContainer::GlyphName(self.get_name(gid)));
+            }
+        }
         let offset_data = gpos2f2.offset_data();
         for (class1, record) in gpos2f2.class1_records().iter().enumerate() {
             let Ok(record) = record else { continue };
+            if !classes1.contains_key(&(class1 as u16)) {
+                continue;
+            }
             for (class2, subrecord) in record.class2_records().iter().enumerate() {
+                if !classes2.contains_key(&(class2 as u16)) {
+                    continue;
+                }
                 let Ok(subrecord) = subrecord else { continue };
 
                 let vr1 = self.resolve_value_record(subrecord.value_record1(), offset_data)?;

@@ -1,0 +1,21 @@
+languagesystem DFLT dflt;
+
+lookup gsub1 {
+    sub a by b;
+} gsub1;
+
+lookup gsub2 {
+    sub b by c;
+} gsub2;
+
+feature rclt {
+    lookup gsub1;
+} rclt;
+
+conditionset heavy {
+    wght 700 900;
+} heavy;
+
+variation rclt heavy {
+    lookup gsub2;
+} rclt;

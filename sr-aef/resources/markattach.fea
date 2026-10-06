@@ -1,0 +1,10 @@
+languagesystem DFLT dflt;
+
+lookup gsub1 {
+    lookupflag MarkAttachmentType [];
+    sub a by b;
+} gsub1;
+
+feature ss01 {
+    lookup gsub1;
+} ss01;
