@@ -34,12 +34,13 @@ use std::collections::{HashMap, HashSet};
 pub use fea_rs_ast;
 use fea_rs_ast::ordered_float::OrderedFloat;
 use fea_rs_ast::{
-    Anchor, AsFea, AttachStatement, Comment, ConditionSet, GdefStatement, GlyphClass,
-    GlyphClassDefStatement, GlyphClassDefinition, GlyphContainer, GlyphName, LanguageStatement,
-    LanguageSystemStatement, LigatureCaretByIndexStatement, LigatureCaretByPosStatement,
-    LookupBlock, LookupFlagStatement, LookupReferenceStatement, MarkClass, MarkClassDefinition,
-    Metric, NameRecord, NameRecordKind, NestedBlock, Pos, ScriptStatement, SizeParameters,
-    Statement, SubOrPos, Subst, SubtableStatement, Table, ToplevelItem, VariationBlock,
+    Anchor, AsFea, AttachStatement, CharacterStatement, Comment, ConditionSet, GdefStatement,
+    GlyphClass, GlyphClassDefStatement, GlyphClassDefinition, GlyphContainer, GlyphName,
+    LanguageStatement, LanguageSystemStatement, LigatureCaretByIndexStatement,
+    LigatureCaretByPosStatement, LookupBlock, LookupFlagStatement, LookupReferenceStatement,
+    MarkClass, MarkClassDefinition, Metric, NameRecord, NameRecordKind, NestedBlock, Pos,
+    ScriptStatement, SizeParameters, Statement, SubOrPos, Subst, SubtableStatement, Table,
+    ToplevelItem, VariationBlock,
 };
 use indexmap::{IndexMap, IndexSet};
 /// A handle to the version of Skrifa that sr-eaf is using. Pass a skrifa::FontRef to uncompile()
@@ -55,8 +56,8 @@ use skrifa::{
             gpos::Gpos,
             gsub::{ClassDef, Gsub},
             layout::{
-                Condition, CoverageTable, FeatureList, FeatureParams, FeatureVariations,
-                LookupFlag, ScriptList, SizeParams,
+                CharacterVariantParams, Condition, CoverageTable, FeatureList, FeatureParams,
+                FeatureVariations, LookupFlag, ScriptList, SizeParams,
             },
             name::{Name, NameId},
         },
@@ -551,6 +552,7 @@ impl<'a> UncompileContext<'a> {
         let mut unregistered_features = vec![];
         let mut feature_name_ids = IndexMap::new();
         let mut size_params = None;
+        let mut cv_params = IndexMap::new();
         if let Some(feature_list) = self.gsub.as_ref().and_then(|gsub| gsub.feature_list().ok()) {
             let systems =
                 feature_language_systems(self.gsub.as_ref().and_then(|g| g.script_list().ok()))?;
@@ -561,6 +563,10 @@ impl<'a> UncompileContext<'a> {
                     feature_name_ids
                         .entry(feature_tag)
                         .or_insert(params.ui_name_id());
+                }
+                if let Some(Ok(FeatureParams::CharacterVariant(params))) = feature.feature_params()
+                {
+                    cv_params.entry(feature_tag).or_insert(params);
                 }
                 let lookup_indices = feature.lookup_list_indices();
                 let lookups = lookup_indices
@@ -603,9 +609,15 @@ impl<'a> UncompileContext<'a> {
         }
         self.add_registered_features(registered_features);
         for (feature_tag, name_id) in feature_name_ids {
-            let names = self.uncompile_feature_names(name_id);
+            let names = self.uncompile_feature_names("featureNames", name_id);
             if let Some(statements) = self.features.get_mut(feature_tag.to_string().as_str()) {
                 statements.insert(0, names);
+            }
+        }
+        for (feature_tag, params) in cv_params {
+            let parameters = self.uncompile_cv_parameters(&params);
+            if let Some(statements) = self.features.get_mut(feature_tag.to_string().as_str()) {
+                statements.insert(0, parameters);
             }
         }
         if let Some(params) = size_params {
@@ -804,7 +816,7 @@ impl<'a> UncompileContext<'a> {
         }
     }
 
-    fn uncompile_feature_names(&self, name_id: NameId) -> Statement {
+    fn uncompile_feature_names(&self, tag: &str, name_id: NameId) -> Statement {
         let statements = self
             .name
             .iter()
@@ -826,7 +838,35 @@ impl<'a> UncompileContext<'a> {
             })
             .collect();
         Statement::NestedBlock(NestedBlock {
-            tag: "featureNames".into(),
+            tag: tag.into(),
+            statements,
+            pos: 0..0,
+        })
+    }
+
+    fn uncompile_cv_parameters(&self, params: &CharacterVariantParams) -> Statement {
+        let mut statements = vec![];
+        for (tag, name_id) in [
+            ("FeatUILabelNameID", params.feat_ui_label_name_id()),
+            (
+                "FeatUITooltipTextNameID",
+                params.feat_ui_tooltip_text_name_id(),
+            ),
+            ("SampleTextNameID", params.sample_text_name_id()),
+        ] {
+            statements.push(self.uncompile_feature_names(tag, name_id));
+        }
+        let first = params.first_param_ui_label_name_id().to_u16();
+        for index in 0..params.num_named_parameters() {
+            statements.push(
+                self.uncompile_feature_names("ParamUILabelNameID", NameId::new(first + index)),
+            );
+        }
+        statements.extend(params.character().iter().map(|character| {
+            Statement::Character(CharacterStatement::new(character.get().to_u32(), 0..0))
+        }));
+        Statement::NestedBlock(NestedBlock {
+            tag: "cvParameters".into(),
             statements,
             pos: 0..0,
         })
@@ -1615,6 +1655,49 @@ lookup gpos_single_1 {
 feature kern {
 lookup gpos_single_1;
 } kern;
+"
+        );
+    }
+
+    #[test]
+    fn test_uncompile_cv_parameters() {
+        let data = std::fs::read("resources/cvparams.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        assert_eq!(
+            ff.as_fea(""),
+            "\
+languagesystem DFLT dflt;
+lookup gsub_alternate_1 {
+    sub a from [b c];
+} gsub_alternate_1;
+feature cv01 {
+    cvParameters {
+                FeatUILabelNameID {
+            name \"Alternate a\";
+        };
+
+                FeatUITooltipTextNameID {
+            name \"Alternate forms of a\";
+        };
+
+                SampleTextNameID {
+            name \"aaa\";
+        };
+
+                ParamUILabelNameID {
+            name \"Round\";
+        };
+
+                ParamUILabelNameID {
+            name \"Square\";
+        };
+
+        Character 0x61;
+    };
+
+    lookup gsub_alternate_1;
+} cv01;
 "
         );
     }

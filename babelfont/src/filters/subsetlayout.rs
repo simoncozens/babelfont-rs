@@ -957,6 +957,7 @@ impl LayoutVisitor for SubsetVisitor<'_> {
             }
             Statement::SizeParameters(_)
             | Statement::SizeMenuName(_)
+            | Statement::Character(_)
             | Statement::Subtable(_)
             | Statement::Script(_) => None,
             Statement::Gdef(_) => {

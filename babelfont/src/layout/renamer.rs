@@ -276,6 +276,7 @@ impl LayoutVisitor for GlyphRenamerVisitor {
             Statement::LookupFlag(lookupflag) => self.visit_lookupflag(lookupflag),
             Statement::SizeParameters(_)
             | Statement::SizeMenuName(_)
+            | Statement::Character(_)
             | Statement::Subtable(_)
             | Statement::Script(_)
             | Statement::Gdef(_)
