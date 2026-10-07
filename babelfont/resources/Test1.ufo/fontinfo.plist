@@ -12,6 +12,16 @@
 	<string>New Font</string>
 	<key>openTypeHeadCreated</key>
 	<string>2020/10/13 09:27:59</string>
+	<key>openTypeOS2TypoAscender</key>
+	<integer>900</integer>
+	<key>openTypeOS2TypoDescender</key>
+	<integer>-300</integer>
+	<key>openTypeVheaVertTypoAscender</key>
+	<integer>500</integer>
+	<key>openTypeVheaVertTypoDescender</key>
+	<integer>-500</integer>
+	<key>openTypeVheaVertTypoLineGap</key>
+	<integer>1000</integer>
 	<key>postscriptBlueValues</key>
 	<array/>
 	<key>postscriptFontName</key>

@@ -1306,9 +1306,83 @@ fn interpret_axes(font: &mut Font) -> Result<(), BabelfontError> {
     Ok(())
 }
 
+/// Express the vertical metrics of UFO-sourced layers as Glyphs `vertWidth`
+/// and `vertOrigin`.
+///
+/// A UFO glyph states its vertical advance as its `height`, and its vertical
+/// origin as an absolute y coordinate in `public.verticalOrigin`. A Glyphs
+/// layer states the advance as `vertWidth`, which defaults to the typo
+/// ascender minus the typo descender, and the origin as `vertOrigin`, an
+/// offset down from the typo ascender. Following glyphsLib's
+/// `to_glyphs_glyph_height_and_vertical_origin`, a value is only written where
+/// it differs from the Glyphs default.
+///
+/// Only masters that state their `vhea` metrics are converted: ufo2ft builds no
+/// `vmtx` for a UFO without them, but a Glyphs compiler builds one for any font
+/// with a `vertWidth`. Layers that already carry a `vertWidth` or `vertOrigin`
+/// are left alone.
+#[cfg(feature = "ufo")]
+fn ufo_vertical_metrics_to_glyphs(font: &mut Font) {
+    use crate::{
+        convertors::ufo::{KEY_HEIGHT, KEY_LIB, KEY_VERTICAL_ORIGIN},
+        LayerType, MetricType,
+    };
+
+    let typo_extents: HashMap<String, (f64, f64)> = font
+        .masters
+        .iter()
+        .filter(|master| master.has_vhea_metrics())
+        .filter_map(|master| {
+            let metric = |typo, fallback| {
+                master
+                    .metrics
+                    .get(&typo)
+                    .or_else(|| master.metrics.get(&fallback))
+                    .map(|&v| v as f64)
+            };
+            let ascender = metric(MetricType::TypoAscender, MetricType::Ascender)?;
+            let descender = metric(MetricType::TypoDescender, MetricType::Descender)?;
+            Some((master.id.clone(), (ascender, descender)))
+        })
+        .collect();
+    if typo_extents.is_empty() {
+        return;
+    }
+
+    for layer in font.glyphs.iter_mut().flat_map(|g| g.layers.iter_mut()) {
+        let (LayerType::DefaultForMaster(master_id) | LayerType::AssociatedWithMaster(master_id)) =
+            &layer.master
+        else {
+            continue;
+        };
+        let Some(&(ascender, descender)) = typo_extents.get(master_id) else {
+            continue;
+        };
+        let fs = &mut layer.format_specific;
+        if !fs.contains_key(KEY_VERT_WIDTH) {
+            if let Some(height) = fs.get(KEY_HEIGHT).and_then(|h| h.as_f64()) {
+                if height != ascender - descender {
+                    fs.insert_json(KEY_VERT_WIDTH, &height);
+                }
+            }
+        }
+        if !fs.contains_key(KEY_VERT_ORIGIN) {
+            let origin = fs
+                .get(KEY_LIB)
+                .and_then(|lib| lib.get(KEY_VERTICAL_ORIGIN))
+                .and_then(|origin| origin.as_f64());
+            if let Some(origin) = origin.filter(|&origin| origin != ascender) {
+                fs.insert_json(KEY_VERT_ORIGIN, &(ascender - origin));
+            }
+        }
+    }
+}
+
 pub(crate) fn as_glyphs3(font: &Font) -> Result<glyphs3::Glyphs3, BabelfontError> {
     // Do some cleanups.
     let mut font = font.clone();
+    #[cfg(feature = "ufo")]
+    ufo_vertical_metrics_to_glyphs(&mut font);
     // #[allow(clippy::unwrap_used)] // Surely this can't fail
     // DropSparseMasters.apply(&mut font).unwrap();
     // println!("Exporting {} masters", font.masters.len());
@@ -2411,5 +2485,31 @@ weightClass = 700;
         assert_eq!(user(axis, |a| a.min), Some(400.0));
         assert_eq!(user(axis, |a| a.max), Some(700.0));
         assert_eq!(user(axis, |a| a.default), Some(400.0));
+    }
+
+    #[cfg(feature = "ufo")]
+    #[test]
+    fn ufo_vertical_metrics_become_vert_width_and_origin() {
+        let vert = |font: &Font, name: &str| {
+            let glyphs = as_glyphs3(font).unwrap();
+            let layer = &glyphs
+                .glyphs
+                .iter()
+                .find(|g| g.name == name)
+                .unwrap()
+                .layers[0];
+            (layer.vert_width, layer.vert_origin)
+        };
+        let mut font = crate::load("resources/Test1.ufo").unwrap();
+        // The typo ascender is 900 and the typo descender -300, so Glyphs.app's
+        // defaults are a vertWidth of 1200 and a vertical origin at y=900.
+        assert_eq!(vert(&font, "A"), (Some(1000.0), Some(20.0)));
+        assert_eq!(vert(&font, "B"), (None, None));
+        assert_eq!(vert(&font, "i"), (Some(0.0), None));
+
+        font.masters[0]
+            .metrics
+            .shift_remove(&crate::MetricType::VheaLineGap);
+        assert_eq!(vert(&font, "A"), (None, None));
     }
 }

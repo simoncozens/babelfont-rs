@@ -37,6 +37,10 @@ pub const KEY_STYLE_NAME: &str = "ufo.styleName";
 pub const KEY_IDENTIFIER: &str = "ufo.identifier";
 /// Key for storing original guide type in FormatSpecific, used to roundtrip horizontal and vertical guides which UFO can either represent as such, or as angled guides with specific angles. Values are "horizontal" or "vertical".
 pub const KEY_ORIGINAL_GUIDE: &str = "ufo.originalGuide";
+/// Key for storing a glyph's vertical advance (the glif's advance `height`) in FormatSpecific
+pub const KEY_HEIGHT: &str = "ufo.height";
+/// The glyph lib key holding the y coordinate of a glyph's vertical origin
+pub const KEY_VERTICAL_ORIGIN: &str = "public.verticalOrigin";
 
 pub(crate) fn stash_lib(lib: Option<&norad::Plist>) -> crate::common::FormatSpecific {
     let mut fs = crate::common::FormatSpecific::default();
@@ -90,11 +94,8 @@ pub fn load<T: AsRef<std::path::Path>>(path: T) -> Result<Font, BabelfontError> 
     for layer in ufo.iter_layers() {
         for g in font.glyphs.iter_mut() {
             if let Some(norad_glyph) = layer.get_glyph(g.name.as_str()) {
-                g.layers.push(norad_glyph_to_babelfont_layer(
-                    norad_glyph,
-                    layer,
-                    &master.id,
-                ))
+                g.layers
+                    .push(norad_glyph_to_babelfont_layer(norad_glyph, layer, &master))
             }
         }
     }
@@ -286,6 +287,13 @@ fn babelfont_layer_to_norad_glyph(
 ) -> Result<norad::Glyph, BabelfontError> {
     let mut norad_glyph = norad::Glyph::new(glyph.name.as_str());
     norad_glyph.width = layer.width as f64;
+    if let Some(height) = layer
+        .format_specific
+        .get(KEY_HEIGHT)
+        .and_then(|h| h.as_f64())
+    {
+        norad_glyph.height = height;
+    }
     norad_glyph.codepoints =
         norad::Codepoints::new(glyph.codepoints.iter().flat_map(|&x| char::from_u32(x)));
 
@@ -320,8 +328,9 @@ fn babelfont_layer_to_norad_glyph(
 pub(crate) fn norad_glyph_to_babelfont_layer(
     glyph: &norad::Glyph,
     layer: &norad::Layer,
-    master_id: &str,
+    master: &Master,
 ) -> Layer {
+    let master_id = master.id.as_str();
     let mut l = Layer::new(glyph.width as f32);
     if layer.is_default() {
         l.name = None;
@@ -339,6 +348,11 @@ pub(crate) fn norad_glyph_to_babelfont_layer(
     }
     if !glyph.lib.is_empty() {
         l.format_specific = stash_lib(Some(&glyph.lib));
+    }
+    // A glif without a height has a height of zero. That is also a real
+    // vertical advance when the font builds vmtx, so keep it there.
+    if glyph.height != 0.0 || master.has_vhea_metrics() {
+        l.format_specific.insert_json(KEY_HEIGHT, &glyph.height);
     }
 
     l.guides = glyph.guidelines.iter().map(|x| x.into()).collect();
@@ -514,6 +528,15 @@ pub(crate) fn save_info(info: &mut norad::FontInfo, font: &Font, master_ix: usiz
         get_metric(MetricType::HheaCaretSlopeRun).map(|x| x as i32);
     info.open_type_hhea_descender = get_metric(MetricType::HheaDescender).map(|x| x as i32);
     info.open_type_hhea_line_gap = get_metric(MetricType::HheaLineGap).map(|x| x as i32);
+    info.open_type_vhea_vert_typo_ascender = get_metric(MetricType::VheaAscender).map(|x| x as i32);
+    info.open_type_vhea_vert_typo_descender =
+        get_metric(MetricType::VheaDescender).map(|x| x as i32);
+    info.open_type_vhea_vert_typo_line_gap = get_metric(MetricType::VheaLineGap).map(|x| x as i32);
+    info.open_type_vhea_caret_slope_rise =
+        get_metric(MetricType::VheaCaretSlopeRise).map(|x| x as i32);
+    info.open_type_vhea_caret_slope_run =
+        get_metric(MetricType::VheaCaretSlopeRun).map(|x| x as i32);
+    info.open_type_vhea_caret_offset = get_metric(MetricType::VheaCaretOffset).map(|x| x as i32);
     // opentype name compatible full name
     info.open_type_name_description = font.names.description.get_default().map(|x| x.to_string());
     info.open_type_name_designer_url = font.names.designer_url.get_default().map(|x| x.to_string());
@@ -716,6 +739,42 @@ pub(crate) fn load_master_info(master: &mut Master, info: &norad::FontInfo) {
         metrics,
         postscript_underline_thickness,
         MetricType::UnderlineThickness
+    );
+    load_metric!(
+        info,
+        metrics,
+        open_type_vhea_vert_typo_ascender,
+        MetricType::VheaAscender
+    );
+    load_metric!(
+        info,
+        metrics,
+        open_type_vhea_vert_typo_descender,
+        MetricType::VheaDescender
+    );
+    load_metric!(
+        info,
+        metrics,
+        open_type_vhea_vert_typo_line_gap,
+        MetricType::VheaLineGap
+    );
+    load_metric!(
+        info,
+        metrics,
+        open_type_vhea_caret_slope_rise,
+        MetricType::VheaCaretSlopeRise
+    );
+    load_metric!(
+        info,
+        metrics,
+        open_type_vhea_caret_slope_run,
+        MetricType::VheaCaretSlopeRun
+    );
+    load_metric!(
+        info,
+        metrics,
+        open_type_vhea_caret_offset,
+        MetricType::VheaCaretOffset
     );
     if let Some(v) = &info.guidelines {
         for g in v.iter() {

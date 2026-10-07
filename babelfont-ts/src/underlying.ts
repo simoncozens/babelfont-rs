@@ -623,6 +623,18 @@ export type MetricType =
   | "HheaCaretSlopeRun"
   /** Caret offset (for the `hhea` table) */
   | "HheaCaretOffset"
+  /** Ascender (to be placed in the `vhea` table) */
+  | "VheaAscender"
+  /** Descender (to be placed in the `vhea` table) */
+  | "VheaDescender"
+  /** Line gap (to be placed in the `vhea` table) */
+  | "VheaLineGap"
+  /** Caret slope rise (for the `vhea` table) */
+  | "VheaCaretSlopeRise"
+  /** Caret slope run (for the `vhea` table) */
+  | "VheaCaretSlopeRun"
+  /** Caret offset (for the `vhea` table) */
+  | "VheaCaretOffset"
   /** Custom metric type */
   | { Custom: string };
 

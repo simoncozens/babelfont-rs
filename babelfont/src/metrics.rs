@@ -61,6 +61,18 @@ pub enum MetricType {
     HheaCaretSlopeRun,
     /// Caret offset (for the `hhea` table)
     HheaCaretOffset,
+    /// Ascender (to be placed in the `vhea` table)
+    VheaAscender,
+    /// Descender (to be placed in the `vhea` table)
+    VheaDescender,
+    /// Line gap (to be placed in the `vhea` table)
+    VheaLineGap,
+    /// Caret slope rise (for the `vhea` table)
+    VheaCaretSlopeRise,
+    /// Caret slope run (for the `vhea` table)
+    VheaCaretSlopeRun,
+    /// Caret offset (for the `vhea` table)
+    VheaCaretOffset,
     /// Custom metric type
     #[serde(untagged)]
     Custom(String),
@@ -97,6 +109,12 @@ impl From<&str> for MetricType {
             "hheaCaretSlopeRise" => MetricType::HheaCaretSlopeRise,
             "hheaCaretSlopeRun" => MetricType::HheaCaretSlopeRun,
             "hheaCaretOffset" => MetricType::HheaCaretOffset,
+            "vheaVertAscender" => MetricType::VheaAscender,
+            "vheaVertDescender" => MetricType::VheaDescender,
+            "vheaVertLineGap" => MetricType::VheaLineGap,
+            "openTypeVheaCaretSlopeRise" => MetricType::VheaCaretSlopeRise,
+            "openTypeVheaCaretSlopeRun" => MetricType::VheaCaretSlopeRun,
+            "openTypeVheaCaretOffset" => MetricType::VheaCaretOffset,
             custom => MetricType::Custom(custom.to_string()),
         }
     }
@@ -134,6 +152,14 @@ impl MetricType {
             MetricType::HheaCaretSlopeRise => "hheaCaretSlopeRise",
             MetricType::HheaCaretSlopeRun => "hheaCaretSlopeRun",
             MetricType::HheaCaretOffset => "hheaCaretOffset",
+            // The names Glyphs (and glyphsLib, and fontc) read these custom
+            // parameters by; Glyphs has no shorter name for the caret ones.
+            MetricType::VheaAscender => "vheaVertAscender",
+            MetricType::VheaDescender => "vheaVertDescender",
+            MetricType::VheaLineGap => "vheaVertLineGap",
+            MetricType::VheaCaretSlopeRise => "openTypeVheaCaretSlopeRise",
+            MetricType::VheaCaretSlopeRun => "openTypeVheaCaretSlopeRun",
+            MetricType::VheaCaretOffset => "openTypeVheaCaretOffset",
             MetricType::Custom(s) => s,
         }
     }

@@ -92,6 +92,20 @@ impl Master {
         false
     }
 
+    /// Whether this master states all three `vhea` line metrics.
+    ///
+    /// ufo2ft only builds `vhea` and `vmtx` from a source that does, so only
+    /// then are its glyphs' vertical advances and origins used.
+    pub fn has_vhea_metrics(&self) -> bool {
+        [
+            MetricType::VheaAscender,
+            MetricType::VheaDescender,
+            MetricType::VheaLineGap,
+        ]
+        .iter()
+        .all(|metric| self.metrics.contains_key(metric))
+    }
+
     // get glyph layer?
     // normalized location?
 }
