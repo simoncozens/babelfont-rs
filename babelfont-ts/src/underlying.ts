@@ -61,10 +61,15 @@ export enum TransformOrder {
 
 /** A decomposed affine transformation with separate translation, rotation, scale, and skew components */
 export interface DecomposedAffine {
+  /** The translation component of the transformation (tx, ty) */
   translation?: [number, number];
+  /** The scale component of the transformation (sx, sy) */
   scale: [number, number];
+  /** The rotation component of the transformation in radians */
   rotation?: number;
+  /** The skew component of the transformation (skew_x, skew_y) in radians */
   skew?: [number, number];
+  /** The order in which the transformation components should be applied */
   order?: TransformOrder;
 }
 
@@ -86,10 +91,12 @@ export interface Component {
 export interface CrossAxisMapping {
   /** Description */
   description?: string;
-  /** Source designspace locations */
-  input: import("@simoncozens/fonttypes").DesignspaceLocation[];
-  /** Target designspace locations */
-  output: import("@simoncozens/fonttypes").DesignspaceLocation[];
+  /** Source designspace location */
+  input?: import("@simoncozens/fonttypes").DesignspaceLocation;
+  /** Target designspace location */
+  output?: import("@simoncozens/fonttypes").DesignspaceLocation;
+  /** Whether the mapping is active */
+  active: boolean;
 }
 
 /** Custom OpenType values that can be set per-master or per-font */
@@ -246,6 +253,8 @@ export interface Features {
    * Paths to search for included feature files.
    */
   include_paths?: string[];
+  /** Format-specific data */
+  format_specific?: Record<string, any>;
 }
 
 /** Name table values for a font or individual master */
@@ -350,6 +359,8 @@ export interface Master {
   id: string;
   /** Location of the master in design space coordinates */
   location?: import("@simoncozens/fonttypes").DesignspaceLocation;
+  /** Whether or not the master is active */
+  active: boolean;
   /** Global guidelines associated with the master */
   guides?: Guide[];
   /** Master-specific metrics */
@@ -390,17 +401,44 @@ export type LayerType =
   /** A free-floating layer not associated with any master */
   | { type: "FreeFloating"; master?: undefined };
 
-/** A shape in a glyph, either a component or a path */
+/** A shape in a glyph: a component, a path, or an opaque format-specific shape */
 export type Shape =
   /** A component in a glyph */
   | Component
   /** A path in a glyph */
-  | Path;
+  | Path
+  /**
+   * An opaque shape in a format that babelfont does not model.
+   *
+   * This exists so that source formats which contain shapes babelfont has no
+   * representation for (for example Glyphs' images and shape groups) can be
+   * round-tripped without loss. Nothing except the originating converter is
+   * expected to understand the contents; font editors are free to store
+   * whatever they wish here and get it back unchanged.
+   */
+  | FormatSpecific;
 
 /** A layer of a glyph in a font */
 export interface Layer {
+  /** Is the layer active */
+  active?: boolean;
   /** The advance width of the layer */
   width: number;
+  /**
+   * The vertical advance (height) of the layer, in font units.
+   *
+   * `None` means the layer states no vertical advance. This is different
+   * from `Some(0.0)`, an explicit zero advance.
+   */
+  vertical_advance?: number;
+  /**
+   * The y coordinate of the layer's vertical origin, in font units.
+   *
+   * This is an absolute coordinate, not an offset. `None` means the layer
+   * states no vertical origin, which is different from `Some(0.0)`, an
+   * explicit origin at y=0.
+   */
+  vertical_origin?: number;
   /** The name of the layer */
   name?: string;
   /** The ID of the layer */
@@ -409,7 +447,7 @@ export interface Layer {
   master?: LayerType;
   /** Guidelines in the layer */
   guides?: Guide[];
-  /** Shapes (paths and components) in the layer */
+  /** Shapes (paths, components and opaque shapes) in the layer */
   shapes?: Shape[];
   /** Anchors in the layer */
   anchors?: Anchor[];
@@ -539,6 +577,14 @@ export enum NodeType {
   Curve = "Curve",
   /** Draw a quadratic Bézier curve to this node */
   QCurve = "QCurve",
+  /** Draw a quartic Bézier curve to this node */
+  Quartic = "Quartic",
+  /** Hobby curve (used in some advanced outline representations) */
+  Hobby = "Hobby",
+  /** Spiro curve */
+  Spiro = "Spiro",
+  /** Raph Levien's new spiral curve */
+  RaphNewSpiral = "RaphNewSpiral",
 }
 
 /** A node in a glyph outline */
@@ -623,6 +669,18 @@ export type MetricType =
   | "HheaCaretSlopeRun"
   /** Caret offset (for the `hhea` table) */
   | "HheaCaretOffset"
+  /** Ascender (to be placed in the `vhea` table) */
+  | "VheaAscender"
+  /** Descender (to be placed in the `vhea` table) */
+  | "VheaDescender"
+  /** Line gap (to be placed in the `vhea` table) */
+  | "VheaLineGap"
+  /** Caret slope rise (for the `vhea` table) */
+  | "VheaCaretSlopeRise"
+  /** Caret slope run (for the `vhea` table) */
+  | "VheaCaretSlopeRun"
+  /** Caret offset (for the `vhea` table) */
+  | "VheaCaretOffset"
   /** Custom metric type */
   | { Custom: string };
 
