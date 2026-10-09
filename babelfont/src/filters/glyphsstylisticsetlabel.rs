@@ -15,6 +15,9 @@ impl GlyphsStylisticSetLabel {
 impl FontFilter for GlyphsStylisticSetLabel {
     fn apply(&self, font: &mut crate::Font) -> Result<(), crate::BabelfontError> {
         for (_feature_name, feature_code) in font.features.features.iter_mut() {
+            if feature_code.code.contains("featureNames") {
+                continue;
+            }
             if let Some(labels) = feature_code
                 .format_specific
                 .get(KEY_STYLISTIC_SET_LABEL)
@@ -99,9 +102,14 @@ impl FontFilter for GlyphsStylisticSetLabel {
     }
 }
 
+/// Returns `(mac_language_id, windows_lcid)`.
+///
+/// `LANGUAGE_TAGS` stores `(tag, windows_lcid, mac_language_id)` — ENG is
+/// Windows 1033 (0x0409) and Mac 0. Mixing those up emits Windows name records
+/// with language 0, which never match the usual 3/1/0x0409 lookup.
 fn tag_to_ids(tag: &str) -> (Option<u16>, Option<u16>) {
     let tag = format!("{:<4}", tag); // Pad to 4 characters
-    for (t, mac_id, win_id) in LANGUAGE_TAGS {
+    for (t, win_id, mac_id) in LANGUAGE_TAGS {
         if *t == tag {
             return (mac_id.map(|id| id as u16), win_id.map(|id| id as u16));
         }
@@ -109,6 +117,7 @@ fn tag_to_ids(tag: &str) -> (Option<u16>, Option<u16>) {
     (None, None)
 }
 
+/// `(OpenType language tag, Windows LCID, Macintosh language ID)`
 const LANGUAGE_TAGS: &[(&str, Option<u32>, Option<u32>)] = &[
     ("AFK ", Some(1078), Some(141)),
     ("ALS ", Some(1156), None),
@@ -229,3 +238,38 @@ const LANGUAGE_TAGS: &[(&str, Option<u32>, Option<u32>)] = &[
     ("WLF ", Some(1160), None),
     ("YBA ", Some(1130), None),
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::convertors::glyphs3::KEY_STYLISTIC_SET_LABEL;
+    use crate::{features::PossiblyAutomaticCode, Font};
+
+    #[test]
+    fn english_maps_to_windows_lcid_1033() {
+        assert_eq!(tag_to_ids("ENG"), (Some(0), Some(1033)));
+        assert_eq!(tag_to_ids("ENG "), (Some(0), Some(1033)));
+    }
+
+    #[test]
+    fn label_emits_windows_english_not_language_zero() {
+        let mut font = Font::new();
+        let mut code = PossiblyAutomaticCode::new("sub a by a.ss01;");
+        code.format_specific.insert(
+            KEY_STYLISTIC_SET_LABEL.into(),
+            serde_json::json!([{ "language": "ENG", "value": "Geometric a g" }]),
+        );
+        font.features.features.push(("ss01".into(), code));
+        assert!(
+            GlyphsStylisticSetLabel.apply(&mut font).is_ok(),
+            "label conversion"
+        );
+        let fea = &font.features.features[0].1.code;
+        assert!(fea.contains("featureNames"), "{fea}");
+        assert!(fea.contains("Geometric a g"), "{fea}");
+        assert!(
+            !fea.contains("name 3 1 0 "),
+            "Windows English must use LCID 1033, not language 0:\n{fea}"
+        );
+    }
+}
