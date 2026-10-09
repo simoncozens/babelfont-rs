@@ -9,12 +9,13 @@
 //! [`Args`](crate::Args) / [`GlyphsetFilter`](crate::GlyphsetFilter) types for
 //! the entry points.
 use babelfont::{
-    Features, GlyphList, close_layout,
+    close_layout,
     filters::{DropFeatures, FontFilter as _, ResolveIncludes, RetainGlyphs, SubsetVisitor},
+    Features, GlyphList,
 };
 use fea_rs_ast::{
-    AsFea as _, LayoutVisitor as _,
     fea_rs::{self, GlyphMap},
+    AsFea as _, LayoutVisitor as _,
 };
 use indexmap::IndexSet;
 #[cfg(feature = "cli")]
@@ -209,12 +210,30 @@ pub fn fontmerge(
         let merged_features = font1_features + "\n" + &font2_features;
         // Read into fea-rs-ast
         let glyph_names: Vec<&str> = final_glyphset.iter().map(|g| g.as_str()).collect();
-        let merged = fea_rs_ast::FeatureFile::new_from_fea(
+
+        let merged = match fea_rs_ast::FeatureFile::new_from_fea(
             &merged_features,
             Some(&glyph_names),
             Some(font1_root),
-        )
-        .expect("Failed to parse merged features");
+        ) {
+            Ok(f) => f,
+            Err(e) => {
+                let better_error = match e {
+                    fea_rs_ast::Error::CannotConvert => "Cannot convert feature file".to_string(),
+                    fea_rs_ast::Error::CannotLoadSourceFile(source_load_error) => {
+                        format!("Cannot load source file: {}", source_load_error)
+                    }
+                    fea_rs_ast::Error::FeatureParsing(diagnostic_set) => {
+                        format!("Feature parsing error: {}", diagnostic_set.display())
+                    }
+                    fea_rs_ast::Error::GlyphOrderBuilding(glyph_order_error) => {
+                        format!("Glyph order building error: {:?}", glyph_order_error)
+                    }
+                };
+                eprintln!("Failed to parse merged features: {}", better_error);
+                std::process::exit(1);
+            }
+        };
         // Split out any languagesystem statements
         let languagesystems: Vec<(String, String)> = merged
             .statements
