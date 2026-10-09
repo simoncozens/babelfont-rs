@@ -7,13 +7,14 @@ note = "A test font.";
 unitsPerEm = 1000;
 versionMajor = 1;
 versionMinor = 0;
+metrics = ( { type = ascender; }, { type = descender; } );
 settings = { dependencies = { aDep = "A Dependency"; }; };
 userData = { fontUD = 1; };
 axes = (
 { name = Weight; tag = wght; names = ( { language = dflt; value = Weight; } ); }
 );
 fontMaster = (
-{ id = m1; name = Regular; axesValues = (0); active = 0; userData = { masterUD = 1; }; }
+{ id = m1; name = Regular; axesValues = (0); active = 0; userData = { masterUD = 1; }; metricValues = ( { pos = 800; }, { pos = -200; } ); }
 );
 instances = (
 { id = "i1"; instanceInterpolations = { m1 = "{0.5, 0.5}"; }; manualInterpolation = 1; name = Regular; type = variable; },
@@ -33,6 +34,8 @@ layers = (
 {
 layerId = m1;
 width = 500;
+vertWidth = 900;
+vertOrigin = 20;
 active = 1;
 attr = { svg = 1; };
 anchors = ( { name = top; pos = (250, 700); locked = 1; orientation = center; attr = { anchorUD = 1; }; } );

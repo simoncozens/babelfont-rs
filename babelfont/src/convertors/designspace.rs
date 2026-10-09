@@ -206,7 +206,7 @@ fn load_master(
     for g in glyphs.iter() {
         let mut glyph_layer_list = vec![];
         if let Some(norad_glyph) = ufo_layer.get_glyph(g.name.as_str()) {
-            let mut our_layer = norad_glyph_to_babelfont_layer(norad_glyph, ufo_layer, &master.id);
+            let mut our_layer = norad_glyph_to_babelfont_layer(norad_glyph, ufo_layer, &master);
             // Even if this is non-default in the UFO, it is the default layer for this master,
             // because we have promoted sparse masters to their own babelfont master.
             our_layer.master = crate::LayerType::DefaultForMaster(master.id.to_string());
@@ -222,7 +222,7 @@ fn load_master(
                     .and_then(|l| l.get_glyph(g.name.as_str()))
                 {
                     let mut background_layer =
-                        norad_glyph_to_babelfont_layer(background_glyph, ufo_layer, &master.id);
+                        norad_glyph_to_babelfont_layer(background_glyph, ufo_layer, &master);
                     background_layer.master = crate::LayerType::FreeFloating;
                     background_layer.id = Some(Uuid::new_v4().to_string());
                     background_layer.is_background = true;

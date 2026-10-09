@@ -42,6 +42,19 @@ pub struct Layer {
     pub active: bool,
     /// The advance width of the layer
     pub width: f32,
+    /// The vertical advance (height) of the layer, in font units.
+    ///
+    /// `None` means the layer states no vertical advance. This is different
+    /// from `Some(0.0)`, an explicit zero advance.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vertical_advance: Option<f32>,
+    /// The y coordinate of the layer's vertical origin, in font units.
+    ///
+    /// This is an absolute coordinate, not an offset. `None` means the layer
+    /// states no vertical origin, which is different from `Some(0.0)`, an
+    /// explicit origin at y=0.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vertical_origin: Option<f32>,
     /// The name of the layer
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
@@ -168,6 +181,8 @@ impl Layer {
         Layer {
             active: self.active,
             width: self.width,
+            vertical_advance: self.vertical_advance,
+            vertical_origin: self.vertical_origin,
             name: self.name.clone(),
             id: self.id.clone(),
             master: self.master.clone(),
@@ -303,7 +318,7 @@ pub(crate) mod glyphs {
     use crate::convertors::glyphs3::{
         color_from_json, copy_user_data, KEY_ATTR, KEY_COLOR_LABEL, KEY_METRIC_BOTTOM,
         KEY_METRIC_LEFT, KEY_METRIC_RIGHT, KEY_METRIC_TOP, KEY_METRIC_VERT_ORIGIN,
-        KEY_METRIC_VERT_WIDTH, KEY_METRIC_WIDTH, KEY_VERT_ORIGIN, KEY_VERT_WIDTH,
+        KEY_METRIC_VERT_WIDTH, KEY_METRIC_WIDTH,
     };
     use std::collections::BTreeMap;
 
@@ -328,8 +343,6 @@ pub(crate) mod glyphs {
             fs.insert_nonempty_json(KEY_LAYER_HINTS, &val.hints);
             fs.insert_nonempty_json(KEY_ANNOTATIONS, &val.annotations);
             fs.insert_some_json(KEY_LAYER_IMAGE, &val.background_image);
-            fs.insert_some_json(KEY_VERT_ORIGIN, &val.vert_origin);
-            fs.insert_some_json(KEY_VERT_WIDTH, &val.vert_width);
             fs.insert_some_json(KEY_METRIC_WIDTH, &val.metric_width);
             fs.insert_some_json(KEY_METRIC_VERT_WIDTH, &val.metric_vert_width);
             fs.insert_some_json(KEY_METRIC_TOP, &val.metric_top);
@@ -385,6 +398,8 @@ pub(crate) mod glyphs {
             color: None,
             shapes: val.shapes.iter().map(Into::into).collect(),
             width: val.width,
+            vertical_advance: val.vert_width,
+            vertical_origin: val.vert_origin,
             guides: val.guides.iter().map(Into::into).collect(),
             anchors: val.anchors.iter().map(Into::into).collect(),
             layer_index: None,
@@ -476,8 +491,8 @@ pub(crate) mod glyphs {
                 .get(KEY_USER_DATA)
                 .and_then(|x| serde_json::from_value::<UserData>(x.clone()).ok())
                 .unwrap_or_default(),
-            vert_origin: val.format_specific.get_parse_opt::<f32>(KEY_VERT_ORIGIN),
-            vert_width: val.format_specific.get_parse_opt::<f32>(KEY_VERT_WIDTH),
+            vert_origin: val.vertical_origin,
+            vert_width: val.vertical_advance,
             visible: val.format_specific.get_bool_or("visible", true),
         }
     }

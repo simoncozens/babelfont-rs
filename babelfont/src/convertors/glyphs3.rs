@@ -3,7 +3,7 @@ use crate::{
     glyph::{self, glyphs::glyph_to_glyphs},
     i18ndictionary::I18NDictionary,
     names::Names,
-    Axis, BabelfontError, CustomOTValues, Font, GlyphList, Master, Tag,
+    Axis, BabelfontError, CustomOTValues, Font, GlyphList, Layer, LayerType, Master, Tag,
 };
 use fontdrasil::coords::{DesignCoord, DesignLocation, UserCoord};
 use glyphslib::glyphs3::{self, Property};
@@ -75,8 +75,6 @@ pub(crate) const KEY_STEM_VALUES: &str = "com.schriftgestalt.Glyphs.stemValues";
 pub(crate) const KEY_STEMS: &str = "com.schriftgestalt.Glyphs.stems";
 pub(crate) const KEY_USER_DATA: &str = "com.schriftgestalt.Glyphs.userData";
 pub(crate) const KEY_SHAPE_TYPE: &str = "com.schriftgestalt.Glyphs.shapeType";
-pub(crate) const KEY_VERT_WIDTH: &str = "com.schriftgestalt.Glyphs.vertWidth";
-pub(crate) const KEY_VERT_ORIGIN: &str = "com.schriftgestalt.Glyphs.vertOrigin";
 pub(crate) const KEY_WEIGHT_CLASS: &str = "com.schriftgestalt.Glyphs.weightClass";
 pub(crate) const KEY_WIDTH_CLASS: &str = "com.schriftgestalt.Glyphs.widthClass";
 pub(crate) const KEY_STYLISTIC_SET_LABEL: &str = "com.schriftgestalt.Glyphs.labels";
@@ -365,6 +363,9 @@ fn _load(glyphs_font: &glyphslib::Font, path: PathBuf) -> Result<Font, Babelfont
     interpret_axes(&mut font)?;
     // Interpret font-level custom parameters
     interpret_custom_parameters(&mut font)?;
+    // Glyphs states a vertical origin as an offset from the master ascender;
+    // now that the metrics are interpreted, store the absolute y instead.
+    glyphs_vertical_origin_to_babelfont(&mut font);
 
     // Bake in Glyphs data ??? When is best to do this?
     // GlyphsData.apply(&mut font)?;
@@ -1391,6 +1392,75 @@ fn interpret_axes(font: &mut Font) -> Result<(), BabelfontError> {
     Ok(())
 }
 
+/// Express babelfont's native vertical metrics as Glyphs `vertWidth` and
+/// `vertOrigin`.
+///
+/// babelfont stores the vertical origin as an absolute y coordinate; Glyphs
+/// stores it as an offset down from the master's (typo) ascender. Following
+/// glyphsLib, a `vertWidth` equal to the ascender-minus-descender default is
+/// left out, as is a `vertOrigin` of zero.
+//
+// This is deliberately *not* gated on the master's `vhea` metrics: a UFO whose
+// master states no vertical metrics may therefore gain a `vertWidth`, and so
+// when you compile the Glyphs source, you might get an unexpected `vmtx` table.
+// But if you didn't want a `vmtx` table, why did you populate your font with
+// vertical advance and origins for all the glyphs? What did you *think* was
+// going to happen? Oh well. If that ever becomes a problem, what I'd like to
+// do is to add some kind of flag like "emit vmtx". I don't really want babelfont
+// convertors to start caring about what kind of source the font originally came from,
+// because that goes against the whole idea of babelfont as a neutral broker format.
+fn babelfont_vertical_metrics_to_glyphs(font: &mut Font) {
+    let extents = vertical_metric_extents(font);
+    for layer in font.glyphs.iter_mut().flat_map(|g| g.layers.iter_mut()) {
+        let Some((ascender, descender)) = extents.get(layer_master_id(layer)).copied() else {
+            continue;
+        };
+        if let Some(advance) = layer.vertical_advance {
+            if (advance as f64) == ascender - descender {
+                layer.vertical_advance = None;
+            }
+        }
+        if let Some(origin) = layer.vertical_origin {
+            // Absolute y -> offset down from the ascender.
+            layer.vertical_origin = Some((ascender - origin as f64) as f32);
+        }
+    }
+}
+
+/// The inverse of [`babelfont_vertical_metrics_to_glyphs`]: convert a Glyphs
+/// `vertOrigin` (an offset down from the ascender) into babelfont's absolute y.
+fn glyphs_vertical_origin_to_babelfont(font: &mut Font) {
+    let extents = vertical_metric_extents(font);
+    for layer in font.glyphs.iter_mut().flat_map(|g| g.layers.iter_mut()) {
+        let Some((ascender, _)) = extents.get(layer_master_id(layer)).copied() else {
+            continue;
+        };
+        if let Some(offset) = layer.vertical_origin {
+            layer.vertical_origin = Some((ascender - offset as f64) as f32);
+        }
+    }
+}
+
+/// The ascender and descender for each master that states them.
+fn vertical_metric_extents(font: &Font) -> HashMap<String, (f64, f64)> {
+    font.masters
+        .iter()
+        .filter_map(|master| {
+            master
+                .vertical_metric_extents()
+                .map(|extents| (master.id.clone(), extents))
+        })
+        .collect()
+}
+
+/// The master a layer belongs to, if it has one.
+fn layer_master_id(layer: &Layer) -> &str {
+    match &layer.master {
+        LayerType::DefaultForMaster(id) | LayerType::AssociatedWithMaster(id) => id,
+        LayerType::FreeFloating => "",
+    }
+}
+
 pub(crate) fn as_glyphs3(font: &Font) -> Result<glyphs3::Glyphs3, BabelfontError> {
     // Do some cleanups.
     let mut font = font.clone();
@@ -1407,6 +1477,8 @@ pub(crate) fn as_glyphs3(font: &Font) -> Result<glyphs3::Glyphs3, BabelfontError
         .map(|v| v as i32)
         .unwrap_or(3)
         .max(3);
+    // Express the native vertical metrics in Glyphs terms.
+    babelfont_vertical_metrics_to_glyphs(&mut font);
     // #[allow(clippy::unwrap_used)] // Surely this can't fail
     // DropSparseMasters.apply(&mut font).unwrap();
     // println!("Exporting {} masters", font.masters.len());
@@ -2013,6 +2085,11 @@ mod tests {
         let glyph = font.glyphs.get("A").unwrap();
         let layer = &glyph.layers[0];
 
+        // The Glyphs vertOrigin (an offset from the ascender) becomes an
+        // absolute y: vertOrigin 20 with an ascender of 800 is y=780.
+        assert_eq!(layer.vertical_advance, Some(900.0));
+        assert_eq!(layer.vertical_origin, Some(780.0));
+
         // Images and shape groups are carried as opaque shapes.
         let opaque = layer
             .shapes
@@ -2607,5 +2684,38 @@ weightClass = 700;
         assert_eq!(user(axis, |a| a.min), Some(400.0));
         assert_eq!(user(axis, |a| a.max), Some(700.0));
         assert_eq!(user(axis, |a| a.default), Some(400.0));
+    }
+
+    #[cfg(feature = "ufo")]
+    #[test]
+    fn ufo_vertical_metrics_become_vert_width_and_origin() {
+        let glyphs_vert = |font: &Font, name: &str| {
+            let glyphs = as_glyphs3(font).unwrap();
+            let layer = &glyphs
+                .glyphs
+                .iter()
+                .find(|g| g.name == name)
+                .unwrap()
+                .layers[0];
+            (layer.vert_width, layer.vert_origin)
+        };
+        let font = crate::load("resources/Test1.ufo").unwrap();
+        // The native fields hold the UFO's own values: the glif `height` and the
+        // absolute `public.verticalOrigin`.
+        let layer = |name: &str| &font.glyphs.get(name).unwrap().layers[0];
+        assert_eq!(layer("A").vertical_advance, Some(1000.0));
+        assert_eq!(layer("A").vertical_origin, Some(880.0));
+        assert_eq!(layer("B").vertical_advance, Some(1200.0));
+        assert_eq!(layer("B").vertical_origin, None);
+        // A glif with no height states no vertical advance, which is different
+        // from an explicit zero.
+        assert_eq!(layer("i").vertical_advance, None);
+
+        // The typo ascender is 900 and the typo descender -300, so Glyphs.app's
+        // defaults are a vertWidth of 1200 and a vertical origin at y=900.
+        assert_eq!(glyphs_vert(&font, "A"), (Some(1000.0), Some(20.0)));
+        // B's advance equals the default, so it is left out; it has no origin.
+        assert_eq!(glyphs_vert(&font, "B"), (None, None));
+        assert_eq!(glyphs_vert(&font, "i"), (None, None));
     }
 }

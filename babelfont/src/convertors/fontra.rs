@@ -731,6 +731,8 @@ fn load_layer(layer: &Layer, glyph_source: Option<&&GlyphSource>) -> crate::Laye
 
     crate::Layer {
         width: layer.glyph.x_advance.unwrap_or_default() as f32,
+        vertical_advance: layer.glyph.y_advance.map(|v| v as f32),
+        vertical_origin: layer.glyph.vertical_origin.map(|v| v as f32),
         name: None,
         active: true,
         id: source_name,

@@ -97,6 +97,21 @@ impl Master {
         false
     }
 
+    /// The ascender and descender Glyphs uses as the reference for a layer's
+    /// vertical origin: the OS/2 typo metrics where the master states them, else
+    /// the hhea ones. `None` if neither is present.
+    pub fn vertical_metric_extents(&self) -> Option<(f64, f64)> {
+        let metric = |typo: MetricType, fallback: MetricType| {
+            self.metrics
+                .get(&typo)
+                .or_else(|| self.metrics.get(&fallback))
+                .map(|&value| value as f64)
+        };
+        let ascender = metric(MetricType::TypoAscender, MetricType::Ascender)?;
+        let descender = metric(MetricType::TypoDescender, MetricType::Descender)?;
+        Some((ascender, descender))
+    }
+
     // get glyph layer?
     // normalized location?
 }

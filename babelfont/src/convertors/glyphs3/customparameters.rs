@@ -80,8 +80,8 @@ fn style_map_names(family: &str, style: &str) -> (String, String) {
 }
 
 /// The metrics Glyphs keeps in `customParameters` rather than in the `metrics`
-/// array: the `OS/2` and `hhea` vertical metrics, and the `OS/2`
-/// sub/superscript and strikeout and `post` underline fields.
+/// array: the `OS/2` and `hhea` vertical metrics, the `vhea` metrics, and the
+/// `OS/2` sub/superscript and strikeout and `post` underline fields.
 ///
 /// A Glyphs 3 `metrics` entry is keyed by its `type`, and the types that exist
 /// are all design positions or angles: ascender, cap height, slant height,
@@ -93,7 +93,7 @@ fn style_map_names(family: &str, style: &str) -> (String, String) {
 /// Read by [`interpret_metric_custom_parameters`] and written by
 /// [`append_master_metric_custom_parameters`]. Those two are twins, so they
 /// share this one list. Order is fixed to keep the emitted .glyphs reproducible.
-pub(crate) const CUSTOM_PARAMETER_METRIC_TYPES: [MetricType; 20] = [
+pub(crate) const CUSTOM_PARAMETER_METRIC_TYPES: [MetricType; 26] = [
     MetricType::TypoAscender,
     MetricType::TypoDescender,
     MetricType::TypoLineGap,
@@ -114,6 +114,12 @@ pub(crate) const CUSTOM_PARAMETER_METRIC_TYPES: [MetricType; 20] = [
     MetricType::SuperscriptYSize,
     MetricType::SuperscriptXOffset,
     MetricType::SuperscriptYOffset,
+    MetricType::VheaAscender,
+    MetricType::VheaDescender,
+    MetricType::VheaLineGap,
+    MetricType::VheaCaretSlopeRise,
+    MetricType::VheaCaretSlopeRun,
+    MetricType::VheaCaretOffset,
 ];
 
 /// Whether a metric belongs in `customParameters` instead of the `metrics`

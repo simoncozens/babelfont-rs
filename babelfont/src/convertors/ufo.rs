@@ -37,6 +37,8 @@ pub const KEY_STYLE_NAME: &str = "ufo.styleName";
 pub const KEY_IDENTIFIER: &str = "ufo.identifier";
 /// Key for storing original guide type in FormatSpecific, used to roundtrip horizontal and vertical guides which UFO can either represent as such, or as angled guides with specific angles. Values are "horizontal" or "vertical".
 pub const KEY_ORIGINAL_GUIDE: &str = "ufo.originalGuide";
+/// The glyph lib key holding the y coordinate of a glyph's vertical origin
+pub const KEY_VERTICAL_ORIGIN: &str = "public.verticalOrigin";
 
 pub(crate) fn stash_lib(lib: Option<&norad::Plist>) -> crate::common::FormatSpecific {
     let mut fs = crate::common::FormatSpecific::default();
@@ -90,11 +92,8 @@ pub fn load<T: AsRef<std::path::Path>>(path: T) -> Result<Font, BabelfontError> 
     for layer in ufo.iter_layers() {
         for g in font.glyphs.iter_mut() {
             if let Some(norad_glyph) = layer.get_glyph(g.name.as_str()) {
-                g.layers.push(norad_glyph_to_babelfont_layer(
-                    norad_glyph,
-                    layer,
-                    &master.id,
-                ))
+                g.layers
+                    .push(norad_glyph_to_babelfont_layer(norad_glyph, layer, &master))
             }
         }
     }
@@ -286,6 +285,9 @@ fn babelfont_layer_to_norad_glyph(
 ) -> Result<norad::Glyph, BabelfontError> {
     let mut norad_glyph = norad::Glyph::new(glyph.name.as_str());
     norad_glyph.width = layer.width as f64;
+    if let Some(advance) = layer.vertical_advance {
+        norad_glyph.height = advance as f64;
+    }
     norad_glyph.codepoints =
         norad::Codepoints::new(glyph.codepoints.iter().flat_map(|&x| char::from_u32(x)));
 
@@ -318,14 +320,36 @@ fn babelfont_layer_to_norad_glyph(
     if let Some(lib) = layer.format_specific.get(KEY_LIB) {
         norad_glyph.lib = serde_json::from_value::<norad::Plist>(lib.clone()).unwrap_or_default();
     }
+    // In a UFO the vertical origin is a glyph lib entry, and the native field
+    // is authoritative.
+    let mut lib_value = serde_json::to_value(&norad_glyph.lib).unwrap_or_default();
+    if let Some(map) = lib_value.as_object_mut() {
+        match layer.vertical_origin {
+            Some(origin) => {
+                // A UFO vertical origin is usually a whole number; write it as
+                // one rather than turning an 880 into 880.0.
+                let value = if origin.fract() == 0.0 {
+                    serde_json::json!(origin as i64)
+                } else {
+                    serde_json::json!(origin)
+                };
+                map.insert(KEY_VERTICAL_ORIGIN.to_string(), value);
+            }
+            None => {
+                map.remove(KEY_VERTICAL_ORIGIN);
+            }
+        }
+    }
+    norad_glyph.lib = serde_json::from_value::<norad::Plist>(lib_value).unwrap_or_default();
     Ok(norad_glyph)
 }
 
 pub(crate) fn norad_glyph_to_babelfont_layer(
     glyph: &norad::Glyph,
     layer: &norad::Layer,
-    master_id: &str,
+    master: &Master,
 ) -> Layer {
+    let master_id = master.id.as_str();
     let mut l = Layer::new(glyph.width as f32);
     if layer.is_default() {
         l.name = None;
@@ -343,6 +367,22 @@ pub(crate) fn norad_glyph_to_babelfont_layer(
     }
     if !glyph.lib.is_empty() {
         l.format_specific = stash_lib(Some(&glyph.lib));
+    }
+    // A glif without a height has a height of zero, which norad cannot tell
+    // apart from an explicit zero, so only a non-zero height is an advance.
+    if glyph.height != 0.0 {
+        l.vertical_advance = Some(glyph.height as f32);
+    }
+    // Move `public.verticalOrigin` out of the stashed lib into the native field,
+    // so that it is not also written back from the stash.
+    if let Some(serde_json::Value::Object(mut lib)) = l.format_specific.remove(KEY_LIB) {
+        if let Some(origin) = lib.remove(KEY_VERTICAL_ORIGIN).and_then(|v| v.as_f64()) {
+            l.vertical_origin = Some(origin as f32);
+        }
+        if !lib.is_empty() {
+            l.format_specific
+                .insert(KEY_LIB.to_string(), serde_json::Value::Object(lib));
+        }
     }
 
     l.guides = glyph.guidelines.iter().map(|x| x.into()).collect();
@@ -522,6 +562,15 @@ pub(crate) fn save_info(info: &mut norad::FontInfo, font: &Font, master_ix: usiz
         get_metric(MetricType::HheaCaretSlopeRun).map(|x| x as i32);
     info.open_type_hhea_descender = get_metric(MetricType::HheaDescender).map(|x| x as i32);
     info.open_type_hhea_line_gap = get_metric(MetricType::HheaLineGap).map(|x| x as i32);
+    info.open_type_vhea_vert_typo_ascender = get_metric(MetricType::VheaAscender).map(|x| x as i32);
+    info.open_type_vhea_vert_typo_descender =
+        get_metric(MetricType::VheaDescender).map(|x| x as i32);
+    info.open_type_vhea_vert_typo_line_gap = get_metric(MetricType::VheaLineGap).map(|x| x as i32);
+    info.open_type_vhea_caret_slope_rise =
+        get_metric(MetricType::VheaCaretSlopeRise).map(|x| x as i32);
+    info.open_type_vhea_caret_slope_run =
+        get_metric(MetricType::VheaCaretSlopeRun).map(|x| x as i32);
+    info.open_type_vhea_caret_offset = get_metric(MetricType::VheaCaretOffset).map(|x| x as i32);
     // opentype name compatible full name
     info.open_type_name_description = font.names.description.get_default().map(|x| x.to_string());
     info.open_type_name_designer_url = font.names.designer_url.get_default().map(|x| x.to_string());
@@ -724,6 +773,42 @@ pub(crate) fn load_master_info(master: &mut Master, info: &norad::FontInfo) {
         metrics,
         postscript_underline_thickness,
         MetricType::UnderlineThickness
+    );
+    load_metric!(
+        info,
+        metrics,
+        open_type_vhea_vert_typo_ascender,
+        MetricType::VheaAscender
+    );
+    load_metric!(
+        info,
+        metrics,
+        open_type_vhea_vert_typo_descender,
+        MetricType::VheaDescender
+    );
+    load_metric!(
+        info,
+        metrics,
+        open_type_vhea_vert_typo_line_gap,
+        MetricType::VheaLineGap
+    );
+    load_metric!(
+        info,
+        metrics,
+        open_type_vhea_caret_slope_rise,
+        MetricType::VheaCaretSlopeRise
+    );
+    load_metric!(
+        info,
+        metrics,
+        open_type_vhea_caret_slope_run,
+        MetricType::VheaCaretSlopeRun
+    );
+    load_metric!(
+        info,
+        metrics,
+        open_type_vhea_caret_offset,
+        MetricType::VheaCaretOffset
     );
     if let Some(v) = &info.guidelines {
         for g in v.iter() {

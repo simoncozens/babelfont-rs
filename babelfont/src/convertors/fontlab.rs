@@ -379,6 +379,8 @@ impl FontlabLayer {
             self.anchors.into_iter().map(|x| x.try_into()).collect();
         Ok(Layer {
             width: self.advanceWidth as f32,
+            vertical_advance: None,
+            vertical_origin: None,
             name: self.name.clone(),
             id: self.name,
             active: true,
