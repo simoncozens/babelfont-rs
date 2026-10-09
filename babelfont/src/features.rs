@@ -73,7 +73,9 @@ impl Features {
     pub fn to_fea(&self) -> String {
         let mut fea = String::new();
         for (name, glyphs) in &self.classes {
-            fea.push_str(&format!("@{} = [{}];\n", name, glyphs.code));
+            // The \n at the end of the code is there because someone have might put a comment
+            // at the end of their class definition...
+            fea.push_str(&format!("@{} = [{}\n];\n", name, glyphs.code));
         }
         for (prefix, code) in &self.prefixes {
             if prefix != "anonymous" {
