@@ -37,6 +37,9 @@ impl LayerType {
 #[cfg_attr(feature = "reactive", derive(reactive_stores::Store))]
 /// A layer of a glyph in a font
 pub struct Layer {
+    /// Is the layer active
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub active: bool,
     /// The advance width of the layer
     pub width: f32,
     /// The name of the layer
@@ -51,7 +54,7 @@ pub struct Layer {
     /// Guidelines in the layer
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub guides: Vec<Guide>,
-    /// Shapes (paths and components) in the layer
+    /// Shapes (paths, components and opaque shapes) in the layer
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub shapes: Vec<Shape>,
     /// Anchors in the layer
@@ -163,6 +166,7 @@ impl Layer {
             .into_iter()
             .map(Shape::Path);
         Layer {
+            active: self.active,
             width: self.width,
             name: self.name.clone(),
             id: self.id.clone(),
@@ -297,9 +301,9 @@ impl Layer {
 #[cfg(feature = "glyphs")]
 pub(crate) mod glyphs {
     use crate::convertors::glyphs3::{
-        copy_user_data, KEY_ATTR, KEY_COLOR_LABEL, KEY_METRIC_BOTTOM, KEY_METRIC_LEFT,
-        KEY_METRIC_RIGHT, KEY_METRIC_TOP, KEY_METRIC_VERT_ORIGIN, KEY_METRIC_VERT_WIDTH,
-        KEY_METRIC_WIDTH, KEY_VERT_ORIGIN, KEY_VERT_WIDTH,
+        color_from_json, copy_user_data, KEY_ATTR, KEY_COLOR_LABEL, KEY_METRIC_BOTTOM,
+        KEY_METRIC_LEFT, KEY_METRIC_RIGHT, KEY_METRIC_TOP, KEY_METRIC_VERT_ORIGIN,
+        KEY_METRIC_VERT_WIDTH, KEY_METRIC_WIDTH, KEY_VERT_ORIGIN, KEY_VERT_WIDTH,
     };
     use std::collections::BTreeMap;
 
@@ -377,6 +381,7 @@ pub(crate) mod glyphs {
                 None => LayerType::DefaultForMaster(val.layer_id.clone()),
             },
             name: val.name.clone(),
+            active: val.active,
             color: None,
             shapes: val.shapes.iter().map(Into::into).collect(),
             width: val.width,
@@ -424,13 +429,19 @@ pub(crate) mod glyphs {
             }
         }
         glyphslib::glyphs3::Layer {
+            active: val.active,
             layer_id: match val.master {
                 LayerType::DefaultForMaster(ref m) => m.clone(),
                 _ => val.id.clone().unwrap_or_default(),
             },
             name: val.name.clone(),
             width: val.width,
-            shapes: val.shapes.iter().map(Into::into).collect(),
+            // XXX: Note that this just drops unrepresentable nodes on the floor
+            shapes: val
+                .shapes
+                .iter()
+                .flat_map(|x| x.try_into())
+                .collect::<Vec<_>>(),
             guides: val.guides.iter().map(Into::into).collect(),
             anchors: val.anchors.iter().map(Into::into).collect(),
             annotations: val
@@ -447,8 +458,8 @@ pub(crate) mod glyphs {
                 .get_parse_opt::<glyphslib::glyphs3::BackgroundImage>(KEY_LAYER_IMAGE),
             color: val
                 .format_specific
-                .get_parse_opt::<u8>(KEY_COLOR_LABEL)
-                .map(glyphslib::common::Color::ColorInt),
+                .get(KEY_COLOR_LABEL)
+                .and_then(color_from_json),
             hints: val
                 .format_specific
                 .get_parse_or::<Vec<BTreeMap<SmolStr, Plist>>>(KEY_LAYER_HINTS, Vec::new()),

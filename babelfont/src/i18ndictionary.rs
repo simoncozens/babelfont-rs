@@ -115,3 +115,16 @@ impl From<I18NDictionary> for IndexMap<String, String> {
         dict.0
     }
 }
+
+#[cfg(feature = "glyphs")]
+impl Into<Vec<glyphslib::glyphs3::LocalizedValue>> for &I18NDictionary {
+    fn into(self) -> Vec<glyphslib::glyphs3::LocalizedValue> {
+        self.0
+            .iter()
+            .map(|(lang, value)| glyphslib::glyphs3::LocalizedValue {
+                language: lang.clone(),
+                value: value.clone(),
+            })
+            .collect()
+    }
+}

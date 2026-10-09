@@ -1366,6 +1366,12 @@ fn save_path(path: &Path, is_quadratic: bool) -> Result<String, BabelfontError> 
                 current = node;
                 offcurves.clear();
             }
+            // Actually spiro probably is representable but I don't care
+            _ => {
+                return Err(BabelfontError::UnrepresentablePointType(
+                    node.nodetype.as_str().to_string(),
+                ));
+            }
         }
     }
 

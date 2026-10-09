@@ -156,6 +156,12 @@ pub enum BabelfontError {
     /// A component referenced a glyph that was not found in the font
     #[error("Component references missing glyph: {0}")]
     MissingGlyphReference(String),
+    /// A point type that cannot be represented in the desired source format
+    #[error("Unrepresentable point type: {0}")]
+    UnrepresentablePointType(String),
+    /// A shape that cannot be represented in the desired source format
+    #[error("Unrepresentable shape type: {0}")]
+    UnrepresentableShapeType(String),
 }
 
 #[derive(Debug, Serialize)]

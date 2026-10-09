@@ -469,8 +469,8 @@ fn finish_contour(contour: &mut Vec<Node>, is_open: bool, paths: &mut Vec<Path>)
 
     if !is_open {
         let last_index = contour.len() - 1;
-        let last_nodetype = contour[last_index].nodetype;
-        if last_nodetype == NodeType::OffCurve {
+        let last_nodetype = &contour[last_index].nodetype;
+        if last_nodetype == &NodeType::OffCurve {
             // Trailing control points wrap around to the contour's start point,
             // which is therefore the on-curve node ending a quadratic run.
             contour[0].nodetype = NodeType::QCurve;
@@ -479,7 +479,7 @@ fn finish_contour(contour: &mut Vec<Node>, is_open: bool, paths: &mut Vec<Path>)
                 contour[0].x == contour[last_index].x && contour[0].y == contour[last_index].y;
             if contour.len() > 1
                 && closes_on_start
-                && !matches!(last_nodetype, NodeType::Line | NodeType::QCurve)
+                && !matches!(last_nodetype, &NodeType::Line | &NodeType::QCurve)
             {
                 // The last node coincides with the start point: drop the
                 // implicit move and rotate the last node to the front.

@@ -45,7 +45,7 @@ default = [
     "types",
     "robocjk",
     "ttf",
-    "vfb"
+    "vfb",
 ]
 
 vfb = ["dep:vfbreader"]
@@ -67,13 +67,13 @@ cli = [
     "dep:clap-verbosity-flag",
     "rayon",
 ]
-rayon = ["norad/rayon", "fontc/rayon" ]
+rayon = ["norad/rayon", "fontc/rayon"]
 types = ["dep:typeshare"]
 reactive = ["dep:reactive_stores"]
 
 [dependencies]
 chrono = { version = "0.4.3", features = ["serde"] }
-glyphslib = { version = "0.2.6", optional = true }
+glyphslib = { version = "0.4.1", optional = true }
 norad = { version = "0.17.0", features = ["kurbo"], optional = true }
 log = { workspace = true }
 serde_json = "1.0"

@@ -220,6 +220,10 @@ impl Shape {
                 };
                 Ok(Shape::Component(new_component))
             }
+            Shape::FormatSpecific(_) => Err(BabelfontError::GlyphNotInterpolatable {
+                glyph: glyph.to_string(),
+                reason: "Cannot interpolate an opaque format-specific shape".to_string(),
+            }),
         }
     }
 }
@@ -234,6 +238,10 @@ impl Path {
                 crate::common::NodeType::Curve => 2,
                 crate::common::NodeType::QCurve => 3,
                 crate::common::NodeType::OffCurve => 4,
+                crate::NodeType::Quartic => 5,
+                crate::NodeType::Hobby => 6,
+                crate::NodeType::Spiro => 7,
+                crate::NodeType::RaphNewSpiral => 8,
             });
         }
         sig
@@ -257,7 +265,7 @@ impl Path {
             new_path.nodes.push(crate::common::Node {
                 x,
                 y,
-                nodetype: node.nodetype,
+                nodetype: node.nodetype.clone(),
                 smooth: node.smooth,
                 format_specific: node.format_specific.clone(),
             });
@@ -378,6 +386,8 @@ impl Glyph {
                             }
                         }
                     }
+                    // Opaque shapes are not checked.
+                    Shape::FormatSpecific(_) => {}
                 }
             }
         }

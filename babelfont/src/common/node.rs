@@ -3,7 +3,7 @@ use typeshare::typeshare;
 
 use crate::common::formatspecific::FormatSpecific;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize, Default)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Serialize, Deserialize, Default)]
 #[typeshare]
 /// Types of nodes in a glyph outline
 pub enum NodeType {
@@ -18,6 +18,30 @@ pub enum NodeType {
     Curve,
     /// Draw a quadratic Bézier curve to this node
     QCurve,
+    /// Draw a quartic Bézier curve to this node
+    Quartic,
+    /// Hobby curve (used in some advanced outline representations)
+    Hobby,
+    /// Spiro curve
+    Spiro,
+    /// Raph Levien's new spiral curve
+    RaphNewSpiral,
+}
+
+impl NodeType {
+    pub(crate) fn as_str(&self) -> &str {
+        match self {
+            NodeType::Move => "m",
+            NodeType::Line => "l",
+            NodeType::OffCurve => "o",
+            NodeType::Curve => "c",
+            NodeType::QCurve => "q",
+            NodeType::Quartic => "u",
+            NodeType::Hobby => "h",
+            NodeType::Spiro => "s",
+            NodeType::RaphNewSpiral => "r",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
@@ -100,7 +124,7 @@ impl Node {
 
 #[cfg(feature = "ufo")]
 mod ufo {
-    use crate::convertors::ufo::stash_lib;
+    use crate::{convertors::ufo::stash_lib, BabelfontError};
 
     use super::*;
 
@@ -116,15 +140,22 @@ mod ufo {
         }
     }
 
-    impl From<NodeType> for norad::PointType {
-        fn from(p: NodeType) -> Self {
-            match p {
+    impl TryFrom<NodeType> for norad::PointType {
+        type Error = BabelfontError;
+
+        fn try_from(p: NodeType) -> Result<Self, Self::Error> {
+            Ok(match p {
                 NodeType::Move => norad::PointType::Move,
                 NodeType::Line => norad::PointType::Line,
                 NodeType::OffCurve => norad::PointType::OffCurve,
                 NodeType::QCurve => norad::PointType::QCurve,
                 NodeType::Curve => norad::PointType::Curve,
-            }
+                _ => {
+                    return Err(BabelfontError::UnrepresentablePointType(
+                        p.as_str().to_string(),
+                    ))
+                }
+            })
         }
     }
 
@@ -140,16 +171,31 @@ mod ufo {
         }
     }
 
-    impl From<&Node> for norad::ContourPoint {
-        fn from(p: &Node) -> Self {
-            norad::ContourPoint::new(p.x, p.y, p.nodetype.into(), p.smooth, None, None)
+    impl TryFrom<&Node> for norad::ContourPoint {
+        type Error = BabelfontError;
+
+        fn try_from(p: &Node) -> Result<Self, Self::Error> {
+            Ok(norad::ContourPoint::new(
+                p.x,
+                p.y,
+                p.nodetype.try_into()?,
+                p.smooth,
+                None,
+                None,
+            ))
         }
     }
 }
 
 #[cfg(feature = "glyphs")]
 mod glyphs {
-    use crate::convertors::glyphs3::{copy_user_data, KEY_USER_DATA};
+    use crate::{
+        convertors::glyphs3::{
+            copy_user_data, KEY_NODE_HOI, KEY_NODE_LOCKED, KEY_NODE_ORIENTATION, KEY_NODE_TANGENT,
+            KEY_USER_DATA,
+        },
+        BabelfontError,
+    };
 
     use super::*;
     use glyphslib::{glyphs2::Node as G2Node, glyphs3::Node as G3Node};
@@ -157,26 +203,46 @@ mod glyphs {
     impl From<glyphslib::common::NodeType> for NodeType {
         fn from(p: glyphslib::common::NodeType) -> Self {
             match p {
-                glyphslib::common::NodeType::Line => NodeType::Line,
+                glyphslib::common::NodeType::Line | glyphslib::common::NodeType::LineSmooth => {
+                    NodeType::Line
+                }
                 glyphslib::common::NodeType::OffCurve => NodeType::OffCurve,
-                glyphslib::common::NodeType::Curve => NodeType::Curve,
-                glyphslib::common::NodeType::QCurve => NodeType::QCurve,
-                glyphslib::common::NodeType::LineSmooth => NodeType::Line,
-                glyphslib::common::NodeType::CurveSmooth => NodeType::Curve,
-                glyphslib::common::NodeType::QCurveSmooth => NodeType::QCurve,
+                glyphslib::common::NodeType::Curve | glyphslib::common::NodeType::CurveSmooth => {
+                    NodeType::Curve
+                }
+                glyphslib::common::NodeType::QCurve | glyphslib::common::NodeType::QCurveSmooth => {
+                    NodeType::QCurve
+                }
+                glyphslib::common::NodeType::Quartic
+                | glyphslib::common::NodeType::QuarticSmooth => NodeType::Quartic,
+                glyphslib::common::NodeType::Hobby | glyphslib::common::NodeType::HobbySmooth => {
+                    NodeType::Hobby
+                }
+                glyphslib::common::NodeType::RaphNewSpiral
+                | glyphslib::common::NodeType::RaphNewSpiralSmooth => NodeType::RaphNewSpiral,
             }
         }
     }
 
-    impl From<NodeType> for glyphslib::common::NodeType {
-        fn from(p: NodeType) -> Self {
-            match p {
+    impl TryFrom<NodeType> for glyphslib::common::NodeType {
+        type Error = BabelfontError;
+
+        fn try_from(p: NodeType) -> Result<Self, Self::Error> {
+            Ok(match p {
                 NodeType::Line => glyphslib::common::NodeType::Line,
                 NodeType::OffCurve => glyphslib::common::NodeType::OffCurve,
                 NodeType::Curve => glyphslib::common::NodeType::Curve,
                 NodeType::QCurve => glyphslib::common::NodeType::QCurve,
                 NodeType::Move => glyphslib::common::NodeType::Line, // ?
-            }
+                NodeType::Quartic => glyphslib::common::NodeType::Quartic,
+                NodeType::Hobby => glyphslib::common::NodeType::Hobby,
+                NodeType::RaphNewSpiral => glyphslib::common::NodeType::RaphNewSpiral,
+                _ => {
+                    return Err(BabelfontError::UnrepresentablePointType(
+                        p.as_str().to_string(),
+                    ))
+                }
+            })
         }
     }
 
@@ -186,6 +252,11 @@ mod glyphs {
             if let Some(user_data) = &val.user_data {
                 copy_user_data(&mut format_specific, user_data);
             }
+            format_specific.insert_json(KEY_NODE_LOCKED, &val.locked);
+            format_specific.insert_json(KEY_NODE_TANGENT, &val.tangent);
+            format_specific.insert_json(KEY_NODE_ORIENTATION, &val.orientation);
+            format_specific.insert_json(KEY_NODE_HOI, &val.hoi);
+
             Node {
                 x: val.x as f64,
                 y: val.y as f64,
@@ -195,25 +266,39 @@ mod glyphs {
                     glyphslib::common::NodeType::LineSmooth
                         | glyphslib::common::NodeType::CurveSmooth
                         | glyphslib::common::NodeType::QCurveSmooth
+                        | glyphslib::common::NodeType::HobbySmooth
+                        | glyphslib::common::NodeType::QuarticSmooth
+                        | glyphslib::common::NodeType::RaphNewSpiralSmooth
                 ),
                 format_specific,
             }
         }
     }
 
-    impl From<&Node> for G3Node {
-        fn from(val: &Node) -> Self {
-            G3Node {
+    impl TryFrom<&Node> for G3Node {
+        type Error = BabelfontError;
+
+        fn try_from(val: &Node) -> Result<Self, Self::Error> {
+            Ok(G3Node {
                 x: val.x as f32,
                 y: val.y as f32,
                 node_type: match (val.nodetype, val.smooth) {
                     (NodeType::Line, true) => glyphslib::common::NodeType::LineSmooth,
                     (NodeType::Curve, true) => glyphslib::common::NodeType::CurveSmooth,
                     (NodeType::QCurve, true) => glyphslib::common::NodeType::QCurveSmooth,
-                    (nt, _) => nt.into(),
+                    (NodeType::Hobby, true) => glyphslib::common::NodeType::HobbySmooth,
+                    (NodeType::Quartic, true) => glyphslib::common::NodeType::QuarticSmooth,
+                    (NodeType::RaphNewSpiral, true) => {
+                        glyphslib::common::NodeType::RaphNewSpiralSmooth
+                    }
+                    (nt, _) => nt.try_into()?,
                 },
                 user_data: val.format_specific.get_json(KEY_USER_DATA),
-            }
+                tangent: val.format_specific.get_json(KEY_NODE_TANGENT),
+                locked: val.format_specific.get_json(KEY_NODE_LOCKED),
+                orientation: val.format_specific.get_json(KEY_NODE_ORIENTATION),
+                hoi: val.format_specific.get_json(KEY_NODE_HOI),
+            })
         }
     }
 
@@ -234,13 +319,15 @@ mod glyphs {
         }
     }
 
-    impl From<&Node> for G2Node {
-        fn from(val: &Node) -> Self {
-            G2Node {
+    impl TryFrom<&Node> for G2Node {
+        type Error = BabelfontError;
+
+        fn try_from(val: &Node) -> Result<Self, Self::Error> {
+            Ok(G2Node {
                 x: val.x as f32,
                 y: val.y as f32,
-                node_type: val.nodetype.into(),
-            }
+                node_type: val.nodetype.try_into()?,
+            })
         }
     }
 }

@@ -169,7 +169,7 @@ pub(crate) mod glyphs {
     use std::str::FromStr;
 
     use crate::{
-        convertors::glyphs3::{copy_user_data, UserData, KEY_USER_DATA},
+        convertors::glyphs3::{color_from_json, copy_user_data, UserData, KEY_USER_DATA},
         layer::glyphs::{layer_from_glyphs, layer_to_glyphs},
         BabelfontError,
     };
@@ -186,6 +186,8 @@ pub(crate) mod glyphs {
         let mut format_specific = FormatSpecific::default();
         format_specific.insert_json_non_null("case", &val.case);
         format_specific.insert_json_non_null("color", &val.color);
+        format_specific.insert_json_non_null("glyph_group", &val.group);
+        format_specific.insert_json_non_null("group_idx", &val.group_idx);
         format_specific.insert_some_json("kern_bottom", &val.kern_bottom);
         format_specific.insert_some_json("kern_left", &val.kern_left);
         format_specific.insert_some_json("kern_right", &val.kern_right);
@@ -225,7 +227,30 @@ pub(crate) mod glyphs {
         let mut component_axes: Vec<Axis> = val
             .smart_component_settings
             .iter()
-            .map(|x| x.into())
+            .enumerate()
+            .map(|(i, setting)| {
+                let mut axis: Axis = setting.into();
+                // Glyphs 4 carries a full `axes` array alongside `partsSettings`,
+                // with localized names, the real tag, the hidden flag and user
+                // data. `partsSettings` alone has none of that.
+                if let Some(g3_axis) = val.axes.get(i) {
+                    if !g3_axis.names.is_empty() {
+                        let mut name = crate::I18NDictionary::new();
+                        for localized in g3_axis.names.iter() {
+                            name.insert(localized.language.clone(), localized.value.clone());
+                        }
+                        axis.name = name;
+                    } else if !g3_axis.name.is_empty() {
+                        axis.name = crate::I18NDictionary::from(&g3_axis.name);
+                    }
+                    if let Ok(tag) = Tag::from_str(&g3_axis.tag) {
+                        axis.tag = tag;
+                    }
+                    axis.hidden = g3_axis.hidden;
+                    copy_user_data(&mut axis.format_specific, &g3_axis.user_data);
+                }
+                axis
+            })
             .collect();
         // Now pre-chew them for easy layer generation
         let sc_axes = glyph_specific_axes(&component_axes);
@@ -339,6 +364,17 @@ pub(crate) mod glyphs {
         G3Glyph {
             name: val.name.to_string(),
             production: val.production_name.as_ref().map(|p| p.to_string()),
+            axes: val
+                .component_axes
+                .iter()
+                .map(|x| glyphslib::glyphs3::Axis {
+                    hidden: x.hidden,
+                    name: x.name(),
+                    names: (&x.name).into(),
+                    tag: x.tag.to_string(),
+                    user_data: x.format_specific.get_json(KEY_USER_DATA),
+                })
+                .collect(),
             unicode: val.codepoints.clone(),
             layers: g3_layers,
             export: val.exported,
@@ -350,6 +386,8 @@ pub(crate) mod glyphs {
                 Direction::TopToBottom => "VTR".to_string(),
                 Direction::Bidi => "BIDI".to_string(),
             }),
+            group: val.format_specific.get_optionstring("glyph_group"),
+            group_idx: val.format_specific.get_parse_or("group_idx", 0),
             kern_bottom: val.format_specific.get_optionstring("kern_bottom"),
             kern_left: kern_left.as_ref().map(|s| s.to_string()),
             kern_right: kern_right.as_ref().map(|s| s.to_string()),
@@ -376,21 +414,10 @@ pub(crate) mod glyphs {
                 .get(KEY_USER_DATA)
                 .and_then(|x| serde_json::from_value::<UserData>(x.clone()).ok())
                 .unwrap_or_default(),
-            color: val.format_specific.get("color").and_then(|x|
-                    // either a tuple -> ColorTuple or an int -> ColorInt
-                    if x.is_number() {
-                        Some(glyphslib::common::Color::ColorInt(x.as_i64().unwrap_or(0) as u8))
-                    } else if x.is_array() {
-                        Some(glyphslib::common::Color::ColorTuple(
-                            x.as_array()
-                                .unwrap_or(&vec![])
-                                .iter()
-                                .filter_map(|v| v.as_u64())
-                                .map(|v| v as u8)
-                                .collect(),
-                        ))
-                    } else { None }
-                ),
+            color: val
+                .format_specific
+                .get("color")
+                .and_then(color_from_json),
         }
     }
 

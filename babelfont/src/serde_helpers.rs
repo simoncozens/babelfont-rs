@@ -134,13 +134,7 @@ where
             "{} {} {}{} {}",
             node.x,
             node.y,
-            match node.nodetype {
-                crate::NodeType::Move => "m",
-                crate::NodeType::Line => "l",
-                crate::NodeType::OffCurve => "o",
-                crate::NodeType::QCurve => "q",
-                crate::NodeType::Curve => "c",
-            },
+            node.nodetype.as_str(),
             if node.smooth { "s" } else { "" },
             if FormatSpecific::is_empty(&node.format_specific) {
                 "".to_string()
@@ -183,11 +177,20 @@ where
             "o" => (crate::NodeType::OffCurve, false),
             "q" => (crate::NodeType::QCurve, false),
             "c" => (crate::NodeType::Curve, false),
+            "u" => (crate::NodeType::Quartic, false),
+            "h" => (crate::NodeType::Hobby, false),
+            "r" => (crate::NodeType::RaphNewSpiral, false),
+            "s" => (crate::NodeType::Spiro, false),
+
             "ms" => (crate::NodeType::Move, true),
             "ls" => (crate::NodeType::Line, true),
             "os" => (crate::NodeType::OffCurve, true),
             "qs" => (crate::NodeType::QCurve, true),
             "cs" => (crate::NodeType::Curve, true),
+            "ss" => (crate::NodeType::Spiro, true),
+            "us" => (crate::NodeType::Quartic, true),
+            "hs" => (crate::NodeType::Hobby, true),
+            "rs" => (crate::NodeType::RaphNewSpiral, true),
             _ => {
                 return Err(serde::de::Error::custom(format!(
                     "Invalid node type: {}",

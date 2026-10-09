@@ -201,7 +201,7 @@ fn remove_implicit_move_in_closed_path(p: &mut Path) {
     #[allow(clippy::unwrap_used)] // We check for is_empty() before, so unwrap is safe
     if p.closed
         && p.nodes.len() > 1
-        && p.nodes.first().map(|n| n.nodetype) == Some(NodeType::Move)
+        && p.nodes.first().map(|n| &n.nodetype) == Some(&NodeType::Move)
         && p.nodes.first().unwrap().x == p.nodes.last().unwrap().x
         && p.nodes.first().unwrap().y == p.nodes.last().unwrap().y
     {

@@ -179,6 +179,11 @@ impl Path {
                     }
                     offs.clear();
                 }
+                _ => {
+                    return Err(BabelfontError::UnrepresentablePointType(
+                        pt.nodetype.as_str().to_string(),
+                    ))
+                }
             }
         }
         if self.closed && !offs.is_empty() {
@@ -366,7 +371,7 @@ impl From<kurbo::BezPath> for Path {
     }
 }
 
-/// A shape in a glyph, either a component or a path
+/// A shape in a glyph: a component, a path, or an opaque format-specific shape
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[typeshare]
 #[serde(untagged)]
@@ -375,6 +380,16 @@ pub enum Shape {
     Component(Component),
     /// A path in a glyph
     Path(Path),
+    /// An opaque shape in a format that babelfont does not model.
+    ///
+    /// This exists so that source formats which contain shapes babelfont has no
+    /// representation for (for example Glyphs' images and shape groups) can be
+    /// round-tripped without loss. Nothing except the originating converter is
+    /// expected to understand the contents; font editors are free to store
+    /// whatever they wish here and get it back unchanged.
+    #[typeshare(typescript(type = "Record<string, any>"))]
+    #[typeshare(python(type = "Dict[str, Any]"))]
+    FormatSpecific(FormatSpecific),
 }
 
 impl Shape {
@@ -383,6 +398,7 @@ impl Shape {
         match self {
             Shape::Component(c) => !c.location.is_empty(),
             Shape::Path(_) => false,
+            Shape::FormatSpecific(_) => false,
         }
     }
 
@@ -395,6 +411,7 @@ impl Shape {
         match self {
             Shape::Component(_) => None,
             Shape::Path(p) => Some(p),
+            Shape::FormatSpecific(_) => None,
         }
     }
 
@@ -403,6 +420,7 @@ impl Shape {
         match self {
             Shape::Component(c) => Some(c),
             Shape::Path(_) => None,
+            Shape::FormatSpecific(_) => None,
         }
     }
 
@@ -411,6 +429,7 @@ impl Shape {
         match self {
             Shape::Component(c) => Some(c),
             Shape::Path(_) => None,
+            Shape::FormatSpecific(_) => None,
         }
     }
 
@@ -419,6 +438,7 @@ impl Shape {
         match self {
             Shape::Component(_) => None,
             Shape::Path(p) => Some(p),
+            Shape::FormatSpecific(_) => None,
         }
     }
     /// Apply a DecomposedAffine transform to the shape
@@ -446,6 +466,8 @@ impl Shape {
 
                 Shape::Path(contour)
             }
+            // We cannot transform an opaque shape, so return it unchanged.
+            Shape::FormatSpecific(fs) => Shape::FormatSpecific(fs.clone()),
         }
     }
 }
@@ -601,26 +623,86 @@ mod glyphs {
     use indexmap::IndexMap;
 
     use crate::convertors::glyphs3::{
-        KEY_ALIGNMENT, KEY_ATTR, KEY_COMPONENT_ANCHOR, KEY_COMPONENT_LOCKED,
+        copy_user_data, KEY_ALIGNMENT, KEY_ATTR, KEY_COMPONENT_ALIGNMENT_EXPLICIT,
+        KEY_COMPONENT_ANCHOR, KEY_COMPONENT_ANCHOR_TO, KEY_COMPONENT_LOCKED,
+        KEY_COMPONENT_MASTER_ID, KEY_COMPONENT_ORIENTATION, KEY_COMPONENT_TRAVERSE_ANCHORS,
+        KEY_SHAPE_TYPE, KEY_USER_DATA,
     };
 
     use super::*;
+
+    /// Discriminator values stored in a [`Shape::FormatSpecific`] so that an
+    /// opaque shape can be sent back to the source format it came from.
+    const SHAPE_TYPE_IMAGE: &str = "image";
+    const SHAPE_TYPE_SHAPE_GROUP: &str = "shapeGroup";
+
+    /// Store a Glyphs shape that babelfont does not model as an opaque
+    /// [`Shape::FormatSpecific`], flattening its fields into the dictionary
+    /// alongside a discriminator.
+    fn opaque_shape<T: serde::Serialize>(kind: &str, val: &T) -> Shape {
+        let mut format_specific = FormatSpecific::default();
+        format_specific.insert(KEY_SHAPE_TYPE.into(), serde_json::json!(kind));
+        if let Ok(serde_json::Value::Object(map)) = serde_json::to_value(val) {
+            for (key, value) in map {
+                format_specific.insert(key, value);
+            }
+        }
+        Shape::FormatSpecific(format_specific)
+    }
+
+    /// Rebuild a Glyphs shape from an opaque [`Shape::FormatSpecific`], using the
+    /// discriminator to decide which shape to reconstruct.
+    fn opaque_shape_to_glyphs(
+        format_specific: &FormatSpecific,
+    ) -> Result<glyphslib::glyphs3::Shape, BabelfontError> {
+        let kind = format_specific
+            .get(KEY_SHAPE_TYPE)
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string();
+        let mut object = serde_json::Map::new();
+        for (key, value) in format_specific.iter() {
+            if key != KEY_SHAPE_TYPE {
+                object.insert(key.clone(), value.clone());
+            }
+        }
+        let value = serde_json::Value::Object(object);
+        match kind.as_str() {
+            SHAPE_TYPE_IMAGE => Ok(glyphslib::glyphs3::Shape::Image(
+                serde_json::from_value(value)
+                    .map_err(|e| BabelfontError::UnrepresentableShapeType(format!("image: {e}")))?,
+            )),
+            SHAPE_TYPE_SHAPE_GROUP => Ok(glyphslib::glyphs3::Shape::ShapeGroup(
+                serde_json::from_value(value).map_err(|e| {
+                    BabelfontError::UnrepresentableShapeType(format!("shapeGroup: {e}"))
+                })?,
+            )),
+            other => Err(BabelfontError::UnrepresentableShapeType(other.to_string())),
+        }
+    }
 
     impl From<&glyphslib::glyphs3::Shape> for Shape {
         fn from(val: &glyphslib::glyphs3::Shape) -> Self {
             match val {
                 glyphslib::glyphs3::Shape::Component(c) => Shape::Component(c.into()),
                 glyphslib::glyphs3::Shape::Path(p) => Shape::Path(p.into()),
+                glyphslib::glyphs3::Shape::Image(image) => opaque_shape(SHAPE_TYPE_IMAGE, image),
+                glyphslib::glyphs3::Shape::ShapeGroup(group) => {
+                    opaque_shape(SHAPE_TYPE_SHAPE_GROUP, group)
+                }
             }
         }
     }
 
-    impl From<&Shape> for glyphslib::glyphs3::Shape {
-        fn from(val: &Shape) -> Self {
-            match val {
+    impl TryFrom<&Shape> for glyphslib::glyphs3::Shape {
+        type Error = BabelfontError;
+
+        fn try_from(val: &Shape) -> Result<Self, Self::Error> {
+            Ok(match val {
                 Shape::Component(c) => glyphslib::glyphs3::Shape::Component(c.into()),
-                Shape::Path(p) => glyphslib::glyphs3::Shape::Path(p.into()),
-            }
+                Shape::Path(p) => glyphslib::glyphs3::Shape::Path(p.try_into()?),
+                Shape::FormatSpecific(fs) => opaque_shape_to_glyphs(fs)?,
+            })
         }
     }
 
@@ -648,6 +730,24 @@ mod glyphs {
                 &val.locked,
                 &false, // default value
             );
+            format_specific.insert_if_ne_json(
+                KEY_COMPONENT_TRAVERSE_ANCHORS,
+                &val.traverse_anchors,
+                &true, // Glyphs' default
+            );
+            format_specific.insert_if_ne_json(
+                KEY_COMPONENT_ORIENTATION,
+                &val.orientation,
+                &glyphslib::common::Orientation::Left,
+            );
+            format_specific.insert_if_ne_json(
+                KEY_COMPONENT_ALIGNMENT_EXPLICIT,
+                &val.alignment_explicit,
+                &false,
+            );
+            format_specific.insert_some_json(KEY_COMPONENT_MASTER_ID, &val.master_id);
+            format_specific.insert_some_json(KEY_COMPONENT_ANCHOR_TO, &val.anchor_to);
+            copy_user_data(&mut format_specific, &val.user_data);
             let mut location = IndexMap::new();
             for (k, v) in &val.smart_component_location {
                 location.insert(k.clone(), DesignCoord::new(*v as f64));
@@ -688,7 +788,24 @@ mod glyphs {
                     .map(|(k, v)| (k.clone(), v.to_f64() as f32))
                     .collect(),
                 locked: val.format_specific.get_bool(KEY_COMPONENT_LOCKED),
-                ..Default::default()
+                traverse_anchors: val
+                    .format_specific
+                    .get_bool_or(KEY_COMPONENT_TRAVERSE_ANCHORS, true),
+                orientation: val.format_specific.get_json(KEY_COMPONENT_ORIENTATION),
+                alignment_explicit: val
+                    .format_specific
+                    .get_bool(KEY_COMPONENT_ALIGNMENT_EXPLICIT),
+                master_id: val
+                    .format_specific
+                    .get_optionstring(KEY_COMPONENT_MASTER_ID),
+                anchor_to: val
+                    .format_specific
+                    .get_optionstring(KEY_COMPONENT_ANCHOR_TO),
+                user_data: val
+                    .format_specific
+                    .get(KEY_USER_DATA)
+                    .and_then(|x| serde_json::from_value(x.clone()).ok())
+                    .unwrap_or_default(),
             }
         }
     }
@@ -714,13 +831,15 @@ mod glyphs {
         }
     }
 
-    impl From<&Path> for glyphslib::glyphs3::Path {
-        fn from(val: &Path) -> Self {
+    impl TryFrom<&Path> for glyphslib::glyphs3::Path {
+        type Error = BabelfontError;
+
+        fn try_from(val: &Path) -> Result<Self, Self::Error> {
             let mut nodes = vec![];
             for node in &val.nodes {
-                nodes.push(node.into());
+                nodes.push(node.try_into()?);
             }
-            glyphslib::glyphs3::Path {
+            Ok(glyphslib::glyphs3::Path {
                 nodes,
                 closed: val.closed,
                 attr: val
@@ -728,7 +847,7 @@ mod glyphs {
                     .get(KEY_ATTR)
                     .and_then(|x| serde_json::from_value(x.clone()).ok())
                     .unwrap_or_default(),
-            }
+            })
         }
     }
 }

@@ -77,6 +77,8 @@ impl FontFilter for RoundCoordinates {
                             let t = &mut component.transform.translation;
                             *t = (round(t.0), round(t.1));
                         }
+                        // Nothing to round in an opaque shape.
+                        Shape::FormatSpecific(_) => {}
                     }
                 }
             }

@@ -292,10 +292,14 @@ fn babelfont_layer_to_norad_glyph(
     for shape in &layer.shapes {
         match shape {
             Shape::Path(p) => {
-                norad_glyph.contours.push(save_path(p));
+                norad_glyph.contours.push(save_path(p)?);
             }
             Shape::Component(c) => {
                 norad_glyph.components.push(save_component(c)?);
+            }
+            Shape::FormatSpecific(_) => {
+                // UFO has no representation for opaque shapes.
+                log::warn!("Skipping opaque shape when saving UFO");
             }
         }
     }
@@ -417,8 +421,12 @@ pub(crate) fn load_path(c: &norad::Contour) -> Path {
     }
 }
 
-pub(crate) fn save_path(p: &Path) -> norad::Contour {
-    let mut points: Vec<norad::ContourPoint> = p.nodes.iter().map(|n| n.into()).collect();
+pub(crate) fn save_path(p: &Path) -> Result<norad::Contour, BabelfontError> {
+    let mut points: Vec<norad::ContourPoint> = p
+        .nodes
+        .iter()
+        .map(|n| n.try_into())
+        .collect::<Result<Vec<_>, BabelfontError>>()?;
     // See https://github.com/simoncozens/rust-font-tools/issues/3
     points.rotate_right(1);
     let mut c = norad::Contour::new(points, None);
@@ -429,7 +437,7 @@ pub(crate) fn save_path(p: &Path) -> norad::Contour {
     {
         c.replace_lib(lib);
     }
-    c
+    Ok(c)
 }
 
 pub(crate) fn save_kerning(

@@ -381,6 +381,7 @@ impl FontlabLayer {
             width: self.advanceWidth as f32,
             name: self.name.clone(),
             id: self.name,
+            active: true,
             master: LayerType::FreeFloating,
             guides: vec![],
             shapes: self

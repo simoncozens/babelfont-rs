@@ -1,0 +1,65 @@
+{
+.appVersion = "4012";
+.formatVersion = 4;
+date = "2026-07-17 03:14:15 +0000";
+familyName = "Glyphs File Format v4";
+note = "A test font.";
+unitsPerEm = 1000;
+versionMajor = 1;
+versionMinor = 0;
+settings = { dependencies = { aDep = "A Dependency"; }; };
+userData = { fontUD = 1; };
+axes = (
+{ name = Weight; tag = wght; names = ( { language = dflt; value = Weight; } ); }
+);
+fontMaster = (
+{ id = m1; name = Regular; axesValues = (0); active = 0; userData = { masterUD = 1; }; }
+);
+instances = (
+{ id = "i1"; instanceInterpolations = { m1 = "{0.5, 0.5}"; }; manualInterpolation = 1; name = Regular; type = variable; },
+{ axesValues = (0); id = "i2"; name = Icon; type = icon; },
+{ axesValues = (0); id = "i3"; name = Single; type = single; }
+);
+glyphs = (
+{
+group = MyGroup;
+groupIdx = 3;
+glyphname = A;
+color = ( p, 5, 1 );
+userData = { glyphUD = 1; };
+axes = ( { name = Size; tag = sz01; hidden = 1; names = ( { language = dflt; value = Size; } ); userData = { axisUD = 1; }; } );
+partsSettings = ( { name = Size; bottomValue = 0; topValue = 100; } );
+layers = (
+{
+layerId = m1;
+width = 500;
+active = 1;
+attr = { svg = 1; };
+anchors = ( { name = top; pos = (250, 700); locked = 1; orientation = center; attr = { anchorUD = 1; }; } );
+guides = ( { name = g1; pos = (10, 20); angle = 45; slope = 1; } );
+shapes = (
+{
+attr = { fill = 1; };
+closed = 1;
+nodes = (
+(0, 0, l),
+(100, 0, o, { userData = { n1 = 1; }; }),
+(100, 100, cs),
+(0, 100, us),
+(50, 200, hs),
+(10, 200, rs),
+(20, 20, lRX),
+(30, 30, l, { hoi = { wght = { ip = (1, 2); }; }; userData = { nd = 1; }; })
+);
+},
+{ anchorTo = top; attr = { cUD = 1; }; masterId = m1; orientation = center; pos = (5, 5); ref = B; traverseAnchors = 0; },
+{ attr = { hidden = 1; }; imagePath = "foo.png"; pos = (1, 2); },
+{ attr = { hidden = 1; }; groupId = g1; }
+);
+},
+{ layerId = "m1.alt"; associatedMasterId = m1; width = 500; color = 3; shapes = ( { closed = 1; nodes = ( (0, 0, l), (10, 10, l) ); } ); }
+);
+},
+{ glyphname = B; layers = ( { layerId = m1; width = 300; } ); }
+);
+}

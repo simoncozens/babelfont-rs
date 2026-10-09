@@ -58,6 +58,8 @@ impl FontFilter for ScaleUpem {
                             comp.transform.translation.0 *= scale_factor;
                             comp.transform.translation.1 *= scale_factor;
                         }
+                        // We cannot scale the geometry of an opaque shape.
+                        crate::Shape::FormatSpecific(_) => {}
                     }
                 }
             }

@@ -280,6 +280,10 @@ pub(crate) fn to_ir_contours_and_components(
                 to_ir_path(glyph_name.clone(), path)
                     .map_err(|e| BadGlyph::new(glyph_name.clone(), e))?,
             ),
+            Shape::FormatSpecific(_) => {
+                // Opaque shapes cannot be compiled to a binary font.
+                log::warn!("Skipping opaque shape when compiling");
+            }
         }
     }
 
@@ -311,6 +315,12 @@ fn add_to_path<'a>(
             NodeType::Curve => path_builder.curve_to((node.x, node.y)),
             NodeType::OffCurve => path_builder.offcurve((node.x, node.y)),
             NodeType::QCurve => path_builder.qcurve_to((node.x, node.y)),
+            _ => {
+                return Err(PathConversionError::Parse(format!(
+                    "Unrepresentable node type: {:?}",
+                    node.nodetype
+                )))
+            }
         }?
     }
     Ok(())

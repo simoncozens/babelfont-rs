@@ -7,6 +7,7 @@ use crate::{
     common::{CustomOTValues, FormatSpecific},
     guide::Guide,
     i18ndictionary::I18NDictionary,
+    serde_helpers::{default_true, is_true},
     LayerType, MetricType,
 };
 use serde::{Deserialize, Serialize};
@@ -30,6 +31,9 @@ pub struct Master {
     #[typeshare(typescript(type = "import('@simoncozens/fonttypes').DesignspaceLocation"))]
     /// Location of the master in design space coordinates
     pub location: DesignLocation,
+    /// Whether or not the master is active
+    #[serde(default = "default_true", skip_serializing_if = "is_true")]
+    pub active: bool,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     /// Global guidelines associated with the master
     pub guides: Vec<Guide>,
@@ -75,6 +79,7 @@ impl Master {
             kerning: Default::default(),
             custom_ot_values: Default::default(),
             format_specific: FormatSpecific::default(),
+            active: true,
         }
     }
 

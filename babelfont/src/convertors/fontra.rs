@@ -517,6 +517,7 @@ fn load_master(id: &str, source: &Source) -> Result<Master, BabelfontError> {
         .into_iter()
         .collect::<Location<_>>();
     Ok(Master {
+        active: true,
         name: source.name.clone().into(),
         id: id.to_string(),
         location,
@@ -731,6 +732,7 @@ fn load_layer(layer: &Layer, glyph_source: Option<&&GlyphSource>) -> crate::Laye
     crate::Layer {
         width: layer.glyph.x_advance.unwrap_or_default() as f32,
         name: None,
+        active: true,
         id: source_name,
         master: layer_type,
         guides: layer.glyph.guides.iter().map(|g| g.into()).collect(),

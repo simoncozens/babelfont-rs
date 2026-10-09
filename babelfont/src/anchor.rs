@@ -67,15 +67,14 @@ mod glyphs {
     use crate::convertors::glyphs3::{
         copy_user_data, KEY_ANCHOR_LOCKED, KEY_ANCHOR_ORIENTATION, KEY_USER_DATA,
     };
+    use glyphslib::common::Attributes;
 
     use super::*;
 
     impl From<&glyphslib::glyphs3::Anchor> for Anchor {
         fn from(val: &glyphslib::glyphs3::Anchor) -> Self {
             let mut format_specific = FormatSpecific::default();
-            if let Some(user_data) = &val.user_data {
-                copy_user_data(&mut format_specific, user_data);
-            }
+            copy_user_data(&mut format_specific, &val.attr);
             // Store "locked" property in format_specific
             if val.locked {
                 format_specific.insert(KEY_ANCHOR_LOCKED.into(), serde_json::json!(true));
@@ -111,6 +110,13 @@ mod glyphs {
                 "right" => glyphslib::common::Orientation::Right,
                 _ => glyphslib::common::Orientation::Center,
             };
+            let attributes = Attributes {
+                dict: val
+                    .format_specific
+                    .get(KEY_USER_DATA)
+                    .and_then(|v| serde_json::from_value(v.clone()).ok())
+                    .unwrap_or_default(),
+            };
             glyphslib::glyphs3::Anchor {
                 name: val.name.clone(),
                 pos: (val.x as f32, val.y as f32),
@@ -120,10 +126,7 @@ mod glyphs {
                     .and_then(|v| v.as_bool())
                     .unwrap_or(false),
                 orientation,
-                user_data: val
-                    .format_specific
-                    .get(KEY_USER_DATA)
-                    .and_then(|v| serde_json::from_value(v.clone()).ok()),
+                attr: attributes,
             }
         }
     }

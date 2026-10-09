@@ -2282,6 +2282,7 @@ fn test_reference_matrix_snaps_near_integers() {
         match &glyph.layers[0].shapes[0] {
             Shape::Component(component) => component.transform.as_affine().as_coeffs(),
             Shape::Path(_) => panic!("expected a component"),
+            Shape::FormatSpecific(_) => panic!("expected a component"),
         }
     };
     let mirrored = coeffs("parenright");

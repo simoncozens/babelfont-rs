@@ -316,6 +316,7 @@ fn one_width(font: &Font, master: &Master) -> Option<i32> {
         .filter_map(|shape| match shape {
             Shape::Component(component) => Some(component.reference.as_str()),
             Shape::Path(_) => None,
+            Shape::FormatSpecific(_) => None,
         })
         .collect();
     let mut width = None;
@@ -365,6 +366,7 @@ fn draws_something(font: &Font, master: &Master, name: &str, depth: usize) -> bo
             depth < MAX_REFERENCE_DEPTH
                 && draws_something(font, master, &component.reference, depth + 1)
         }
+        Shape::FormatSpecific(_) => false,
     })
 }
 

@@ -31,14 +31,27 @@ pub(crate) const KEY_APP_VERSION: &str = "com.schriftgestalt.Glyphs.appVersion";
 pub(crate) const KEY_ATTR: &str = "com.schriftgestalt.Glyphs.attr";
 pub(crate) const KEY_COLOR_LABEL: &str = "com.schriftgestalt.Glyphs.colorLabel";
 pub(crate) const KEY_COMPONENT_ANCHOR: &str = "com.schriftgestalt.Glyphs.componentAnchor";
+pub(crate) const KEY_COMPONENT_ANCHOR_TO: &str = "com.schriftgestalt.Glyphs.componentAnchorTo";
+pub(crate) const KEY_COMPONENT_MASTER_ID: &str = "com.schriftgestalt.Glyphs.componentMasterId";
+pub(crate) const KEY_COMPONENT_ORIENTATION: &str = "com.schriftgestalt.Glyphs.componentOrientation";
+pub(crate) const KEY_COMPONENT_TRAVERSE_ANCHORS: &str =
+    "com.schriftgestalt.Glyphs.componentTraverseAnchors";
+pub(crate) const KEY_COMPONENT_ALIGNMENT_EXPLICIT: &str =
+    "com.schriftgestalt.Glyphs.componentAlignmentExplicit";
 pub(crate) const KEY_COMPONENT_LOCKED: &str = "com.schriftgestalt.Glyphs.componentLocked";
 pub(crate) const KEY_CUSTOM_PARAMETERS: &str = "com.schriftgestalt.Glyphs.customParameters.";
 pub(crate) const KEY_DISPLAY_STRINGS: &str = "com.schriftgestalt.Glyphs.displayStrings";
 pub(crate) const KEY_FORMAT_VERSION: &str = "com.schriftgestalt.Glyphs.formatVersion";
 pub(crate) const KEY_ICON_NAME: &str = "com.schriftgestalt.Glyphs.iconName";
 pub(crate) const KEY_INSTANCE_EXPORTS: &str = "com.schriftgestalt.Glyphs.exports";
+pub(crate) const KEY_INSTANCE_EXPORT_TYPE: &str = "com.schriftgestalt.Glyphs.instance.type";
+pub(crate) const KEY_INSTANCE_INTERPOLATIONS: &str =
+    "com.schriftgestalt.Glyphs.instanceInterpolations";
+pub(crate) const KEY_INSTANCE_MANUAL_INTERPOLATION: &str =
+    "com.schriftgestalt.Glyphs.manualInterpolation";
 pub(crate) const KEY_IS_BOLD: &str = "com.schriftgestalt.Glyphs.isBold";
 pub(crate) const KEY_IS_ITALIC: &str = "com.schriftgestalt.Glyphs.isItalic";
+pub(crate) const KEY_KERNING_CONTEXT: &str = "com.schriftgestalt.Glyphs.kerningContext";
 pub(crate) const KEY_KERNING_RTL: &str = "com.schriftgestalt.Glyphs.kerningRTL";
 pub(crate) const KEY_KERNING_VERTICAL: &str = "com.schriftgestalt.Glyphs.kerningVertical";
 pub(crate) const KEY_LAYER_HINTS: &str = "com.schriftgestalt.Glyphs.layerHints";
@@ -51,12 +64,17 @@ pub(crate) const KEY_METRIC_TOP: &str = "com.schriftgestalt.Glyphs.metricTop";
 pub(crate) const KEY_METRIC_VERT_ORIGIN: &str = "com.schriftgestalt.Glyphs.metricVertOrigin";
 pub(crate) const KEY_METRIC_VERT_WIDTH: &str = "com.schriftgestalt.Glyphs.metricVertWidth";
 pub(crate) const KEY_METRIC_WIDTH: &str = "com.schriftgestalt.Glyphs.metricWidth";
+pub(crate) const KEY_NODE_LOCKED: &str = "com.schriftgestalt.Glyphs.node.locked";
+pub(crate) const KEY_NODE_TANGENT: &str = "com.schriftgestalt.Glyphs.node.tangent";
+pub(crate) const KEY_NODE_ORIENTATION: &str = "com.schriftgestalt.Glyphs.node.orientation";
+pub(crate) const KEY_NODE_HOI: &str = "com.schriftgestalt.Glyphs.node.hoi";
 pub(crate) const KEY_NUMBER_NAMES: &str = "com.schriftgestalt.Glyphs.numberNames";
 pub(crate) const KEY_NUMBER_VALUES: &str = "com.schriftgestalt.Glyphs.numberValues";
 pub(crate) const KEY_SETTINGS: &str = "com.schriftgestalt.Glyphs.settings";
 pub(crate) const KEY_STEM_VALUES: &str = "com.schriftgestalt.Glyphs.stemValues";
 pub(crate) const KEY_STEMS: &str = "com.schriftgestalt.Glyphs.stems";
 pub(crate) const KEY_USER_DATA: &str = "com.schriftgestalt.Glyphs.userData";
+pub(crate) const KEY_SHAPE_TYPE: &str = "com.schriftgestalt.Glyphs.shapeType";
 pub(crate) const KEY_VERT_WIDTH: &str = "com.schriftgestalt.Glyphs.vertWidth";
 pub(crate) const KEY_VERT_ORIGIN: &str = "com.schriftgestalt.Glyphs.vertOrigin";
 pub(crate) const KEY_WEIGHT_CLASS: &str = "com.schriftgestalt.Glyphs.weightClass";
@@ -111,6 +129,32 @@ fn serialize_custom_parameters(
         })
         .collect()
 }
+
+/// Parse a Glyphs colour from the JSON we stored it as. Handles all three
+/// representations: a colour label index, a colour tuple, and a Glyphs 4
+/// palette reference (`["p", index, alpha]`).
+pub(crate) fn color_from_json(value: &serde_json::Value) -> Option<glyphslib::common::Color> {
+    if let Some(index) = value.as_i64() {
+        return Some(glyphslib::common::Color::ColorInt(index as u8));
+    }
+    let array = value.as_array()?;
+    // Glyphs 4 palette reference.
+    if array.first().and_then(|v| v.as_str()) == Some("p") {
+        return Some(glyphslib::common::Color::ColorPaletteIndex {
+            index: array.get(1).and_then(|v| v.as_u64()).unwrap_or(0) as u16,
+            alpha: array.get(2).and_then(|v| v.as_f64()).unwrap_or(1.0),
+        });
+    }
+    // A colour tuple. It was stored scaled to 0..255, so unscale it.
+    Some(glyphslib::common::Color::ColorTuple(
+        array
+            .iter()
+            .filter_map(|v| v.as_f64())
+            .map(|v| v / 255.0)
+            .collect(),
+    ))
+}
+
 pub(crate) fn copy_user_data(
     format_specific: &mut FormatSpecific,
     user_data: &BTreeMap<SmolStr, glyphslib::Plist>,
@@ -153,12 +197,24 @@ pub fn load_package_entries(
 
 fn _load(glyphs_font: &glyphslib::Font, path: PathBuf) -> Result<Font, BabelfontError> {
     let mut font = Font::new();
+    // Remember which Glyphs file format version we came from, so that
+    // `as_glyphs3` can write the same version back out again. A Glyphs 2 source
+    // is upgraded to Glyphs 3 for our in-memory model, so we record "2" but will
+    // never write anything lower than 3.
+    let source_format_version = if glyphs_font.as_glyphs2().is_some() {
+        2
+    } else {
+        glyphs_font
+            .as_glyphs3()
+            .map(|g| g.format_version)
+            .unwrap_or(3)
+    };
+    font.format_specific.insert(
+        KEY_FORMAT_VERSION.into(),
+        serde_json::json!(source_format_version),
+    );
     let mut upgraded = glyphs_font.clone();
     let glyphs_font = if glyphs_font.as_glyphs2().is_some() {
-        font.format_specific.insert(
-            KEY_FORMAT_VERSION.into(),
-            serde_json::Value::String("2".into()),
-        );
         upgraded.upgrade_in_place();
         upgraded.as_glyphs3()
     } else {
@@ -332,6 +388,22 @@ fn load_instance(font: &Font, instance: &glyphs3::Instance) -> crate::Instance {
     format_specific.insert_if_ne_json(KEY_INSTANCE_EXPORTS, &instance.exports, &true);
     format_specific.insert_if_ne_json(KEY_IS_BOLD, &instance.is_bold, &false);
     format_specific.insert_if_ne_json(KEY_IS_ITALIC, &instance.is_italic, &false);
+    if !instance.instance_interpolations.is_empty() {
+        format_specific.insert_json(
+            KEY_INSTANCE_INTERPOLATIONS,
+            &instance.instance_interpolations,
+        );
+    }
+    format_specific.insert_if_ne_json(
+        KEY_INSTANCE_MANUAL_INTERPOLATION,
+        &instance.manual_interpolation,
+        &false,
+    );
+    format_specific.insert_if_ne_json(
+        KEY_INSTANCE_EXPORT_TYPE,
+        &instance.export_type,
+        &glyphslib::glyphs3::ExportType::default(),
+    );
     let mut names = Names::new();
     let mut custom_ot_values = CustomOTValues::default();
     load_properties(
@@ -348,7 +420,7 @@ fn load_instance(font: &Font, instance: &glyphs3::Instance) -> crate::Instance {
         }
     }
     crate::Instance {
-        id: instance.name.clone(),
+        id: instance.id.as_ref().unwrap_or(&instance.name).clone(),
         name: I18NDictionary::from(&instance.name),
         location: designspace_to_location(&instance.axes_values),
         custom_names: names,
@@ -363,6 +435,7 @@ fn save_instance(
     axes: &[Axis],
     weight_class: Option<i32>,
     width_class: Option<i32>,
+    format_version: i32,
 ) -> glyphs3::Instance {
     let mut axes_values = vec![];
     if !instance.variable {
@@ -379,6 +452,11 @@ fn save_instance(
     }
     let format_specific = &instance.format_specific;
     glyphs3::Instance {
+        id: if format_version > 3 {
+            Some(instance.id.clone())
+        } else {
+            None
+        },
         name: instance
             .name
             .get_default()
@@ -409,16 +487,22 @@ fn save_instance(
             .and_then(|x| serde_json::from_value::<UserData>(x.clone()).ok())
             .unwrap_or_default(),
         link_style: instance.linked_style.clone(),
-        instance_interpolations: Default::default(),
+        instance_interpolations: format_specific
+            .get_parse_opt::<BTreeMap<String, glyphslib::common::InstanceFactors>>(
+                KEY_INSTANCE_INTERPOLATIONS,
+            )
+            .unwrap_or_default(),
         is_bold: instance.format_specific.get_bool_or(KEY_IS_BOLD, false),
         is_italic: instance.format_specific.get_bool_or(KEY_IS_ITALIC, false),
-        manual_interpolation: Default::default(),
+        manual_interpolation: format_specific.get_bool(KEY_INSTANCE_MANUAL_INTERPOLATION),
         properties: save_properties(&instance.custom_names, &CustomOTValues::default()),
-        export_type: if instance.variable {
-            glyphslib::glyphs3::ExportType::Variable
-        } else {
-            glyphslib::glyphs3::ExportType::Static
-        },
+        export_type: format_specific
+            .get_parse_opt::<glyphslib::glyphs3::ExportType>(KEY_INSTANCE_EXPORT_TYPE)
+            .unwrap_or(if instance.variable {
+                glyphslib::glyphs3::ExportType::Variable
+            } else {
+                glyphslib::glyphs3::ExportType::Single
+            }),
     }
 }
 
@@ -627,6 +711,7 @@ fn load_master(master: &glyphs3::Master, glyphs_font: &glyphs3::Glyphs3, font: &
         master.id.clone(),
         designspace_to_location(&master.axes_values),
     );
+    m.active = master.active;
     m.guides = master.guides.iter().map(Into::into).collect();
     for (i, metric_value) in master.metric_values.iter().enumerate() {
         let metric_name = if i < glyphs_font.metrics.len() {
@@ -1309,6 +1394,19 @@ fn interpret_axes(font: &mut Font) -> Result<(), BabelfontError> {
 pub(crate) fn as_glyphs3(font: &Font) -> Result<glyphs3::Glyphs3, BabelfontError> {
     // Do some cleanups.
     let mut font = font.clone();
+    // The Glyphs file format version to write. We remember the version we read
+    // (see `_load`); fonts we build ourselves default to Glyphs 3. Glyphs 2 is
+    // never written, because a Glyphs 2 font is upgraded on load.
+    let format_version = font
+        .format_specific
+        .get(KEY_FORMAT_VERSION)
+        .and_then(|v| {
+            v.as_i64()
+                .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
+        })
+        .map(|v| v as i32)
+        .unwrap_or(3)
+        .max(3);
     // #[allow(clippy::unwrap_used)] // Surely this can't fail
     // DropSparseMasters.apply(&mut font).unwrap();
     // println!("Exporting {} masters", font.masters.len());
@@ -1320,6 +1418,16 @@ pub(crate) fn as_glyphs3(font: &Font) -> Result<glyphs3::Glyphs3, BabelfontError
             hidden: ax.hidden,
             name: ax.name(),
             tag: ax.tag.to_string(),
+            names: if format_version > 3 {
+                (&ax.name).into()
+            } else {
+                vec![]
+            },
+            user_data: ax
+                .format_specific
+                .get(KEY_USER_DATA)
+                .and_then(|x| serde_json::from_value::<UserData>(x.clone()).ok())
+                .unwrap_or_default(),
         })
         .collect();
 
@@ -1459,7 +1567,7 @@ pub(crate) fn as_glyphs3(font: &Font) -> Result<glyphs3::Glyphs3, BabelfontError
     }
     let glyphs_font = glyphs3::Glyphs3 {
         app_version,
-        format_version: 3,
+        format_version,
         display_strings,
         axes,
         classes,
@@ -1490,10 +1598,14 @@ pub(crate) fn as_glyphs3(font: &Font) -> Result<glyphs3::Glyphs3, BabelfontError
                     &font.axes,
                     font.custom_ot_values.os2_us_weight_class.map(|w| w as i32),
                     font.custom_ot_values.os2_us_width_class.map(|w| w as i32),
+                    format_version,
                 )
             })
             .collect(),
         kerning,
+        kerning_context: font
+            .format_specific
+            .get_parse_or(KEY_KERNING_CONTEXT, BTreeMap::new()),
         kerning_rtl: font
             .format_specific
             .get_parse_or(KEY_KERNING_RTL, BTreeMap::new()),
@@ -1566,6 +1678,7 @@ fn save_master(
 
     glyphs3::Master {
         id: master.id.clone(),
+        active: master.active,
         name: master
             .name
             .get_default()
@@ -1881,6 +1994,89 @@ mod tests {
             Shape::Path(p) => assert!(!p.closed),
             _ => panic!("Expected a path shape"),
         }
+    }
+
+    /// The v4-specific bits of a Glyphs 4 file survive a load (the byte-exact
+    /// roundtrip is covered by `test_roundtrip` above).
+    #[test]
+    fn test_glyphs_file_format_v4() {
+        let font = load("resources/GlyphsFileFormatv4.glyphs".into()).unwrap();
+
+        // We remember the file format version so we can write v4 back out.
+        assert_eq!(
+            font.format_specific
+                .get(KEY_FORMAT_VERSION)
+                .and_then(|v| v.as_i64()),
+            Some(4)
+        );
+
+        let glyph = font.glyphs.get("A").unwrap();
+        let layer = &glyph.layers[0];
+
+        // Images and shape groups are carried as opaque shapes.
+        let opaque = layer
+            .shapes
+            .iter()
+            .filter(|s| matches!(s, Shape::FormatSpecific(_)))
+            .count();
+        assert_eq!(opaque, 2, "expected an image and a shape group");
+
+        // The component keeps its Glyphs 4 fields.
+        let component = layer.shapes.iter().find_map(|s| s.as_component()).unwrap();
+        assert_eq!(
+            component
+                .format_specific
+                .get(KEY_COMPONENT_TRAVERSE_ANCHORS),
+            Some(&serde_json::json!(false))
+        );
+        assert_eq!(
+            component
+                .format_specific
+                .get(KEY_COMPONENT_MASTER_ID)
+                .and_then(|v| v.as_str()),
+            Some("m1")
+        );
+        assert_eq!(
+            component
+                .format_specific
+                .get(KEY_COMPONENT_ANCHOR_TO)
+                .and_then(|v| v.as_str()),
+            Some("top")
+        );
+
+        // Node higher-order interpolation rides in the node's format-specific data.
+        let path = layer.paths().next().unwrap();
+        assert!(path.nodes.iter().any(|n| n
+            .format_specific
+            .get(KEY_NODE_HOI)
+            .is_some_and(|v| !v.is_null())));
+
+        // Writing v4 back out keeps those, plus the palette colour, the
+        // glyph-specific axis metadata and the instance types.
+        let out = as_glyphs3(&font).unwrap();
+        assert_eq!(out.format_version, 4);
+
+        let out_a = out.glyphs.iter().find(|g| g.name == "A").unwrap();
+        assert!(matches!(
+            out_a.color,
+            Some(glyphslib::common::Color::ColorPaletteIndex { index: 5, .. })
+        ));
+        assert_eq!(out_a.axes[0].tag, "sz01");
+        assert!(out_a.axes[0].hidden);
+
+        use glyphslib::glyphs3::ExportType;
+        assert!(out
+            .instances
+            .iter()
+            .any(|i| i.export_type == ExportType::Variable));
+        assert!(out
+            .instances
+            .iter()
+            .any(|i| i.export_type == ExportType::Icon));
+        assert!(out
+            .instances
+            .iter()
+            .any(|i| i.export_type == ExportType::Single));
     }
 
     #[test]

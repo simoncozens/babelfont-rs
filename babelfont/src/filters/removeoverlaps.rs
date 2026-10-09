@@ -35,6 +35,8 @@ impl FontFilter for RemoveOverlaps {
                                 components.push(Shape::Component(component))
                             }
                             Shape::Path(path) => bezpath_before.extend(path.to_kurbo()?),
+                            // Opaque shapes are passed through untouched.
+                            Shape::FormatSpecific(fs) => components.push(Shape::FormatSpecific(fs)),
                         }
                     }
                     let contours = binary_op(
