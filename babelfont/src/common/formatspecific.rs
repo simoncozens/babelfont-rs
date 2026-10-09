@@ -1,10 +1,18 @@
 use indexmap::IndexMap;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
+use typeshare::typeshare;
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 /// A map for storing format-specific data.
-// Don't typeshare this; use type aliases instead
+// A previous comment said "Don't typeshare this; use type aliases instead"
+// and now I can't remember why I said that, but now we're using FormatSpecific
+// inside the Shape enum, typeshare doesn't support annotations on enum
+// discriminators, so we kind of have to.
+#[typeshare]
+#[typeshare(serialized_as = "HashMap<String, any>")] // dirty but somehow works
+#[typeshare(typescript(type = "Record<string, any>"))]
+#[typeshare(python(type = "Dict[str, Any]"))]
 pub struct FormatSpecific(IndexMap<String, Value>);
 
 impl FormatSpecific {

@@ -387,8 +387,6 @@ pub enum Shape {
     /// round-tripped without loss. Nothing except the originating converter is
     /// expected to understand the contents; font editors are free to store
     /// whatever they wish here and get it back unchanged.
-    #[typeshare(typescript(type = "Record<string, any>"))]
-    #[typeshare(python(type = "Dict[str, Any]"))]
     FormatSpecific(FormatSpecific),
 }
 
