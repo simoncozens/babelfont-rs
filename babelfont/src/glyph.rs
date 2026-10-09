@@ -414,10 +414,7 @@ pub(crate) mod glyphs {
                 .get(KEY_USER_DATA)
                 .and_then(|x| serde_json::from_value::<UserData>(x.clone()).ok())
                 .unwrap_or_default(),
-            color: val
-                .format_specific
-                .get("color")
-                .and_then(color_from_json),
+            color: val.format_specific.get("color").and_then(color_from_json),
         }
     }
 

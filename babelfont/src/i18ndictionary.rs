@@ -117,9 +117,9 @@ impl From<I18NDictionary> for IndexMap<String, String> {
 }
 
 #[cfg(feature = "glyphs")]
-impl Into<Vec<glyphslib::glyphs3::LocalizedValue>> for &I18NDictionary {
-    fn into(self) -> Vec<glyphslib::glyphs3::LocalizedValue> {
-        self.0
+impl From<&I18NDictionary> for Vec<glyphslib::glyphs3::LocalizedValue> {
+    fn from(val: &I18NDictionary) -> Self {
+        val.0
             .iter()
             .map(|(lang, value)| glyphslib::glyphs3::LocalizedValue {
                 language: lang.clone(),

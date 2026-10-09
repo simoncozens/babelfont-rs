@@ -265,7 +265,7 @@ impl Path {
             new_path.nodes.push(crate::common::Node {
                 x,
                 y,
-                nodetype: node.nodetype.clone(),
+                nodetype: node.nodetype,
                 smooth: node.smooth,
                 format_specific: node.format_specific.clone(),
             });
