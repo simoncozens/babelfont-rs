@@ -1,0 +1,256 @@
+# Based on fontc's release workflow:
+# https://github.com/googlefonts/fontc/blob/main/.github/workflows/release.yml
+
+name: Wheels
+
+on:
+  # only run on version-tagged commits for sr-aef, babelfont or fontmerge, or manually
+  push:
+    tags:
+      - "sr-aef-v*.*.*"
+      - "babelfont-v*.*.*"
+      - "fontmerge-v*.*.*"
+  # enables workflow to be run manually
+  # https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#workflow_dispatch
+  workflow_dispatch:
+    inputs:
+      tool:
+        description: 'Which tool to build'
+        required: true
+        type: choice
+        options:
+          - sr-aef
+          - babelfont
+          - fontmerge
+        default: sr-aef
+
+# read-only access to repo contents by default; specific jobs may override it
+# https://docs.github.com/en/actions/using-jobs/assigning-permissions-to-jobs
+permissions:
+  contents: read
+
+jobs:
+  detect:
+    name: Detect which tool to release
+    runs-on: ubuntu-latest
+    outputs:
+      tool: ${{ steps.detect.outputs.tool }}
+      package: ${{ steps.detect.outputs.package }}
+      working-directory: ${{ steps.detect.outputs.working-directory }}
+      manifest-path: ${{ steps.detect.outputs.manifest-path }}
+    steps:
+      - name: Detect tool from tag or manual input
+        id: detect
+        run: |
+          # Check if this is a manual workflow_dispatch with an input
+          if [[ -n "${{ inputs.tool }}" ]]; then
+            TOOL="${{ inputs.tool }}"
+          # Otherwise detect from tag
+          elif [[ "${GITHUB_REF}" == refs/tags/sr-aef-v* ]]; then
+            TOOL="sr-aef"
+          elif [[ "${GITHUB_REF}" == refs/tags/babelfont-v* ]]; then
+            TOOL="babelfont"
+          elif [[ "${GITHUB_REF}" == refs/tags/fontmerge-v* ]]; then
+            TOOL="fontmerge"
+          else
+            echo "Error: Could not detect tool from tag or manual input"
+            echo "Tag was: ${GITHUB_REF}"
+            exit 1
+          fi
+
+          # Set outputs based on the detected tool
+          if [[ "$TOOL" == "sr-aef" ]]; then
+            echo "tool=sr-aef" >> $GITHUB_OUTPUT
+            echo "package=sr-aef" >> $GITHUB_OUTPUT
+            echo "working-directory=sr-aef" >> $GITHUB_OUTPUT
+            echo "manifest-path=sr-aef/Cargo.toml" >> $GITHUB_OUTPUT
+          elif [[ "$TOOL" == "babelfont" ]]; then
+            echo "tool=babelfont" >> $GITHUB_OUTPUT
+            # babelfont on PyPI is the Python babelfont library
+            echo "package=babelfont-rs" >> $GITHUB_OUTPUT
+            echo "working-directory=babelfont" >> $GITHUB_OUTPUT
+            echo "manifest-path=babelfont/Cargo.toml" >> $GITHUB_OUTPUT
+          elif [[ "$TOOL" == "fontmerge" ]]; then
+            echo "tool=fontmerge" >> $GITHUB_OUTPUT
+            echo "package=fontmerge" >> $GITHUB_OUTPUT
+            echo "working-directory=fontmerge" >> $GITHUB_OUTPUT
+            echo "manifest-path=fontmerge/Cargo.toml" >> $GITHUB_OUTPUT
+          fi
+
+  build:
+    name: Build ${{ needs.detect.outputs.tool }} ${{ matrix.platform.target }}
+    needs: detect
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            python-architecture: x64
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            python-architecture: x64
+          - target: i686-pc-windows-msvc
+            os: windows-latest
+            python-architecture: x86
+    runs-on: ${{ matrix.platform.os }}
+    env:
+      TOOL: ${{ needs.detect.outputs.tool }}
+      PACKAGE: ${{ needs.detect.outputs.package }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          architecture: ${{ matrix.platform.python-architecture }}
+
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          targets: ${{ matrix.platform.target }}
+
+      - name: Build wheel (macOS universal2) and sdist
+        if: matrix.platform.target == 'x86_64-apple-darwin'
+        uses: PyO3/maturin-action@v1
+        with:
+          target: universal2-apple-darwin
+          # No --locked here: this wheel is built from the extracted sdist,
+          # whose workspace is pruned to the tool's
+          # dependency closure, so cargo must drop the orphaned Cargo.lock
+          # entries (versions of the remaining pins are unaffected).
+          args: --release -o dist --sdist
+          working-directory: ${{ needs.detect.outputs.working-directory }}
+
+      - name: Build wheel (without sdist)
+        if: matrix.platform.target != 'x86_64-apple-darwin'
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{matrix.platform.target}}
+          args: --release --locked -o dist
+          working-directory: ${{ needs.detect.outputs.working-directory }}
+
+      - name: Install wheel
+        shell: bash
+        working-directory: ${{ needs.detect.outputs.working-directory }}
+        run: |
+          pip install --no-index --find-links dist/ --force-reinstall ${PACKAGE}
+          which ${TOOL}
+          ${TOOL} --version
+
+      - name: Check sdist metadata
+        if: matrix.platform.target == 'x86_64-apple-darwin'
+        working-directory: ${{ needs.detect.outputs.working-directory }}
+        run: pipx run twine check dist/*.tar.gz
+
+      - name: Upload wheel artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: wheels-${{ env.TOOL }}-${{ matrix.platform.target }}
+          path: ${{ needs.detect.outputs.working-directory }}/dist
+
+  build_linux_glibc:
+    name: Build ${{ needs.detect.outputs.tool }} ${{ matrix.platform.target }} (glibc)
+    needs: detect
+    runs-on: ubuntu-latest
+    env:
+      TOOL: ${{ needs.detect.outputs.tool }}
+      PACKAGE: ${{ needs.detect.outputs.package }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - target: "x86_64-unknown-linux-gnu"
+            manylinux: "2014"
+          - target: "aarch64-unknown-linux-gnu"
+            manylinux: "2014"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Build Wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.platform.target }}
+          manylinux: ${{ matrix.platform.manylinux }}
+          args: --release --locked -o dist
+          working-directory: ${{ needs.detect.outputs.working-directory }}
+
+      - name: Install x86_64 wheel
+        if: startsWith(matrix.platform.target, 'x86_64')
+        working-directory: ${{ needs.detect.outputs.working-directory }}
+        run: |
+          pip install --no-index --find-links dist/ --force-reinstall ${PACKAGE}
+          which ${TOOL}
+          ${TOOL} --version
+
+      - name: Upload wheel artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: wheels-${{ env.TOOL }}-${{ matrix.platform.target }}
+          path: ${{ needs.detect.outputs.working-directory }}/dist
+
+  build_linux_musl:
+    name: Build ${{ needs.detect.outputs.tool }} ${{ matrix.platform.target }} (musl)
+    needs: detect
+    runs-on: ubuntu-latest
+    env:
+      TOOL: ${{ needs.detect.outputs.tool }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - target: "x86_64-unknown-linux-musl"
+            image_tag: "x86_64-musl"
+            compatibility: "musllinux_1_1"
+          - target: "aarch64-unknown-linux-musl"
+            image_tag: "aarch64-musl"
+            compatibility: "musllinux_1_1"
+    container:
+      image: docker://ghcr.io/rust-cross/rust-musl-cross:${{ matrix.platform.image_tag }}
+    steps:
+      # checkout@v3 doesn't work inside the manylinux container:
+      # https://github.com/actions/checkout/issues/1487
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Build Wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.platform.target }}
+          manylinux: ${{ matrix.platform.compatibility }}
+          container: off
+          args: --release --locked -o dist
+          working-directory: ${{ needs.detect.outputs.working-directory }}
+
+      - name: Upload wheel artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: wheels-${{ env.TOOL }}-${{ matrix.platform.target }}
+          path: ${{ needs.detect.outputs.working-directory }}/dist
+
+  release-pypi:
+    name: Publish to PyPI
+    if: startsWith(github.ref, 'refs/tags/sr-aef-v') || startsWith(github.ref, 'refs/tags/babelfont-v') || startsWith(github.ref, 'refs/tags/fontmerge-v')
+    needs: [detect, build, build_linux_glibc, build_linux_musl]
+    runs-on: ubuntu-latest
+    permissions:
+      # IMPORTANT: this permission is mandatory for trusted publishing
+      # https://blog.pypi.org/posts/2023-04-20-introducing-trusted-publishers/
+      id-token: write
+
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: wheels-${{ needs.detect.outputs.tool }}-*
+          # so that all artifacts are downloaded in the same directory specified by 'path'
+          merge-multiple: true
+          path: dist
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true

@@ -40,6 +40,12 @@ A small CLI is available behind the `cli` feature:
 cargo install sr-aef --features cli
 ```
 
+or from PyPI:
+
+```bash
+pip install sr-aef
+```
+
 Print the reconstructed feature file for a font:
 
 ```bash
