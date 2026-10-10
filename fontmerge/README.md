@@ -21,6 +21,12 @@ Install the CLI with:
 cargo install fontmerge
 ```
 
+or from PyPI:
+
+```bash
+pip install fontmerge
+```
+
 Merge all of `Donor.glyphs` into `Host.glyphs`:
 
 ```bash
