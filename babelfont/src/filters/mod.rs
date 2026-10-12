@@ -166,6 +166,9 @@ declare_filters! {
 // lookups that should be dropped.
 pub use subsetlayout::SubsetVisitor;
 
+/// The exporter rule `FontForgeUnderlinePosition` applies.
+pub use fontforgeunderlineposition::FontForgeUnderlineRule;
+
 /// A trait for font filters that can be applied to a font
 pub trait FontFilter {
     /// Apply the filter to the given font
