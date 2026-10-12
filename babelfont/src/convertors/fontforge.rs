@@ -66,6 +66,9 @@ pub(crate) const COMMENT_ENTRIES_KEY: &str = "sfd.comment_entries";
 pub(crate) const HSTEM_KEY: &str = "sfd.HStem";
 pub(crate) const VSTEM_KEY: &str = "sfd.VStem";
 pub(crate) const LAYER_QUADRATIC_KEY: &str = "sfd.is_quadratic";
+/// Font-level format-specific key prefix holding the delta an offset-mode
+/// vertical metric states, before it was added to its base.
+pub(crate) const OFFSET_DELTA_PREFIX: &str = "sfd.offset_delta.";
 
 // ===========================================================================
 // Public entry points
@@ -1358,6 +1361,12 @@ impl SfdParser {
                 self.font.format_specific.insert(
                     format!("sfd.offset_mode.{}", sfd_key),
                     serde_json::Value::Bool(true),
+                );
+                // Keep the stated delta too, so a filter can re-resolve the
+                // metric against another base.
+                self.font.format_specific.insert(
+                    format!("{}{}", OFFSET_DELTA_PREFIX, sfd_key),
+                    serde_json::Value::from(*v),
                 );
                 *v += base;
             }
