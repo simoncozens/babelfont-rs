@@ -249,6 +249,12 @@ Install it from source with:
 cargo install babelfont --features cli
 ```
 
+or from PyPI:
+
+```bash
+pip install babelfont-rs
+```
+
 ## Related Projects
 
 - [fontmerge](https://crates.io/crates/fontmerge) - merge selected glyphs and layout features from one font into another
