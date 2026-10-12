@@ -1389,7 +1389,79 @@ fn interpret_axes(font: &mut Font) -> Result<(), BabelfontError> {
         });
     }
 
+    // The mapping now lives in `axis.map`; drop the stashed custom parameter
+    font.format_specific
+        .remove(&format!("{}{}", KEY_CUSTOM_PARAMETERS, "Axis Mappings"));
+
     Ok(())
+}
+
+/// If the axis mapping is not derivable from the masters and instances,
+/// we need to store it as a custom parameter.
+fn axis_mappings_custom_parameter(font: &Font) -> Option<glyphslib::common::CustomParameter> {
+    let origin_id = get_origin_master(font).map(|master| master.id.as_str());
+    let uses_axis_locations = !font.axes.is_empty()
+        && !font.masters.is_empty()
+        && font
+            .masters
+            .iter()
+            .all(|master| axis_location_cp(&master.format_specific).is_some());
+
+    let mut mappings: BTreeMap<SmolStr, glyphslib::Plist> = BTreeMap::new();
+    for axis in &font.axes {
+        let Some(map) = axis.map.as_ref() else {
+            continue;
+        };
+        // Empty and identity mappings are elided on reload, so there is nothing
+        // to record for them.
+        if map.is_empty()
+            || map
+                .iter()
+                .all(|(user, design)| user.to_f64() == design.to_f64())
+        {
+            continue;
+        }
+
+        // The mapping the loader would derive if we wrote nothing here.
+        let derived = compute_axis(font, axis, origin_id, None, uses_axis_locations);
+        if let Some(derived_pairs) = derived.map {
+            let mut ours: Vec<(f64, f64)> = map
+                .iter()
+                .map(|(user, design)| (user.to_f64(), design.to_f64()))
+                .collect();
+            ours.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+            if derived_pairs.len() == ours.len()
+                && derived_pairs
+                    .into_iter()
+                    .zip(ours)
+                    .all(|((user, design), (u, d))| user == u && design == d)
+            {
+                continue;
+            }
+        }
+
+        let mut axis_mapping: BTreeMap<SmolStr, glyphslib::Plist> = BTreeMap::new();
+        for (user, design) in map {
+            axis_mapping.insert(
+                SmolStr::new(user.to_f64().to_string()),
+                glyphslib::Plist::Float(design.to_f64()),
+            );
+        }
+        mappings.insert(
+            SmolStr::new(axis.tag.to_string()),
+            glyphslib::Plist::Dictionary(axis_mapping),
+        );
+    }
+
+    if mappings.is_empty() {
+        return None;
+    }
+
+    Some(glyphslib::common::CustomParameter {
+        name: "Axis Mappings".to_string(),
+        value: glyphslib::Plist::Dictionary(mappings),
+        disabled: false,
+    })
 }
 
 /// Express babelfont's native vertical metrics as Glyphs `vertWidth` and
@@ -1553,6 +1625,11 @@ pub(crate) fn as_glyphs3(font: &Font) -> Result<glyphs3::Glyphs3, BabelfontError
     let mut custom_parameters = serialize_custom_parameters(&font.format_specific);
     // Now overlay any font-level custom parameters in the font structure (custom_ot_values etc)
     export_font_level_cps(&mut custom_parameters, &mut font)?;
+    // Drop the font's Axis Mappings in favour of the authoritative axis.map
+    custom_parameters.retain(|cp| cp.name != "Axis Mappings");
+    if let Some(axis_mappings) = axis_mappings_custom_parameter(&font) {
+        custom_parameters.push(axis_mappings);
+    }
 
     let family_name = font
         .names
@@ -2684,6 +2761,223 @@ weightClass = 700;
         assert_eq!(user(axis, |a| a.min), Some(400.0));
         assert_eq!(user(axis, |a| a.max), Some(700.0));
         assert_eq!(user(axis, |a| a.default), Some(400.0));
+    }
+
+    #[test]
+    fn non_derivable_axis_map_survives_a_glyphs_round_trip() {
+        // A map with more points than the masters can supply has to be written
+        // as an explicit "Axis Mappings" custom parameter, otherwise the
+        // reloader collapses it to the points it can re-derive (here a single
+        // master-derived identity pair). This is what a designspace `<map>`
+        // loses when it round-trips through Glyphs without the parameter.
+        let mut font = Font::new();
+
+        let mut weight = Axis::new("Weight", Tag::new(b"wght"));
+        weight.min = Some(UserCoord::new(100.0));
+        weight.max = Some(UserCoord::new(900.0));
+        weight.default = Some(UserCoord::new(400.0));
+        weight.map = Some(vec![
+            (UserCoord::new(100.0), DesignCoord::new(0.0)),
+            (UserCoord::new(400.0), DesignCoord::new(94.0)),
+            (UserCoord::new(700.0), DesignCoord::new(152.0)),
+            (UserCoord::new(900.0), DesignCoord::new(200.0)),
+        ]);
+        font.axes.push(weight);
+
+        // Two masters whose design locations only pin down two of those points.
+        font.masters.push(Master::new(
+            "Light",
+            "m01",
+            DesignLocation::from(vec![(Tag::new(b"wght"), DesignCoord::new(94.0))]),
+        ));
+        font.masters.push(Master::new(
+            "Black",
+            "m02",
+            DesignLocation::from(vec![(Tag::new(b"wght"), DesignCoord::new(152.0))]),
+        ));
+
+        let glyphs = as_glyphs3(&font).unwrap();
+        // The writer must have decided the map can't be re-derived and emitted
+        // an explicit parameter rather than dropping it.
+        assert!(
+            glyphs
+                .custom_parameters
+                .iter()
+                .any(|cp| cp.name == "Axis Mappings"),
+            "expected an Axis Mappings custom parameter to preserve the map"
+        );
+        let serialized = glyphslib::Font::Glyphs3(glyphs).to_string().unwrap();
+        let reloaded = load_str(&serialized, PathBuf::from("roundtrip.glyphs")).unwrap();
+
+        let axis = &reloaded.axes[0];
+        assert_eq!(axis.tag, Tag::new(b"wght"));
+        assert_eq!(
+            axis_map(axis),
+            vec![(100.0, 0.0), (400.0, 94.0), (700.0, 152.0), (900.0, 200.0),]
+        );
+        assert_eq!(user(axis, |a| a.min), Some(100.0));
+        assert_eq!(user(axis, |a| a.max), Some(900.0));
+        assert_eq!(user(axis, |a| a.default), Some(400.0));
+    }
+
+    #[test]
+    fn derivable_axis_map_needs_no_custom_parameter() {
+        // The same map the loader re-derives from the instances' weight classes
+        // must not be written back out as an explicit "Axis Mappings"
+        // parameter; that would be noise, not preservation.
+        let mut font = Font::new();
+
+        let mut weight = Axis::new("Weight", Tag::new(b"wght"));
+        weight.min = Some(UserCoord::new(400.0));
+        weight.max = Some(UserCoord::new(700.0));
+        weight.default = Some(UserCoord::new(400.0));
+        weight.map = Some(vec![
+            (UserCoord::new(400.0), DesignCoord::new(94.0)),
+            (UserCoord::new(700.0), DesignCoord::new(152.0)),
+        ]);
+        font.axes.push(weight);
+
+        font.masters.push(Master::new(
+            "Regular",
+            "m01",
+            DesignLocation::from(vec![(Tag::new(b"wght"), DesignCoord::new(94.0))]),
+        ));
+        font.masters.push(Master::new(
+            "Bold",
+            "m02",
+            DesignLocation::from(vec![(Tag::new(b"wght"), DesignCoord::new(152.0))]),
+        ));
+
+        for (name, design, weight_class) in [("Regular", 94.0, 400), ("Bold", 152.0, 700)] {
+            let mut instance = crate::Instance::default();
+            instance.name.set_default(name.to_string());
+            instance.location =
+                DesignLocation::from(vec![(Tag::new(b"wght"), DesignCoord::new(design))]);
+            instance.format_specific.insert(
+                super::KEY_WEIGHT_CLASS.to_string(),
+                serde_json::json!(weight_class),
+            );
+            font.instances.push(instance);
+        }
+
+        let glyphs = as_glyphs3(&font).unwrap();
+        assert!(
+            !glyphs
+                .custom_parameters
+                .iter()
+                .any(|cp| cp.name == "Axis Mappings"),
+            "a derivable mapping must not be written as an explicit parameter"
+        );
+    }
+
+    #[test]
+    fn axis_mappings_custom_parameter_is_consumed_on_load() {
+        let font = load_test_font(
+            r#"{
+.formatVersion = 3;
+familyName = MappingsConsumedTest;
+date = "2024-05-08 05:56:55 +0000";
+unitsPerEm = 1000;
+versionMajor = 1;
+versionMinor = 0;
+axes = (
+{
+name = Weight;
+tag = wght;
+}
+);
+customParameters = (
+{
+name = "Axis Mappings";
+value = {
+wght = {
+300 = 1;
+900 = 199;
+};
+};
+}
+);
+metrics = ();
+fontMaster = (
+{
+id = m01;
+name = Light;
+axesValues = (1);
+metricValues = ();
+},
+{
+id = m02;
+name = Black;
+axesValues = (199);
+metricValues = ();
+}
+);
+glyphs = ();
+instances = ();
+}
+"#,
+        );
+
+        // The mapping is folded into the native field...
+        assert_eq!(axis_map(&font.axes[0]), vec![(300.0, 1.0), (900.0, 199.0)]);
+        // ...and the custom parameter stash is cleared, so `axis.map` is the
+        // single source of truth for any later export.
+        assert!(super::get_cp(&font.format_specific, "Axis Mappings").is_none());
+    }
+
+    #[test]
+    fn edited_axis_map_overrides_a_stashed_mapping_on_export() {
+        let mut font = Font::new();
+
+        let mut weight = Axis::new("Weight", Tag::new(b"wght"));
+        weight.min = Some(UserCoord::new(300.0));
+        weight.max = Some(UserCoord::new(900.0));
+        weight.default = Some(UserCoord::new(300.0));
+        weight.map = Some(vec![
+            (UserCoord::new(300.0), DesignCoord::new(1.0)),
+            (UserCoord::new(900.0), DesignCoord::new(199.0)),
+        ]);
+        font.axes.push(weight);
+
+        font.masters.push(Master::new(
+            "Light",
+            "m01",
+            DesignLocation::from(vec![(Tag::new(b"wght"), DesignCoord::new(1.0))]),
+        ));
+        font.masters.push(Master::new(
+            "Black",
+            "m02",
+            DesignLocation::from(vec![(Tag::new(b"wght"), DesignCoord::new(199.0))]),
+        ));
+
+        // A stale stash left behind by an older load must not shadow the edited
+        // native map, and must not be written out alongside a regenerated one.
+        font.format_specific.insert(
+            format!("{}{}", super::KEY_CUSTOM_PARAMETERS, "Axis Mappings"),
+            serde_json::json!({
+                "value": { "wght": { "400": 94.0, "700": 152.0 } },
+                "disabled": false,
+            }),
+        );
+
+        let glyphs = as_glyphs3(&font).unwrap();
+        let axis_mappings: Vec<_> = glyphs
+            .custom_parameters
+            .iter()
+            .filter(|cp| cp.name == "Axis Mappings")
+            .collect();
+        assert_eq!(
+            axis_mappings.len(),
+            1,
+            "the stale mapping must be dropped, not duplicated"
+        );
+
+        let serialized = glyphslib::Font::Glyphs3(glyphs).to_string().unwrap();
+        let reloaded = load_str(&serialized, PathBuf::from("roundtrip.glyphs")).unwrap();
+        assert_eq!(
+            axis_map(&reloaded.axes[0]),
+            vec![(300.0, 1.0), (900.0, 199.0)]
+        );
     }
 
     #[cfg(feature = "ufo")]
