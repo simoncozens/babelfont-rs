@@ -1,6 +1,6 @@
 [package]
 name = "fontmerge"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 rust-version = "1.85"
 authors = ["Simon Cozens <simon@simon-cozens.org>"]
@@ -26,7 +26,7 @@ required-features = ["cli"]
 cli = ["indicatif", "clap", "env_logger", "clap-verbosity-flag"]
 
 [dependencies]
-babelfont = { version = "0.2.1", path = "../babelfont" }
+babelfont = { version = "0.2.4", path = "../babelfont" }
 clap = { workspace = true, features = ["derive"], optional = true }
 log = { workspace = true }
 env_logger = { workspace = true, optional = true }
