@@ -326,6 +326,10 @@ fn load_metrics(
         MetricType::HheaDescender,
         fontref.hhea()?.descender().to_i16() as i32,
     );
+    metrics.insert(
+        MetricType::HheaLineGap,
+        fontref.hhea()?.line_gap().to_i16() as i32,
+    );
 
     // post stores the angle negative for a right lean; babelfont stores the
     // Glyphs convention, the opposite sign.
@@ -841,5 +845,11 @@ mod tests {
         let metrics = &font.masters[0].metrics;
         assert_eq!(metrics.get(&MetricType::XHeight), Some(&480));
         assert_eq!(metrics.get(&MetricType::CapHeight), Some(&700));
+    }
+    #[test]
+    fn test_hhea_line_gap() {
+        let font = load(STATIC_LEGACY).unwrap();
+        let metrics = &font.masters[0].metrics;
+        assert_eq!(metrics.get(&MetricType::HheaLineGap), Some(&25));
     }
 }
