@@ -268,20 +268,26 @@ fn load_metrics(
     font: &mut Font,
     loc: &fontdrasil::coords::Location<fontdrasil::coords::DesignSpace>,
 ) -> Result<IndexMap<MetricType, i32>, BabelfontError> {
-    let skrifa_metrics = fontref.metrics(
-        Size::unscaled(),
-        LocationRef::new(&fontdrasil_location_to_skrifa_location(
-            loc.clone(),
-            &font.axes,
-        )?),
-    );
+    let coords = fontdrasil_location_to_skrifa_location(loc.clone(), &font.axes)?;
+    let location = LocationRef::new(&coords);
+    let skrifa_metrics = fontref.metrics(Size::unscaled(), location);
     let mut metrics = IndexMap::new();
     metrics.insert(MetricType::Ascender, skrifa_metrics.ascent as i32);
     metrics.insert(MetricType::Descender, skrifa_metrics.descent as i32);
-    if let Some(x_height) = skrifa_metrics.x_height {
+    // OS/2 before version 2 has no sxHeight or sCapHeight; the specification
+    // defines them as the tops of U+0078 and U+0048
+    let glyph_metrics = fontref.glyph_metrics(Size::unscaled(), location);
+    let outline_top = |c: char| {
+        fontref
+            .charmap()
+            .map(c)
+            .and_then(|gid| glyph_metrics.bounds(gid))
+            .map(|bounds| bounds.y_max)
+    };
+    if let Some(x_height) = skrifa_metrics.x_height.or_else(|| outline_top('x')) {
         metrics.insert(MetricType::XHeight, x_height as i32);
     }
-    if let Some(cap_height) = skrifa_metrics.cap_height {
+    if let Some(cap_height) = skrifa_metrics.cap_height.or_else(|| outline_top('H')) {
         metrics.insert(MetricType::CapHeight, cap_height as i32);
     }
     if let Some(strikeout) = skrifa_metrics.strikeout {
@@ -828,5 +834,12 @@ mod tests {
     fn test_font_revision() {
         // head.fontRevision 2.005 (0x00020148)
         assert_eq!(load(STATIC_LEGACY).unwrap().version, (2, 5));
+    }
+    #[test]
+    fn test_heights_without_os2_v2() {
+        let font = load(STATIC_LEGACY).unwrap();
+        let metrics = &font.masters[0].metrics;
+        assert_eq!(metrics.get(&MetricType::XHeight), Some(&480));
+        assert_eq!(metrics.get(&MetricType::CapHeight), Some(&700));
     }
 }
