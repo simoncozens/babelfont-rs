@@ -1229,12 +1229,13 @@ pub fn unique_glyph_names(font: &skrifa::FontRef) -> Vec<SmolStr> {
     )
 }
 
-/// A glyph's post table name.
+/// A glyph's post table name; an unnamed glyph is named as fontTools names it.
 fn glyph_name(glyph_names: &GlyphNames, gid: GlyphId) -> String {
-    glyph_names
-        .get(gid)
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| format!("gid{:04}", gid))
+    match glyph_names.get(gid) {
+        Some(name) if !name.is_synthesized() => name.to_string(),
+        _ if gid.to_u32() == 0 => ".notdef".to_string(),
+        _ => format!("glyph{:05}", gid.to_u32()),
+    }
 }
 
 /// A glyph name with each character a feature file does not allow replaced by
@@ -1791,6 +1792,17 @@ lookup gpos_pair_1;
         );
         let fea = uncompile(&fontref, true).unwrap().as_fea("");
         assert!(fea.contains("sub a by dupe.1;"), "{fea}");
+    }
+
+    #[test]
+    fn test_unnamed_glyph_names() {
+        // post format 3 names no glyph
+        let data = std::fs::read("resources/noname.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        assert_eq!(
+            unique_glyph_names(&fontref),
+            [".notdef", "glyph00001", "glyph00002"]
+        );
     }
 
     #[test]
