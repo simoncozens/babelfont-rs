@@ -760,6 +760,7 @@ mod tests {
 
     const STATIC_LEGACY: &str = "resources/ttf/StaticLegacy.ttf";
     const GDEF_CLASSES: &str = "resources/ttf/GdefClasses.ttf";
+    const DUPLICATE_NAMES: &str = "resources/ttf/DuplicateNames.ttf";
 
     fn component_coeffs(font: &Font, glyph: &str) -> Vec<[f64; 6]> {
         font.glyphs.get(glyph).unwrap().layers[0]
@@ -910,5 +911,17 @@ mod tests {
             .map(|(_, name)| name)
             .collect();
         assert_eq!(ja, ["\u{3057}\u{3063}\u{307d}\u{308a}"]);
+    }
+    #[test]
+    fn test_duplicate_glyph_names() {
+        // the post table names glyphs 2 and 3 both "dupe"; Acomp uses glyph 3
+        let font = load(DUPLICATE_NAMES).unwrap();
+        let names: Vec<&str> = font.glyphs.iter().map(|g| g.name.as_str()).collect();
+        assert_eq!(names, [".notdef", "A", "dupe", "dupe.1", "Acomp"]);
+        let component = font.glyphs.get("Acomp").unwrap().layers[0]
+            .components()
+            .next()
+            .unwrap();
+        assert_eq!(component.reference, "dupe.1");
     }
 }
