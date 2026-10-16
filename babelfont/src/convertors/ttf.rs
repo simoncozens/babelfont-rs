@@ -506,6 +506,56 @@ fn fontdrasil_location_to_skrifa_location<Space: ConvertSpace<NormalizedSpace>>(
     Ok(coords)
 }
 
+/// How far a TrueType rasterizer shifts a glyph's stored outline when drawing
+/// it: by lsb - xMin, or for a composite with a USE_MY_METRICS component, by that
+/// component's shift. An empty glyph's xMin is 0. (At the default location, and
+/// without component deltas.)
+fn drawn_shift(
+    fontref: &skrifa::FontRef<'_>,
+    glyf: &glyf::Glyf<'_>,
+    gid: skrifa::GlyphId,
+    depth: usize,
+) -> Result<f64, BabelfontError> {
+    if depth > COMPOSITE_RECURSION_LIMIT {
+        return Err(BabelfontError::BinaryFontRead(format!(
+            "Glyph ID {} nests components too deeply",
+            gid.to_u32()
+        )));
+    }
+    let glyph = fontref.loca(None)?.get_glyf(gid, glyf)?;
+    let x_min = glyph.as_ref().map_or(0, |glyph| glyph.x_min()) as f64;
+    let lsb = fontref
+        .hmtx()?
+        .side_bearing(gid)
+        .map_or(x_min, |lsb| lsb as f64);
+    let mut shift = lsb - x_min;
+    if let Some(glyf::Glyph::Composite(composite)) = glyph {
+        for component in composite.components() {
+            if component
+                .flags
+                .contains(glyf::CompositeGlyphFlags::USE_MY_METRICS)
+            {
+                shift = drawn_shift(fontref, glyf, component.glyph.into(), depth + 1)?;
+            }
+        }
+    }
+    Ok(shift)
+}
+
+/// The shift a component's outline was read with (an empty one has none)
+fn read_shift(
+    fontref: &skrifa::FontRef<'_>,
+    glyf: &glyf::Glyf<'_>,
+    gid: skrifa::GlyphId,
+) -> Result<f64, BabelfontError> {
+    if fontref.loca(None)?.get_glyf(gid, glyf)?.is_none() {
+        return Ok(0.0);
+    }
+    drawn_shift(fontref, glyf, gid, 0)
+}
+
+const COMPOSITE_RECURSION_LIMIT: usize = 32;
+
 fn load_layer(
     axes: &[crate::Axis],
     fontref: &skrifa::FontRef<'_>,
@@ -541,6 +591,12 @@ fn load_layer(
         }
         glyf::Glyph::Composite(c) => {
             // This gets complex. :-/
+            //
+            // Simple glyphs are read as drawn (see drawn_shift). A composite is
+            // drawn from its components' stored outlines and then shifted, so
+            // each offset gains the composite's shift and loses the one its
+            // component was read with, transformed as the component is.
+            let shift = drawn_shift(fontref, &glyf, gid, 0)?;
             for component in c.components() {
                 let gid = component.glyph;
                 let anchor = match component.anchor {
@@ -555,9 +611,17 @@ fn load_layer(
                 let yx = component.transform.yx.to_f32() as f64;
                 let xy = component.transform.xy.to_f32() as f64;
                 let yy = component.transform.yy.to_f32() as f64;
+                let component_shift = read_shift(fontref, &glyf, gid.into())?;
                 // XXX apply deltas
                 // kurbo::Affine::new expects [xx, yx, xy, yy, dx, dy]
-                let our_affine = kurbo::Affine::new([xx, yx, xy, yy, anchor.0, anchor.1]);
+                let our_affine = kurbo::Affine::new([
+                    xx,
+                    yx,
+                    xy,
+                    yy,
+                    anchor.0 + shift - xx * component_shift,
+                    anchor.1 - yx * component_shift,
+                ]);
 
                 layer.shapes.push(crate::Shape::Component(crate::Component {
                     reference: names
@@ -582,6 +646,7 @@ fn load_layer(
 #[allow(clippy::unwrap_used, clippy::indexing_slicing)]
 mod tests {
     use super::*;
+    use kurbo::Shape as _;
 
     const STATIC_LEGACY: &str = "resources/ttf/StaticLegacy.ttf";
 
@@ -605,5 +670,53 @@ mod tests {
         let font = load(STATIC_LEGACY).unwrap();
         let coeffs = component_coeffs(&font, "barrot");
         assert_close(&coeffs[0][..4], &[0.0, 1.0, -1.0, 0.0]);
+    }
+    #[test]
+    fn test_glyphs_read_as_drawn() {
+        // every glyph, simple or composite, comes out where skrifa draws it
+        let binary = std::fs::read(STATIC_LEGACY).unwrap();
+        let fontref = skrifa::FontRef::new(&binary).unwrap();
+        let font = load(STATIC_LEGACY).unwrap();
+        for (gid, glyph) in font.glyphs.iter().enumerate() {
+            let mut pen = PathBuilder::new();
+            fontref
+                .outline_glyphs()
+                .get(GlyphId::new(gid as u32))
+                .unwrap()
+                .draw(
+                    DrawSettings::unhinted(Size::unscaled(), LocationRef::default()),
+                    &mut pen,
+                )
+                .unwrap();
+            let drawn = pen
+                .build()
+                .iter()
+                .map(|p| p.to_kurbo().unwrap().bounding_box())
+                .reduce(|a, b| a.union(b))
+                .unwrap_or_default();
+            let layer = &glyph.layers[0];
+            let mut paths: Vec<crate::Path> = layer.paths().cloned().collect();
+            for component in layer.components() {
+                paths.extend(component.decompose(None, |name, _| {
+                    let layer = &font.glyphs.get(name)?.layers[0];
+                    Some(crate::shape::ResolvedShapes {
+                        paths: layer.paths().cloned().collect(),
+                        components: layer.components().cloned().collect(),
+                    })
+                }));
+            }
+            let read = paths
+                .iter()
+                .map(|p| p.to_kurbo().unwrap().bounding_box())
+                .reduce(|a, b| a.union(b))
+                .unwrap_or_default();
+            assert_close(
+                &[read.x0, read.y0, read.x1, read.y1],
+                &[drawn.x0, drawn.y0, drawn.x1, drawn.y1],
+            );
+        }
+        assert_close(&component_coeffs(&font, "barflip")[0][4..], &[310.0, 600.0]);
+        let bars = component_coeffs(&font, "bars");
+        assert_close(&[bars[0][4], bars[1][4]], &[-5.0, 245.0]);
     }
 }
