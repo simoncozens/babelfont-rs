@@ -20,7 +20,7 @@ use skrifa::{
         TableProvider,
     },
     string::StringId,
-    GlyphId, MetadataProvider,
+    GlyphId, GlyphNames, MetadataProvider,
 };
 use smol_str::SmolStr;
 use sr_aef::fea_rs_ast::AsFea;
@@ -52,7 +52,42 @@ pub fn load<T: AsRef<std::path::Path>>(path: T) -> Result<Font, BabelfontError> 
     load_glyphs(&fontref, &mut font)?;
     load_features(&fontref, &mut font)?;
     load_legacy_kerning(&fontref, &mut font)?;
+    name_unnamed_glyphs(&fontref, &mut font)?;
     Ok(font)
+}
+
+/// Names each glyph that the post table leaves unnamed and the cmap encodes for
+/// its codepoint, as the Adobe Glyph List Specification does (uniXXXX, uXXXXX),
+/// wherever the glyph is used.
+fn name_unnamed_glyphs(fontref: &skrifa::FontRef, font: &mut Font) -> Result<(), BabelfontError> {
+    use crate::filters::FontFilter;
+    let names = GlyphNames::new(fontref);
+    let mut taken: HashSet<SmolStr> = font.glyphs.iter().map(|g| g.name.clone()).collect();
+    let mut renames = HashMap::new();
+    // glyph 0 is .notdef
+    for (gid, glyph) in font.glyphs.iter().enumerate().skip(1) {
+        if !names
+            .get(GlyphId::new(gid as u32))
+            .is_some_and(|name| name.is_synthesized())
+        {
+            continue;
+        }
+        let Some(codepoint) = glyph.codepoints.iter().min() else {
+            continue;
+        };
+        let name: SmolStr = if *codepoint <= 0xFFFF {
+            format!("uni{codepoint:04X}").into()
+        } else {
+            format!("u{codepoint:05X}").into()
+        };
+        if taken.insert(name.clone()) {
+            renames.insert(glyph.name.to_string(), name.to_string());
+        }
+    }
+    if !renames.is_empty() {
+        crate::filters::RenameGlyphs::new(renames).apply(font)?;
+    }
+    Ok(())
 }
 
 /// head.fontRevision as major and minor versions, the minor in thousandths as
@@ -962,6 +997,7 @@ mod tests {
     const GDEF_CLASSES: &str = "resources/ttf/GdefClasses.ttf";
     const DUPLICATE_NAMES: &str = "resources/ttf/DuplicateNames.ttf";
     const MARK_NO_GDEF: &str = "resources/ttf/MarkNoGdef.ttf";
+    const UNNAMED: &str = "resources/ttf/Unnamed.ttf";
 
     fn assert_category(
         font: &Font,
@@ -1227,5 +1263,27 @@ mod tests {
         // and ignores it when GPOS has a kern feature
         let font = load(GDEF_CLASSES).unwrap();
         assert!(font.masters[0].kerning.is_empty());
+    }
+    #[test]
+    fn test_unnamed_glyphs() {
+        // post format 3: encoded glyphs are named for their codepoints everywhere
+        let font = load(UNNAMED).unwrap();
+        let names: Vec<&str> = font.glyphs.iter().map(|g| g.name.as_str()).collect();
+        assert_eq!(names, [".notdef", "uni0041", "uni00C5", "glyph00003"]);
+        let component = font.glyphs.get("uni00C5").unwrap().layers[0]
+            .components()
+            .next()
+            .unwrap();
+        assert_eq!(component.reference, "uni0041");
+        assert_eq!(
+            font.masters[0]
+                .kerning
+                .get(&("uni0041".into(), "uni00C5".into())),
+            Some(&-50)
+        );
+        assert!(font
+            .features
+            .to_fea()
+            .contains("sub uni0041 by glyph00003;"));
     }
 }
