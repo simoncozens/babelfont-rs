@@ -1217,13 +1217,14 @@ pub fn uncompile_context<'a>(font: &'a skrifa::FontRef) -> Result<UncompileConte
     UncompileContext::new(font)
 }
 
-/// The glyph names the uncompiled features use: the post table's, made unique.
+/// The glyph names the uncompiled features use: the post table's, valid in a
+/// feature file and unique.
 pub fn unique_glyph_names(font: &skrifa::FontRef) -> Vec<SmolStr> {
     let glyph_names = GlyphNames::new(font);
     unique_names(
         (0..glyph_names.num_glyphs())
             .map(GlyphId::new)
-            .map(|gid| SmolStr::new(glyph_name(&glyph_names, gid)))
+            .map(|gid| fea_glyph_name(&glyph_name(&glyph_names, gid)))
             .collect(),
     )
 }
@@ -1234,6 +1235,25 @@ fn glyph_name(glyph_names: &GlyphNames, gid: GlyphId) -> String {
         .get(gid)
         .map(|s| s.to_string())
         .unwrap_or_else(|| format!("gid{:04}", gid))
+}
+
+/// A glyph name with each character a feature file does not allow replaced by
+/// `_`, and a leading `_` if it starts with a digit or a hyphen.
+fn fea_glyph_name(name: &str) -> SmolStr {
+    let mut out: String = name
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-') {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    if out.is_empty() || out.starts_with(|c: char| c.is_ascii_digit() || c == '-') {
+        out.insert(0, '_');
+    }
+    SmolStr::new(out)
 }
 
 /// Each name, or if an earlier glyph has it, the first free `.1`, `.2`, ...
@@ -1739,6 +1759,16 @@ lookup gpos_pair_1;
 } kern;
 "
         );
+    }
+
+    #[test]
+    fn test_fea_glyph_name() {
+        assert_eq!(fea_glyph_name("Numero sign"), "Numero_sign");
+        assert_eq!(fea_glyph_name("uni0300"), "uni0300");
+        assert_eq!(fea_glyph_name("1st"), "_1st");
+        assert_eq!(fea_glyph_name("-x"), "_-x");
+        assert_eq!(fea_glyph_name(""), "_");
+        assert_eq!(fea_glyph_name(".notdef"), ".notdef");
     }
 
     #[test]
