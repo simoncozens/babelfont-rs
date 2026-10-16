@@ -330,6 +330,11 @@ fn load_metrics(
         MetricType::HheaLineGap,
         fontref.hhea()?.line_gap().to_i16() as i32,
     );
+    if let Ok(vhea) = fontref.vhea() {
+        metrics.insert(MetricType::VheaAscender, vhea.ascender().to_i16() as i32);
+        metrics.insert(MetricType::VheaDescender, vhea.descender().to_i16() as i32);
+        metrics.insert(MetricType::VheaLineGap, vhea.line_gap().to_i16() as i32);
+    }
 
     // post stores the angle negative for a right lean; babelfont stores the
     // Glyphs convention, the opposite sign.
@@ -576,6 +581,28 @@ fn fontdrasil_location_to_skrifa_location<Space: ConvertSpace<NormalizedSpace>>(
     Ok(coords)
 }
 
+/// A glyph's vmtx advance, and its vertical origin: the top of its bounding box
+/// (0 for an empty glyph) plus its top side bearing.
+fn load_vertical_metrics(
+    fontref: &skrifa::FontRef<'_>,
+    gid: skrifa::GlyphId,
+    layer: &mut Layer,
+) -> Result<(), BabelfontError> {
+    let Ok(vmtx) = fontref.vmtx() else {
+        return Ok(());
+    };
+    let (Some(advance), Some(tsb)) = (vmtx.advance(gid), vmtx.side_bearing(gid)) else {
+        return Ok(());
+    };
+    let y_max = fontref
+        .loca(None)?
+        .get_glyf(gid, &fontref.glyf()?)?
+        .map_or(0, |glyph| glyph.y_max()) as f32;
+    layer.vertical_advance = Some(advance as f32);
+    layer.vertical_origin = Some(y_max + tsb as f32);
+    Ok(())
+}
+
 /// How far a TrueType rasterizer shifts a glyph's stored outline when drawing
 /// it: by lsb - xMin, or for a composite with a USE_MY_METRICS component, by that
 /// component's shift. An empty glyph's xMin is 0. (At the default location, and
@@ -638,6 +665,7 @@ fn load_layer(
     let width = fontref.glyph_metrics(Size::unscaled(), locationref);
     let mut layer = Layer::new(width.advance_width(gid).unwrap_or_default());
     layer.master = crate::LayerType::DefaultForMaster(master.id.clone());
+    load_vertical_metrics(fontref, gid, &mut layer)?;
 
     // Skrifa pens don't support components. Parse component glyphs manually.
     let glyf = fontref.glyf()?;
@@ -727,6 +755,7 @@ mod tests {
     use kurbo::Shape as _;
 
     const STATIC_LEGACY: &str = "resources/ttf/StaticLegacy.ttf";
+    const GDEF_CLASSES: &str = "resources/ttf/GdefClasses.ttf";
 
     fn component_coeffs(font: &Font, glyph: &str) -> Vec<[f64; 6]> {
         font.glyphs.get(glyph).unwrap().layers[0]
@@ -851,5 +880,17 @@ mod tests {
         let font = load(STATIC_LEGACY).unwrap();
         let metrics = &font.masters[0].metrics;
         assert_eq!(metrics.get(&MetricType::HheaLineGap), Some(&25));
+    }
+    #[test]
+    fn test_vertical_metrics() {
+        // vhea 900/-100/0; a: advance height 1000, tsb 100, yMax 500
+        let font = load(GDEF_CLASSES).unwrap();
+        let metrics = &font.masters[0].metrics;
+        assert_eq!(metrics.get(&MetricType::VheaAscender), Some(&900));
+        assert_eq!(metrics.get(&MetricType::VheaDescender), Some(&-100));
+        assert_eq!(metrics.get(&MetricType::VheaLineGap), Some(&0));
+        let layer = &font.glyphs.get("a").unwrap().layers[0];
+        assert_eq!(layer.vertical_advance, Some(1000.0));
+        assert_eq!(layer.vertical_origin, Some(600.0));
     }
 }
