@@ -586,7 +586,15 @@ fn load_layer(
                         &mut pen,
                     )
                     .map_err(|e| BabelfontError::BinaryFontRead(e.to_string()))?;
-                layer.shapes = pen.build().into_iter().map(crate::Shape::Path).collect();
+                // glyf contours run clockwise, a source's counter-clockwise
+                layer.shapes = pen
+                    .build()
+                    .into_iter()
+                    .map(|mut path| {
+                        path.reverse();
+                        crate::Shape::Path(path)
+                    })
+                    .collect();
             }
         }
         glyf::Glyph::Composite(c) => {
@@ -718,5 +726,22 @@ mod tests {
         assert_close(&component_coeffs(&font, "barflip")[0][4..], &[310.0, 600.0]);
         let bars = component_coeffs(&font, "bars");
         assert_close(&[bars[0][4], bars[1][4]], &[-5.0, 245.0]);
+    }
+    #[test]
+    fn test_contours_read_counter_clockwise() {
+        // x is a clockwise rectangle in the binary
+        let font = load(STATIC_LEGACY).unwrap();
+        let path = font.glyphs.get("x").unwrap().layers[0]
+            .paths()
+            .next()
+            .unwrap();
+        let n = path.nodes.len();
+        let area: f64 = (0..n)
+            .map(|i| {
+                let (a, b) = (&path.nodes[i], &path.nodes[(i + 1) % n]);
+                a.x * b.y - b.x * a.y
+            })
+            .sum();
+        assert!(area > 0.0, "{:?}", path.nodes);
     }
 }
