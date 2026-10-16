@@ -34,6 +34,7 @@ pub fn load<T: AsRef<std::path::Path>>(path: T) -> Result<Font, BabelfontError> 
     let fontref =
         skrifa::FontRef::new(&binary).map_err(|e| BabelfontError::BinaryFontRead(e.to_string()))?;
     font.upm = fontref.head()?.units_per_em();
+    font.version = font_version(&fontref)?;
 
     load_axes(&fontref, &mut font)?;
     load_axis_mappings(&fontref, &mut font)?;
@@ -44,6 +45,17 @@ pub fn load<T: AsRef<std::path::Path>>(path: T) -> Result<Font, BabelfontError> 
     load_glyphs(&fontref, &mut font)?;
     load_features(&fontref, &mut font)?;
     Ok(font)
+}
+
+/// head.fontRevision as major and minor versions, the minor in thousandths as
+/// Glyphs and UFO state it: 0x00003333 (0.19999) is 0.200
+fn font_version(fontref: &skrifa::FontRef) -> Result<(u16, u16), BabelfontError> {
+    let revision = fontref.head()?.font_revision().to_f64();
+    let thousandths = (revision * 1000.0).round();
+    Ok((
+        (thousandths / 1000.0).floor() as u16,
+        (thousandths % 1000.0) as u16,
+    ))
 }
 
 fn name_id_to_i18n(fontref: &skrifa::FontRef, name_id: StringId) -> crate::I18NDictionary {
@@ -811,5 +823,10 @@ mod tests {
         // USE_TYPO_METRICS; REGULAR is left to the compiler
         assert_eq!(ot.os2_fs_selection, Some(1 << 7));
         assert_eq!(ot.head_lowest_rec_ppem, Some(9));
+    }
+    #[test]
+    fn test_font_revision() {
+        // head.fontRevision 2.005 (0x00020148)
+        assert_eq!(load(STATIC_LEGACY).unwrap().version, (2, 5));
     }
 }
