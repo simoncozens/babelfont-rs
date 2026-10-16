@@ -121,7 +121,31 @@ fn load_names(fontref: &skrifa::FontRef, font: &mut Font) -> Result<(), Babelfon
     Ok(())
 }
 
+/// A static font's style as an application reads it: the typographic
+/// subfamily, else the subfamily.
+fn style_name(fontref: &skrifa::FontRef) -> crate::I18NDictionary {
+    for name_id in [
+        StringId::TYPOGRAPHIC_SUBFAMILY_NAME,
+        StringId::SUBFAMILY_NAME,
+    ] {
+        let name = name_id_to_i18n(fontref, name_id);
+        if name.get_default().is_some() {
+            return name;
+        }
+    }
+    "Regular".into()
+}
+
 fn load_instances(fontref: &skrifa::FontRef, font: &mut Font) -> Result<(), BabelfontError> {
+    if font.axes.is_empty() {
+        // A static font is the one instance of its one master
+        font.instances.push(Instance {
+            id: "0".to_string(),
+            name: style_name(fontref),
+            ..Default::default()
+        });
+        return Ok(());
+    }
     for (id, instance) in fontref.named_instances().iter().enumerate() {
         let name = name_id_to_i18n(fontref, instance.subfamily_name_id());
         let coordinates = instance.location();
@@ -194,7 +218,11 @@ fn load_masters(fontref: &skrifa::FontRef, font: &mut Font) -> Result<(), Babelf
     }
 
     font.masters.push(crate::Master {
-        name: "Default".into(),
+        name: if font.axes.is_empty() {
+            style_name(fontref)
+        } else {
+            "Default".into()
+        },
         id: uuid::Uuid::new_v4().to_string(),
         location: default_location,
         metrics,
@@ -743,5 +771,14 @@ mod tests {
             })
             .sum();
         assert!(area > 0.0, "{:?}", path.nodes);
+    }
+    #[test]
+    fn test_static_font_master_and_instance() {
+        // named after the style: ID 17, not ID 2
+        let font = load(STATIC_LEGACY).unwrap();
+        assert_eq!(font.masters.len(), 1);
+        assert_eq!(font.masters[0].name.get_default().unwrap(), "Medium");
+        assert_eq!(font.instances.len(), 1);
+        assert_eq!(font.instances[0].name.get_default().unwrap(), "Medium");
     }
 }
