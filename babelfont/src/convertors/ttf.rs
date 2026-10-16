@@ -580,6 +580,11 @@ fn load_features(fontref: &skrifa::FontRef, font: &mut Font) -> Result<(), Babel
             PossiblyAutomaticCode::new(language_systems_block),
         );
     }
+    if let Some(glyph_classes) = gdef_glyph_classes(fontref, font)? {
+        features
+            .prefixes
+            .insert("GDEF".into(), PossiblyAutomaticCode::new(glyph_classes));
+    }
     if !mark_class_definitions.is_empty() {
         features.prefixes.insert(
             "MarkClasses".into(),
@@ -600,6 +605,44 @@ fn load_features(fontref: &skrifa::FontRef, font: &mut Font) -> Result<(), Babel
     }
     font.features = features;
     Ok(())
+}
+
+/// GDEF's glyph classes as a GlyphClassDef statement, so that a compiler keeps
+/// them rather than deriving its own
+fn gdef_glyph_classes(
+    fontref: &skrifa::FontRef,
+    font: &Font,
+) -> Result<Option<String>, BabelfontError> {
+    let Ok(gdef) = fontref.gdef() else {
+        return Ok(None);
+    };
+    let Some(class_def) = gdef.glyph_class_def().transpose()? else {
+        return Ok(None);
+    };
+    let mut classes: [Vec<&str>; 4] = Default::default();
+    for (gid, class) in class_def.iter() {
+        let glyph = font.glyphs.get_by_index(gid.to_u32() as usize);
+        let members = (class as usize)
+            .checked_sub(1)
+            .and_then(|index| classes.get_mut(index));
+        if let (Some(glyph), Some(members)) = (glyph, members) {
+            members.push(glyph.name.as_str());
+        }
+    }
+    let classes = classes
+        .iter()
+        .map(|members| {
+            if members.is_empty() {
+                String::new()
+            } else {
+                fea_rs_ast::GlyphContainer::new_class(members).as_fea("")
+            }
+        })
+        .join(", ");
+    Ok(Some(format!(
+        "table GDEF {{\n    GlyphClassDef {};\n}} GDEF;",
+        classes
+    )))
 }
 
 fn get_x_y_location_for_anchor(
@@ -1098,5 +1141,15 @@ mod tests {
         for glyph in ["a", "commaaccent", "uni034F"] {
             assert_category(&font, glyph, GlyphCategory::Base, None);
         }
+    }
+    #[test]
+    fn test_gdef_glyph_classes() {
+        let font = load(GDEF_CLASSES).unwrap();
+        assert_eq!(
+            font.features.prefixes.get("GDEF").unwrap().code,
+            "table GDEF {\n    GlyphClassDef [a gravecomb \\script], [f_f], [acutecomb tildecomb], ;\n} GDEF;"
+        );
+        let font = load(STATIC_LEGACY).unwrap();
+        assert!(font.features.prefixes.get("GDEF").is_none());
     }
 }
