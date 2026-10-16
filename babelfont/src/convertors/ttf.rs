@@ -38,6 +38,7 @@ pub fn load<T: AsRef<std::path::Path>>(path: T) -> Result<Font, BabelfontError> 
     load_axes(&fontref, &mut font)?;
     load_axis_mappings(&fontref, &mut font)?;
     load_names(&fontref, &mut font)?;
+    load_custom_ot_values(&fontref, &mut font)?;
     load_instances(&fontref, &mut font)?;
     load_masters(&fontref, &mut font)?;
     load_glyphs(&fontref, &mut font)?;
@@ -116,8 +117,27 @@ fn load_names(fontref: &skrifa::FontRef, font: &mut Font) -> Result<(), Babelfon
             *record = name_id_to_i18n(fontref, name_id);
         }
     }
+    Ok(())
+}
 
-    font.custom_ot_values.os2_vendor_id = Some(fontref.os2()?.ach_vend_id());
+/// The fsSelection bits a source states; a compiler sets ITALIC, BOLD and
+/// REGULAR from the style.
+const SOURCE_FS_SELECTION_BITS: u16 = !(1 << 0 | 1 << 5 | 1 << 6);
+
+fn load_custom_ot_values(fontref: &skrifa::FontRef, font: &mut Font) -> Result<(), BabelfontError> {
+    let os2 = fontref.os2()?;
+    let ot = &mut font.custom_ot_values;
+    ot.os2_vendor_id = Some(os2.ach_vend_id());
+    ot.os2_fs_type = Some(os2.fs_type());
+    ot.os2_family_class = Some(os2.s_family_class() as u16);
+    ot.os2_panose = os2.panose_10().try_into().ok();
+    ot.os2_fs_selection = Some(os2.fs_selection().bits() & SOURCE_FS_SELECTION_BITS);
+    ot.head_lowest_rec_ppem = Some(fontref.head()?.lowest_rec_ppem());
+    // A variable font's weight and width classes describe its default instance only
+    if font.axes.is_empty() {
+        ot.os2_us_weight_class = Some(os2.us_weight_class());
+        ot.os2_us_width_class = Some(os2.us_width_class());
+    }
     Ok(())
 }
 
@@ -780,5 +800,16 @@ mod tests {
         assert_eq!(font.masters[0].name.get_default().unwrap(), "Medium");
         assert_eq!(font.instances.len(), 1);
         assert_eq!(font.instances[0].name.get_default().unwrap(), "Medium");
+    }
+    #[test]
+    fn test_os2_values() {
+        let ot = load(STATIC_LEGACY).unwrap().custom_ot_values;
+        assert_eq!(ot.os2_us_weight_class, Some(500));
+        assert_eq!(ot.os2_us_width_class, Some(6));
+        assert_eq!(ot.os2_fs_type, Some(0));
+        assert_eq!(ot.os2_panose, Some([2, 0, 6, 3, 0, 0, 0, 0, 0, 0]));
+        // USE_TYPO_METRICS; REGULAR is left to the compiler
+        assert_eq!(ot.os2_fs_selection, Some(1 << 7));
+        assert_eq!(ot.head_lowest_rec_ppem, Some(9));
     }
 }
