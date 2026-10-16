@@ -16,7 +16,7 @@ use skrifa::{
     outline::DrawSettings,
     prelude::{LocationRef, Size},
     raw::{
-        tables::{glyf, gpos::PositionSubtables},
+        tables::{glyf, gpos::PositionSubtables, kern},
         TableProvider,
     },
     string::StringId,
@@ -51,6 +51,7 @@ pub fn load<T: AsRef<std::path::Path>>(path: T) -> Result<Font, BabelfontError> 
     load_masters(&fontref, &mut font)?;
     load_glyphs(&fontref, &mut font)?;
     load_features(&fontref, &mut font)?;
+    load_legacy_kerning(&fontref, &mut font)?;
     Ok(font)
 }
 
@@ -607,6 +608,67 @@ fn load_features(fontref: &skrifa::FontRef, font: &mut Font) -> Result<(), Babel
     Ok(())
 }
 
+/// A kern table's horizontal format 0 pairs as the default master's kerning,
+/// read as a shaper applies them: only without a GPOS kern feature, summed
+/// across subtables, and never across a mark.
+fn load_legacy_kerning(fontref: &skrifa::FontRef, font: &mut Font) -> Result<(), BabelfontError> {
+    let Ok(kern) = fontref.kern() else {
+        return Ok(());
+    };
+    if let Ok(gpos) = fontref.gpos() {
+        if gpos
+            .feature_list()?
+            .feature_records()
+            .iter()
+            .any(|record| record.feature_tag() == Tag::new(b"kern"))
+        {
+            return Ok(());
+        }
+    }
+    let has_classes = fontref
+        .gdef()
+        .is_ok_and(|gdef| gdef.glyph_class_def().is_some());
+    let is_mark = |glyph: &Glyph| {
+        if has_classes {
+            glyph.category == GlyphCategory::Mark
+        } else {
+            shaper_mark(glyph)
+        }
+    };
+    let mut pairs: IndexMap<(SmolStr, SmolStr), i32> = IndexMap::new();
+    for subtable in kern.subtables() {
+        let subtable = subtable?;
+        if !subtable.is_horizontal() || subtable.is_cross_stream() || subtable.is_variable() {
+            continue;
+        }
+        let Ok(kern::SubtableKind::Format0(format0)) = subtable.kind() else {
+            log::warn!("Only format 0 kern subtables are read");
+            continue;
+        };
+        for pair in format0.pairs() {
+            let left = font.glyphs.get_by_index(pair.left().to_u32() as usize);
+            let right = font.glyphs.get_by_index(pair.right().to_u32() as usize);
+            if let (Some(left), Some(right)) = (left, right) {
+                if is_mark(left) || is_mark(right) {
+                    continue;
+                }
+                *pairs
+                    .entry((left.name.clone(), right.name.clone()))
+                    .or_default() += pair.value() as i32;
+            }
+        }
+    }
+    // The default master is the last one pushed
+    if let Some(master) = font.masters.last_mut() {
+        for (pair, value) in pairs {
+            master
+                .kerning
+                .insert(pair, value.clamp(i16::MIN as i32, i16::MAX as i32) as i16);
+        }
+    }
+    Ok(())
+}
+
 /// GDEF's glyph classes as a GlyphClassDef statement, so that a compiler keeps
 /// them rather than deriving its own
 fn gdef_glyph_classes(
@@ -1151,5 +1213,19 @@ mod tests {
         );
         let font = load(STATIC_LEGACY).unwrap();
         assert!(font.features.prefixes.get("GDEF").is_none());
+    }
+    #[test]
+    fn test_legacy_kerning() {
+        // two subtables; x x is in both
+        let font = load(STATIC_LEGACY).unwrap();
+        let kerning = &font.masters[0].kerning;
+        assert_eq!(kerning.get(&("x".into(), "H".into())), Some(&-30));
+        assert_eq!(kerning.get(&("H".into(), "x".into())), Some(&-20));
+        assert_eq!(kerning.get(&("x".into(), "x".into())), Some(&10));
+        // a shaper skips marks applying the table
+        assert_eq!(kerning.get(&("x".into(), "gravecomb".into())), None);
+        // and ignores it when GPOS has a kern feature
+        let font = load(GDEF_CLASSES).unwrap();
+        assert!(font.masters[0].kerning.is_empty());
     }
 }
