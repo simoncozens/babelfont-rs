@@ -430,6 +430,13 @@ fn load_features(fontref: &skrifa::FontRef, font: &mut Font) -> Result<(), Babel
     }
 
     // Do the same but for mark classes.
+    // The lookups name the mark classes, so they are defined too
+    let mark_class_definitions = uncompile_context
+        .mark_classes
+        .values()
+        .flatten()
+        .map(|definition| definition.as_fea(""))
+        .join("\n");
     for (anchor_name, classdefs) in uncompile_context.mark_classes {
         let anchor_name = format!("_{}", anchor_name);
         for definition in classdefs.iter() {
@@ -490,6 +497,12 @@ fn load_features(fontref: &skrifa::FontRef, font: &mut Font) -> Result<(), Babel
         features.prefixes.insert(
             "LanguageSystems".into(),
             PossiblyAutomaticCode::new(language_systems_block),
+        );
+    }
+    if !mark_class_definitions.is_empty() {
+        features.prefixes.insert(
+            "MarkClasses".into(),
+            PossiblyAutomaticCode::new(mark_class_definitions),
         );
     }
     for (lookup_name, statements) in uncompile_context.lookups.iter() {
@@ -934,5 +947,23 @@ mod tests {
             .features
             .to_fea()
             .contains("= [a gravecomb acutecomb tildecomb f_f\n];"));
+    }
+    #[test]
+    fn test_mark_classes_defined() {
+        // every mark class a lookup names has a markClass statement
+        let fea = load(GDEF_CLASSES).unwrap().features.to_fea();
+        let used: Vec<&str> = fea
+            .split("mark @")
+            .skip(1)
+            .map(|rest| {
+                rest.split(|c: char| c == ';' || c.is_whitespace())
+                    .next()
+                    .unwrap()
+            })
+            .collect();
+        assert!(!used.is_empty(), "{fea}");
+        for class in used {
+            assert!(fea.contains(&format!("> @{class};")), "@{class}: {fea}");
+        }
     }
 }
