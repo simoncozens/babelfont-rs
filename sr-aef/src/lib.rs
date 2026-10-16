@@ -137,6 +137,8 @@ pub struct UncompileContext<'a> {
     #[cfg_attr(feature = "cli", serde(skip))]
     axes: Option<fontdrasil::types::Axes>,
     num_glyphs: u16,
+    /// Lookups whose rules were written into aalt
+    aalt_lookups: IndexSet<SmolStr>,
 }
 
 impl<'a> UncompileContext<'a> {
@@ -188,6 +190,7 @@ impl<'a> UncompileContext<'a> {
                 .unwrap_or_default(),
             axes: variations::fontdrasil_axes(font)?,
             num_glyphs: glyph_names.num_glyphs() as u16,
+            aalt_lookups: IndexSet::new(),
         };
         slf.gather_language_systems()?;
         slf.uncompile_gsub_lookups()?;
@@ -802,6 +805,22 @@ impl<'a> UncompileContext<'a> {
                 }
             }
         }
+        // A lookup written into aalt is dropped unless something else uses it
+        let used: HashSet<SmolStr> = self
+            .features
+            .values()
+            .flatten()
+            .filter_map(|statement| match statement {
+                Statement::LookupReference(reference) => Some(SmolStr::new(&reference.lookup_name)),
+                _ => None,
+            })
+            .chain(self.lookups.values().flat_map(called_lookups))
+            .collect();
+        for name in std::mem::take(&mut self.aalt_lookups) {
+            if !used.contains(&name) {
+                self.lookups.shift_remove(&name);
+            }
+        }
     }
 
     /// Build script, language, and lookup statements for feature registrations.
@@ -954,6 +973,36 @@ impl<'a> UncompileContext<'a> {
     }
 
     fn add_feature_lookups(&mut self, feature_tag: Tag, lookups: Vec<Statement>) {
+        // aalt may contain only single and alternate substitutions, so its
+        // lookups are written out as their rules
+        let lookups = if feature_tag == Tag::new(b"aalt") {
+            lookups
+                .into_iter()
+                .flat_map(|statement| match &statement {
+                    Statement::LookupReference(reference) => self
+                        .lookups
+                        .get(reference.lookup_name.as_str())
+                        .map(|block| {
+                            self.aalt_lookups.insert(block.name.clone());
+                            block
+                                .statements
+                                .iter()
+                                .filter(|s| {
+                                    matches!(
+                                        s,
+                                        Statement::SingleSubst(_) | Statement::AlternateSubst(_)
+                                    )
+                                })
+                                .cloned()
+                                .collect()
+                        })
+                        .unwrap_or_else(|| vec![statement]),
+                    _ => vec![statement],
+                })
+                .collect()
+        } else {
+            lookups
+        };
         let statements = self
             .features
             .entry(feature_tag.to_string().into())
@@ -1656,6 +1705,20 @@ lookup gpos_pair_1;
 } kern;
 "
         );
+    }
+
+    #[test]
+    fn test_uncompile_aalt_rules() {
+        let data = std::fs::read("resources/aalt.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let fea = uncompile(&fontref, true).unwrap().as_fea("");
+        let aalt = &fea[fea.find("feature aalt").unwrap()..fea.find("} aalt;").unwrap()];
+        assert!(!aalt.contains("lookup "), "{fea}");
+        assert!(aalt.contains("sub a by a.alt1;"), "{fea}");
+        assert!(aalt.contains("sub b from [b.alt1 b.alt2];"), "{fea}");
+        // salt also uses the single substitution; nothing else uses the alternate one
+        assert!(fea.contains("lookup gsub_single_1 {"), "{fea}");
+        assert!(!fea.contains("lookup gsub_alternate_1 {"), "{fea}");
     }
 
     #[test]
