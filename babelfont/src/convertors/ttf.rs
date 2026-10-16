@@ -13,7 +13,7 @@ use skrifa::{
     prelude::{LocationRef, Size},
     raw::{tables::glyf, TableProvider},
     string::StringId,
-    GlyphId, GlyphNames, MetadataProvider,
+    GlyphId, MetadataProvider,
 };
 use smol_str::SmolStr;
 use sr_aef::fea_rs_ast::AsFea;
@@ -271,17 +271,10 @@ fn load_metrics(
 }
 
 fn load_glyphs(fontref: &skrifa::FontRef, font: &mut Font) -> Result<(), BabelfontError> {
-    let glyph_count = fontref.maxp()?.num_glyphs() as u32;
-    let names = GlyphNames::new(fontref);
-    for glyph_id_u32 in 0..glyph_count {
-        let gid = skrifa::GlyphId::new(glyph_id_u32);
-        let proposed_name = names
-            .get(gid)
-            .ok_or(BabelfontError::BinaryFontRead(format!(
-                "Glyph ID {} does not have a name in the font's 'post' table",
-                glyph_id_u32
-            )))?;
-        let mut glyph = Glyph::new(proposed_name.as_str());
+    // the names the uncompiled features use
+    let names = sr_aef::unique_glyph_names(fontref);
+    for name in &names {
+        let mut glyph = Glyph::new(name.as_str());
         glyph.exported = true;
         font.glyphs.push(glyph);
     }
@@ -518,7 +511,7 @@ fn load_layer(
     fontref: &skrifa::FontRef<'_>,
     gid: skrifa::GlyphId,
     master: &crate::Master,
-    names: &skrifa::GlyphNames<'_>,
+    names: &[SmolStr],
 ) -> Result<crate::Layer, BabelfontError> {
     let loc = fontdrasil_location_to_skrifa_location(master.location.clone(), axes)?;
     let locationref = LocationRef::new(&loc);
@@ -569,13 +562,12 @@ fn load_layer(
 
                 layer.shapes.push(crate::Shape::Component(crate::Component {
                     reference: names
-                        .get(gid.into())
+                        .get(gid.to_u32() as usize)
                         .ok_or(BabelfontError::BinaryFontRead(format!(
-                            "Component glyph ID {} does not have a name in the font's 'post' table",
+                            "Component glyph ID {} is not in the font",
                             gid.to_u32()
                         )))?
-                        .to_string()
-                        .into(),
+                        .clone(),
                     transform: our_affine.into(),
                     location: IndexMap::new(), // We don't have per-component locations in TTF, so leave this empty
                     format_specific: FormatSpecific::default(),

@@ -146,19 +146,10 @@ impl<'a> UncompileContext<'a> {
         let glyph_names = GlyphNames::new(font);
         let default = LocationRef::default();
         let glyph_metrics = GlyphMetrics::new(font, Size::unscaled(), default);
-        let glyph_id_to_name: HashMap<GlyphId, SmolStr> = (0..glyph_names.num_glyphs())
-            .map(GlyphId::new)
-            .map(|gid| {
-                (
-                    gid,
-                    SmolStr::new(
-                        glyph_names
-                            .get(gid)
-                            .map(|s| s.to_string())
-                            .unwrap_or_else(|| format!("gid{:04}", gid)),
-                    ),
-                )
-            })
+        let glyph_id_to_name: HashMap<GlyphId, SmolStr> = unique_glyph_names(font)
+            .into_iter()
+            .enumerate()
+            .map(|(gid, name)| (GlyphId::new(gid as u32), name))
             .collect();
         let glyph_name_to_id = glyph_id_to_name
             .iter()
@@ -1226,6 +1217,49 @@ pub fn uncompile_context<'a>(font: &'a skrifa::FontRef) -> Result<UncompileConte
     UncompileContext::new(font)
 }
 
+/// The glyph names the uncompiled features use: the post table's, made unique.
+pub fn unique_glyph_names(font: &skrifa::FontRef) -> Vec<SmolStr> {
+    let glyph_names = GlyphNames::new(font);
+    unique_names(
+        (0..glyph_names.num_glyphs())
+            .map(GlyphId::new)
+            .map(|gid| SmolStr::new(glyph_name(&glyph_names, gid)))
+            .collect(),
+    )
+}
+
+/// A glyph's post table name.
+fn glyph_name(glyph_names: &GlyphNames, gid: GlyphId) -> String {
+    glyph_names
+        .get(gid)
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| format!("gid{:04}", gid))
+}
+
+/// Each name, or if an earlier glyph has it, the first free `.1`, `.2`, ...
+/// suffix, as fontTools does. A suffixed name loses a leading period, which a
+/// feature file allows only in `.notdef` and `.null`.
+fn unique_names(names: Vec<SmolStr>) -> Vec<SmolStr> {
+    let all: HashSet<SmolStr> = names.iter().cloned().collect();
+    let mut taken: HashSet<SmolStr> = HashSet::new();
+    names
+        .into_iter()
+        .map(|name| {
+            if taken.insert(name.clone()) {
+                return name;
+            }
+            let base = match name.strip_prefix('.') {
+                Some(rest) => format!("_{rest}"),
+                None => name.to_string(),
+            };
+            (1..)
+                .map(|n| SmolStr::new(format!("{base}.{n}")))
+                .find(|candidate| !all.contains(candidate) && taken.insert(candidate.clone()))
+                .unwrap_or(name)
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use fea_rs_ast::AsFea;
@@ -1705,6 +1739,28 @@ lookup gpos_pair_1;
 } kern;
 "
         );
+    }
+
+    #[test]
+    fn test_unique_names() {
+        let names = [".notdef", ".notdef", "a", "a", "a.1"].map(SmolStr::new);
+        assert_eq!(
+            unique_names(names.to_vec()),
+            [".notdef", "_notdef.1", "a", "a.2", "a.1"]
+        );
+    }
+
+    #[test]
+    fn test_unique_glyph_names() {
+        // the post table names glyphs 2 and 3 both "dupe"; salt substitutes glyph 3
+        let data = std::fs::read("resources/dupnames.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        assert_eq!(
+            unique_glyph_names(&fontref),
+            [".notdef", "a", "dupe", "dupe.1"]
+        );
+        let fea = uncompile(&fontref, true).unwrap().as_fea("");
+        assert!(fea.contains("sub a by dupe.1;"), "{fea}");
     }
 
     #[test]
