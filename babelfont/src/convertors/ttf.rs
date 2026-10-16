@@ -5,13 +5,20 @@ use fontdrasil::{
     },
     types::Axes,
 };
+use icu_properties::{
+    props::{DefaultIgnorableCodePoint, GeneralCategory},
+    CodePointMapData, CodePointSetData,
+};
 use indexmap::IndexMap;
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
 use skrifa::{
     outline::DrawSettings,
     prelude::{LocationRef, Size},
-    raw::{tables::glyf, TableProvider},
+    raw::{
+        tables::{glyf, gpos::PositionSubtables},
+        TableProvider,
+    },
     string::StringId,
     GlyphId, MetadataProvider,
 };
@@ -24,7 +31,7 @@ use crate::layout::expand::expand_glyph_container;
 
 use crate::{
     features::PossiblyAutomaticCode, Anchor, BabelfontError, Features, Font, FormatSpecific, Glyph,
-    Instance, Layer, LayerType, MetricType, PathBuilder, Tag,
+    GlyphCategory, Instance, Layer, LayerType, MetricType, PathBuilder, Tag,
 };
 
 /// Load a TTF font from a file path
@@ -381,7 +388,81 @@ fn load_glyphs(fontref: &skrifa::FontRef, font: &mut Font) -> Result<(), Babelfo
             )))?;
         glyph.codepoints.push(unicode);
     }
+    load_categories(fontref, font)
+}
+
+/// Each glyph's category from GDEF's glyph classes, so that a compiler does not
+/// guess one from its name; a mark with an advance is Spacing Combining. Without
+/// glyph classes every glyph is a base, so that the compiled font has none either
+/// and a shaper guesses them as it does for the binary. But a font that attaches
+/// marks gets glyph classes from a compiler anyway, so there a glyph a shaper
+/// takes for a mark is one.
+fn load_categories(fontref: &skrifa::FontRef, font: &mut Font) -> Result<(), BabelfontError> {
+    let class_def = match fontref.gdef() {
+        Ok(gdef) => gdef.glyph_class_def().transpose()?,
+        Err(_) => None,
+    };
+    let marks_by_codepoint = class_def.is_none() && attaches_marks(fontref)?;
+    let metrics = fontref.glyph_metrics(Size::unscaled(), LocationRef::default());
+    for (gid, glyph) in font.glyphs.iter_mut().enumerate() {
+        let gid = GlyphId::new(gid as u32);
+        let class = match &class_def {
+            Some(class_def) => class_def.get(gid),
+            None if marks_by_codepoint && shaper_mark(glyph) => 3,
+            None => 1,
+        };
+        glyph.category = match class {
+            2 => GlyphCategory::Ligature,
+            3 => GlyphCategory::Mark,
+            _ => GlyphCategory::Base,
+        };
+        let subcategory = match class {
+            2 => Some("Ligature"),
+            3 if metrics.advance_width(gid).unwrap_or_default() == 0.0 => Some("Nonspacing"),
+            3 => Some("Spacing Combining"),
+            _ => None,
+        };
+        if let Some(subcategory) = subcategory {
+            glyph.format_specific.insert(
+                "subcategory".to_string(),
+                serde_json::Value::String(subcategory.to_string()),
+            );
+        }
+    }
     Ok(())
+}
+
+/// Whether a shaper without glyph classes takes a glyph for a mark: when one of
+/// its codepoints is a nonspacing mark and not default-ignorable.
+fn shaper_mark(glyph: &Glyph) -> bool {
+    let general_category = CodePointMapData::<GeneralCategory>::new();
+    let default_ignorable = CodePointSetData::new::<DefaultIgnorableCodePoint>();
+    glyph
+        .codepoints
+        .iter()
+        .filter_map(|&codepoint| char::from_u32(codepoint))
+        .any(|c| {
+            general_category.get(c) == GeneralCategory::NonspacingMark
+                && !default_ignorable.contains(c)
+        })
+}
+
+/// Whether the font's GPOS attaches marks (to bases, ligatures or marks).
+fn attaches_marks(fontref: &skrifa::FontRef) -> Result<bool, BabelfontError> {
+    let Ok(gpos) = fontref.gpos() else {
+        return Ok(false);
+    };
+    for lookup in gpos.lookup_list()?.lookups().iter() {
+        if matches!(
+            lookup?.subtables()?,
+            PositionSubtables::MarkToBase(_)
+                | PositionSubtables::MarkToLig(_)
+                | PositionSubtables::MarkToMark(_)
+        ) {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 // This is only sound for mark class definitions
@@ -775,6 +856,26 @@ mod tests {
     const STATIC_LEGACY: &str = "resources/ttf/StaticLegacy.ttf";
     const GDEF_CLASSES: &str = "resources/ttf/GdefClasses.ttf";
     const DUPLICATE_NAMES: &str = "resources/ttf/DuplicateNames.ttf";
+    const MARK_NO_GDEF: &str = "resources/ttf/MarkNoGdef.ttf";
+
+    fn assert_category(
+        font: &Font,
+        glyph: &str,
+        category: GlyphCategory,
+        subcategory: Option<&str>,
+    ) {
+        let glyph = font.glyphs.get(glyph).unwrap();
+        assert_eq!(glyph.category, category, "{}", glyph.name);
+        assert_eq!(
+            glyph
+                .format_specific
+                .get_optionstring("subcategory")
+                .as_deref(),
+            subcategory,
+            "{}",
+            glyph.name
+        );
+    }
 
     fn component_coeffs(font: &Font, glyph: &str) -> Vec<[f64; 6]> {
         font.glyphs.get(glyph).unwrap().layers[0]
@@ -964,6 +1065,38 @@ mod tests {
         assert!(!used.is_empty(), "{fea}");
         for class in used {
             assert!(fea.contains(&format!("> @{class};")), "@{class}: {fea}");
+        }
+    }
+    #[test]
+    fn test_categories_from_gdef() {
+        let font = load(GDEF_CLASSES).unwrap();
+        // a base in GDEF, though U+0300 is a nonspacing mark
+        assert_category(&font, "gravecomb", GlyphCategory::Base, None);
+        assert_category(&font, "acutecomb", GlyphCategory::Mark, Some("Nonspacing"));
+        assert_category(
+            &font,
+            "tildecomb",
+            GlyphCategory::Mark,
+            Some("Spacing Combining"),
+        );
+        assert_category(&font, "f_f", GlyphCategory::Ligature, Some("Ligature"));
+    }
+
+    #[test]
+    fn test_categories_without_gdef() {
+        let font = load(STATIC_LEGACY).unwrap();
+        for glyph in ["gravecomb", "commaaccent", "x"] {
+            assert_category(&font, glyph, GlyphCategory::Base, None);
+        }
+    }
+
+    #[test]
+    fn test_categories_without_gdef_attaching_marks() {
+        let font = load(MARK_NO_GDEF).unwrap();
+        assert_category(&font, "gravecomb", GlyphCategory::Mark, Some("Nonspacing"));
+        // U+034F is a default-ignorable nonspacing mark
+        for glyph in ["a", "commaaccent", "uni034F"] {
+            assert_category(&font, glyph, GlyphCategory::Base, None);
         }
     }
 }

@@ -147,6 +147,7 @@ dependencies = [
  "fontdrasil",
  "fontir",
  "glyphslib",
+ "icu_properties",
  "indexmap 2.14.2",
  "itertools",
  "kurbo",
