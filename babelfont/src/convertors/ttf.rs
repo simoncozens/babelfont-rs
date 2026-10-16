@@ -68,7 +68,11 @@ fn name_id_to_i18n(fontref: &skrifa::FontRef, name_id: StringId) -> crate::I18ND
             } else {
                 lang
             };
-            dict.insert(lang.to_string(), name.to_string());
+            // skrifa reads a record it cannot decode as empty
+            let value = name.to_string();
+            if !value.is_empty() {
+                dict.insert(lang.to_string(), value);
+            }
         }
     }
     dict
@@ -892,5 +896,19 @@ mod tests {
         let layer = &font.glyphs.get("a").unwrap().layers[0];
         assert_eq!(layer.vertical_advance, Some(1000.0));
         assert_eq!(layer.vertical_origin, Some(600.0));
+    }
+    #[test]
+    fn test_undecodable_name_left_out() {
+        // the MacJapanese record does not decode; the Windows one does
+        let font = load(STATIC_LEGACY).unwrap();
+        let ja: Vec<&String> = font
+            .names
+            .family_name
+            .0
+            .iter()
+            .filter(|(lang, _)| lang.starts_with("ja"))
+            .map(|(_, name)| name)
+            .collect();
+        assert_eq!(ja, ["\u{3057}\u{3063}\u{307d}\u{308a}"]);
     }
 }
