@@ -550,15 +550,14 @@ fn load_layer(
                         component: _,
                     } => (0.0, 0.0),
                 };
+                // x' = xx * x + xy * y, y' = yx * x + yy * y
+                let xx = component.transform.xx.to_f32() as f64;
+                let yx = component.transform.yx.to_f32() as f64;
+                let xy = component.transform.xy.to_f32() as f64;
+                let yy = component.transform.yy.to_f32() as f64;
                 // XXX apply deltas
-                let our_affine = kurbo::Affine::new([
-                    component.transform.xx.to_f32() as f64,
-                    component.transform.xy.to_f32() as f64,
-                    component.transform.yx.to_f32() as f64,
-                    component.transform.yy.to_f32() as f64,
-                    anchor.0,
-                    anchor.1,
-                ]);
+                // kurbo::Affine::new expects [xx, yx, xy, yy, dx, dy]
+                let our_affine = kurbo::Affine::new([xx, yx, xy, yy, anchor.0, anchor.1]);
 
                 layer.shapes.push(crate::Shape::Component(crate::Component {
                     reference: names
@@ -577,4 +576,34 @@ fn load_layer(
     }
 
     Ok(layer)
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::indexing_slicing)]
+mod tests {
+    use super::*;
+
+    const STATIC_LEGACY: &str = "resources/ttf/StaticLegacy.ttf";
+
+    fn component_coeffs(font: &Font, glyph: &str) -> Vec<[f64; 6]> {
+        font.glyphs.get(glyph).unwrap().layers[0]
+            .components()
+            .map(|c| c.transform.as_affine().as_coeffs())
+            .collect()
+    }
+
+    fn assert_close(a: &[f64], b: &[f64]) {
+        assert!(
+            a.iter().zip(b).all(|(x, y)| (x - y).abs() < 1e-6),
+            "{a:?} != {b:?}"
+        );
+    }
+
+    #[test]
+    fn test_component_transform_order() {
+        // barrot turns bar 90 degrees: x' = -y, y' = x
+        let font = load(STATIC_LEGACY).unwrap();
+        let coeffs = component_coeffs(&font, "barrot");
+        assert_close(&coeffs[0][..4], &[0.0, 1.0, -1.0, 0.0]);
+    }
 }
