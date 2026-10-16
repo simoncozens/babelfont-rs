@@ -471,10 +471,11 @@ fn load_features(fontref: &skrifa::FontRef, font: &mut Font) -> Result<(), Babel
     }
 
     for (class_name, glyphs) in uncompile_context.named_classes.iter() {
-        features.classes.insert(
-            class_name.clone(),
-            PossiblyAutomaticCode::new(glyphs.as_fea("")),
-        );
+        // A class's code is its members; the writers add the brackets
+        let members = glyphs.glyphs.iter().map(|g| g.as_fea("")).join(" ");
+        features
+            .classes
+            .insert(class_name.clone(), PossiblyAutomaticCode::new(members));
     }
     let mut language_systems = vec![];
     for (script_tag, lang_sys_tags) in &uncompile_context.language_systems {
@@ -923,5 +924,15 @@ mod tests {
             .next()
             .unwrap();
         assert_eq!(component.reference, "dupe.1");
+    }
+    #[test]
+    fn test_named_class_members() {
+        let font = load(GDEF_CLASSES).unwrap();
+        let (_, members) = font.features.classes.first().unwrap();
+        assert_eq!(members.code, "a gravecomb acutecomb tildecomb f_f");
+        assert!(font
+            .features
+            .to_fea()
+            .contains("= [a gravecomb acutecomb tildecomb f_f\n];"));
     }
 }
