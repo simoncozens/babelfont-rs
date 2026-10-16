@@ -350,6 +350,16 @@ impl<'a> UncompileContext<'a> {
         name
     }
 
+    /// A made-up name for a mark class's anchor. It must not end in `_<digits>`,
+    /// which denotes a ligature component's anchor.
+    pub(crate) fn mark_class_symbol(&mut self, class_number: u16) -> SmolStr {
+        let prefix = SmolStr::new(format!("mark_class_{}x", class_number));
+        let symbol_index = self.symbols.entry(prefix.clone()).or_insert(1);
+        let name = SmolStr::new(format!("{}{}", prefix, symbol_index));
+        *symbol_index += 1;
+        name
+    }
+
     fn assign_lookup_name<T: SubOrPos>(&mut self, prefix: &str, index: u16, phase: T) {
         let name = self.gensym(prefix);
         self.lookup_map.insert((phase.to_string(), index), name);
@@ -1301,7 +1311,7 @@ GlyphClassDef [A], [], [grave acute dotbelowcomb], [];
 
 markClass grave <anchor 200 150> @bottomleft;
 markClass acute <anchor 350 0> @bottomleft;
-markClass dotbelowcomb <anchor 200 -200> @mark_class_1_1;
+markClass dotbelowcomb <anchor 200 -200> @mark_class_1x1;
 lookup gsub_single_1 {
     sub a by b;
 } gsub_single_1;
@@ -1356,7 +1366,7 @@ lookup gsub_single_6 {
 lookup gpos_mark_to_base_1 {
     pos base A
         <anchor 150 100> mark @bottomleft
-        <anchor -200 -200> mark @mark_class_1_1;
+        <anchor -200 -200> mark @mark_class_1x1;
 } gpos_mark_to_base_1;
 lookup gpos_single_1 {
     pos A 10;
@@ -1947,8 +1957,8 @@ GlyphClassDef [b], [a], [c d], [];
 } GDEF;
 
 markClass c <anchor 0 500> @left;
-markClass c <anchor 0 500> @mark_class_0_1;
-markClass d <anchor 0 0> @mark_class_1_1;
+markClass c <anchor 0 500> @mark_class_0x1;
+markClass d <anchor 0 0> @mark_class_1x1;
 markClass c <anchor 0 500> @topleft;
 lookup gpos_mark_to_base_1 {
     pos base a
@@ -1958,11 +1968,11 @@ lookup gpos_mark_to_base_1 {
 } gpos_mark_to_base_1;
 lookup gpos_mark_to_ligature_1 {
     pos ligature a
-        <anchor 100 500> mark @mark_class_0_1
-        <anchor NULL> mark @mark_class_1_1
+        <anchor 100 500> mark @mark_class_0x1
+        <anchor NULL> mark @mark_class_1x1
         ligComponent
-        <anchor 400 500> mark @mark_class_0_1
-        <anchor NULL> mark @mark_class_1_1;
+        <anchor 400 500> mark @mark_class_0x1
+        <anchor NULL> mark @mark_class_1x1;
 } gpos_mark_to_ligature_1;
 lookup gpos_mark_to_mark_1 {
     pos mark c
