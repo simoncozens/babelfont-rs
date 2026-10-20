@@ -63,6 +63,7 @@
 //! - [`filters::DropGuides`]: Remove guidelines
 //! - [`filters::DropSparseMasters`]: Remove sparse masters
 //! - [`filters::ResolveIncludes`]: Resolve feature file includes
+//! - [`filters::ExpandGlyphs3Predicates`]: Expand Glyphs 3 glyph predicates in feature code
 //! - [`filters::ScaleUpem`]: Scale the units-per-em
 //!
 //! ## Example: Load, Filter, and Convert

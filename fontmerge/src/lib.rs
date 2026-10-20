@@ -419,7 +419,7 @@ fn disambiguate_donor_names(
                 error::FontmergeError::Parse(format!("Failed to parse font 2 features: {e}"))
             })?;
     let glyph_set: HashSet<&str> = final_glyphset.iter().map(|g| g.as_str()).collect();
-    let mut visitor = SubsetVisitor::new(glyph_set);
+    let mut visitor = SubsetVisitor::new(font2, glyph_set);
     match duplicate_lookups {
         DuplicateLookupHandling::First => visitor.drop_lookups(host_lookups),
         DuplicateLookupHandling::Both => visitor.reserve_lookup_names(host_lookups),

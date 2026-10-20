@@ -40,6 +40,9 @@ impl GlyphRenamerVisitor {
                 range.start = self.rename(&range.start);
                 range.end = self.rename(&range.end);
             }
+            GlyphContainer::GlyphsPredicateClass(_) => {
+                // Keep it
+            }
         }
     }
 

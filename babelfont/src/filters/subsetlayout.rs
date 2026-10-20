@@ -10,6 +10,8 @@ use std::{
 };
 
 use crate::filters::FontFilter;
+use crate::layout::expand::expand_glyph_container;
+use crate::Font;
 
 /// A filter that subsets the layout features of a font to only include specified glyphs
 pub struct SubsetLayout(pub(crate) HashSet<SmolStr>);
@@ -38,7 +40,7 @@ impl FontFilter for SubsetLayout {
         let mut feature_file: FeatureFile =
             FeatureFile::new_from_fea(&features, Some(&old_glyphs), font.source.clone())?;
         let glyph_set: HashSet<&str> = new_glyphs.iter().copied().collect();
-        let mut visitor = SubsetVisitor::new(glyph_set);
+        let mut visitor = SubsetVisitor::new(font, glyph_set);
         visitor.visit(&mut feature_file).map_err(|e| {
             crate::BabelfontError::FilterError(format!("Error during feature subsetting: {}", e))
         })?;
@@ -73,6 +75,7 @@ static DELETION_COMMENT: LazyLock<Statement> = std::sync::LazyLock::new(|| {
 /// it -- for example to drop lookups whose names collide when merging fonts --
 /// can construct it directly and use [`SubsetVisitor::drop_lookups`].
 pub struct SubsetVisitor<'a> {
+    font: &'a Font,
     glyphs: HashSet<&'a str>,
     dropped_lookups: HashSet<SmolStr>,
     dropped_features: HashSet<String>,
@@ -99,8 +102,9 @@ pub struct SubsetVisitor<'a> {
 }
 impl<'a> SubsetVisitor<'a> {
     /// Create a new `SubsetVisitor` with the specified set of glyphs.
-    pub fn new(glyphs: HashSet<&'a str>) -> Self {
+    pub fn new(font: &'a Font, glyphs: HashSet<&'a str>) -> Self {
         Self {
+            font,
             glyphs,
             dropped_lookups: HashSet::new(),
             dropped_features: HashSet::new(),
@@ -191,53 +195,12 @@ impl<'a> SubsetVisitor<'a> {
     }
 
     fn expand_glyph_container(&self, gc: &GlyphContainer) -> Vec<SmolStr> {
-        // Expand original glyphs recursively
-        let mut todo = vec![gc.clone()];
-        let mut original_glyphs = vec![];
-        while let Some(container) = todo.pop() {
-            match container {
-                GlyphContainer::GlyphName(glyph_name) => {
-                    original_glyphs.push(glyph_name.name.clone());
-                }
-                GlyphContainer::GlyphClassName(mut class_name) => {
-                    if class_name.starts_with("@") {
-                        class_name = class_name[1..].into();
-                    }
-                    // Resolve through any rename before looking the class up.
-                    let effective = self
-                        .class_bindings
-                        .get(&class_name)
-                        .cloned()
-                        .unwrap_or(class_name);
-                    if let Some(definition) = self.original_class_definitions.get(&effective) {
-                        for glyph in definition.iter().rev() {
-                            todo.push(GlyphContainer::GlyphName(GlyphName::new(glyph)));
-                        }
-                    } else {
-                        log::warn!("Warning: no definition found for glyph class {}", effective);
-                    }
-                }
-                GlyphContainer::GlyphClass(glyph_class) => {
-                    for gc in glyph_class.glyphs.iter().rev() {
-                        todo.push(gc.clone());
-                    }
-                }
-                GlyphContainer::GlyphNameOrRange(name) => {
-                    // I'm just going to treat it as a glyph name for now
-                    original_glyphs.push(name.clone());
-                }
-                GlyphContainer::GlyphRange(range) => {
-                    for glyph in range.glyphset() {
-                        original_glyphs.push(glyph);
-                    }
-                }
-                GlyphContainer::Cid(_) | GlyphContainer::CidRange(_) => {
-                    // Genuinely don't know what to do here.
-                    // Do nothing, nobody will notice.
-                }
-            }
-        }
-        original_glyphs
+        expand_glyph_container(
+            self.font,
+            gc,
+            &self.original_class_definitions,
+            Some(&self.class_bindings),
+        )
     }
 
     fn subset_single_subst(
@@ -850,6 +813,8 @@ impl<'a> SubsetVisitor<'a> {
             }
             // We're not resolving CIDs, just keep them
             fea_rs_ast::GlyphContainer::Cid(_) | fea_rs_ast::GlyphContainer::CidRange(_) => true,
+            // And just keep Glyphs predicate blocks
+            fea_rs_ast::GlyphContainer::GlyphsPredicateClass(_) => true,
         }
     }
 }
@@ -1069,7 +1034,8 @@ mod tests {
 
     #[test]
     fn test_filter_range() {
-        let visitor = SubsetVisitor::new(vec!["a", "b", "g"].into_iter().collect());
+        let test_font = Font::new();
+        let visitor = SubsetVisitor::new(&test_font, vec!["a", "b", "g"].into_iter().collect());
         let mut container = fea_rs_ast::GlyphContainer::GlyphRange(fea_rs_ast::GlyphRange::new(
             "a".into(),
             "f".into(),
@@ -1303,7 +1269,8 @@ sub [heh-ar.isol heh-ar.fina]' hamzaabove-ar by [heh-ar.isol.1 heh-ar.fina.1];
             None::<std::path::PathBuf>,
         )
         .expect("Failed to parse features");
-        let mut visitor = SubsetVisitor::new(glyphs.iter().copied().collect());
+        let test_font = Font::new();
+        let mut visitor = SubsetVisitor::new(&test_font, glyphs.iter().copied().collect());
         visitor.drop_lookups(HashSet::from([SmolStr::new("one")]));
         visitor
             .visit(&mut feature_file)
@@ -1365,7 +1332,8 @@ sub [heh-ar.isol heh-ar.fina]' hamzaabove-ar by [heh-ar.isol.1 heh-ar.fina.1];
             None::<std::path::PathBuf>,
         )
         .expect("Failed to parse features");
-        let mut visitor = SubsetVisitor::new(glyphs.iter().copied().collect());
+        let test_font = Font::new();
+        let mut visitor = SubsetVisitor::new(&test_font, glyphs.iter().copied().collect());
         visitor.reserve_class_names([SmolStr::new("FOO")]);
         visitor
             .visit(&mut feature_file)
@@ -1393,7 +1361,8 @@ sub [heh-ar.isol heh-ar.fina]' hamzaabove-ar by [heh-ar.isol.1 heh-ar.fina.1];
             None::<std::path::PathBuf>,
         )
         .expect("Failed to parse features");
-        let mut visitor = SubsetVisitor::new(glyphs.iter().copied().collect());
+        let test_font = Font::new();
+        let mut visitor = SubsetVisitor::new(&test_font, glyphs.iter().copied().collect());
         visitor.reserve_lookup_names([SmolStr::new("one")]);
         visitor
             .visit(&mut feature_file)
@@ -1422,7 +1391,8 @@ sub [heh-ar.isol heh-ar.fina]' hamzaabove-ar by [heh-ar.isol.1 heh-ar.fina.1];
             None::<std::path::PathBuf>,
         )
         .expect("Failed to parse features");
-        let mut visitor = SubsetVisitor::new(glyphs.iter().copied().collect());
+        let test_font = Font::new();
+        let mut visitor = SubsetVisitor::new(&test_font, glyphs.iter().copied().collect());
         visitor
             .visit(&mut feature_file)
             .expect("Feature subsetting failed");

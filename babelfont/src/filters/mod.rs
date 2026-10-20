@@ -51,7 +51,7 @@ macro_rules! declare_filters {
         // Import modules
         $($(
             $(#[$meta])*
-            mod $module;
+            pub(crate) mod $module;
         )*)*
 
         // Re-export types
@@ -140,6 +140,7 @@ declare_filters! {
         GlyphsStylisticSetLabel(glyphsstylisticsetlabel) => "glyphsstylisticsetlabel",
         GlyphsBracketLayers(glyphsbracketlayers) => "glyphsbracketlayers",
         SetSubcategory(setsubcategory) => "setsubcategory",
+        ExpandGlyphs3Predicates(glyphs3predicates) => "expandglyphs3predicates",
     }
     group "Filters for manipulating feature code" {
         ResolveIncludes(resolveincludes) => "resolveincludes",

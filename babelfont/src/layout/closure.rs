@@ -1,9 +1,9 @@
 use std::collections::{HashMap, HashSet};
 
-use fea_rs_ast::{FeatureFile, GlyphContainer, GlyphName, LayoutVisitor, Statement};
+use fea_rs_ast::{FeatureFile, GlyphContainer, LayoutVisitor, Statement};
 use smol_str::SmolStr;
 
-use crate::{BabelfontError, Font};
+use crate::{layout::expand::expand_glyph_container, BabelfontError, Font};
 
 /// Given a font and a set of glyphs, return the closure of those glyphs under the layout features of the font.
 pub fn close_layout(
@@ -20,7 +20,7 @@ pub fn close_layout(
     // The first round we would add b to the closure, but not c, because we skipped over lookup A as it didn't
     // contain any glyphs we cared about. We could avoid this by revisiting lookups during processing of
     // contextual substitutions, but that's tricky and this is a big hammer.
-    let mut visitor = LayoutClosureVisitor::new(glyphs);
+    let mut visitor = LayoutClosureVisitor::new(font, glyphs);
 
     let mut count = visitor.glyphs.len();
     let mut rounds = 0;
@@ -40,62 +40,22 @@ pub fn close_layout(
     Ok(visitor.glyphs)
 }
 
-struct LayoutClosureVisitor {
+struct LayoutClosureVisitor<'a> {
+    font: &'a Font,
     glyphs: HashSet<SmolStr>,
     original_class_definitions: HashMap<SmolStr, Vec<SmolStr>>,
 }
-impl LayoutClosureVisitor {
-    fn new(glyphs: HashSet<SmolStr>) -> Self {
+impl<'a> LayoutClosureVisitor<'a> {
+    fn new(font: &'a Font, glyphs: HashSet<SmolStr>) -> Self {
         Self {
+            font,
             glyphs,
             original_class_definitions: HashMap::new(),
         }
     }
 
     fn expand_glyph_container(&self, gc: &GlyphContainer) -> Vec<SmolStr> {
-        // Expand original glyphs recursively
-        let mut todo = vec![gc.clone()];
-        let mut original_glyphs = vec![];
-        while let Some(container) = todo.pop() {
-            match container {
-                GlyphContainer::GlyphName(glyph_name) => {
-                    original_glyphs.push(glyph_name.name.clone());
-                }
-                GlyphContainer::GlyphClassName(mut class_name) => {
-                    if class_name.starts_with("@") {
-                        class_name = class_name[1..].into();
-                    }
-                    if let Some(definition) = self.original_class_definitions.get(&class_name) {
-                        for glyph in definition.iter().rev() {
-                            todo.push(GlyphContainer::GlyphName(GlyphName::new(glyph)));
-                        }
-                    } else {
-                        log::warn!(
-                            "Warning: no definition found for glyph class {}",
-                            class_name
-                        );
-                    }
-                }
-                GlyphContainer::GlyphClass(glyph_class) => {
-                    for gc in glyph_class.glyphs.iter().rev() {
-                        todo.push(gc.clone());
-                    }
-                }
-                GlyphContainer::GlyphNameOrRange(name) => {
-                    // I'm just going to treat it as a glyph name for now
-                    original_glyphs.push(name.clone());
-                }
-                GlyphContainer::GlyphRange(range) => {
-                    for glyph in range.glyphset() {
-                        original_glyphs.push(glyph);
-                    }
-                }
-                GlyphContainer::Cid(_) | GlyphContainer::CidRange(_) => {
-                    // No support, you don't deserve it
-                }
-            }
-        }
-        original_glyphs
+        expand_glyph_container(self.font, gc, &self.original_class_definitions, None)
     }
 
     fn contains(&self, gc: &GlyphContainer) -> bool {
@@ -220,7 +180,7 @@ impl LayoutClosureVisitor {
     }
 }
 
-impl LayoutVisitor for LayoutClosureVisitor {
+impl LayoutVisitor for LayoutClosureVisitor<'_> {
     fn depth_first(&self) -> bool {
         true
     }

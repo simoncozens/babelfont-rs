@@ -204,6 +204,7 @@ Babelfont includes several built-in filters for font manipulation:
 - **`DropGuides`** - Remove all guidelines
 - **`DropSparseMasters`** - Convert sparse masters to associated layers
 - **`ResolveIncludes`** - Resolve feature file include statements
+- **`ExpandGlyphs3Predicates`** - Replace Glyphs 3 glyph predicates (`$[...]`) in feature code with the glyphs they select
 - **`ScaleUpem`** - Scale the units-per-em value
 
 Filters can be chained together:

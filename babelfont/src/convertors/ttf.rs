@@ -20,6 +20,8 @@ use sr_aef::fea_rs_ast::AsFea;
 use std::collections::{HashMap, HashSet};
 use write_fonts::types::F2Dot14;
 
+use crate::layout::expand::expand_glyph_container;
+
 use crate::{
     features::PossiblyAutomaticCode, Anchor, BabelfontError, Features, Font, FormatSpecific, Glyph,
     Instance, Layer, LayerType, MetricType, PathBuilder, Tag,
@@ -311,22 +313,6 @@ fn load_glyphs(fontref: &skrifa::FontRef, font: &mut Font) -> Result<(), Babelfo
 }
 
 // This is only sound for mark class definitions
-fn expand_glyphcontainer(glyphs: &fea_rs_ast::GlyphContainer) -> Vec<SmolStr> {
-    let mut r = vec![];
-    match glyphs {
-        fea_rs_ast::GlyphContainer::GlyphName(glyph_name) => {
-            return glyph_name.glyphset().cloned().collect()
-        }
-        fea_rs_ast::GlyphContainer::GlyphClass(glyph_class) => {
-            glyph_class.glyphs.iter().for_each(|g| {
-                r.extend(expand_glyphcontainer(g));
-            });
-        }
-        _ => unreachable!(),
-    }
-    r
-}
-
 fn load_features(fontref: &skrifa::FontRef, font: &mut Font) -> Result<(), BabelfontError> {
     let axes = font.fontdrasil_axes()?;
     let uncompile_context = sr_aef::uncompile_context(fontref)
@@ -377,7 +363,7 @@ fn load_features(fontref: &skrifa::FontRef, font: &mut Font) -> Result<(), Babel
         for definition in classdefs.iter() {
             let anchor = &definition.anchor;
             let glyphs = &definition.glyphs;
-            let glyphset = expand_glyphcontainer(glyphs);
+            let glyphset = expand_glyph_container(font, glyphs, &HashMap::new(), None);
             for glyph_name in glyphset {
                 if let Some(glyph) = font.glyphs.get_mut(&glyph_name) {
                     for layer in glyph.layers.iter_mut() {
