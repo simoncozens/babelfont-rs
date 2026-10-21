@@ -1,9 +1,20 @@
 use crate::filters::FontFilter;
 use crate::MetricType;
 
+/// The FontForge release whose TTF exporter a binary came from, as far as the
+/// `post` underline position is concerned.
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FontForgeUnderlineRule {
+    /// Tag 20170731 and earlier: `upos - uwidth/2`.
+    #[default]
+    UpTo20170731,
+    /// Tag 20190317 and later: `upos + uwidth/2`.
+    From20190317,
+}
+
 #[derive(Default)]
 /// A filter that converts `UnderlinePosition` to `post.underlinePosition` the way
-/// FontForge up to tag 20170731 did.
+/// FontForge's TTF exporter does.
 ///
 /// FontForge's `UnderlinePosition` names the centre of the underline; the `post`
 /// table's `underlinePosition` names its top. FontForge's exporter applies the offset
@@ -13,12 +24,11 @@ use crate::MetricType;
 /// `fontforge/tottf.c`, `dumppost()`, computed `upos - uwidth/2` up to tag 20170731
 /// and `upos + uwidth/2` from 20190317 on; the sign was reversed in commit `9f667c9c`
 /// (fontforge/fontforge#3389, "Fix the direction of the underline position correction
-/// for TTF output"). This filter applies the older rule: `UnderlinePosition: -50` with
-/// `UnderlineWidth: 50` becomes -75, the underline's bottom edge rather than the top
-/// the `post` table defines. The two values are real numbers there, and
-/// `putshort` truncates the difference towards zero, so position 30 with width 51
-/// gives 4. A binary exported by FontForge 20190317 or later needs the opposite sign,
-/// so this filter does not match one.
+/// for TTF output"). The older rule turns `UnderlinePosition: -50` with
+/// `UnderlineWidth: 50` into -75, the underline's bottom edge rather than the top the
+/// `post` table defines; the newer one gives -25, the top. The two values are real
+/// numbers there, and `putshort` truncates the result towards zero, so position 30
+/// with width 51 gives 4 under the older rule and 55 under the newer one.
 ///
 /// It is opt-in for that reason: there is no single correct offset, only the one of
 /// the FontForge that exported the binary, whatever the export date.
@@ -27,12 +37,20 @@ use crate::MetricType;
 /// ones and drops a fractional value such as `UnderlinePosition: -51.2`. This filter
 /// then leaves a master with a fractional position alone, and counts a fractional
 /// width as zero.
-pub struct FontForgeUnderlinePosition;
+pub struct FontForgeUnderlinePosition {
+    rule: FontForgeUnderlineRule,
+}
 
 impl FontForgeUnderlinePosition {
-    /// Create a new FontForgeUnderlinePosition filter
+    /// Create a new FontForgeUnderlinePosition filter with the rule of FontForge up to
+    /// tag 20170731
     pub fn new() -> Self {
-        FontForgeUnderlinePosition
+        Self::with_rule(FontForgeUnderlineRule::UpTo20170731)
+    }
+
+    /// Create a new FontForgeUnderlinePosition filter with the given exporter rule
+    pub fn with_rule(rule: FontForgeUnderlineRule) -> Self {
+        FontForgeUnderlinePosition { rule }
     }
 }
 
@@ -48,24 +66,41 @@ impl FontFilter for FontForgeUnderlinePosition {
                 .get(&MetricType::UnderlineThickness)
                 .copied()
                 .unwrap_or(0);
-            // `putshort(at->post, sf->upos - sf->uwidth/2)`: real arithmetic, then
+            let half = f64::from(thickness) / 2.0;
+            // `putshort(at->post, sf->upos -/+ sf->uwidth/2)`: real arithmetic, then
             // truncation towards zero.
-            let exported = (f64::from(position) - f64::from(thickness) / 2.0) as i32;
+            let exported = match self.rule {
+                FontForgeUnderlineRule::UpTo20170731 => f64::from(position) - half,
+                FontForgeUnderlineRule::From20190317 => f64::from(position) + half,
+            } as i32;
             master.metrics.insert(MetricType::UnderlinePosition, exported);
             adjusted += 1;
         }
-        log::info!(
-            "Moved underlinePosition down by half the thickness on {adjusted} master(s), \
-             as FontForge's TTF exporter did up to tag 20170731 (position - thickness/2)"
-        );
+        match self.rule {
+            FontForgeUnderlineRule::UpTo20170731 => log::info!(
+                "Moved underlinePosition down by half the thickness on {adjusted} master(s), \
+                 as FontForge's TTF exporter did up to tag 20170731 (position - thickness/2)"
+            ),
+            FontForgeUnderlineRule::From20190317 => log::info!(
+                "Moved underlinePosition up by half the thickness on {adjusted} master(s), \
+                 as FontForge's TTF exporter does from tag 20190317 on (position + thickness/2)"
+            ),
+        }
         Ok(())
     }
 
-    fn from_str(_s: &str) -> Result<Self, crate::BabelfontError>
+    fn from_str(s: &str) -> Result<Self, crate::BabelfontError>
     where
         Self: Sized,
     {
-        Ok(FontForgeUnderlinePosition::new())
+        match s.trim() {
+            // A bare flag: clap's value for a flag given without one.
+            "" | "true" | "20170731" => Ok(Self::with_rule(FontForgeUnderlineRule::UpTo20170731)),
+            "20190317" => Ok(Self::with_rule(FontForgeUnderlineRule::From20190317)),
+            other => Err(crate::BabelfontError::FilterError(format!(
+                "--fontforge-underline-position takes 20170731 or 20190317, not '{other}'"
+            ))),
+        }
     }
 
     #[cfg(feature = "cli")]
@@ -76,14 +111,20 @@ impl FontFilter for FontForgeUnderlinePosition {
         clap::Arg::new("fontforgeunderlineposition")
             .long("fontforge-underline-position")
             .help(
-                "Apply the offset FontForge's TTF exporter applied up to tag 20170731 to a \
-                 FontForge source's UnderlinePosition (the underline's centre): position - \
-                 thickness/2, which is the underline's bottom edge rather than the top the post \
-                 table defines. FontForge reversed the sign in commit 9f667c9c (2018-12-26, \
-                 merged 2018-12-28; tag 20190317 is the first to carry it), so use this only for \
-                 a binary exported by an older FontForge, whatever the export date",
+                "Apply the offset FontForge's TTF exporter applies to a FontForge source's \
+                 UnderlinePosition (the underline's centre). Without a value, or with \
+                 =20170731, the rule up to tag 20170731: position - thickness/2, which is the \
+                 underline's bottom edge rather than the top the post table defines. With \
+                 =20190317, the rule from tag 20190317 on: position + thickness/2, the top. \
+                 FontForge reversed the sign in commit 9f667c9c (2018-12-26, merged \
+                 2018-12-28), so choose by the FontForge that exported the binary, whatever \
+                 the export date",
             )
-            .action(clap::ArgAction::SetTrue)
+            .num_args(0..=1)
+            .require_equals(true)
+            .value_name("FONTFORGE_TAG")
+            .value_parser(["20170731", "20190317"])
+            .action(clap::ArgAction::Append)
     }
 }
 
@@ -166,5 +207,50 @@ mod tests {
         filter.apply(&mut font).unwrap();
         filter.apply(&mut font).unwrap();
         assert_eq!(position_of(&font), Some(-100));
+    }
+
+    #[test]
+    fn test_from_20190317_the_centre_moves_up_by_half_the_thickness() {
+        // UnderlinePosition -50 with UnderlineWidth 50 exports as
+        // post.underlinePosition -25.
+        let mut font = font_with(-50, 50);
+        FontForgeUnderlinePosition::with_rule(FontForgeUnderlineRule::From20190317)
+            .apply(&mut font)
+            .unwrap();
+        assert_eq!(position_of(&font), Some(-25));
+    }
+
+    #[test]
+    fn test_from_20190317_the_sum_is_truncated_towards_zero() {
+        // -185 + 175/2 is -97.5 in real arithmetic, and the conversion to a short
+        // gives -97. Integer division would give -185 + 87 = -98.
+        let mut font = font_with(-185, 175);
+        FontForgeUnderlinePosition::with_rule(FontForgeUnderlineRule::From20190317)
+            .apply(&mut font)
+            .unwrap();
+        assert_eq!(position_of(&font), Some(-97));
+
+        // A positive result truncates towards zero too: 30 + 25.5 is 55.5, so 55.
+        let mut font = font_with(30, 51);
+        FontForgeUnderlinePosition::with_rule(FontForgeUnderlineRule::From20190317)
+            .apply(&mut font)
+            .unwrap();
+        assert_eq!(position_of(&font), Some(55));
+    }
+
+    #[test]
+    fn test_the_rule_is_chosen_by_fontforge_tag() {
+        let rule = |s: &str| FontForgeUnderlinePosition::from_str(s).map(|f| f.rule);
+        assert_eq!(rule("").unwrap(), FontForgeUnderlineRule::UpTo20170731);
+        assert_eq!(rule("true").unwrap(), FontForgeUnderlineRule::UpTo20170731);
+        assert_eq!(
+            rule("20170731").unwrap(),
+            FontForgeUnderlineRule::UpTo20170731
+        );
+        assert_eq!(
+            rule("20190317").unwrap(),
+            FontForgeUnderlineRule::From20190317
+        );
+        assert!(rule("2019").is_err());
     }
 }
