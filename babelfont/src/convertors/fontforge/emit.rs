@@ -1067,8 +1067,11 @@ fn emit_layer_anchors(out: &mut Vec<String>, layer: &Layer) {
             .get("sfd.index")
             .and_then(|v| v.as_u64())
             .unwrap_or(0);
+        let ligature_suffix = format!("_{}", index + 1);
         let name = if kind == "mark" && anchor.name.starts_with('_') {
             anchor.name[1..].to_string()
+        } else if kind == "baselig" && anchor.name.ends_with(&ligature_suffix) {
+            anchor.name[..anchor.name.len() - ligature_suffix.len()].to_string()
         } else {
             anchor.name.clone()
         };
