@@ -104,6 +104,12 @@ impl BabelfontIrSource {
         if options.produce_varc_table {
             RewriteSmartAxes.apply(&mut font)?;
         }
+        // Turn Glyphs stylistic-set labels into featureNames *before* layout
+        // subsetting. RetainGlyphs/SubsetLayout round-trip FEA through
+        // Features::from_fea, which dumps everything into an anonymous prefix
+        // and drops per-feature format_specific data (including the labels).
+        GlyphsStylisticSetLabel.apply(&mut font)?;
+
         // Unexported glyphs - decompose and drop
         RetainGlyphs::new(
             font.glyphs
@@ -117,7 +123,6 @@ impl BabelfontIrSource {
         // Glyphs.app magic handling filters
         GlyphsNumberValue.apply(&mut font)?;
         GlyphsData.apply(&mut font)?;
-        GlyphsStylisticSetLabel.apply(&mut font)?;
         GlyphsBracketLayers::new(vec![]).apply(&mut font)?;
 
         // These really should be errors, not assertions
