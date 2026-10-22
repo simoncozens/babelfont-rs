@@ -101,21 +101,64 @@ fn font_version(fontref: &skrifa::FontRef) -> Result<(u16, u16), BabelfontError>
     ))
 }
 
+/// The language key of a name record, as the SFD reader keys `LangName` (#118):
+/// US English is the default; other Windows languages are their layout tag, else
+/// their BCP-47 tag. A Macintosh language is keyed as the Windows language it
+/// names, English as the default.
+fn name_record_language(platform_id: u16, language_id: u16) -> Option<String> {
+    use crate::names::{ot_lang_id_to_iso_tag, ot_lang_id_to_name_language, LANGUAGE_ID_TO_BCP47};
+    match platform_id {
+        3 if language_id == 0x0409 => Some(crate::i18ndictionary::DFLT.to_string()),
+        3 => ot_lang_id_to_name_language(language_id).map(str::to_string),
+        1 if language_id == 0 => Some(crate::i18ndictionary::DFLT.to_string()),
+        1 => {
+            let bcp47 = ot_lang_id_to_iso_tag(language_id)?;
+            let windows = LANGUAGE_ID_TO_BCP47
+                .iter()
+                .filter(|&&(id, tag)| {
+                    id >= 0x0400 && (tag == bcp47 || tag.starts_with(&format!("{bcp47}-")))
+                })
+                .map(|&(id, _)| id)
+                .min();
+            Some(
+                windows
+                    .and_then(|id| name_record_language(3, id))
+                    .unwrap_or_else(|| bcp47.to_string()),
+            )
+        }
+        _ => None,
+    }
+}
+
+/// A name's strings by language. A Macintosh record is read only where no Windows
+/// record states that name in its language.
 fn name_id_to_i18n(fontref: &skrifa::FontRef, name_id: StringId) -> crate::I18NDictionary {
-    let names = fontref.localized_strings(name_id);
     let mut dict = crate::I18NDictionary::new();
-    for name in names {
-        if let Some(lang) = name.language() {
-            let lang = if lang == "en-US" {
-                crate::i18ndictionary::DFLT
-            } else {
-                lang
-            };
-            // skrifa reads a record it cannot decode as empty
-            let value = name.to_string();
-            if !value.is_empty() {
-                dict.insert(lang.to_string(), value);
-            }
+    let Ok(name) = fontref.name() else {
+        return dict;
+    };
+    let mut mac = vec![];
+    for record in name.name_record().iter().filter(|r| r.name_id() == name_id) {
+        let Some(lang) = name_record_language(record.platform_id(), record.language_id()) else {
+            continue;
+        };
+        // a record that does not decode reads as empty
+        let value = record
+            .string(name.string_data())
+            .map(|s| s.to_string())
+            .unwrap_or_default();
+        if value.is_empty() {
+            continue;
+        }
+        if record.platform_id() == 3 {
+            dict.insert(lang, value);
+        } else {
+            mac.push((lang, value));
+        }
+    }
+    for (lang, value) in mac {
+        if !dict.0.contains_key(&lang) {
+            dict.insert(lang, value);
         }
     }
     dict
@@ -1155,6 +1198,27 @@ mod tests {
         assert_eq!(layer.vertical_origin, Some(600.0));
     }
     #[test]
+    fn test_name_record_languages_are_keyed_as_sfd_names() {
+        assert_eq!(name_record_language(3, 0x0409).as_deref(), Some("dflt"));
+        assert_eq!(name_record_language(3, 0x0403).as_deref(), Some("CAT"));
+        assert_eq!(name_record_language(3, 0x080A).as_deref(), Some("es-MX"));
+        // Macintosh English and Japanese
+        assert_eq!(name_record_language(1, 0).as_deref(), Some("dflt"));
+        assert_eq!(name_record_language(1, 11).as_deref(), Some("JPN"));
+    }
+
+    #[test]
+    fn test_macintosh_names_the_windows_records_state_are_not_repeated() {
+        let font = load(STATIC_LEGACY).unwrap();
+        let langs: Vec<&String> = font.names.family_name.0.keys().collect();
+        assert_eq!(langs, ["dflt", "JPN"]);
+        assert_eq!(
+            font.names.family_name.get_default().map(String::as_str),
+            Some("Fixture Medium")
+        );
+    }
+
+    #[test]
     fn test_undecodable_name_left_out() {
         // the MacJapanese record does not decode; the Windows one does
         let font = load(STATIC_LEGACY).unwrap();
@@ -1163,7 +1227,7 @@ mod tests {
             .family_name
             .0
             .iter()
-            .filter(|(lang, _)| lang.starts_with("ja"))
+            .filter(|(lang, _)| lang.as_str() == "JPN")
             .map(|(_, name)| name)
             .collect();
         assert_eq!(ja, ["\u{3057}\u{3063}\u{307d}\u{308a}"]);
