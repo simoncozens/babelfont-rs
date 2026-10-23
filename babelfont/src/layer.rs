@@ -120,6 +120,7 @@ impl Layer {
     pub fn new(width: f32) -> Layer {
         Layer {
             width,
+            active: true,
             ..Default::default()
         }
     }
