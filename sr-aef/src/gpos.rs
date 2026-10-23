@@ -496,7 +496,7 @@ impl<'a> UncompileContext<'a> {
             let anchor_name = guessed_name_by_class
                 .get(&class_number)
                 .cloned()
-                .unwrap_or_else(|| self.gensym(&format!("mark_class_{}", class_number)));
+                .unwrap_or_else(|| self.mark_class_symbol(class_number));
             self.register_mark_class(mark_class, &anchor_name);
             class_to_anchor_name.insert(class_number, anchor_name);
         }
@@ -736,7 +736,7 @@ impl<'a> UncompileContext<'a> {
                 continue;
             }
             // Create one with a symbol
-            let name = self.gensym(&format!("mark_class_{}", class_number));
+            let name = self.mark_class_symbol(*class_number);
             self.anchors
                 .insert(name.clone(), base_glyphs_anchors.clone());
             new_names.push(name);

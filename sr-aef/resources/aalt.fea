@@ -1,0 +1,18 @@
+languagesystem DFLT dflt;
+
+lookup single {
+    sub a by a.alt1;
+} single;
+
+lookup alternate {
+    sub b from [b.alt1 b.alt2];
+} alternate;
+
+feature aalt {
+    lookup single;
+    lookup alternate;
+} aalt;
+
+feature salt {
+    lookup single;
+} salt;
