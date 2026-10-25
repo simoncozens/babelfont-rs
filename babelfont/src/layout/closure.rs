@@ -3,7 +3,10 @@ use std::collections::{HashMap, HashSet};
 use fea_rs_ast::{FeatureFile, GlyphContainer, LayoutVisitor, Statement};
 use smol_str::SmolStr;
 
-use crate::{layout::expand::expand_glyph_container, BabelfontError, Font};
+use crate::{
+    layout::expand::{expand_glyph_container, single_subst_pairs},
+    BabelfontError, Font,
+};
 
 /// Given a font and a set of glyphs, return the closure of those glyphs under the layout features of the font.
 pub fn close_layout(
@@ -84,7 +87,10 @@ impl<'a> LayoutClosureVisitor<'a> {
             .iter()
             .flat_map(|gc| self.expand_glyph_container(gc))
             .collect::<Vec<_>>();
-        let mapping = mapping_from.into_iter().zip(mapping_to);
+        let Some(mapping) = single_subst_pairs(mapping_from, mapping_to) else {
+            log::warn!("Skipping single substitution with mismatched glyph counts");
+            return;
+        };
         for (from, to) in mapping {
             if self.glyphs.contains(from.as_str()) {
                 log::debug!(
@@ -234,6 +240,18 @@ mod tests {
         result.sort();
         let expected_glyphs: Vec<SmolStr> = expected_glyphs.iter().map(|s| (*s).into()).collect();
         assert_eq!(result, expected_glyphs);
+    }
+
+    #[test]
+    fn test_class_to_single_substitution_closes_every_class_member() {
+        test_closure(
+            dummy_font_with_glyphs_and_features(
+                vec!["a", "b", "c"],
+                "feature foo { sub [a b] by c; } foo;",
+            ),
+            vec!["b"],
+            vec!["b", "c"],
+        );
     }
 
     #[test]
