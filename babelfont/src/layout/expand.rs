@@ -81,7 +81,7 @@ mod tests {
     use smol_str::SmolStr;
 
     fn names(glyphs: &[&str]) -> Vec<SmolStr> {
-        glyphs.iter().map(|g| SmolStr::new(g)).collect()
+        glyphs.iter().map(SmolStr::new).collect()
     }
 
     fn pairs(from: &[&str], to: &[&str]) -> Option<Vec<(String, String)>> {
