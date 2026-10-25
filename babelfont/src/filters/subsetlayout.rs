@@ -6,11 +6,12 @@ use fea_rs_ast::{
 use smol_str::SmolStr;
 use std::{
     collections::{HashMap, HashSet},
+    ops::Range,
     sync::LazyLock,
 };
 
 use crate::filters::FontFilter;
-use crate::layout::expand::expand_glyph_container;
+use crate::layout::expand::{expand_glyph_container, single_subst_pairs};
 use crate::Font;
 
 /// A filter that subsets the layout features of a font to only include specified glyphs
@@ -62,6 +63,16 @@ impl FontFilter for SubsetLayout {
             .value_name("GLYPHS")
             .help("Subset layout features to only include specified glyphs (comma-separated list)")
     }
+}
+
+/// The glyph mapping of a single substitution after subsetting.
+enum SingleMapping {
+    /// The two sides could not be paired; leave the rule as it is.
+    Unpaired,
+    /// No pair survives; drop the rule.
+    Empty,
+    /// The surviving source and target sides.
+    Kept(Vec<GlyphContainer>, Vec<GlyphContainer>),
 }
 
 static DELETION_COMMENT: LazyLock<Statement> = std::sync::LazyLock::new(|| {
@@ -203,6 +214,51 @@ impl<'a> SubsetVisitor<'a> {
         )
     }
 
+    /// Subset the glyph mapping shared by single and reverse-chain single
+    /// substitutions, keeping only pairs whose source and target both survive.
+    fn subset_single_mapping(
+        &self,
+        glyphs: &[GlyphContainer],
+        replacements: &[GlyphContainer],
+        location: &Range<usize>,
+    ) -> SingleMapping {
+        // Look into class definitions, then pair glyph -> replacement.
+        let mapping_from: Vec<SmolStr> = glyphs
+            .iter()
+            .flat_map(|gc| self.expand_glyph_container(gc))
+            .collect();
+        let mapping_to: Vec<SmolStr> = replacements
+            .iter()
+            .flat_map(|gc| self.expand_glyph_container(gc))
+            .collect();
+        let Some(mapping) = single_subst_pairs(mapping_from, mapping_to) else {
+            return SingleMapping::Unpaired;
+        };
+        let kept: Vec<(SmolStr, SmolStr)> = mapping
+            .into_iter()
+            .filter(|(glyph, replacement)| {
+                self.glyphs.contains(glyph.as_str()) && self.glyphs.contains(replacement.as_str())
+            })
+            .collect();
+        let name = |glyph: &SmolStr| GlyphContainer::GlyphName(GlyphName::new(glyph.as_str()));
+        let class = |glyphs: Vec<GlyphContainer>| {
+            GlyphContainer::GlyphClass(GlyphClass::new(glyphs, location.clone()))
+        };
+        match kept.as_slice() {
+            [] => SingleMapping::Empty,
+            [(glyph, replacement)] => SingleMapping::Kept(vec![name(glyph)], vec![name(replacement)]),
+            [(_, first), rest @ ..] if rest.iter().all(|(_, r)| r == first) => {
+                // Keep the class-to-glyph form: sub [a b] by x;
+                let from = kept.iter().map(|(glyph, _)| name(glyph)).collect();
+                SingleMapping::Kept(vec![class(from)], vec![name(first)])
+            }
+            _ => {
+                let (from, to) = kept.iter().map(|(g, r)| (name(g), name(r))).unzip();
+                SingleMapping::Kept(vec![class(from)], vec![class(to)])
+            }
+        }
+    }
+
     fn subset_single_subst(
         &self,
         statement: &mut fea_rs_ast::SingleSubstStatement,
@@ -214,61 +270,24 @@ impl<'a> SubsetVisitor<'a> {
                 }
             }
         }
-        // We have to go pairwise over glyph->replacement,
-        // looking into class definitions as we do so.
-        let mapping_from: Vec<SmolStr> = statement
-            .glyphs
-            .iter()
-            .flat_map(|gc| self.expand_glyph_container(gc))
-            .collect::<Vec<_>>();
-        let mapping_to: Vec<SmolStr> = statement
-            .replacement
-            .iter()
-            .flat_map(|gc| self.expand_glyph_container(gc))
-            .collect::<Vec<_>>();
-        let mapping = mapping_from.into_iter().zip(mapping_to);
-        // Empty the existing mapping
-        statement.glyphs.clear();
-        statement.replacement.clear();
-        let mut new_from = vec![];
-        let mut new_to = vec![];
-
-        for (glyph, replacement) in mapping {
-            if self.glyphs.contains(glyph.as_str()) && self.glyphs.contains(replacement.as_str()) {
-                new_from.push(GlyphContainer::GlyphName(GlyphName::new(glyph.as_str())));
-                new_to.push(GlyphContainer::GlyphName(GlyphName::new(
-                    replacement.as_str(),
-                )));
-            }
-        }
-        match new_from.len() {
-            0 => Some(DELETION_COMMENT.clone()),
-            1 => Some(Statement::SingleSubst(fea_rs_ast::SingleSubstStatement {
-                prefix: statement.prefix.clone(),
-                suffix: statement.suffix.clone(),
-                glyphs: new_from,
-                replacement: new_to,
-                location: statement.location.clone(),
-                force_chain: statement.force_chain,
-            })),
-            _ => {
-                // Put them into classes
-                Some(Statement::SingleSubst(fea_rs_ast::SingleSubstStatement {
-                    prefix: statement.prefix.clone(),
-                    suffix: statement.suffix.clone(),
-                    glyphs: vec![GlyphContainer::GlyphClass(GlyphClass::new(
-                        new_from,
-                        statement.location.clone(),
-                    ))],
-                    replacement: vec![GlyphContainer::GlyphClass(GlyphClass::new(
-                        new_to,
-                        statement.location.clone(),
-                    ))],
-                    location: statement.location.clone(),
-                    force_chain: statement.force_chain,
-                }))
-            }
-        }
+        let (glyphs, replacement) =
+            match self.subset_single_mapping(
+                &statement.glyphs,
+                &statement.replacement,
+                &statement.location,
+            ) {
+                SingleMapping::Unpaired => return None,
+                SingleMapping::Empty => return Some(DELETION_COMMENT.clone()),
+                SingleMapping::Kept(glyphs, replacement) => (glyphs, replacement),
+            };
+        Some(Statement::SingleSubst(fea_rs_ast::SingleSubstStatement {
+            prefix: statement.prefix.clone(),
+            suffix: statement.suffix.clone(),
+            glyphs,
+            replacement,
+            location: statement.location.clone(),
+            force_chain: statement.force_chain,
+        }))
     }
     fn subset_multiple_subst(
         &self,
@@ -342,62 +361,25 @@ impl<'a> SubsetVisitor<'a> {
                 }
             }
         }
-        // XXX Code copied from single subst above
-        let mapping_from: Vec<SmolStr> = statement
-            .glyphs
-            .iter()
-            .flat_map(|gc| self.expand_glyph_container(gc))
-            .collect::<Vec<_>>();
-        let mapping_to: Vec<SmolStr> = statement
-            .replacements
-            .iter()
-            .flat_map(|gc| self.expand_glyph_container(gc))
-            .collect::<Vec<_>>();
-        let mapping = mapping_from.into_iter().zip(mapping_to);
-        // Empty the existing mapping
-        statement.glyphs.clear();
-        statement.replacements.clear();
-        let mut new_from = vec![];
-        let mut new_to = vec![];
-
-        for (glyph, replacement) in mapping {
-            if self.glyphs.contains(glyph.as_str()) && self.glyphs.contains(replacement.as_str()) {
-                new_from.push(GlyphContainer::GlyphName(GlyphName::new(glyph.as_str())));
-                new_to.push(GlyphContainer::GlyphName(GlyphName::new(
-                    replacement.as_str(),
-                )));
-            }
-        }
-        match new_from.len() {
-            0 => Some(DELETION_COMMENT.clone()),
-            1 => Some(Statement::ReverseChainSubst(
-                fea_rs_ast::ReverseChainSingleSubstStatement {
-                    prefix: statement.prefix.clone(),
-                    suffix: statement.suffix.clone(),
-                    glyphs: new_from,
-                    replacements: new_to,
-                    location: statement.location.clone(),
-                },
-            )),
-            _ => {
-                // Put them into classes
-                Some(Statement::ReverseChainSubst(
-                    fea_rs_ast::ReverseChainSingleSubstStatement {
-                        prefix: statement.prefix.clone(),
-                        suffix: statement.suffix.clone(),
-                        glyphs: vec![GlyphContainer::GlyphClass(GlyphClass::new(
-                            new_from,
-                            statement.location.clone(),
-                        ))],
-                        replacements: vec![GlyphContainer::GlyphClass(GlyphClass::new(
-                            new_to,
-                            statement.location.clone(),
-                        ))],
-                        location: statement.location.clone(),
-                    },
-                ))
-            }
-        }
+        let (glyphs, replacements) =
+            match self.subset_single_mapping(
+                &statement.glyphs,
+                &statement.replacements,
+                &statement.location,
+            ) {
+                SingleMapping::Unpaired => return None,
+                SingleMapping::Empty => return Some(DELETION_COMMENT.clone()),
+                SingleMapping::Kept(glyphs, replacements) => (glyphs, replacements),
+            };
+        Some(Statement::ReverseChainSubst(
+            fea_rs_ast::ReverseChainSingleSubstStatement {
+                prefix: statement.prefix.clone(),
+                suffix: statement.suffix.clone(),
+                glyphs,
+                replacements,
+                location: statement.location.clone(),
+            },
+        ))
     }
     fn subset_single_pos(
         &self,
@@ -1089,6 +1071,88 @@ sub [heh-ar.isol heh-ar.fina]' hamzaabove-ar by [heh-ar.isol.1 heh-ar.fina.1];
         close_layout,
         convertors::fontir::{BabelfontIrSource, CompilationOptions},
     };
+
+    fn subset_fea(glyphs: Vec<&str>, fea: &str, keep: Vec<&str>) -> String {
+        let mut font = dummy_font_with_glyphs(glyphs);
+        font.features = Features::from_fea(fea);
+        SubsetLayout::new(keep)
+            .apply(&mut font)
+            .expect("Feature subsetting failed");
+        font.features.to_fea()
+    }
+
+    #[test]
+    fn test_subset_class_to_single_glyph_keeps_every_member() {
+        let fea = subset_fea(
+            vec!["beh", "noon", "yeh", "beh.medi"],
+            "feature medi { sub [beh noon yeh] by beh.medi; } medi;\n",
+            vec!["beh", "noon", "yeh", "beh.medi"],
+        );
+        assert_eq!(fea, "feature medi {\nsub [beh noon yeh] by beh.medi;\n} medi;\n\n");
+    }
+
+    #[test]
+    fn test_subset_class_to_single_glyph_drops_missing_members() {
+        let fea = subset_fea(
+            vec!["beh", "noon", "yeh", "beh.medi"],
+            "feature medi { sub [beh noon yeh] by beh.medi; } medi;\n",
+            vec!["noon", "yeh", "beh.medi"],
+        );
+        assert_eq!(fea, "feature medi {\nsub [noon yeh] by beh.medi;\n} medi;\n\n");
+    }
+
+    #[test]
+    fn test_subset_class_to_single_glyph_without_target_is_removed() {
+        let fea = subset_fea(
+            vec!["beh", "noon", "beh.medi"],
+            "feature medi { sub [beh noon] by beh.medi; } medi;\n",
+            vec!["beh", "noon"],
+        );
+        assert!(!fea.contains("sub "), "rule should be removed: {fea}");
+    }
+
+    #[test]
+    fn test_subset_class_to_class_still_pairs_by_position() {
+        let fea = subset_fea(
+            vec!["a", "b", "c", "x", "y", "z"],
+            "feature foo { sub [a b c] by [x y z]; } foo;\n",
+            vec!["a", "c", "x", "z"],
+        );
+        assert_eq!(fea, "feature foo {\nsub [a c] by [x z];\n} foo;\n\n");
+    }
+
+    #[test]
+    fn test_subset_reverse_chain_class_to_single_glyph() {
+        let fea = subset_fea(
+            vec!["p", "a", "b", "c", "x"],
+            "feature foo { rsub p [a b c]' by x; } foo;\n",
+            vec!["p", "a", "c", "x"],
+        );
+        assert!(fea.contains("[a c]"), "class members dropped: {fea}");
+        assert!(fea.contains("by x;"), "target dropped: {fea}");
+    }
+
+    #[test]
+    fn test_fustat_medial_yeh_survives_subsetting() {
+        // Yeh decomposes to alefMaksura-ar in ccmp; medi then maps it via
+        // `sub [behDotless-ar noonghunna-ar alefMaksura-ar] by behDotless-ar.medi;`
+        let mut font = crate::load("resources/Fustat.glyphs").unwrap();
+        let seed = ["alefMaksura-ar", "behDotless-ar", "twodotshorizontalbelow-ar"];
+        let new_glyphset =
+            close_layout(&font, seed.iter().map(|s| (*s).into()).collect()).unwrap();
+        assert!(new_glyphset.contains("behDotless-ar.medi"));
+        SubsetLayout::new(new_glyphset.into_iter().collect())
+            .apply(&mut font)
+            .expect("Feature subsetting failed");
+        let fea = font.features.to_fea();
+        assert!(
+            fea.lines().any(|line| line.trim_start().starts_with("sub ")
+                && line.contains("alefMaksura-ar")
+                && line.trim_end().ends_with("by behDotless-ar.medi;")),
+            "alefMaksura-ar -> behDotless-ar.medi was dropped"
+        );
+        BabelfontIrSource::compile(font, CompilationOptions::default()).unwrap();
+    }
 
     #[test]
     fn test_fustat_subset() {
