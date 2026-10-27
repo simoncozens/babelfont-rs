@@ -2382,6 +2382,35 @@ mod tests {
     }
 
     #[test]
+    fn test_save_classes_without_subcategory() {
+        let to_glyphs = |category, width| {
+            let glyph = crate::Glyph {
+                name: "g".into(),
+                category,
+                layers: vec![Layer {
+                    width,
+                    ..Default::default()
+                }],
+                ..Default::default()
+            };
+            glyph_to_glyphs(&glyph, &[], None, None)
+        };
+        let mark = to_glyphs(GlyphCategory::Mark, 0.0);
+        assert_eq!(mark.category, Some("Mark".to_string()));
+        assert_eq!(mark.subcategory, Some("Nonspacing".to_string()));
+        // Glyphs zeroes a Nonspacing mark's advance, so a mark that advances is Spacing Combining
+        let spacing_mark = to_glyphs(GlyphCategory::Mark, 300.0);
+        assert_eq!(spacing_mark.category, Some("Mark".to_string()));
+        assert_eq!(
+            spacing_mark.subcategory,
+            Some("Spacing Combining".to_string())
+        );
+        let ligature = to_glyphs(GlyphCategory::Ligature, 600.0);
+        assert_eq!(ligature.subcategory, Some("Ligature".to_string()));
+        assert_eq!(to_glyphs(GlyphCategory::Base, 600.0).subcategory, None);
+    }
+
+    #[test]
     fn all_the_axes() {
         let font = load("resources/RadioCanadaDisplay-Italic.glyphs".into()).unwrap();
         assert_eq!(font.axes[0].tag, Tag::new(b"wght"));
