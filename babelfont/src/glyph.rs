@@ -351,7 +351,7 @@ pub(crate) mod glyphs {
         }
 
         let subcategory = val.format_specific.get_optionstring("subcategory");
-        let category = match subcategory {
+        let category = match subcategory.as_deref() {
             Some(s)
                 if (s == "Spacing" || s == "Spacing Combining")
                     && val.category == GlyphCategory::Base =>
@@ -360,6 +360,18 @@ pub(crate) mod glyphs {
             }
             _ => &val.category,
         };
+        // Glyphs reads a mark only from a Nonspacing or Spacing Combining subcategory and
+        // a ligature only from Ligature, so a class that came without one (a UFO's
+        // public.openTypeCategories) would be lost. Glyphs zeroes a Nonspacing mark's
+        // advance on export, so a mark that advances is Spacing Combining.
+        let subcategory = subcategory.or_else(|| match category {
+            GlyphCategory::Mark if val.layers.iter().all(|l| l.is_background || l.width == 0.0) => {
+                Some("Nonspacing".to_string())
+            }
+            GlyphCategory::Mark => Some("Spacing Combining".to_string()),
+            GlyphCategory::Ligature => Some("Ligature".to_string()),
+            _ => None,
+        });
 
         G3Glyph {
             name: val.name.to_string(),
@@ -405,7 +417,7 @@ pub(crate) mod glyphs {
             script: val.format_specific.get_optionstring("script"),
             sort_name: val.format_specific.get_optionstring("sort_name"),
             sort_name_keep: val.format_specific.get_optionstring("sort_name_keep"),
-            subcategory: val.format_specific.get_optionstring("subcategory"),
+            subcategory,
             tags: val
                 .format_specific
                 .get_parse_or::<Vec<String>>("tags", Vec::new()),
