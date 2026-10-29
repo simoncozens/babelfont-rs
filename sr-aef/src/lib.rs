@@ -137,6 +137,8 @@ pub struct UncompileContext<'a> {
     #[cfg_attr(feature = "cli", serde(skip))]
     axes: Option<fontdrasil::types::Axes>,
     num_glyphs: u16,
+    /// Lookups whose rules were written into aalt
+    aalt_lookups: IndexSet<SmolStr>,
 }
 
 impl<'a> UncompileContext<'a> {
@@ -144,19 +146,10 @@ impl<'a> UncompileContext<'a> {
         let glyph_names = GlyphNames::new(font);
         let default = LocationRef::default();
         let glyph_metrics = GlyphMetrics::new(font, Size::unscaled(), default);
-        let glyph_id_to_name: HashMap<GlyphId, SmolStr> = (0..glyph_names.num_glyphs())
-            .map(GlyphId::new)
-            .map(|gid| {
-                (
-                    gid,
-                    SmolStr::new(
-                        glyph_names
-                            .get(gid)
-                            .map(|s| s.to_string())
-                            .unwrap_or_else(|| format!("gid{:04}", gid)),
-                    ),
-                )
-            })
+        let glyph_id_to_name: HashMap<GlyphId, SmolStr> = unique_glyph_names(font)
+            .into_iter()
+            .enumerate()
+            .map(|(gid, name)| (GlyphId::new(gid as u32), name))
             .collect();
         let glyph_name_to_id = glyph_id_to_name
             .iter()
@@ -188,6 +181,7 @@ impl<'a> UncompileContext<'a> {
                 .unwrap_or_default(),
             axes: variations::fontdrasil_axes(font)?,
             num_glyphs: glyph_names.num_glyphs() as u16,
+            aalt_lookups: IndexSet::new(),
         };
         slf.gather_language_systems()?;
         slf.uncompile_gsub_lookups()?;
@@ -352,6 +346,16 @@ impl<'a> UncompileContext<'a> {
     pub(crate) fn gensym(&mut self, prefix: &str) -> SmolStr {
         let symbol_index = self.symbols.entry(prefix.into()).or_insert(1);
         let name = SmolStr::new(format!("{}_{}", prefix, symbol_index));
+        *symbol_index += 1;
+        name
+    }
+
+    /// A made-up name for a mark class's anchor. It must not end in `_<digits>`,
+    /// which denotes a ligature component's anchor.
+    pub(crate) fn mark_class_symbol(&mut self, class_number: u16) -> SmolStr {
+        let prefix = SmolStr::new(format!("mark_class_{}x", class_number));
+        let symbol_index = self.symbols.entry(prefix.clone()).or_insert(1);
+        let name = SmolStr::new(format!("{}{}", prefix, symbol_index));
         *symbol_index += 1;
         name
     }
@@ -802,6 +806,22 @@ impl<'a> UncompileContext<'a> {
                 }
             }
         }
+        // A lookup written into aalt is dropped unless something else uses it
+        let used: HashSet<SmolStr> = self
+            .features
+            .values()
+            .flatten()
+            .filter_map(|statement| match statement {
+                Statement::LookupReference(reference) => Some(SmolStr::new(&reference.lookup_name)),
+                _ => None,
+            })
+            .chain(self.lookups.values().flat_map(called_lookups))
+            .collect();
+        for name in std::mem::take(&mut self.aalt_lookups) {
+            if !used.contains(&name) {
+                self.lookups.shift_remove(&name);
+            }
+        }
     }
 
     /// Build script, language, and lookup statements for feature registrations.
@@ -954,6 +974,36 @@ impl<'a> UncompileContext<'a> {
     }
 
     fn add_feature_lookups(&mut self, feature_tag: Tag, lookups: Vec<Statement>) {
+        // aalt may contain only single and alternate substitutions, so its
+        // lookups are written out as their rules
+        let lookups = if feature_tag == Tag::new(b"aalt") {
+            lookups
+                .into_iter()
+                .flat_map(|statement| match &statement {
+                    Statement::LookupReference(reference) => self
+                        .lookups
+                        .get(reference.lookup_name.as_str())
+                        .map(|block| {
+                            self.aalt_lookups.insert(block.name.clone());
+                            block
+                                .statements
+                                .iter()
+                                .filter(|s| {
+                                    matches!(
+                                        s,
+                                        Statement::SingleSubst(_) | Statement::AlternateSubst(_)
+                                    )
+                                })
+                                .cloned()
+                                .collect()
+                        })
+                        .unwrap_or_else(|| vec![statement]),
+                    _ => vec![statement],
+                })
+                .collect()
+        } else {
+            lookups
+        };
         let statements = self
             .features
             .entry(feature_tag.to_string().into())
@@ -1177,6 +1227,70 @@ pub fn uncompile_context<'a>(font: &'a skrifa::FontRef) -> Result<UncompileConte
     UncompileContext::new(font)
 }
 
+/// The glyph names the uncompiled features use: the post table's, valid in a
+/// feature file and unique.
+pub fn unique_glyph_names(font: &skrifa::FontRef) -> Vec<SmolStr> {
+    let glyph_names = GlyphNames::new(font);
+    unique_names(
+        (0..glyph_names.num_glyphs())
+            .map(GlyphId::new)
+            .map(|gid| fea_glyph_name(&glyph_name(&glyph_names, gid)))
+            .collect(),
+    )
+}
+
+/// A glyph's post table name; an unnamed glyph is named as fontTools names it.
+fn glyph_name(glyph_names: &GlyphNames, gid: GlyphId) -> String {
+    match glyph_names.get(gid) {
+        Some(name) if !name.is_synthesized() => name.to_string(),
+        _ if gid.to_u32() == 0 => ".notdef".to_string(),
+        _ => format!("glyph{:05}", gid.to_u32()),
+    }
+}
+
+/// A glyph name with each character a feature file does not allow replaced by
+/// `_`, and a leading `_` if it starts with a digit or a hyphen.
+fn fea_glyph_name(name: &str) -> SmolStr {
+    let mut out: String = name
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-') {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    if out.is_empty() || out.starts_with(|c: char| c.is_ascii_digit() || c == '-') {
+        out.insert(0, '_');
+    }
+    SmolStr::new(out)
+}
+
+/// Each name, or if an earlier glyph has it, the first free `.1`, `.2`, ...
+/// suffix, as fontTools does. A suffixed name loses a leading period, which a
+/// feature file allows only in `.notdef` and `.null`.
+fn unique_names(names: Vec<SmolStr>) -> Vec<SmolStr> {
+    let all: HashSet<SmolStr> = names.iter().cloned().collect();
+    let mut taken: HashSet<SmolStr> = HashSet::new();
+    names
+        .into_iter()
+        .map(|name| {
+            if taken.insert(name.clone()) {
+                return name;
+            }
+            let base = match name.strip_prefix('.') {
+                Some(rest) => format!("_{rest}"),
+                None => name.to_string(),
+            };
+            (1..)
+                .map(|n| SmolStr::new(format!("{base}.{n}")))
+                .find(|candidate| !all.contains(candidate) && taken.insert(candidate.clone()))
+                .unwrap_or(name)
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use fea_rs_ast::AsFea;
@@ -1197,7 +1311,7 @@ GlyphClassDef [A], [], [grave acute dotbelowcomb], [];
 
 markClass grave <anchor 200 150> @bottomleft;
 markClass acute <anchor 350 0> @bottomleft;
-markClass dotbelowcomb <anchor 200 -200> @mark_class_1_1;
+markClass dotbelowcomb <anchor 200 -200> @mark_class_1x1;
 lookup gsub_single_1 {
     sub a by b;
 } gsub_single_1;
@@ -1252,7 +1366,7 @@ lookup gsub_single_6 {
 lookup gpos_mark_to_base_1 {
     pos base A
         <anchor 150 100> mark @bottomleft
-        <anchor -200 -200> mark @mark_class_1_1;
+        <anchor -200 -200> mark @mark_class_1x1;
 } gpos_mark_to_base_1;
 lookup gpos_single_1 {
     pos A 10;
@@ -1659,6 +1773,63 @@ lookup gpos_pair_1;
     }
 
     #[test]
+    fn test_fea_glyph_name() {
+        assert_eq!(fea_glyph_name("Numero sign"), "Numero_sign");
+        assert_eq!(fea_glyph_name("uni0300"), "uni0300");
+        assert_eq!(fea_glyph_name("1st"), "_1st");
+        assert_eq!(fea_glyph_name("-x"), "_-x");
+        assert_eq!(fea_glyph_name(""), "_");
+        assert_eq!(fea_glyph_name(".notdef"), ".notdef");
+    }
+
+    #[test]
+    fn test_unique_names() {
+        let names = [".notdef", ".notdef", "a", "a", "a.1"].map(SmolStr::new);
+        assert_eq!(
+            unique_names(names.to_vec()),
+            [".notdef", "_notdef.1", "a", "a.2", "a.1"]
+        );
+    }
+
+    #[test]
+    fn test_unique_glyph_names() {
+        // the post table names glyphs 2 and 3 both "dupe"; salt substitutes glyph 3
+        let data = std::fs::read("resources/dupnames.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        assert_eq!(
+            unique_glyph_names(&fontref),
+            [".notdef", "a", "dupe", "dupe.1"]
+        );
+        let fea = uncompile(&fontref, true).unwrap().as_fea("");
+        assert!(fea.contains("sub a by dupe.1;"), "{fea}");
+    }
+
+    #[test]
+    fn test_unnamed_glyph_names() {
+        // post format 3 names no glyph
+        let data = std::fs::read("resources/noname.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        assert_eq!(
+            unique_glyph_names(&fontref),
+            [".notdef", "glyph00001", "glyph00002"]
+        );
+    }
+
+    #[test]
+    fn test_uncompile_aalt_rules() {
+        let data = std::fs::read("resources/aalt.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let fea = uncompile(&fontref, true).unwrap().as_fea("");
+        let aalt = &fea[fea.find("feature aalt").unwrap()..fea.find("} aalt;").unwrap()];
+        assert!(!aalt.contains("lookup "), "{fea}");
+        assert!(aalt.contains("sub a by a.alt1;"), "{fea}");
+        assert!(aalt.contains("sub b from [b.alt1 b.alt2];"), "{fea}");
+        // salt also uses the single substitution; nothing else uses the alternate one
+        assert!(fea.contains("lookup gsub_single_1 {"), "{fea}");
+        assert!(!fea.contains("lookup gsub_alternate_1 {"), "{fea}");
+    }
+
+    #[test]
     fn test_uncompile_size_feature() {
         let data = std::fs::read("resources/size.ttf").unwrap();
         let fontref = skrifa::FontRef::new(&data).unwrap();
@@ -1786,8 +1957,8 @@ GlyphClassDef [b], [a], [c d], [];
 } GDEF;
 
 markClass c <anchor 0 500> @left;
-markClass c <anchor 0 500> @mark_class_0_1;
-markClass d <anchor 0 0> @mark_class_1_1;
+markClass c <anchor 0 500> @mark_class_0x1;
+markClass d <anchor 0 0> @mark_class_1x1;
 markClass c <anchor 0 500> @topleft;
 lookup gpos_mark_to_base_1 {
     pos base a
@@ -1797,11 +1968,11 @@ lookup gpos_mark_to_base_1 {
 } gpos_mark_to_base_1;
 lookup gpos_mark_to_ligature_1 {
     pos ligature a
-        <anchor 100 500> mark @mark_class_0_1
-        <anchor NULL> mark @mark_class_1_1
+        <anchor 100 500> mark @mark_class_0x1
+        <anchor NULL> mark @mark_class_1x1
         ligComponent
-        <anchor 400 500> mark @mark_class_0_1
-        <anchor NULL> mark @mark_class_1_1;
+        <anchor 400 500> mark @mark_class_0x1
+        <anchor NULL> mark @mark_class_1x1;
 } gpos_mark_to_ligature_1;
 lookup gpos_mark_to_mark_1 {
     pos mark c
