@@ -1,6 +1,6 @@
 [package]
 name = "babelfont"
-version = "0.2.4"
+version = "0.2.5"
 edition = "2021"
 rust-version = "1.85"
 authors = ["Simon Cozens <simon@simon-cozens.org>"]
@@ -100,7 +100,7 @@ num-traits = "0.2.19"
 vfbreader = { version = "0.1.5", optional = true }
 skrifa = { workspace = true, optional = true }
 icu_properties = { version = "=2.1", optional = true }
-sr-aef = { version = "0.1.1", path = "../sr-aef" }
+sr-aef = { version = "0.1.2", path = "../sr-aef" }
 itertools = "0.14.0"
 unicode-normalization = "0.1.25"
 reactive_stores = { version = "0.4.3", optional = true }
