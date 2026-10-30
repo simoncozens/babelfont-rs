@@ -1846,9 +1846,9 @@ impl SfdParser {
                 }
                 "AnchorPoint" => {
                     if let Some(v) = value {
-                        let mut anchor = self
-                            .parse_anchor(v)
-                            .ok_or(BabelfontError::General(format!("Couldn't parse anchor: '{v}'")))?;
+                        let mut anchor = self.parse_anchor(v).ok_or(BabelfontError::General(
+                            format!("Couldn't parse anchor: '{v}'"),
+                        ))?;
                         // In SFD, AnchorPoint lines usually appear before the
                         // "Fore"/"Layer" markers, so current_layer_idx is still
                         // None. The anchor belongs to the glyph's foreground
