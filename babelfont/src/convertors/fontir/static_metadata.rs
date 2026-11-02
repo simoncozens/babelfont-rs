@@ -39,6 +39,20 @@ fn make_glyph_categories(font: &Font) -> PreliminaryGdefCategories {
     }
 }
 
+/// The legacy family and subfamily names (IDs 1 and 2) a source states, as UFO's
+/// `styleMapFamilyName` and `styleMapStyleName` (see `ufo::KEY_STYLE_MAP_*`); a
+/// TTF states them too, and its own need not be the four style-linked styles
+const KEY_STYLE_MAP_FAMILY_NAME: &str = "ufo.styleMapFamilyName";
+const KEY_STYLE_MAP_STYLE_NAME: &str = "ufo.styleMapStyleName";
+
+fn stated(font: &Font, key: &str) -> Option<String> {
+    font.format_specific
+        .get(key)
+        .and_then(|value| value.as_str())
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+}
+
 fn names(font: &Font, flags: SelectionFlags) -> HashMap<NameKey, String> {
     let mut builder = NameBuilder::default();
     builder.set_version(font.version.0 as i32, font.version.1 as u32);
@@ -53,16 +67,19 @@ fn names(font: &Font, flags: SelectionFlags) -> HashMap<NameKey, String> {
         }
     }
 
-    let subfamily = if flags.contains(SelectionFlags::BOLD | SelectionFlags::ITALIC) {
-        "Bold Italic"
-    } else if flags.contains(SelectionFlags::BOLD) {
-        "Bold"
-    } else if flags.contains(SelectionFlags::ITALIC) {
-        "Italic"
-    } else {
-        "Regular"
-    };
-    builder.add(NameId::SUBFAMILY_NAME, subfamily.to_string());
+    let subfamily = stated(font, KEY_STYLE_MAP_STYLE_NAME).unwrap_or_else(|| {
+        if flags.contains(SelectionFlags::BOLD | SelectionFlags::ITALIC) {
+            "Bold Italic"
+        } else if flags.contains(SelectionFlags::BOLD) {
+            "Bold"
+        } else if flags.contains(SelectionFlags::ITALIC) {
+            "Italic"
+        } else {
+            "Regular"
+        }
+        .to_string()
+    });
+    builder.add(NameId::SUBFAMILY_NAME, subfamily);
 
     // Family name needs to include style, with some mutilation (drop last Regular, Bold, Italic)
     // <https://github.com/googlefonts/glyphsLib/blob/74c63244fdbef1da540d646b0784ae6d2c3ca834/Lib/glyphsLib/builder/names.py#L92>
@@ -70,15 +87,14 @@ fn names(font: &Font, flags: SelectionFlags) -> HashMap<NameKey, String> {
         .get(NameId::FAMILY_NAME)
         .map(|s| s.to_string())
         .unwrap_or_default();
-    let family = NameBuilder::make_family_name(
-        &original_family,
-        font.default_master()
-            .and_then(|f| f.name.get_default())
-            .map(|f| f.as_str())
-            .unwrap_or("Regular"),
-        true,
-    );
-    builder.add(NameId::FAMILY_NAME, family.clone());
+    let default_style = font
+        .default_master()
+        .and_then(|f| f.name.get_default())
+        .map(|f| f.as_str())
+        .unwrap_or("Regular");
+    let family = stated(font, KEY_STYLE_MAP_FAMILY_NAME)
+        .unwrap_or_else(|| NameBuilder::make_family_name(&original_family, default_style, true));
+    builder.add(NameId::FAMILY_NAME, family);
 
     if let Some(typographic_family) = &builder
         .get(NameId::TYPOGRAPHIC_FAMILY_NAME)
@@ -90,9 +106,9 @@ fn names(font: &Font, flags: SelectionFlags) -> HashMap<NameKey, String> {
         );
     }
 
-    if let Some(typographic_subfamily) = &builder.get(NameId::TYPOGRAPHIC_SUBFAMILY_NAME).or(font
-        .default_master()
-        .and_then(|x| x.name.get_default().map(|x| x.as_str())))
+    if let Some(typographic_subfamily) = &builder
+        .get(NameId::TYPOGRAPHIC_SUBFAMILY_NAME)
+        .or(Some(default_style))
     {
         builder.add(
             NameId::TYPOGRAPHIC_SUBFAMILY_NAME,
@@ -105,7 +121,179 @@ fn names(font: &Font, flags: SelectionFlags) -> HashMap<NameKey, String> {
         .map(|id| id.to_string())
         .unwrap_or("NONE".to_string());
 
-    builder.build(&vendor_id)
+    let mut names = builder.build(&vendor_id);
+    // the compiler leaves out typographic names that repeat IDs 1 and 2, as
+    // ufo2ft does; a font that states them keeps them
+    for (name_id, stated) in [
+        (
+            NameId::TYPOGRAPHIC_FAMILY_NAME,
+            &font.names.typographic_family,
+        ),
+        (
+            NameId::TYPOGRAPHIC_SUBFAMILY_NAME,
+            &font.names.typographic_subfamily,
+        ),
+    ] {
+        if let Some(value) = stated.get_default().filter(|v| !v.is_empty()) {
+            if !names.keys().any(|key| key.name_id == name_id) {
+                names.insert(NameKey::new(name_id, value), value.clone());
+            }
+        }
+    }
+    add_localized_names(font, &mut names);
+    names
+}
+
+/// The names' other languages, where a name is written as the source states it
+/// in its default language: a localized family name is no translation of a
+/// family name the compiler derived
+fn add_localized_names(font: &Font, names: &mut HashMap<NameKey, String>) {
+    let written: HashMap<NameId, String> = names
+        .iter()
+        .filter(|(key, _)| key.platform_id == 3 && key.lang_id == 0x0409)
+        .map(|(key, value)| (key.name_id, value.clone()))
+        .collect();
+    let default_master_name = font.default_master().map(|m| &m.name);
+    for (name_id, written) in written {
+        let source = match name_id {
+            NameId::TYPOGRAPHIC_FAMILY_NAME if font.names.typographic_family.is_empty() => {
+                Some(&font.names.family_name)
+            }
+            NameId::TYPOGRAPHIC_SUBFAMILY_NAME if font.names.typographic_subfamily.is_empty() => {
+                default_master_name
+            }
+            _ => font.names.get(name_id),
+        };
+        let Some(source) = source else { continue };
+        if source.get_default() != Some(&written) {
+            continue;
+        }
+        for (language, value) in source.0.iter() {
+            let Some(lang_id) = crate::names::name_language_to_ot_lang_id(language) else {
+                log::warn!("No Windows language ID for name language {language}");
+                continue;
+            };
+            if lang_id == 0x0409 || value.is_empty() {
+                continue;
+            }
+            names.insert(
+                NameKey::new_with_lang(name_id, value, lang_id),
+                value.clone(),
+            );
+        }
+    }
+}
+
+/// post.italicAngle, counter-clockwise: the default master's angle, which is
+/// whole degrees and clockwise, or the angle a source states more precisely
+/// where it rounds to that
+fn italic_angle(font: &Font) -> f64 {
+    // negate the italic angle because it's clockwise in Glyphs.app whereas it's
+    // counter-clockwise in UFO/OpenType and our GlobalMetrics follow the latter
+    // https://github.com/googlefonts/glyphsLib/blob/f162e7/Lib/glyphsLib/builder/masters.py#L36
+    let master_angle = font
+        .default_master()
+        .and_then(|x| x.metrics.get(&MetricType::ItalicAngle))
+        .map(|v| -v as f64)
+        .unwrap_or(0.0);
+    match font.custom_ot_values.post_italic_angle {
+        Some(precise) if precise.round() == master_angle => precise,
+        _ => master_angle,
+    }
+}
+
+/// The fsSelection bits a font states, with ITALIC, BOLD and REGULAR from its
+/// style where it states none of them (UFO's `openTypeOS2Selection` cannot)
+fn selection_flags(font: &Font, italic_angle: f64) -> SelectionFlags {
+    let style_bits = SelectionFlags::ITALIC | SelectionFlags::BOLD | SelectionFlags::REGULAR;
+    let stated = font
+        .custom_ot_values
+        .os2_fs_selection
+        .map(SelectionFlags::from_bits_truncate)
+        .unwrap_or_default();
+    let mut flags = stated.difference(style_bits);
+    if font.names.wws_family_name.get_default().is_some() {
+        flags |= SelectionFlags::WWS;
+    }
+    if stated.intersects(style_bits) {
+        return flags | stated.intersection(style_bits);
+    }
+    let master_name = font
+        .default_master()
+        .and_then(|x| x.name.get_default())
+        .map(|x| x.to_ascii_lowercase())
+        .unwrap_or("regular".to_string());
+    // if there is an italic angle we're italic
+    // <https://github.com/googlefonts/glyphsLib/blob/74c63244fdbef1da540d646b0784ae6d2c3ca834/Lib/glyphsLib/builder/names.py#L25>
+    if italic_angle != 0.0 {
+        flags |= SelectionFlags::ITALIC;
+    }
+    // https://github.com/googlefonts/glyphsLib/blob/42bc1db912fd4b66f130fb3bdc63a0c1e774eb38/Lib/glyphsLib/builder/names.py#L27
+    flags |= match master_name.as_str() {
+        "italic" => SelectionFlags::ITALIC,
+        "bold" => SelectionFlags::BOLD,
+        "bold italic" => SelectionFlags::BOLD | SelectionFlags::ITALIC,
+        _ => SelectionFlags::empty(),
+    };
+    if !flags.intersects(SelectionFlags::ITALIC | SelectionFlags::BOLD) {
+        flags |= SelectionFlags::REGULAR;
+    }
+    flags
+}
+
+/// OS/2, head and post values the font states, where they differ from what a
+/// compiler would choose
+fn set_stated_values(font: &Font, misc: &mut fontir::ir::MiscMetadata) {
+    let ot = &font.custom_ot_values;
+    if ot.os2_fs_type.is_some() {
+        misc.fs_type = ot.os2_fs_type;
+    }
+    if ot.os2_us_weight_class.is_some() {
+        misc.us_weight_class = ot.os2_us_weight_class;
+    }
+    if ot.os2_us_width_class.is_some() {
+        misc.us_width_class = ot.os2_us_width_class;
+    }
+    if let Some(family_class) = ot.os2_family_class {
+        misc.family_class = Some(family_class as i16);
+    }
+    if let Some(panose) = ot.os2_panose {
+        misc.panose = Some(panose.into());
+    }
+    if ot.post_is_fixed_pitch.is_some() {
+        misc.is_fixed_pitch = ot.post_is_fixed_pitch;
+    }
+    if let Some(ppem) = ot.head_lowest_rec_ppem {
+        misc.lowest_rec_ppm = ppem;
+    }
+    if let Some(flags) = ot.head_flags {
+        misc.head_flags = write_fonts::tables::head::Flags::from_bits_truncate(flags);
+    }
+    let bits = |ranges: &[Option<u32>]| -> Option<HashSet<u32>> {
+        ranges.iter().any(Option::is_some).then(|| {
+            ranges
+                .iter()
+                .enumerate()
+                .flat_map(|(word, range)| {
+                    let range = range.unwrap_or(0);
+                    (0..32)
+                        .filter(move |bit| range & (1 << bit) != 0)
+                        .map(move |bit| word as u32 * 32 + bit)
+                })
+                .collect()
+        })
+    };
+    if let Some(unicode_ranges) = bits(&[
+        ot.os2_unicode_range1,
+        ot.os2_unicode_range2,
+        ot.os2_unicode_range3,
+        ot.os2_unicode_range4,
+    ]) {
+        misc.unicode_range_bits = Some(unicode_ranges);
+    }
+    if let Some(code_pages) = bits(&[ot.os2_code_page_range1, ot.os2_code_page_range2]) {
+        misc.codepage_range_bits = Some(code_pages);
+    }
 }
 
 #[derive(Debug)]
@@ -167,46 +355,8 @@ impl Work<Context, WorkId, Error> for StaticMetadataWork {
             .iter()
             .map(|m| m.location.to_normalized(&axes))
             .collect::<Result<HashSet<_>, _>>()?;
-        // negate the italic angle because it's clockwise in Glyphs.app whereas it's
-        // counter-clockwise in UFO/OpenType and our GlobalMetrics follow the latter
-        // https://github.com/googlefonts/glyphsLib/blob/f162e7/Lib/glyphsLib/builder/masters.py#L36
-        let italic_angle = font
-            .default_master()
-            .and_then(|x| x.metrics.get(&MetricType::ItalicAngle))
-            .map(|v| -v as f32)
-            .unwrap_or(0.0);
-
-        let master_name = font
-            .default_master()
-            .and_then(|x| x.name.get_default())
-            .map(|x| x.to_ascii_lowercase())
-            .unwrap_or("regular".to_string());
-
-        let mut selection_flags = match false {
-            true => SelectionFlags::USE_TYPO_METRICS,
-            false => SelectionFlags::empty(),
-        } | match font.names.wws_family_name.get_default().is_some() {
-            true => SelectionFlags::WWS,
-            false => SelectionFlags::empty(),
-        } |
-        // if there is an italic angle we're italic
-        // <https://github.com/googlefonts/glyphsLib/blob/74c63244fdbef1da540d646b0784ae6d2c3ca834/Lib/glyphsLib/builder/names.py#L25>
-        match italic_angle {
-            0.0 => SelectionFlags::empty(),
-            _ => SelectionFlags::ITALIC,
-        } |
-        // https://github.com/googlefonts/glyphsLib/blob/42bc1db912fd4b66f130fb3bdc63a0c1e774eb38/Lib/glyphsLib/builder/names.py#L27
-        match master_name.as_str() {
-            "italic" => SelectionFlags::ITALIC,
-            "bold" => SelectionFlags::BOLD,
-            "bold italic" => SelectionFlags::BOLD | SelectionFlags::ITALIC,
-            _ => SelectionFlags::empty(),
-        };
-        if selection_flags.intersection(SelectionFlags::ITALIC | SelectionFlags::BOLD)
-            == SelectionFlags::empty()
-        {
-            selection_flags |= SelectionFlags::REGULAR;
-        }
+        let italic_angle = italic_angle(font);
+        let selection_flags = selection_flags(font, italic_angle);
 
         let categories = make_glyph_categories(font);
 
@@ -242,7 +392,7 @@ impl Work<Context, WorkId, Error> for StaticMetadataWork {
             named_instances,
             global_locations,
             postscript_names,
-            italic_angle.into(),
+            italic_angle,
             None, // glyphsapp_number_values,
             build_vertical,
         )
@@ -256,6 +406,7 @@ impl Work<Context, WorkId, Error> for StaticMetadataWork {
                 static_metadata.misc.vendor_id = vendor_id;
             }
         }
+        set_stated_values(font, &mut static_metadata.misc);
 
         // treat "    " (four spaces) as equivalent to no value; it means
         // 'null', per the spec

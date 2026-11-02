@@ -30,6 +30,7 @@ mod global_metrics;
 mod glyphs;
 mod kerning;
 mod static_metadata;
+mod symbol_cmap;
 mod varc;
 
 /// Options for compiling a Babelfont Font to FontIR
@@ -154,6 +155,9 @@ impl BabelfontIrSource {
         }
         if !source.font.variation_sequences.is_empty() {
             binary = cmap14::insert_variation_sequences(&binary, &source.font)?;
+        }
+        if symbol_cmap::is_symbol_encoded(&source.font) {
+            binary = symbol_cmap::encode_as_symbol(&binary)?;
         }
         if source.options.produce_varc_table {
             insert_varc_table(&binary, &source.font)
