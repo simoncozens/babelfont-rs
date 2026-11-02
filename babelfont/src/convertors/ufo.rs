@@ -210,6 +210,7 @@ pub fn as_norad(font: &Font, master_ix: usize) -> Result<norad::Font, BabelfontE
     }
 
     ufo.lib = serde_json::from_value::<norad::Plist>(lib.into())?;
+    save_uvs_sequences(font, &mut ufo.lib);
     let master = font
         .masters
         .get(master_ix)
@@ -1117,6 +1118,32 @@ pub(crate) fn load_glyphs(font: &mut Font, ufo: &norad::Font) {
     add_uvs_sequences(font, ufo);
 }
 
+/// The font's Unicode variation sequences as UFO's lib states them: selector →
+/// codepoint → glyph name, the codepoints in hexadecimal
+fn save_uvs_sequences(font: &Font, lib: &mut norad::Plist) {
+    if font.variation_sequences.is_empty() {
+        return;
+    }
+    let mut nested = serde_json::Map::new();
+    for (&(selector, codepoint), glyph) in &font.variation_sequences {
+        if let serde_json::Value::Object(records) = nested
+            .entry(format!("{selector:04X}"))
+            .or_insert_with(|| serde_json::Value::Object(serde_json::Map::new()))
+        {
+            records.insert(
+                format!("{codepoint:04X}"),
+                serde_json::Value::String(glyph.to_string()),
+            );
+        }
+    }
+    let entry = serde_json::json!({ "public.unicodeVariationSequences": nested });
+    if let Ok(entry) = serde_json::from_value::<norad::Plist>(entry) {
+        for (key, value) in entry {
+            lib.insert(key, value);
+        }
+    }
+}
+
 fn add_uvs_sequences(font: &mut Font, ufo: &norad::Font) {
     if let Some(uvs) = ufo
         .lib
@@ -1310,6 +1337,28 @@ pub(crate) mod tests {
             Some(&22),
             "a UFO round-trip must preserve the angle"
         );
+    }
+
+    #[test]
+    fn test_variation_sequences_round_trip() {
+        let mut font = crate::load("resources/IbarraRealNova-Italic.ufo").unwrap();
+        font.variation_sequences
+            .insert((0xFE00, 0x41), smol_str::SmolStr::from("A"));
+        font.variation_sequences
+            .insert((0xE0100, 0x1F600), smol_str::SmolStr::from("B"));
+        let ufo = as_norad(&font, 0).unwrap();
+        let lib = ufo
+            .lib
+            .get("public.unicodeVariationSequences")
+            .and_then(|v| v.as_dictionary())
+            .unwrap();
+        let fe00 = lib.get("FE00").and_then(|v| v.as_dictionary()).unwrap();
+        assert_eq!(fe00.get("0041").and_then(|v| v.as_string()), Some("A"));
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("uvs.ufo");
+        font.save(out.clone()).unwrap();
+        let reloaded = crate::load(out).unwrap();
+        assert_eq!(reloaded.variation_sequences, font.variation_sequences);
     }
 
     #[test]
