@@ -178,21 +178,26 @@ impl<'a> UncompileContext<'a> {
     ) -> Option<(String, f32, f32)> {
         let tag = self.axis_tags.get(condition.axis_index() as usize)?;
         let axis = self.axes.as_ref()?.get(&to_fd_tag(*tag))?;
+        // A feature file states a condition in whole user units (and fea-rs-ast
+        // reads no other), so the whole number that stores as the same value,
+        // or failing one, the nearest
         let to_user = |value: F2Dot14| {
             let user = NormalizedCoord::new(value.to_f32() as f64)
                 .to_user(&axis.converter)
                 .to_f64();
-            let rounded = UserCoord::new(user.round());
-            if rounded
-                .to_normalized(&axis.converter)
-                .to_f2dot14()
-                .to_bits()
-                == value.to_bits()
-            {
-                rounded.to_f64() as f32
-            } else {
-                user as f32
-            }
+            let exact = |candidate: f64| {
+                UserCoord::new(candidate)
+                    .to_normalized(&axis.converter)
+                    .to_f2dot14()
+                    .to_bits()
+                    == value.to_bits()
+            };
+            let nearest = user.round();
+            [0.0, -1.0, 1.0, -2.0, 2.0]
+                .into_iter()
+                .map(|offset| nearest + offset)
+                .find(|candidate| exact(*candidate))
+                .unwrap_or(nearest) as f32
         };
         Some((
             tag.to_string(),
