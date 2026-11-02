@@ -69,9 +69,10 @@ impl DecomposedAffine {
         let translate = kurbo::Vec2::new(self.translation.0, self.translation.1);
 
         match self.order {
+            // skew is an angle; kurbo's skew takes the shear, its tangent
             TransformOrder::Glyphs => {
                 kurbo::Affine::translate(translate)
-                    * kurbo::Affine::skew(self.skew.0, self.skew.1)
+                    * kurbo::Affine::skew(self.skew.0.tan(), self.skew.1.tan())
                     * kurbo::Affine::rotate(self.rotation)
                     * kurbo::Affine::scale_non_uniform(self.scale.0, self.scale.1)
             }
@@ -79,7 +80,7 @@ impl DecomposedAffine {
                 kurbo::Affine::translate(translate)
                     * kurbo::Affine::rotate(self.rotation)
                     * kurbo::Affine::scale_non_uniform(self.scale.0, self.scale.1)
-                    * kurbo::Affine::skew(self.skew.0, self.skew.1)
+                    * kurbo::Affine::skew(self.skew.0.tan(), self.skew.1.tan())
             }
         }
     }
@@ -146,25 +147,36 @@ fn decompose<T: Into<f64>>(
 }
 
 impl From<kurbo::Affine> for DecomposedAffine {
+    /// The affine as rotation · scale · skew in x (the order `as_affine` puts
+    /// them back in): x' = a x + c y, y' = b x + d y is
+    /// R(θ) · S(sx, sy) · K(k), with sx and θ from the first column, and k and
+    /// sy what the second column leaves.
     fn from(t: kurbo::Affine) -> Self {
-        let [
-            scale_x,
-            scale_yx, // No, really.
-            scale_xy,
-            scale_y,
-            t_x,
-            t_y,
-         ] = t.as_coeffs();
-        // Default to Fontra order when decomposing a raw affine
-        decompose(
-            scale_x,
-            scale_xy,
-            scale_yx,
-            scale_y,
-            t_x,
-            t_y,
-            TransformOrder::RestOfTheWorld,
-        )
+        let [a, b, c, d, t_x, t_y] = t.as_coeffs();
+        // a mirrored first column is a negative scale, not a half turn, so
+        // flips come back exact
+        let sx = if a < 0.0 { -a.hypot(b) } else { a.hypot(b) };
+        if sx == 0.0 {
+            // the first column is zero: no rotation to find, a degenerate scale
+            return DecomposedAffine {
+                translation: (t_x, t_y),
+                scale: (0.0, c.hypot(d)),
+                rotation: 0.0,
+                skew: (0.0, 0.0),
+                order: TransformOrder::RestOfTheWorld,
+            };
+        }
+        let rotation = (b / sx).atan2(a / sx);
+        let (sin, cos) = rotation.sin_cos();
+        let shear = (cos * c + sin * d) / sx;
+        let sy = cos * d - sin * c;
+        DecomposedAffine {
+            translation: (t_x, t_y),
+            scale: (sx, sy),
+            rotation,
+            skew: (shear.atan(), 0.0),
+            order: TransformOrder::RestOfTheWorld,
+        }
     }
 }
 
@@ -221,6 +233,35 @@ mod fontra {
                 skew: (t.skew_x as f64, t.skew_y as f64),
                 order: TransformOrder::RestOfTheWorld,
             }
+        }
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_affines_survive_decomposition() {
+        // kurbo's order: [xx, yx, xy, yy, dx, dy], x' = xx x + xy y, y' = yx x + yy y
+        for coeffs in [
+            [1.0, 0.0, 0.0, 1.0, 5.0, 7.0],
+            [0.0, 1.0, -1.0, 0.0, 0.0, 0.0],
+            [-1.0, 0.0, 0.0, 1.0, 0.0, 0.0],
+            [-1.0, 0.0, 0.0, -1.0, 2.0, 0.0],
+            [-0.5, 0.4, 0.2, 1.1, 0.0, 0.0],
+            [0.8, 0.0, 0.3, 0.8, 10.0, 20.0],
+            [0.8, 0.3, 0.0, 0.8, 0.0, 0.0],
+            [1.2, 0.2, -0.4, 0.9, 3.0, 4.0],
+        ] {
+            let back = DecomposedAffine::from(kurbo::Affine::new(coeffs))
+                .as_affine()
+                .as_coeffs();
+            assert!(
+                back.iter().zip(coeffs).all(|(a, b)| (a - b).abs() < 1e-9),
+                "{coeffs:?} came back as {back:?}"
+            );
         }
     }
 }
