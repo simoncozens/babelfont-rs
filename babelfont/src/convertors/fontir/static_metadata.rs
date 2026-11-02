@@ -213,12 +213,11 @@ impl Work<Context, WorkId, Error> for StaticMetadataWork {
         // // Only build vertical metrics if at least one glyph defines a vertical
         // // attribute.
         // // https://github.com/googlefonts/glyphsLib/blob/c4db6b98/Lib/glyphsLib/builder/builders.py#L191-L199
-        // let build_vertical = font
-        //     .glyphs
-        //     .iter()
-        //     .flat_map(|glyph| glyph.layers.iter())
-        //     .any(|layer| layer.vert_width.is_some() || layer.vert_origin.is_some());
-        let build_vertical = false;
+        let build_vertical = font
+            .glyphs
+            .iter()
+            .flat_map(|glyph| glyph.layers.iter())
+            .any(|layer| layer.vertical_advance.is_some() || layer.vertical_origin.is_some());
 
         let dont_use_prod_names = self.0.options.dont_use_production_names;
 
