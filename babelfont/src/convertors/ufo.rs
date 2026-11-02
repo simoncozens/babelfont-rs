@@ -584,14 +584,30 @@ pub(crate) fn save_info(info: &mut norad::FontInfo, font: &Font, master_ix: usiz
         .manufacturer_url
         .get_default()
         .map(|x| x.to_string());
+    // UFO's "preferred" names are the typographic ones (IDs 16 and 17)
     info.open_type_name_preferred_family_name = font
         .names
-        .wws_family_name
+        .typographic_family
         .get_default()
         .map(|x| x.to_string());
     info.open_type_name_preferred_subfamily_name = font
         .names
-        .preferred_subfamily_name
+        .typographic_subfamily
+        .get_default()
+        .map(|x| x.to_string());
+    info.open_type_name_wws_family_name = font
+        .names
+        .wws_family_name
+        .get_default()
+        .map(|x| x.to_string());
+    info.open_type_name_wws_subfamily_name = font
+        .names
+        .wws_subfamily_name
+        .get_default()
+        .map(|x| x.to_string());
+    info.open_type_name_compatible_full_name = font
+        .names
+        .compatible_full_name
         .get_default()
         .map(|x| x.to_string());
     info.open_type_name_sample_text = font.names.sample_text.get_default().map(|x| x.to_string());
@@ -919,9 +935,6 @@ pub(crate) fn load_font_info(
     if let Some(p) = &info.postscript_font_name {
         font.names.postscript_name = p.into();
     }
-    if let Some(p) = &info.open_type_name_preferred_subfamily_name {
-        font.names.preferred_subfamily_name = p.into();
-    }
     copy_name!(font, info, description);
     copy_name!(font, info, designer_url);
     copy_name!(font, info, designer);
@@ -954,11 +967,22 @@ pub(crate) fn load_font_info(
         font.format_specific
             .insert(KEY_STYLE_NAME.into(), stylename.clone().into());
     }
+    // UFO's "preferred" names are the typographic ones (IDs 16 and 17), not
+    // WWS names or the legacy subfamily (ID 2)
     if let Some(v) = info.open_type_name_preferred_family_name.as_ref() {
-        font.names.wws_family_name = v.into(); // Is this the right place?
+        font.names.typographic_family = v.into();
     }
     if let Some(v) = info.open_type_name_preferred_subfamily_name.as_ref() {
-        font.names.preferred_subfamily_name = v.into();
+        font.names.typographic_subfamily = v.into();
+    }
+    if let Some(v) = info.open_type_name_wws_family_name.as_ref() {
+        font.names.wws_family_name = v.into();
+    }
+    if let Some(v) = info.open_type_name_wws_subfamily_name.as_ref() {
+        font.names.wws_subfamily_name = v.into();
+    }
+    if let Some(v) = info.open_type_name_compatible_full_name.as_ref() {
+        font.names.compatible_full_name = v.into();
     }
     if let Some(panose) = &info.open_type_os2_panose {
         font.custom_ot_values.os2_panose = Some([
@@ -1336,6 +1360,46 @@ pub(crate) mod tests {
                 .get(&crate::MetricType::ItalicAngle),
             Some(&22),
             "a UFO round-trip must preserve the angle"
+        );
+    }
+
+    #[test]
+    fn test_preferred_names_are_typographic() {
+        let mut ufo = norad::Font::load("resources/IbarraRealNova-Italic.ufo").unwrap();
+        ufo.font_info.open_type_name_preferred_family_name = Some("Ibarra".into());
+        ufo.font_info.open_type_name_preferred_subfamily_name = Some("Real Italic".into());
+        ufo.font_info.open_type_name_wws_family_name = Some("Ibarra WWS".into());
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("names.ufo");
+        ufo.save(&path).unwrap();
+        let font = crate::load(&path).unwrap();
+        let name = |n: &crate::I18NDictionary| n.get_default().cloned();
+        assert_eq!(
+            name(&font.names.typographic_family).as_deref(),
+            Some("Ibarra")
+        );
+        assert_eq!(
+            name(&font.names.typographic_subfamily).as_deref(),
+            Some("Real Italic")
+        );
+        assert_eq!(
+            name(&font.names.wws_family_name).as_deref(),
+            Some("Ibarra WWS")
+        );
+        assert_eq!(name(&font.names.preferred_subfamily_name), None);
+        // and back
+        let info = as_norad(&font, 0).unwrap().font_info;
+        assert_eq!(
+            info.open_type_name_preferred_family_name.as_deref(),
+            Some("Ibarra")
+        );
+        assert_eq!(
+            info.open_type_name_preferred_subfamily_name.as_deref(),
+            Some("Real Italic")
+        );
+        assert_eq!(
+            info.open_type_name_wws_family_name.as_deref(),
+            Some("Ibarra WWS")
         );
     }
 
