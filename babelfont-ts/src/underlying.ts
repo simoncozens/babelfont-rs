@@ -542,7 +542,7 @@ export interface Font {
    */
   custom_ot_values?: CustomOTValues;
   /** A map of Unicode Variation Sequences to glyph names */
-  variation_sequences?: Record<string, string>;
+  variation_sequences?: Record<number, Record<number, string>>;
   /** A representation of the font's OpenType features */
   features: Features;
   /**
