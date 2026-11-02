@@ -22,6 +22,7 @@ use fontir::{
 use std::sync::Arc;
 
 mod avar2;
+mod cmap14;
 mod color;
 mod curve_kinds;
 mod features;
@@ -150,6 +151,9 @@ impl BabelfontIrSource {
             .map_err(improve_ir_error)?;
         if !source.font.cross_axis_mappings.is_empty() {
             binary = avar2::insert_avar2_table(&binary, &source.font)?;
+        }
+        if !source.font.variation_sequences.is_empty() {
+            binary = cmap14::insert_variation_sequences(&binary, &source.font)?;
         }
         if source.options.produce_varc_table {
             insert_varc_table(&binary, &source.font)
