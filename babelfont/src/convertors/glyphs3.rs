@@ -195,6 +195,7 @@ pub fn load_package_entries(
 
 fn _load(glyphs_font: &glyphslib::Font, path: PathBuf) -> Result<Font, BabelfontError> {
     let mut font = Font::new();
+    let glyphs2 = glyphs_font.as_glyphs2();
     // Remember which Glyphs file format version we came from, so that
     // `as_glyphs3` can write the same version back out again. A Glyphs 2 source
     // is upgraded to Glyphs 3 for our in-memory model, so we record "2" but will
@@ -282,6 +283,9 @@ fn _load(glyphs_font: &glyphslib::Font, path: PathBuf) -> Result<Font, Babelfont
             .map(|g| glyph::glyphs::from_glyphs(g, &axes_order))
             .collect::<Result<Vec<_>, BabelfontError>>()?,
     );
+    if let Some(glyphs2) = glyphs2 {
+        restore_glyphs2_component_transforms(&mut font, glyphs2);
+    }
     // Instances
     font.instances = glyphs_font
         .instances
@@ -1530,6 +1534,36 @@ fn layer_master_id(layer: &Layer) -> &str {
     match &layer.master {
         LayerType::DefaultForMaster(id) | LayerType::AssociatedWithMaster(id) => id,
         LayerType::FreeFloating => "",
+    }
+}
+
+/// A Glyphs 2 component's transform is a matrix. Upgrading to Glyphs 3 keeps
+/// only a rotation and scale read from it, losing a slant (and misreading the
+/// rotation where there is one): decompose the matrix itself, as Glyphs 3 states
+/// it. The upgrade keeps each layer's components first, in their order.
+fn restore_glyphs2_component_transforms(font: &mut Font, glyphs2: &glyphslib::glyphs2::Glyphs2) {
+    for source in &glyphs2.glyphs {
+        let Some(glyph) = font.glyphs.get_mut(&source.name) else {
+            continue;
+        };
+        for source_layer in &source.layers {
+            let Some(layer) = glyph
+                .layers
+                .iter_mut()
+                .find(|l| !l.is_background && l.id.as_deref() == Some(&source_layer.layer_id))
+            else {
+                continue;
+            };
+            let components = layer.shapes.iter_mut().filter_map(|shape| match shape {
+                crate::Shape::Component(component) => Some(component),
+                _ => None,
+            });
+            for (component, source_component) in components.zip(&source_layer.components) {
+                if component.reference == source_component.component_glyph {
+                    component.transform = (&source_component.transform).into();
+                }
+            }
+        }
     }
 }
 
@@ -3040,5 +3074,130 @@ instances = ();
         // B's advance equals the default, so it is left out; it has no origin.
         assert_eq!(glyphs_vert(&font, "B"), (None, None));
         assert_eq!(glyphs_vert(&font, "i"), (None, None));
+    }
+
+    /// Glyphs 3.4.1 wrote the same slanted component as Glyphs 3 fields (angle
+    /// 20, scale 0.8, slant 10 degrees) and as a Glyphs 2 matrix (glyphs-reader's
+    /// read_component_slant_2_and_3): this matrix
+    const SLANTED: [f64; 4] = [0.8, 0.2736, -0.1411, 0.7518];
+
+    const SLANTED_GLYPHS3: &str = r#"{
+.formatVersion = 3;
+familyName = Slant;
+fontMaster = ({id = m01; name = Regular;});
+glyphs = (
+{glyphname = A; layers = ({layerId = m01; shapes = ({ref = B; angle = 20; scale = (0.8,0.8); slant = (10,0);}); width = 600;});},
+{glyphname = B; layers = ({layerId = m01; shapes = ({closed = 1; nodes = ((0,0,l),(100,0,l),(100,100,l));}); width = 600;});}
+);
+unitsPerEm = 1000;
+}
+"#;
+
+    const SLANTED_GLYPHS2: &str = r#"{
+.appVersion = "1342";
+familyName = Slant;
+fontMaster = ({id = m01;});
+glyphs = (
+{glyphname = A; layers = ({layerId = m01; components = ({name = B; transform = "{0.8, 0.27362, -0.14106, 0.75175, 0, 0}";}); width = 600;});},
+{glyphname = B; layers = ({layerId = m01; paths = ({closed = 1; nodes = ("0 0 LINE","100 0 LINE","100 100 LINE");}); width = 600;});}
+);
+unitsPerEm = 1000;
+}
+"#;
+
+    fn first_component(font: &Font, glyph: &str) -> crate::Component {
+        font.glyphs.get(glyph).unwrap().layers[0]
+            .components()
+            .next()
+            .unwrap()
+            .clone()
+    }
+
+    fn assert_coeffs(affine: kurbo::Affine, expected: [f64; 4], tolerance: f64) {
+        let coeffs = affine.as_coeffs();
+        assert!(
+            coeffs[..4]
+                .iter()
+                .zip(expected)
+                .all(|(a, b)| (a - b).abs() < tolerance),
+            "{coeffs:?} is not {expected:?}"
+        );
+    }
+
+    /// The matrix Glyphs makes of its fields: translate · slant · rotate ·
+    /// scale, the slant's tangent and the angle in degrees
+    fn glyphs_matrix(component: &glyphslib::glyphs3::Component) -> kurbo::Affine {
+        let (sx, sy) = component.slant;
+        kurbo::Affine::translate((component.position.0 as f64, component.position.1 as f64))
+            * kurbo::Affine::skew(
+                (sx as f64).to_radians().tan(),
+                (sy as f64).to_radians().tan(),
+            )
+            * kurbo::Affine::rotate((component.angle as f64).to_radians())
+            * kurbo::Affine::scale_non_uniform(component.scale.0 as f64, component.scale.1 as f64)
+    }
+
+    #[test]
+    fn component_slant_is_degrees() {
+        let font = load_test_font(SLANTED_GLYPHS3);
+        let component = first_component(&font, "A");
+        // the model's skew is radians
+        assert!((component.transform.skew.0 - 10f64.to_radians()).abs() < 1e-6);
+        assert_coeffs(component.transform.as_affine(), SLANTED, 1e-4);
+        // and written back in degrees
+        let glyphs = as_glyphs3(&font).unwrap();
+        let glyphslib::glyphs3::Shape::Component(written) = &glyphs.glyphs[0].layers[0].shapes[0]
+        else {
+            panic!("not a component");
+        };
+        assert!((written.slant.0 - 10.0).abs() < 1e-4, "{:?}", written.slant);
+        assert!((written.angle - 20.0).abs() < 1e-4, "{}", written.angle);
+    }
+
+    #[test]
+    fn glyphs2_component_matrix_keeps_its_slant() {
+        let font = load_test_font(SLANTED_GLYPHS2);
+        let component = first_component(&font, "A");
+        assert_coeffs(component.transform.as_affine(), SLANTED, 1e-4);
+        assert!((component.transform.skew.0.to_degrees() - 10.0).abs() < 1e-2);
+        assert!((component.transform.rotation.to_degrees() - 20.0).abs() < 1e-2);
+    }
+
+    #[test]
+    fn transforms_in_the_other_order_are_written_as_glyphs_reads_them() {
+        use crate::common::decomposition::{DecomposedAffine, TransformOrder};
+        let mut font = load_test_font(SLANTED_GLYPHS3);
+        for (rotation, scale, skew) in [
+            (30f64, (1.2, 0.7), (15f64, 0f64)),
+            (-75.0, (-0.8, 1.1), (-20.0, 0.0)),
+            (120.0, (0.5, 0.9), (5.0, 0.0)),
+        ] {
+            let transform = DecomposedAffine {
+                translation: (10.0, 20.0),
+                scale,
+                rotation: rotation.to_radians(),
+                skew: (skew.0.to_radians(), skew.1.to_radians()),
+                order: TransformOrder::RestOfTheWorld,
+            };
+            if let Some(crate::Shape::Component(component)) =
+                font.glyphs.get_mut("A").unwrap().layers[0]
+                    .shapes
+                    .get_mut(0)
+            {
+                component.transform = transform;
+            }
+            let glyphs = as_glyphs3(&font).unwrap();
+            let glyphslib::glyphs3::Shape::Component(written) =
+                &glyphs.glyphs[0].layers[0].shapes[0]
+            else {
+                panic!("not a component");
+            };
+            let expected = transform.as_affine().as_coeffs();
+            let got = glyphs_matrix(written).as_coeffs();
+            assert!(
+                got.iter().zip(expected).all(|(a, b)| (a - b).abs() < 1e-3),
+                "{got:?} is not {expected:?}"
+            );
+        }
     }
 }

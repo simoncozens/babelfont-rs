@@ -752,10 +752,14 @@ mod glyphs {
     impl From<&glyphslib::glyphs3::Component> for Component {
         fn from(val: &glyphslib::glyphs3::Component) -> Self {
             use crate::common::decomposition::TransformOrder;
-            // Glyphs uses: translate → skew → rotate → scale
+            // Glyphs uses: translate → skew → rotate → scale, the angle and the
+            // slant in degrees; the model's are radians
             let transform = DecomposedAffine {
                 translation: (val.position.0 as f64, val.position.1 as f64),
-                skew: (val.slant.0 as f64, val.slant.1 as f64),
+                skew: (
+                    (val.slant.0 as f64).to_radians(),
+                    (val.slant.1 as f64).to_radians(),
+                ),
                 rotation: (val.angle as f64).to_radians(),
                 scale: (val.scale.0 as f64, val.scale.1 as f64),
                 order: TransformOrder::Glyphs,
@@ -807,22 +811,29 @@ mod glyphs {
 
     impl From<&Component> for glyphslib::glyphs3::Component {
         fn from(val: &Component) -> Self {
-            // val.transform is already a DecomposedAffine, use it directly
+            let alignment = val
+                .format_specific
+                .get(KEY_ALIGNMENT)
+                .and_then(|value| value.as_i64())
+                .map(|value| value as i8);
+
+            // Glyphs reads its fields as translate · skew · rotate · scale: a
+            // transform in the other order is decomposed again
+            use crate::common::decomposition::TransformOrder;
+            let transform = val.transform.in_order(TransformOrder::Glyphs);
             glyphslib::glyphs3::Component {
                 component_glyph: val.reference.to_string(),
                 position: (
-                    val.transform.translation.0 as f32,
-                    val.transform.translation.1 as f32,
+                    transform.translation.0 as f32,
+                    transform.translation.1 as f32,
                 ),
-                scale: (val.transform.scale.0 as f32, val.transform.scale.1 as f32),
-                angle: (val.transform.rotation as f32).to_degrees(),
-                slant: (val.transform.skew.0 as f32, val.transform.skew.1 as f32),
-                alignment: val
-                    .format_specific
-                    .get(KEY_ALIGNMENT)
-                    .and_then(|v| v.as_i64())
-                    .map(|s| s as i8)
-                    .unwrap_or(-1),
+                scale: (transform.scale.0 as f32, transform.scale.1 as f32),
+                angle: transform.rotation.to_degrees() as f32,
+                slant: (
+                    transform.skew.0.to_degrees() as f32,
+                    transform.skew.1.to_degrees() as f32,
+                ),
+                alignment: alignment.unwrap_or(-1),
                 anchor: val.format_specific.get_optionstring(KEY_COMPONENT_ANCHOR),
                 attr: val.format_specific.get_json(KEY_ATTR),
                 smart_component_location: val
