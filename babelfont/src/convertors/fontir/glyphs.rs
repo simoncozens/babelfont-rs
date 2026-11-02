@@ -161,6 +161,8 @@ impl Work<Context, WorkId, Error> for GlyphIrWork {
                 }
             }
         }
+        check_curve_kinds(&self.glyph_name, &ir_glyph.sources)?;
+
         // Let's do our own sanity check for default locations
         let locations: Vec<Location<fontdrasil::coords::NormalizedSpace>> =
             ir_glyph.sources.keys().cloned().collect::<Vec<_>>();
@@ -217,6 +219,44 @@ impl Work<Context, WorkId, Error> for GlyphIrWork {
         context.glyphs.set(ir_glyph);
         Ok(())
     }
+}
+
+/// A segment must be cubic in every master or quadratic in every master: a
+/// compiler cannot interpolate one into the other (and fontbe panics trying).
+fn check_curve_kinds(
+    glyph_name: &GlyphName,
+    sources: &HashMap<NormalizedLocation, GlyphInstance>,
+) -> Result<(), Error> {
+    use kurbo::PathEl;
+    let mut sources = sources.iter();
+    let Some((first_location, first)) = sources.next() else {
+        return Ok(());
+    };
+    for (location, instance) in sources {
+        for (index, (a, b)) in first.contours.iter().zip(&instance.contours).enumerate() {
+            let mixed = a.elements().iter().zip(b.elements()).any(|pair| {
+                matches!(
+                    pair,
+                    (PathEl::CurveTo(..), PathEl::QuadTo(..))
+                        | (PathEl::QuadTo(..), PathEl::CurveTo(..))
+                )
+            });
+            if mixed {
+                return Err(BadGlyph::new(
+                    glyph_name.clone(),
+                    BadGlyphKind::FrontendSpecific(format!(
+                        "contour {} is cubic at one master and quadratic at another ({} and {}); \
+                         convert the font to one curve type",
+                        index + 1,
+                        debug_location(first_location),
+                        debug_location(location)
+                    )),
+                )
+                .into());
+            }
+        }
+    }
+    Ok(())
 }
 
 fn process_layer(
