@@ -175,13 +175,53 @@ impl CubicToQuadratic {
 
 impl FontFilter for CubicToQuadratic {
     fn apply(&self, font: &mut crate::Font) -> Result<(), crate::BabelfontError> {
+        // A path with no cubic segment is quadratic already: drawn through
+        // kurbo, its implied on-curves would come back explicit (o's four
+        // off-curves as eight nodes). Keep it as it is.
+        let quadratic: Vec<Vec<Vec<Option<Path>>>> = font
+            .glyphs
+            .iter()
+            .map(|glyph| {
+                glyph
+                    .layers
+                    .iter()
+                    .map(|layer| {
+                        layer
+                            .shapes
+                            .iter()
+                            .map(|shape| {
+                                shape
+                                    .as_path()
+                                    .filter(|path| {
+                                        !path
+                                            .nodes
+                                            .iter()
+                                            .any(|node| node.nodetype == crate::NodeType::Curve)
+                                    })
+                                    .cloned()
+                            })
+                            .collect()
+                    })
+                    .collect()
+            })
+            .collect();
         apply_interpolatable_path_filter(
             font,
             "CubicToQuadratic",
             &self.0,
             convert_bezpath_independently,
             convert_bezpaths_in_parallel,
-        )
+        )?;
+        for (glyph, layers) in font.glyphs.iter_mut().zip(quadratic) {
+            for (layer, shapes) in glyph.layers.iter_mut().zip(layers) {
+                for (shape, original) in layer.shapes.iter_mut().zip(shapes) {
+                    if let Some(original) = original {
+                        *shape = crate::Shape::Path(original);
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 
     fn from_str(s: &str) -> Result<Self, crate::BabelfontError>
@@ -208,6 +248,57 @@ impl FontFilter for CubicToQuadratic {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_an_off_curve_only_path_is_left_as_it_is() {
+        // a TrueType circle: four off-curves, every on-curve implied; and a
+        // cubic beside it
+        let node = |x: f64, y: f64, nodetype: crate::NodeType| crate::Node {
+            x,
+            y,
+            nodetype,
+            smooth: false,
+            format_specific: Default::default(),
+        };
+        let quadratic = Path {
+            nodes: vec![
+                node(0.0, 50.0, crate::NodeType::OffCurve),
+                node(50.0, 100.0, crate::NodeType::OffCurve),
+                node(100.0, 50.0, crate::NodeType::OffCurve),
+                node(50.0, 0.0, crate::NodeType::OffCurve),
+            ],
+            closed: true,
+            format_specific: Default::default(),
+        };
+        let cubic = Path {
+            nodes: vec![
+                node(0.0, 0.0, crate::NodeType::Line),
+                node(0.0, 100.0, crate::NodeType::OffCurve),
+                node(100.0, 100.0, crate::NodeType::OffCurve),
+                node(100.0, 0.0, crate::NodeType::Curve),
+            ],
+            closed: true,
+            format_specific: Default::default(),
+        };
+        let mut font = crate::load("resources/Test1.ufo").unwrap();
+        let name = font.glyphs.iter().next().unwrap().name.clone();
+        for layer in font.glyphs.get_mut(&name).unwrap().layers.iter_mut() {
+            layer.shapes = vec![
+                crate::Shape::Path(quadratic.clone()),
+                crate::Shape::Path(cubic.clone()),
+            ];
+        }
+        CubicToQuadratic::default().apply(&mut font).unwrap();
+        for layer in font.glyphs.get(&name).unwrap().layers.iter() {
+            let paths: Vec<&Path> = layer.paths().collect();
+            assert_eq!(paths[0], &quadratic);
+            // the cubic beside it is converted
+            assert!(paths[1]
+                .nodes
+                .iter()
+                .all(|n| n.nodetype != crate::NodeType::Curve));
+        }
+    }
 
     #[test]
     fn test_final_segment() {
