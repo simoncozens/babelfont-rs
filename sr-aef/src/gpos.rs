@@ -209,19 +209,48 @@ impl<'a> UncompileContext<'a> {
                         classes2.insert(0, rest);
                     }
                 }
+                // each class written once, by name where large
+                let mut keys1: Vec<u32> = classes1.keys().copied().collect();
+                keys1.sort();
+                let mut containers1: HashMap<u32, GlyphContainer> = HashMap::new();
+                for class in keys1 {
+                    containers1.insert(class, self.pair_class(classes1.get(&class)));
+                }
+                let mut keys2: Vec<u32> = classes2.keys().copied().collect();
+                keys2.sort();
+                let mut containers2: HashMap<u32, GlyphContainer> = HashMap::new();
+                for class in keys2 {
+                    containers2.insert(class, self.pair_class(classes2.get(&class)));
+                }
                 for (class1, record) in records.iter().enumerate() {
                     let Some(record) = record else { continue };
-                    let Some(first) = classes1.get(&(class1 as u32)) else {
+                    let Some(first) = containers1.get(&(class1 as u32)) else {
                         continue;
                     };
+                    // pairs that adjust nothing say nothing a missing pair does
+                    // not, but one keeps the row's first glyphs covered (later
+                    // subtables never see them); a dense class matrix is mostly
+                    // zeros
+                    let any_value = record.iter().enumerate().any(|(class2, value)| {
+                        containers2.contains_key(&(class2 as u32))
+                            && value.as_ref().is_some_and(|value| {
+                                has_value(&value.first) || has_value(&value.second)
+                            })
+                    });
+                    let mut row_written = false;
                     for (class2, value) in record.iter().enumerate() {
                         let Some(value) = value else { continue };
-                        let Some(second) = classes2.get(&(class2 as u32)) else {
+                        let Some(second) = containers2.get(&(class2 as u32)) else {
                             continue;
                         };
+                        let zero = !has_value(&value.first) && !has_value(&value.second);
+                        if zero && (any_value || row_written) {
+                            continue;
+                        }
+                        row_written = true;
                         block.statements.push(self.pair_statement(
-                            GlyphContainer::GlyphClass(GlyphClass::new(first.clone(), 0..0)),
-                            GlyphContainer::GlyphClass(GlyphClass::new(second.clone(), 0..0)),
+                            first.clone(),
+                            second.clone(),
                             &value.first,
                             &value.second,
                         )?);
@@ -629,6 +658,34 @@ impl<'a> UncompileContext<'a> {
             defined.sort();
             (defined == wanted).then(|| name.clone())
         })
+    }
+
+    /// A class of a pair positioning class definition: by name where it is
+    /// large, so that every pair it is in does not write it out again (class
+    /// kerning of hundreds of classes otherwise writes gigabytes)
+    fn pair_class(&mut self, glyphs: Option<&Vec<GlyphContainer>>) -> GlyphContainer {
+        let glyphs = glyphs.cloned().unwrap_or_default();
+        if glyphs.len() < crate::PROMOTE_TO_NAMED_CLASS_THRESHOLD {
+            return GlyphContainer::GlyphClass(GlyphClass::new(glyphs, 0..0));
+        }
+        let key = glyphs
+            .iter()
+            .map(|g| g.as_fea(""))
+            .collect::<Vec<_>>()
+            .join(" ");
+        if let Some(name) = self.pair_class_names.get(&key) {
+            return GlyphContainer::GlyphClassName(format!("@{name}").into());
+        }
+        let name: SmolStr = format!(
+            "{}{}",
+            crate::PAIR_CLASS_PREFIX,
+            self.pair_class_names.len() + 1
+        )
+        .into();
+        self.pair_class_names.insert(key, name.clone());
+        self.named_classes
+            .insert(name.clone(), GlyphClass::new(glyphs, 0..0));
+        GlyphContainer::GlyphClassName(format!("@{name}").into())
     }
 
     /// Whether no ligature has an anchor of this name and its component

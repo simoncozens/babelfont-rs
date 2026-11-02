@@ -219,6 +219,9 @@ impl<'a> UncompileContext<'a> {
                 .iter()
                 .map(|(user_loc, coords)| {
                     let delta = ivs.compute_delta(index, coords).unwrap_or_default();
+                    if let Some(simple) = self.simple_locations.borrow().get(coords) {
+                        return (simple.clone(), (default as i32 + delta.to_i32()) as i16);
+                    }
                     let simple_user_loc: SimpleUserLocation = user_loc
                         .iter()
                         .map(|(tag, coord)| {
@@ -238,7 +241,9 @@ impl<'a> UncompileContext<'a> {
                             (tag.to_string().into(), OrderedFloat(coord.to_f64()))
                         })
                         .collect();
-
+                    self.simple_locations
+                        .borrow_mut()
+                        .insert(coords.clone(), simple_user_loc.clone());
                     (simple_user_loc, (default as i32 + delta.to_i32()) as i16)
                 })
                 .collect();

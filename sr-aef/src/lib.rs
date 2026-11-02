@@ -79,6 +79,9 @@ type FeatureLanguageSystems = Vec<(LanguageSystem, bool)>; // and whether the fe
 
 const PROMOTE_TO_NAMED_CLASS_THRESHOLD: usize = 5;
 
+/// The prefix of the names of pair positioning classes
+pub const PAIR_CLASS_PREFIX: &str = "pair_class_";
+
 /// The context object that holds all the information we need when uncompiling a font.
 #[cfg_attr(feature = "cli", derive(serde::Serialize))]
 pub struct UncompileContext<'a> {
@@ -147,6 +150,13 @@ pub struct UncompileContext<'a> {
     /// on ligatures, by glyph and 1-based component
     #[cfg_attr(feature = "cli", serde(skip))]
     ligature_components: IndexMap<u16, Vec<(SmolStr, usize, Anchor)>>,
+    /// Variation locations as metrics state them, by normalized coordinates
+    /// Pair positioning classes written by name, by their members
+    #[cfg_attr(feature = "cli", serde(skip))]
+    pair_class_names: HashMap<String, SmolStr>,
+    #[cfg_attr(feature = "cli", serde(skip))]
+    simple_locations:
+        std::cell::RefCell<HashMap<Vec<skrifa::raw::types::F2Dot14>, SimpleUserLocation>>,
 }
 
 impl<'a> UncompileContext<'a> {
@@ -200,6 +210,8 @@ impl<'a> UncompileContext<'a> {
             num_glyphs: glyph_names.num_glyphs() as u16,
             aalt_lookups: IndexSet::new(),
             ligature_components: IndexMap::new(),
+            simple_locations: Default::default(),
+            pair_class_names: HashMap::new(),
         };
         slf.gather_language_systems()?;
         slf.uncompile_gsub_lookups()?;
@@ -1259,10 +1271,28 @@ pub fn uncompile_context<'a>(font: &'a skrifa::FontRef) -> Result<UncompileConte
 /// feature file and unique.
 pub fn unique_glyph_names(font: &skrifa::FontRef) -> Vec<SmolStr> {
     let glyph_names = GlyphNames::new(font);
+    // in one pass: looking each name up walks the post table's names from
+    // the start, which for tens of thousands of glyphs takes seconds
+    let mut names: Vec<Option<SmolStr>> = vec![None; glyph_names.num_glyphs() as usize];
+    for (gid, name) in glyph_names.iter() {
+        if let Some(slot) = names.get_mut(gid.to_u32() as usize) {
+            let name = match name {
+                name if !name.is_synthesized() => name.to_string(),
+                _ if gid.to_u32() == 0 => ".notdef".to_string(),
+                _ => format!("glyph{:05}", gid.to_u32()),
+            };
+            *slot = Some(fea_glyph_name(&name));
+        }
+    }
     unique_names(
-        (0..glyph_names.num_glyphs())
-            .map(GlyphId::new)
-            .map(|gid| fea_glyph_name(&glyph_name(&glyph_names, gid)))
+        names
+            .into_iter()
+            .enumerate()
+            .map(|(gid, name)| {
+                name.unwrap_or_else(|| {
+                    fea_glyph_name(&glyph_name(&glyph_names, GlyphId::new(gid as u32)))
+                })
+            })
             .collect(),
     )
 }
@@ -1301,6 +1331,9 @@ fn fea_glyph_name(name: &str) -> SmolStr {
 fn unique_names(names: Vec<SmolStr>) -> Vec<SmolStr> {
     let all: HashSet<SmolStr> = names.iter().cloned().collect();
     let mut taken: HashSet<SmolStr> = HashSet::new();
+    // the next suffix to try for each base: every one before it is taken, so
+    // thousands of glyphs of one name do not each count up from 1
+    let mut next: HashMap<String, usize> = HashMap::new();
     names
         .into_iter()
         .map(|name| {
@@ -1311,10 +1344,14 @@ fn unique_names(names: Vec<SmolStr>) -> Vec<SmolStr> {
                 Some(rest) => format!("_{rest}"),
                 None => name.to_string(),
             };
-            (1..)
-                .map(|n| SmolStr::new(format!("{base}.{n}")))
-                .find(|candidate| !all.contains(candidate) && taken.insert(candidate.clone()))
-                .unwrap_or(name)
+            let n = next.entry(base.clone()).or_insert(1);
+            loop {
+                let candidate = SmolStr::new(format!("{base}.{n}"));
+                *n += 1;
+                if !all.contains(&candidate) && taken.insert(candidate.clone()) {
+                    return candidate;
+                }
+            }
         })
         .collect()
 }
@@ -1632,7 +1669,11 @@ lookup gpos_pair_1;
         let data = std::fs::read("resources/class0.ttf").unwrap();
         let fontref = skrifa::FontRef::new(&data).unwrap();
         let fea = uncompile(&fontref, true).unwrap().as_fea("");
-        assert!(fea.contains("pos [a b] [.notdef a b d e] -20;"), "{fea}");
+        assert!(
+            fea.contains("@pair_class_1 = [.notdef a b d e];")
+                && fea.contains("pos [a b] @pair_class_1 -20;"),
+            "{fea}"
+        );
         assert!(fea.contains("pos [a b] [c] -10;"), "{fea}");
     }
 
@@ -1863,6 +1904,18 @@ lookup gpos_pair_1;
             unique_names(names.to_vec()),
             [".notdef", "_notdef.1", "a", "a.2", "a.1"]
         );
+    }
+
+    #[test]
+    fn test_many_glyphs_of_one_name() {
+        // AquaKana names 16,579 glyphs .notdef: each takes the next suffix
+        // without counting up from 1 again (which took minutes)
+        let names = vec![SmolStr::new(".notdef"); 50_000];
+        let start = std::time::Instant::now();
+        let unique = unique_names(names);
+        assert!(start.elapsed() < std::time::Duration::from_secs(2));
+        assert_eq!(unique[49_999], "_notdef.49999");
+        assert_eq!(unique.iter().collect::<HashSet<_>>().len(), 50_000);
     }
 
     #[test]
