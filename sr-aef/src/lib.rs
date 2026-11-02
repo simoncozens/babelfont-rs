@@ -1660,6 +1660,19 @@ lookup gpos_pair_1;
     }
 
     #[test]
+    fn test_shadowed_ligature_is_left_out() {
+        let data = std::fs::read("resources/ligdup.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let fea = uncompile(&fontref, true).unwrap().as_fea("");
+        assert!(fea.contains("sub f f by f_f;"), "{fea}");
+        assert!(
+            !fea.lines().any(|l| l.trim() == "sub f f by f_f.alt;"),
+            "{fea}"
+        );
+        assert!(fea.contains("# sub f f by f_f.alt; is shadowed"), "{fea}");
+    }
+
+    #[test]
     fn test_uncompile_feature_names() {
         let data = std::fs::read("resources/featurenames.ttf").unwrap();
         let fontref = skrifa::FontRef::new(&data).unwrap();

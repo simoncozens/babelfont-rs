@@ -1,0 +1,6 @@
+# the ligature set of f states f f twice (f_f, then f_f.alt): the first wins
+languagesystem DFLT dflt;
+feature liga {
+    sub f f by f_f;
+    sub f i by f_i;
+} liga;
