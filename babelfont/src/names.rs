@@ -707,9 +707,44 @@ pub fn ot_lang_id_to_name_language(lang_id: u16) -> Option<&'static str> {
     ot_lang_id_to_layout_tag(lang_id).or_else(|| ot_lang_id_to_iso_tag(lang_id))
 }
 
+/// The Windows language ID of a name's language key, as
+/// [`ot_lang_id_to_name_language`] keys it: "dflt" is US English.
+pub fn name_language_to_ot_lang_id(language: &str) -> Option<u16> {
+    if language == crate::i18ndictionary::DFLT {
+        return Some(0x0409);
+    }
+    LANGUAGE_ID_TO_LAYOUT_TAG
+        .iter()
+        .chain(LANGUAGE_ID_TO_BCP47)
+        .map(|&(id, _)| id)
+        .find(|&id| id >= 0x0400 && ot_lang_id_to_name_language(id) == Some(language))
+}
+
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod language_id_tests {
     use super::*;
+
+    #[test]
+    fn test_name_languages_find_their_language_ids() {
+        assert_eq!(name_language_to_ot_lang_id("dflt"), Some(0x0409));
+        assert_eq!(name_language_to_ot_lang_id("JPN"), Some(0x0411));
+        assert_eq!(name_language_to_ot_lang_id("es-MX"), Some(0x080A));
+        assert_eq!(name_language_to_ot_lang_id("fr-CA"), Some(0x0C0C));
+        assert_eq!(name_language_to_ot_lang_id("xx"), None);
+        for &(id, _) in LANGUAGE_ID_TO_LAYOUT_TAG.iter().chain(LANGUAGE_ID_TO_BCP47) {
+            if id < 0x0400 {
+                continue;
+            }
+            let language = ot_lang_id_to_name_language(id).unwrap();
+            let found = name_language_to_ot_lang_id(language).unwrap();
+            assert_eq!(
+                ot_lang_id_to_name_language(found),
+                Some(language),
+                "0x{id:04X}"
+            );
+        }
+    }
 
     #[test]
     fn test_every_layout_tag_is_found_by_its_language_id() {
