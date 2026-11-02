@@ -111,6 +111,40 @@ impl DecomposedAffine {
             }),
         }
     }
+
+    /// The same transform turned half a turn more with both scales negated
+    /// (R(θ + π) = -R(θ)), the rotation within half a turn of `near`
+    fn nearest_rotation(&self, near: f64) -> DecomposedAffine {
+        use std::f64::consts::{PI, TAU};
+        let unwrap = |t: DecomposedAffine| DecomposedAffine {
+            rotation: t.rotation - ((t.rotation - near) / TAU).round() * TAU,
+            ..t
+        };
+        let same = unwrap(*self);
+        let turned = unwrap(DecomposedAffine {
+            rotation: self.rotation + PI,
+            scale: (-self.scale.0, -self.scale.1),
+            ..*self
+        });
+        if (turned.rotation - near).abs() < (same.rotation - near).abs() {
+            turned
+        } else {
+            same
+        }
+    }
+
+    /// Masters' transforms as interpolation needs them: in one order, and with
+    /// rotations that do not jump half a turn between masters (an affine turned
+    /// 100° decomposes as one turned -80° with both scales negated)
+    pub fn compatible(transforms: &[DecomposedAffine]) -> Vec<DecomposedAffine> {
+        let Some(first) = transforms.first() else {
+            return vec![];
+        };
+        transforms
+            .iter()
+            .map(|t| t.in_order(first.order).nearest_rotation(first.rotation))
+            .collect()
+    }
 }
 
 /// The roots of a k² + b k + c = 0, the smallest first
@@ -196,11 +230,13 @@ impl From<kurbo::Affine> for DecomposedAffine {
         // flips come back exact
         let sx = if a < 0.0 { -a.hypot(b) } else { a.hypot(b) };
         if sx == 0.0 {
-            // the first column is zero: no rotation to find, a degenerate scale
+            // the first column is zero: R(θ) · S(0, sy) leaves the second column
+            // sy · (-sin θ, cos θ), so θ comes from it
+            let sy = c.hypot(d);
             return DecomposedAffine {
                 translation: (t_x, t_y),
-                scale: (0.0, c.hypot(d)),
-                rotation: 0.0,
+                scale: (0.0, sy),
+                rotation: if sy == 0.0 { 0.0 } else { (-c).atan2(d) },
                 skew: (0.0, 0.0),
                 order: TransformOrder::RestOfTheWorld,
             };
