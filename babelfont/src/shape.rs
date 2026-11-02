@@ -126,6 +126,27 @@ impl Path {
     // Stolen completely from norad
     pub fn to_kurbo(&self) -> Result<kurbo::BezPath, BabelfontError> {
         let mut path = kurbo::BezPath::new();
+        // A closed TrueType contour may be off-curves only: every on-curve
+        // is implied, halfway between two off-curves
+        if self.closed
+            && !self.nodes.is_empty()
+            && self.nodes.iter().all(|n| n.nodetype == NodeType::OffCurve)
+        {
+            let points: Vec<kurbo::Point> = self.nodes.iter().map(|n| n.to_kurbo()).collect();
+            let (Some(first), Some(last)) = (points.first(), points.last()) else {
+                return Err(BabelfontError::BadPath);
+            };
+            let start = last.midpoint(*first);
+            path.move_to(start);
+            for (i, point) in points.iter().enumerate() {
+                let end = points
+                    .get(i + 1)
+                    .map_or(start, |next| point.midpoint(*next));
+                path.quad_to(*point, end);
+            }
+            path.close_path();
+            return Ok(path);
+        }
         let mut offs = std::collections::VecDeque::new();
         let rotate = if self.closed {
             self.nodes
@@ -169,6 +190,10 @@ impl Path {
                     offs.clear();
                 }
                 NodeType::QCurve => {
+                    // without off-curves, a quadratic segment is a line
+                    if offs.is_empty() {
+                        path.line_to(kurbo_point);
+                    }
                     while let Some(pt) = offs.pop_front() {
                         if let Some(next) = offs.front() {
                             let implied_point = pt.midpoint(*next);
@@ -177,7 +202,6 @@ impl Path {
                             path.quad_to(pt, kurbo_point);
                         }
                     }
-                    offs.clear();
                 }
                 _ => {
                     return Err(BabelfontError::UnrepresentablePointType(
@@ -1075,6 +1099,59 @@ mod tests {
                 ix, a.smooth, b.smooth
             );
         }
+    }
+
+    fn path_of(nodes: Vec<Node>) -> Path {
+        Path {
+            nodes,
+            closed: true,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_to_kurbo_off_curves_only() {
+        // a TrueType circle: four off-curves, every on-curve implied
+        let path = path_of(vec![
+            Node::new_offcurve(0.0, 50.0),
+            Node::new_offcurve(50.0, 100.0),
+            Node::new_offcurve(100.0, 50.0),
+            Node::new_offcurve(50.0, 0.0),
+        ]);
+        let kurbo = path.to_kurbo().unwrap();
+        let els = kurbo.elements();
+        assert_eq!(els[0], PathEl::MoveTo((25.0, 25.0).into()));
+        assert_eq!(
+            els.iter()
+                .filter(|el| matches!(el, PathEl::QuadTo(..)))
+                .count(),
+            4
+        );
+        assert_eq!(
+            els[4],
+            PathEl::QuadTo((50.0, 0.0).into(), (25.0, 25.0).into())
+        );
+        // each quadratic bulges a quarter of the way past its on-curves
+        let bbox = kurbo::Shape::bounding_box(&kurbo);
+        assert_eq!(
+            (bbox.x0, bbox.y0, bbox.x1, bbox.y1),
+            (12.5, 12.5, 87.5, 87.5)
+        );
+    }
+
+    #[test]
+    fn test_to_kurbo_quadratic_without_off_curves_is_a_line() {
+        let mut corner = Node::new_line(100.0, 0.0);
+        corner.nodetype = NodeType::QCurve;
+        let path = path_of(vec![
+            Node::new_line(0.0, 0.0),
+            corner,
+            Node::new_line(100.0, 100.0),
+        ]);
+        let kurbo = path.to_kurbo().unwrap();
+        assert!(kurbo
+            .elements()
+            .contains(&PathEl::LineTo((100.0, 0.0).into())));
     }
 
     /// A closed square, drawn counter-clockwise, with straight sides.
