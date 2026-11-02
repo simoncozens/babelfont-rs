@@ -1,7 +1,7 @@
 //! Un-compiling of GPOS lookups.
 
 use fea_rs_ast::AsFea;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use fea_rs_ast::{
     Anchor as FeaAnchor, CursivePosStatement, GlyphClass, GlyphContainer, LookupBlock,
@@ -16,7 +16,7 @@ use skrifa::{
         tables::gpos::{
             AnchorTable, CursivePos, ExtensionPosFormat1, MarkBasePos, MarkLigPos, MarkMarkPos,
             PairPos, PositionChainContext, PositionLookup, PositionSequenceContext,
-            PositionSubtables, SinglePos, ValueRecord,
+            PositionSubtables, SinglePos, ValueFormat, ValueRecord,
         },
     },
 };
@@ -184,6 +184,29 @@ impl<'a> UncompileContext<'a> {
                             .entry(class)
                             .or_default()
                             .push(GlyphContainer::GlyphName(self.get_name(glyph)));
+                    }
+                }
+                // Class 0 of the second glyphs is every glyph no other class
+                // has: a value against it kerns a first glyph with all of them
+                let class_zero_kerns = records.iter().any(|record| {
+                    record
+                        .as_ref()
+                        .and_then(|record| record.first())
+                        .and_then(|zero| zero.as_ref())
+                        .is_some_and(|zero| has_value(&zero.first) || has_value(&zero.second))
+                });
+                if class_zero_kerns {
+                    let classed: HashSet<u32> = class_def2
+                        .iter()
+                        .filter(|(_, class)| *class != 0)
+                        .map(|(glyph, _)| glyph.to_u32())
+                        .collect();
+                    let rest: Vec<GlyphContainer> = (0..self.num_glyphs as u32)
+                        .filter(|gid| !classed.contains(gid))
+                        .map(|gid| GlyphContainer::GlyphName(self.get_name(GlyphId::new(gid))))
+                        .collect();
+                    if !rest.is_empty() {
+                        classes2.insert(0, rest);
                     }
                 }
                 for (class1, record) in records.iter().enumerate() {
@@ -381,6 +404,24 @@ impl<'a> UncompileContext<'a> {
             }));
         // a ligature's anchors are named per component, as `top_1`, `top_2`
         let ligature = !null_anchors_when_empty;
+        let mut ligature_components: IndexMap<u16, Vec<(SmolStr, usize, FeaAnchor)>> =
+            IndexMap::new();
+        if ligature {
+            for (_, name, rows) in &resolved {
+                for (component, anchors) in rows.iter().enumerate() {
+                    for (class, anchor) in anchors.iter().enumerate() {
+                        if let Some(anchor) = anchor {
+                            ligature_components.entry(class as u16).or_default().push((
+                                name.clone(),
+                                component + 1,
+                                anchor.clone(),
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+        self.ligature_components = ligature_components;
         let class_names = self.prepare_guessed_mark_classes(mark_classes, &class_anchors, ligature);
 
         let mut statements = vec![];
@@ -500,8 +541,13 @@ impl<'a> UncompileContext<'a> {
         for (class_number, base_glyphs_anchors) in mark_class_to_base_glyph_anchor {
             let marks = mark_classes.get(class_number);
             if let Some(name) = marks.and_then(|marks| self.same_mark_class(marks)) {
-                // A ligature's anchors are named per component, never so
-                if ligature || self.anchors_agree(&name, base_glyphs_anchors) {
+                // A ligature's anchors are named per component
+                let agree = if ligature {
+                    self.ligature_anchors_agree(&name, *class_number)
+                } else {
+                    self.anchors_agree(&name, base_glyphs_anchors)
+                };
+                if agree {
                     if !ligature {
                         self.anchors
                             .entry(name.clone())
@@ -583,6 +629,21 @@ impl<'a> UncompileContext<'a> {
             defined.sort();
             (defined == wanted).then(|| name.clone())
         })
+    }
+
+    /// Whether no ligature has an anchor of this name and its component
+    /// somewhere else already, for the anchors of a mark class
+    fn ligature_anchors_agree(&self, name: &str, class_number: u16) -> bool {
+        self.ligature_components
+            .get(&class_number)
+            .into_iter()
+            .flatten()
+            .all(|(glyph, component, anchor)| {
+                self.anchors
+                    .get(format!("{name}_{component}").as_str())
+                    .and_then(|existing| existing.get(glyph))
+                    .is_none_or(|known| known.as_fea("") == anchor.as_fea(""))
+            })
     }
 
     /// Whether no glyph has an anchor of this name somewhere else already
@@ -754,6 +815,30 @@ impl_uncompile_subtables!(PositionSubtables, empty = "gpos_extension", {
     Contextual => ContextualKind,
     ChainContextual => ChainContextualKind,
 });
+
+/// Whether a value record moves anything, in its values or its devices
+fn has_value(record: &ValueRecord) -> bool {
+    [
+        record.x_placement(),
+        record.y_placement(),
+        record.x_advance(),
+        record.y_advance(),
+    ]
+    .iter()
+    .any(|value| value.is_some_and(|value| value != 0))
+        || [
+            ValueFormat::X_PLACEMENT_DEVICE,
+            ValueFormat::Y_PLACEMENT_DEVICE,
+            ValueFormat::X_ADVANCE_DEVICE,
+            ValueFormat::Y_ADVANCE_DEVICE,
+        ]
+        .into_iter()
+        .any(|field| {
+            record
+                .device_offset(field)
+                .is_some_and(|offset| !offset.is_null())
+        })
+}
 
 fn anchor_location(anchor: &FeaAnchor) -> (f32, f32) {
     let x = match &anchor.x {

@@ -143,6 +143,10 @@ pub struct UncompileContext<'a> {
     /// Ogonek marks: the glyph U+0328 maps to, and glyphs named for an ogonek
     #[cfg_attr(feature = "cli", serde(skip))]
     ogonek_glyphs: HashSet<SmolStr>,
+    /// While a mark-to-ligature lookup is named: each mark class's anchors
+    /// on ligatures, by glyph and 1-based component
+    #[cfg_attr(feature = "cli", serde(skip))]
+    ligature_components: IndexMap<u16, Vec<(SmolStr, usize, Anchor)>>,
 }
 
 impl<'a> UncompileContext<'a> {
@@ -195,6 +199,7 @@ impl<'a> UncompileContext<'a> {
             axes: variations::fontdrasil_axes(font)?,
             num_glyphs: glyph_names.num_glyphs() as u16,
             aalt_lookups: IndexSet::new(),
+            ligature_components: IndexMap::new(),
         };
         slf.gather_language_systems()?;
         slf.uncompile_gsub_lookups()?;
@@ -1619,6 +1624,39 @@ lookup gpos_pair_1;
 } kern;
 "
         );
+    }
+
+    #[test]
+    fn test_uncompile_class_zero_kerning() {
+        // class 0 of the second glyphs is every glyph no other class has
+        let data = std::fs::read("resources/class0.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let fea = uncompile(&fontref, true).unwrap().as_fea("");
+        assert!(fea.contains("pos [a b] [.notdef a b d e] -20;"), "{fea}");
+        assert!(fea.contains("pos [a b] [c] -10;"), "{fea}");
+    }
+
+    #[test]
+    fn test_ligature_anchors_of_one_class_differ() {
+        // the second lookup's ligature anchors are not the first's: they
+        // take another name rather than overwrite topleft_1 and topleft_2
+        let data = std::fs::read("resources/ligconflict.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let context = uncompile_context(&fontref).unwrap();
+        let names: Vec<&SmolStr> = context
+            .anchors
+            .iter()
+            .filter(|(_, glyphs)| glyphs.contains_key("f_f"))
+            .map(|(name, _)| name)
+            .collect();
+        assert_eq!(names.len(), 4, "{names:?}");
+        let first = context
+            .anchors
+            .get("topleft_1")
+            .unwrap()
+            .get("f_f")
+            .unwrap();
+        assert_eq!(first.as_fea(""), "<anchor 100 700>");
     }
 
     #[test]
