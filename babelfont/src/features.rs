@@ -113,6 +113,11 @@ mod glyphs {
         FormatSpecific,
     };
 
+    /// Where a compiler inserts the kerning it generates
+    const INSERTION_MARKER: &str = "# Automatic Code";
+    /// What this reader added to a kern feature's code: an insertion marker
+    const KEY_KERN_MARKER_ADDED: &str = "com.schriftgestalt.Glyphs.kernMarkerAdded";
+
     impl From<&glyphslib::common::FeatureClass> for PossiblyAutomaticCode {
         fn from(val: &glyphslib::common::FeatureClass) -> Self {
             let mut code = PossiblyAutomaticCode {
@@ -207,6 +212,23 @@ mod glyphs {
                     serde_json::Value::Array(labels),
                 );
             }
+            // Glyphs puts its kerning after a kern feature's own code, and
+            // glyphsLib and fontc put an insertion marker at its end
+            // (insert_mark_if_manual_kern_feature): without one, a compiler
+            // generates no kerning. A disabled feature, which they leave
+            // out, has its code commented out here, and the marker after it.
+            if val.tag == "kern" && !val.automatic && !val.code.contains(INSERTION_MARKER) {
+                let added = if code.code.is_empty() || code.code.ends_with('\n') {
+                    INSERTION_MARKER.to_string()
+                } else {
+                    format!("\n{INSERTION_MARKER}")
+                };
+                code.code.push_str(&added);
+                code.format_specific.insert(
+                    KEY_KERN_MARKER_ADDED.into(),
+                    serde_json::Value::String(added),
+                );
+            }
             code
         }
     }
@@ -287,8 +309,18 @@ mod glyphs {
                 })
                 .unwrap_or_default();
 
+            // the insertion marker the reader added goes, if it is still where
+            // the reader put it
+            let added = self
+                .format_specific
+                .get(KEY_KERN_MARKER_ADDED)
+                .and_then(|v| v.as_str());
+            let code = match added.and_then(|added| self.code.strip_suffix(added)) {
+                Some(original) => original.to_string(),
+                None => self.code.clone(),
+            };
             glyphslib::common::Feature {
-                code: self.code.clone(),
+                code,
                 automatic: self.automatic,
                 disabled,
                 notes,
