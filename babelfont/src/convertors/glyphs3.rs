@@ -2498,6 +2498,25 @@ mod tests {
     }
 
     #[test]
+    fn test_load_ligatures() {
+        // a ligature by its subcategory, as glyphsLib and fontc have it; a
+        // category other than Letter goes back as it came
+        for category in ["Letter", "Number"] {
+            let glyphs_glyph = glyphslib::glyphs3::Glyph {
+                name: "one_half".into(),
+                category: Some(category.into()),
+                subcategory: Some("Ligature".into()),
+                ..Default::default()
+            };
+            let glyph = crate::glyph::glyphs::from_glyphs(&glyphs_glyph, &[]).unwrap();
+            assert_eq!(glyph.category, GlyphCategory::Ligature);
+            let back = glyph_to_glyphs(&glyph, &[], None, None);
+            assert_eq!(back.category, Some(category.to_string()));
+            assert_eq!(back.subcategory, Some("Ligature".to_string()));
+        }
+    }
+
+    #[test]
     fn test_load_spacing_combining_marks() {
         // a mark that attaches and advances is a mark, as glyphsLib and
         // fontc have it

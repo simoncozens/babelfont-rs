@@ -49,6 +49,81 @@ static GLYPHS_DATA_INDEX: LazyLock<GlyphsDataIndex> = LazyLock::new(|| {
     index
 });
 
+/// Glyphs.app's data on a glyph by its name or a name it went by
+fn named(name: &str) -> Option<&'static GlyphInfo> {
+    let index = &*GLYPHS_DATA_INDEX;
+    index
+        .by_name
+        .get(name)
+        .or_else(|| index.by_alt_name.get(name))
+        .copied()
+}
+
+/// A glyph's category and subcategory, as Glyphs and fontc make them up for
+/// a name its data does not have (fontc's construct_category): a glyph with
+/// a suffix (acutecomb.case) is of the glyph it varies, a ligature
+/// (f_f_l, lam_alef-ar) of its parts: a mark if the first is, the first's
+/// if the others are marks, else a letter ligature
+fn category_of(name: &str) -> Option<(&'static str, Option<&'static str>)> {
+    let attributes = |info: &'static GlyphInfo| (info.category.as_str(), info.sub_category.as_deref());
+    if name.starts_with('_') {
+        return None;
+    }
+    if let Some(info) = named(name) {
+        return Some(attributes(info));
+    }
+    // the base: with several suffixes, the longest a known glyph has
+    let dots: Vec<usize> = name.match_indices('.').map(|(i, _)| i).collect();
+    let base = dots
+        .iter()
+        .skip(1)
+        .map(|i| &name[..*i])
+        .find(|base| named(base).is_some())
+        .or_else(|| name.split('.').next())
+        .unwrap_or(name);
+    if let Some(info) = named(base) {
+        return Some(attributes(info));
+    }
+    // a ligature: the parts, each with the last's script suffix where a
+    // glyph of that name is known
+    let (_, last) = base.rsplit_once('_')?;
+    let script = last.rsplit_once('-').map(|(_, script)| script);
+    let trimmed = match script {
+        Some(script) => base.trim_end_matches(script).trim_end_matches('-'),
+        None => base,
+    };
+    let parts: Vec<String> = trimmed
+        .split('_')
+        .map(|part| match script {
+            Some(script) if !part.contains('-') => {
+                let with_script = format!("{part}-{script}");
+                if named(part).is_some() && named(&with_script).is_none() {
+                    part.to_string()
+                } else {
+                    with_script
+                }
+            }
+            _ => part.to_string(),
+        })
+        .collect();
+    let infos: Vec<Option<&'static GlyphInfo>> = parts.iter().map(|p| named(p)).collect();
+    let first = infos.first().copied().flatten()?;
+    match first.category.as_str() {
+        "Mark" => Some(("Mark", first.sub_category.as_deref())),
+        "Letter" => {
+            let rest_attach = infos.iter().skip(1).all(|info| {
+                info.is_none_or(|info| matches!(info.category.as_str(), "Mark" | "Separator"))
+            });
+            if rest_attach {
+                Some(attributes(first))
+            } else {
+                Some(("Letter", Some("Ligature")))
+            }
+        }
+        _ => None,
+    }
+}
+
 /// A filter that adds Glyphs.app glyph metadata to the font
 pub struct GlyphsData;
 
@@ -66,41 +141,19 @@ impl FontFilter for GlyphsData {
             if glyph.category != crate::GlyphCategory::Unknown {
                 continue;
             }
-            // a glyph with a suffix (acutecomb.case) is of the category of
-            // the glyph it varies, as Glyphs has it
-            let Some(info) = exact.or_else(|| {
-                let base = glyph.name.split('.').next()?;
-                (base != glyph.name.as_str())
-                    .then(|| {
-                        index
-                            .by_name
-                            .get(base)
-                            .or_else(|| index.by_alt_name.get(base))
-                            .copied()
-                    })
-                    .flatten()
-            }) else {
+            let Some((category, subcategory)) = category_of(&glyph.name) else {
                 continue;
             };
-            match info.category.as_str() {
-                // a mark only if it attaches: a spacing accent or a
-                // modifier letter (acute, apostrophemod) is a base, as
-                // glyphsLib and fontc have it (category_for_glyph_preliminary)
-                "Mark" => {
-                    glyph.category = if matches!(
-                        info.sub_category.as_deref(),
-                        Some("Nonspacing" | "Spacing Combining")
-                    ) {
-                        crate::GlyphCategory::Mark
-                    } else {
-                        crate::GlyphCategory::Base
-                    }
-                }
-                "Base" => glyph.category = crate::GlyphCategory::Base,
-                "Ligature" => glyph.category = crate::GlyphCategory::Ligature,
-                // "Component" => glyph.category = crate::GlyphCategory::Component,
-                _ => {}
-            }
+            // glyphsLib and fontc (category_for_glyph_preliminary): a mark
+            // only if it attaches, and a ligature by its subcategory. A
+            // spacing accent or a modifier letter (acute, apostrophemod) is a
+            // base
+            glyph.category = match (category, subcategory) {
+                ("Mark", Some("Nonspacing" | "Spacing Combining")) => crate::GlyphCategory::Mark,
+                (_, Some("Ligature")) => crate::GlyphCategory::Ligature,
+                ("Mark", _) => crate::GlyphCategory::Base,
+                _ => continue,
+            };
         }
         Ok(())
     }
@@ -161,5 +214,24 @@ mod tests {
         // a spacing accent's variant is a base, as the accent is
         assert_eq!(glyph("acute.case").category, GlyphCategory::Base);
         assert_eq!(glyph("acutecomb.case").production_name, None);
+    }
+
+    #[test]
+    fn test_ligatures_are_ligatures() {
+        // as fontc makes up a category for a name Glyphs' data lacks: by the
+        // glyph a suffix varies, else by the parts of a ligature
+        let mut font = Font::new();
+        for name in ["fi", "f_f_l", "f_f.ss01", "A_V", "a_acutecomb", "acutecomb_gravecomb"] {
+            font.glyphs.push(Glyph::new(name));
+        }
+        GlyphsData.apply(&mut font).unwrap();
+        let category = |name: &str| font.glyphs.get(name).unwrap().category.clone();
+        assert_eq!(category("fi"), GlyphCategory::Ligature);
+        assert_eq!(category("f_f_l"), GlyphCategory::Ligature);
+        assert_eq!(category("f_f.ss01"), GlyphCategory::Ligature);
+        assert_eq!(category("A_V"), GlyphCategory::Ligature);
+        // a letter with marks is the letter; marks together a mark
+        assert_eq!(category("a_acutecomb"), GlyphCategory::Unknown);
+        assert_eq!(category("acutecomb_gravecomb"), GlyphCategory::Mark);
     }
 }
