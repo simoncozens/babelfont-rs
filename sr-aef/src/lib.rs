@@ -99,6 +99,15 @@ pub struct UncompileContext<'a> {
         serde(serialize_with = "crate::serialize::serialize_language_systems")
     )]
     pub language_systems: IndexMap<Tag, IndexSet<Tag>>,
+    /// The language systems to declare: those of GPOS, where a compiler
+    /// generates kerning and mark attachment (it registers them under every
+    /// declared language system), or all of them for a font without GPOS.
+    /// A feature registered elsewhere states its scripts and languages.
+    #[cfg_attr(
+        feature = "cli",
+        serde(serialize_with = "crate::serialize::serialize_language_systems")
+    )]
+    pub declared_language_systems: IndexMap<Tag, IndexSet<Tag>>,
     /// Anchors on a glyph which we haven't worked out what they should be called.
     /// class -> glyphname -> anchor
     pub unnamed_anchors: IndexMap<SmolStr, Vec<Anchor>>,
@@ -190,6 +199,7 @@ impl<'a> UncompileContext<'a> {
             gdef: font.gdef().ok(),
             name: font.name().ok(),
             language_systems: IndexMap::new(),
+            declared_language_systems: IndexMap::new(),
             unnamed_anchors: IndexMap::new(),
             anchors: IndexMap::new(),
             mark_classes: IndexMap::new(),
@@ -272,14 +282,12 @@ impl<'a> UncompileContext<'a> {
     }
 
     fn gather_language_systems(&mut self) -> Result<(), ReadError> {
-        let mut systems = IndexMap::new();
-        for script_list in [
-            self.gsub.as_ref().and_then(|g| g.script_list().ok()),
-            self.gpos.as_ref().and_then(|g| g.script_list().ok()),
-        ]
-        .into_iter()
-        .flatten()
-        {
+        let gather = |script_list: Option<ScriptList>,
+                      systems: &mut IndexMap<Tag, IndexSet<Tag>>|
+         -> Result<(), ReadError> {
+            let Some(script_list) = script_list else {
+                return Ok(());
+            };
             for script_record in script_list.script_records() {
                 let script_tag = script_record.script_tag();
                 let languages: &mut IndexSet<Tag> = systems.entry(script_tag).or_default();
@@ -292,21 +300,52 @@ impl<'a> UncompileContext<'a> {
                     languages.insert(lang_sys_tag);
                 }
             }
-        }
-        if let Some(index) = systems.get_index_of(&Tag::new(b"DFLT")) {
-            systems.move_index(index, 0);
-            let languages = &mut systems[0];
-            if let Some(index) = languages.get_index_of(&Tag::new(b"dflt")) {
-                languages.move_index(index, 0);
+            Ok(())
+        };
+        let dflt_first = |systems: &mut IndexMap<Tag, IndexSet<Tag>>| {
+            if let Some(index) = systems.get_index_of(&Tag::new(b"DFLT")) {
+                systems.move_index(index, 0);
+                let languages = &mut systems[0];
+                if let Some(index) = languages.get_index_of(&Tag::new(b"dflt")) {
+                    languages.move_index(index, 0);
+                }
+            }
+        };
+        let mut systems = IndexMap::new();
+        gather(
+            self.gsub.as_ref().and_then(|g| g.script_list().ok()),
+            &mut systems,
+        )?;
+        gather(
+            self.gpos.as_ref().and_then(|g| g.script_list().ok()),
+            &mut systems,
+        )?;
+        dflt_first(&mut systems);
+        let mut declared = IndexMap::new();
+        gather(
+            self.gpos.as_ref().and_then(|g| g.script_list().ok()),
+            &mut declared,
+        )?;
+        declared.retain(|_, languages: &mut IndexSet<Tag>| !languages.is_empty());
+        if declared.is_empty() {
+            declared = systems.clone();
+        } else {
+            // in the order of all of them
+            declared.sort_by(|a, _, b, _| systems.get_index_of(a).cmp(&systems.get_index_of(b)));
+            for (script, languages) in declared.iter_mut() {
+                if let Some(all) = systems.get(script) {
+                    languages.sort_by(|a, b| all.get_index_of(a).cmp(&all.get_index_of(b)));
+                }
             }
         }
         self.language_systems = systems;
+        self.declared_language_systems = declared;
         Ok(())
     }
 
     fn dump_language_systems(&self) -> Vec<ToplevelItem> {
         let mut items = vec![];
-        for (script_tag, lang_sys_tags) in &self.language_systems {
+        for (script_tag, lang_sys_tags) in &self.declared_language_systems {
             for lang_sys_tag in lang_sys_tags {
                 let lss =
                     LanguageSystemStatement::new(script_tag.to_string(), lang_sys_tag.to_string());
@@ -886,9 +925,16 @@ impl<'a> UncompileContext<'a> {
         systems: &IndexMap<LanguageSystem, (bool, Vec<Statement>)>,
     ) -> Option<Vec<Statement>> {
         let dflt = Tag::new(b"dflt");
-        let system_count: usize = self.language_systems.values().map(|l| l.len()).sum();
+        // a feature with no script statement is registered under every
+        // declared language system
+        let declared: Vec<LanguageSystem> = self
+            .declared_language_systems
+            .iter()
+            .flat_map(|(script, languages)| languages.iter().map(|l| (*script, *l)))
+            .collect();
         let (_, first) = &systems[0];
-        let everywhere = systems.len() == system_count
+        let everywhere = systems.len() == declared.len()
+            && declared.iter().all(|system| systems.contains_key(system))
             && systems.values().all(|(required, lookups)| {
                 !required
                     && lookups.len() == first.len()
