@@ -55,35 +55,51 @@ pub struct GlyphsData;
 impl FontFilter for GlyphsData {
     fn apply(&self, font: &mut crate::Font) -> Result<(), crate::BabelfontError> {
         log::info!("Applying GlyphsData filter");
-        for glyph_info in GLYPHS_DATA.iter() {
-            if let Some(glyph) = font.glyphs.get_mut(&glyph_info.name) {
-                if let Some(production_name) = &glyph_info.production {
-                    if glyph.production_name.is_none() {
-                        glyph.production_name = Some(production_name.into());
+        let index = &*GLYPHS_DATA_INDEX;
+        for glyph in font.glyphs.iter_mut() {
+            let exact = index.by_name.get(glyph.name.as_str()).copied();
+            if let Some(production_name) = exact.and_then(|info| info.production.as_ref()) {
+                if glyph.production_name.is_none() {
+                    glyph.production_name = Some(production_name.into());
+                }
+            }
+            if glyph.category != crate::GlyphCategory::Unknown {
+                continue;
+            }
+            // a glyph with a suffix (acutecomb.case) is of the category of
+            // the glyph it varies, as Glyphs has it
+            let Some(info) = exact.or_else(|| {
+                let base = glyph.name.split('.').next()?;
+                (base != glyph.name.as_str())
+                    .then(|| {
+                        index
+                            .by_name
+                            .get(base)
+                            .or_else(|| index.by_alt_name.get(base))
+                            .copied()
+                    })
+                    .flatten()
+            }) else {
+                continue;
+            };
+            match info.category.as_str() {
+                // a mark only if it attaches: a spacing accent or a
+                // modifier letter (acute, apostrophemod) is a base, as
+                // glyphsLib and fontc have it (category_for_glyph_preliminary)
+                "Mark" => {
+                    glyph.category = if matches!(
+                        info.sub_category.as_deref(),
+                        Some("Nonspacing" | "Spacing Combining")
+                    ) {
+                        crate::GlyphCategory::Mark
+                    } else {
+                        crate::GlyphCategory::Base
                     }
                 }
-                if glyph.category != crate::GlyphCategory::Unknown {
-                    continue;
-                }
-                match glyph_info.category.as_str() {
-                    // a mark only if it attaches: a spacing accent or a
-                    // modifier letter (acute, apostrophemod) is a base, as
-                    // glyphsLib and fontc have it (category_for_glyph_preliminary)
-                    "Mark" => {
-                        glyph.category = if matches!(
-                            glyph_info.sub_category.as_deref(),
-                            Some("Nonspacing" | "Spacing Combining")
-                        ) {
-                            crate::GlyphCategory::Mark
-                        } else {
-                            crate::GlyphCategory::Base
-                        }
-                    }
-                    "Base" => glyph.category = crate::GlyphCategory::Base,
-                    "Ligature" => glyph.category = crate::GlyphCategory::Ligature,
-                    // "Component" => glyph.category = crate::GlyphCategory::Component,
-                    _ => {}
-                }
+                "Base" => glyph.category = crate::GlyphCategory::Base,
+                "Ligature" => glyph.category = crate::GlyphCategory::Ligature,
+                // "Component" => glyph.category = crate::GlyphCategory::Component,
+                _ => {}
             }
         }
         Ok(())
@@ -128,5 +144,22 @@ mod tests {
         assert_eq!(category("apostrophemod"), GlyphCategory::Base);
         assert_eq!(category("acute"), GlyphCategory::Base);
         assert_eq!(category("acutecomb"), GlyphCategory::Mark);
+    }
+
+    #[test]
+    fn test_a_variant_is_of_its_glyphs_category() {
+        // acutecomb.case is a mark as acutecomb is, though Glyphs' data names
+        // only acutecomb; its production name is its own to make
+        let mut font = Font::new();
+        for name in ["acutecomb.case", "dotbelowcomb.case", "acute.case"] {
+            font.glyphs.push(Glyph::new(name));
+        }
+        GlyphsData.apply(&mut font).unwrap();
+        let glyph = |name: &str| font.glyphs.get(name).unwrap();
+        assert_eq!(glyph("acutecomb.case").category, GlyphCategory::Mark);
+        assert_eq!(glyph("dotbelowcomb.case").category, GlyphCategory::Mark);
+        // a spacing accent's variant is a base, as the accent is
+        assert_eq!(glyph("acute.case").category, GlyphCategory::Base);
+        assert_eq!(glyph("acutecomb.case").production_name, None);
     }
 }
