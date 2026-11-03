@@ -629,13 +629,16 @@ impl<'a> UncompileContext<'a> {
                 } else {
                     self.anchors_agree(&name, base_glyphs_anchors)
                 };
-                if agree {
+                // and the name keeps the group after the earlier ones it must
+                // follow
+                if agree && self.keeps_order(&name, base_glyphs_anchors, marks) {
                     if !ligature {
                         self.anchors
                             .entry(name.clone())
                             .or_default()
                             .extend(base_glyphs_anchors.clone());
                     }
+                    self.record_group(&name, base_glyphs_anchors, marks);
                     new_names.push(name);
                     continue;
                 }
@@ -699,7 +702,7 @@ impl<'a> UncompileContext<'a> {
         targets: &IndexMap<SmolStr, FeaAnchor>,
         marks: Option<&Vec<(GlyphContainer, FeaAnchor)>>,
     ) -> SmolStr {
-        let (lookup, kind) = self.naming_lookup.unwrap_or_default();
+        let (lookup, _) = self.naming_lookup.unwrap_or_default();
         let features = self
             .gpos_lookup_features
             .get(&lookup)
@@ -716,25 +719,7 @@ impl<'a> UncompileContext<'a> {
         } else {
             guessed.to_string()
         };
-        let below = is_below(&base);
-        let target_glyphs: HashSet<SmolStr> = targets.keys().cloned().collect();
-        let mark_glyphs: HashSet<SmolStr> = marks
-            .into_iter()
-            .flatten()
-            .flat_map(|(glyphs, _)| glyph_names(glyphs))
-            .collect();
-        // the groups this one must come after
-        let floor: Option<SmolStr> = self
-            .named_groups
-            .iter()
-            .filter(|g| {
-                g.kind == kind
-                    && g.below == below
-                    && !g.targets.is_disjoint(&target_glyphs)
-                    && !g.marks.is_disjoint(&mark_glyphs)
-            })
-            .map(|g| g.name.clone())
-            .max();
+        let floor = self.floor(&base, targets, marks);
         let free =
             |name: &str| self.anchors.get(name).is_none() && self.mark_classes.get(name).is_none();
         let candidates = std::iter::once(base.clone())
@@ -752,14 +737,60 @@ impl<'a> UncompileContext<'a> {
         if name != guessed {
             self.provisional_anchor_names.insert(name.clone());
         }
-        self.named_groups.push(NamedGroup {
-            name: name.clone(),
-            kind,
-            below,
-            targets: target_glyphs,
-            marks: mark_glyphs,
-        });
+        self.record_group(&name, targets, marks);
         name
+    }
+
+    /// The last name of the groups of earlier lookups of this one's type and
+    /// feature that attach the same marks to the same glyphs: a name for this
+    /// group comes after it
+    fn floor(
+        &self,
+        name: &str,
+        targets: &IndexMap<SmolStr, FeaAnchor>,
+        marks: Option<&Vec<(GlyphContainer, FeaAnchor)>>,
+    ) -> Option<SmolStr> {
+        let (_, kind) = self.naming_lookup.unwrap_or_default();
+        let below = is_below(name);
+        let (target_glyphs, mark_glyphs) = group_glyphs(targets, marks);
+        self.named_groups
+            .iter()
+            .filter(|g| {
+                g.kind == kind
+                    && g.below == below
+                    && g.name != name
+                    && !g.targets.is_disjoint(&target_glyphs)
+                    && !g.marks.is_disjoint(&mark_glyphs)
+            })
+            .map(|g| g.name.clone())
+            .max()
+    }
+
+    fn keeps_order(
+        &self,
+        name: &str,
+        targets: &IndexMap<SmolStr, FeaAnchor>,
+        marks: Option<&Vec<(GlyphContainer, FeaAnchor)>>,
+    ) -> bool {
+        self.floor(name, targets, marks)
+            .is_none_or(|floor| name > floor.as_str())
+    }
+
+    fn record_group(
+        &mut self,
+        name: &str,
+        targets: &IndexMap<SmolStr, FeaAnchor>,
+        marks: Option<&Vec<(GlyphContainer, FeaAnchor)>>,
+    ) {
+        let (_, kind) = self.naming_lookup.unwrap_or_default();
+        let (targets, marks) = group_glyphs(targets, marks);
+        self.named_groups.push(NamedGroup {
+            name: name.into(),
+            kind,
+            below: is_below(name),
+            targets,
+            marks,
+        });
     }
 
     /// The name of a mark class already defined with exactly these marks and anchors
@@ -1058,6 +1089,21 @@ pub(crate) struct NamedGroup {
 /// Whether fontc puts an anchor group in blwm rather than abvm
 fn is_below(name: &str) -> bool {
     name.starts_with("bottom") || name == "nukta"
+}
+
+/// The glyphs a group attaches to, and its marks
+fn group_glyphs(
+    targets: &IndexMap<SmolStr, FeaAnchor>,
+    marks: Option<&Vec<(GlyphContainer, FeaAnchor)>>,
+) -> (HashSet<SmolStr>, HashSet<SmolStr>) {
+    (
+        targets.keys().cloned().collect(),
+        marks
+            .into_iter()
+            .flatten()
+            .flat_map(|(glyphs, _)| glyph_names(glyphs))
+            .collect(),
+    )
 }
 
 /// The glyph names of a glyph or class
