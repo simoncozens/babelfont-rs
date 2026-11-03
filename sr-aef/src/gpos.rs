@@ -48,7 +48,17 @@ impl<'a> UncompileContext<'a> {
             self.assign_lookup_name(lookup.subtables()?.prefix(), i as u16, Pos);
         }
         for (i, lookup) in lookup_list.lookups().iter().flatten().enumerate() {
-            let mut block = lookup.subtables()?.uncompile(self, i as u16, Pos)?;
+            let subtables = lookup.subtables()?;
+            // a pair lookup's varying values are stated at all of its regions
+            let regions = match &subtables {
+                PositionSubtables::Pair(pairs) => {
+                    Some(self.pair_lookup_regions(pairs.iter().flatten())?)
+                }
+                _ => None,
+            };
+            *self.lookup_regions.borrow_mut() = regions;
+            let mut block = subtables.uncompile(self, i as u16, Pos)?;
+            *self.lookup_regions.borrow_mut() = None;
             if let Some(Statement::Subtable(_)) = block.statements.last() {
                 block.statements.pop();
             }
@@ -259,6 +269,33 @@ impl<'a> UncompileContext<'a> {
             }
         }
         Ok(())
+    }
+
+    /// The variation regions any value of a pair lookup uses
+    fn pair_lookup_regions(
+        &self,
+        subtables: impl Iterator<Item = PairPos<'a>>,
+    ) -> Result<std::collections::BTreeSet<u16>, ReadError> {
+        let mut regions = std::collections::BTreeSet::new();
+        for subtable in subtables {
+            match subtable.positioning()? {
+                PairPositioning::Pairs { pair_sets, .. } => {
+                    for pair in pair_sets.iter().flatten() {
+                        for record in [&pair.first, &pair.first_is_next] {
+                            regions.extend(self.value_record_regions(record)?);
+                        }
+                    }
+                }
+                PairPositioning::Classes { records, .. } => {
+                    for value in records.iter().flatten().flatten().flatten() {
+                        for record in [&value.first, &value.second] {
+                            regions.extend(self.value_record_regions(record)?);
+                        }
+                    }
+                }
+            }
+        }
+        Ok(regions)
     }
 
     fn pair_statement(

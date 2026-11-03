@@ -102,6 +102,42 @@ impl<'a> UncompileContext<'a> {
             .transpose()
     }
 
+    /// The variation regions a value record's deltas use
+    pub(crate) fn value_record_regions(
+        &self,
+        value_record: &skrifa::raw::tables::gpos::ValueRecord,
+    ) -> Result<Vec<u16>, ReadError> {
+        let Some(variations) = self.variation_store()? else {
+            return Ok(vec![]);
+        };
+        let mut out = vec![];
+        for device in [
+            value_record.x_placement_device(),
+            value_record.y_placement_device(),
+            value_record.x_advance_device(),
+            value_record.y_advance_device(),
+        ] {
+            let Some(Ok(DeviceOrVariationIndex::VariationIndex(varix))) = device else {
+                continue;
+            };
+            let Some(data) = variations
+                .item_variation_data()
+                .get(varix.delta_set_outer_index() as usize)
+            else {
+                continue;
+            };
+            let data = data?;
+            out.extend(
+                data.region_indexes()
+                    .iter()
+                    .zip(data.delta_set(varix.delta_set_inner_index()))
+                    .filter(|(_, delta)| *delta != 0)
+                    .map(|(region, _)| region.get()),
+            );
+        }
+        Ok(out)
+    }
+
     fn variation_locations(
         &self,
         index: DeltaSetIndex,
@@ -114,15 +150,25 @@ impl<'a> UncompileContext<'a> {
             && let Some(data) = variations.item_variation_data().get(index.outer as usize)
         {
             let data = data?;
-            for (region_index, delta) in data
+            let own: Vec<u16> = data
                 .region_indexes()
                 .iter()
                 .zip(data.delta_set(index.inner))
-            {
-                if delta == 0 {
-                    continue;
-                }
-                let region_axes = regions.get(region_index.get() as usize)?.region_axes();
+                .filter(|(_, delta)| *delta != 0)
+                .map(|(region, _)| region.get())
+                .collect();
+            // A kerning value that varies is stated wherever its lookup's
+            // values vary: a compiler kerns from one set of locations, and
+            // stated only where its own deltas are not zero, a reader would
+            // interpolate between fewer of them than the compiler did, and
+            // differently (Big Shoulders' intermediate weight master)
+            let lookup_regions = self.lookup_regions.borrow().clone();
+            let used: Vec<u16> = match lookup_regions {
+                Some(lookup) if !own.is_empty() => lookup.into_iter().collect(),
+                _ => own,
+            };
+            for region_index in used {
+                let region_axes = regions.get(region_index as usize)?.region_axes();
                 let peak: Vec<F2Dot14> = region_axes
                     .iter()
                     .map(|region_axis| region_axis.peak_coord())

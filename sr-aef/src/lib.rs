@@ -166,6 +166,9 @@ pub struct UncompileContext<'a> {
     #[cfg_attr(feature = "cli", serde(skip))]
     simple_locations:
         std::cell::RefCell<HashMap<Vec<skrifa::raw::types::F2Dot14>, SimpleUserLocation>>,
+    /// The variation regions the pair lookup being read uses
+    #[cfg_attr(feature = "cli", serde(skip))]
+    lookup_regions: std::cell::RefCell<Option<std::collections::BTreeSet<u16>>>,
 }
 
 impl<'a> UncompileContext<'a> {
@@ -221,6 +224,7 @@ impl<'a> UncompileContext<'a> {
             aalt_lookups: IndexSet::new(),
             ligature_components: IndexMap::new(),
             simple_locations: Default::default(),
+            lookup_regions: Default::default(),
             pair_class_names: HashMap::new(),
         };
         slf.gather_language_systems()?;
@@ -1862,6 +1866,25 @@ feature kern {
 lookup gpos_single_1;
 } kern;
 "
+        );
+    }
+
+    #[test]
+    fn test_uncompile_pair_values_at_their_lookups_regions() {
+        // a c varies over one region of the two its lookup's values vary
+        // over: it is stated at both, as a compiler kerns from one set of
+        // locations (resources/lookupregions.py)
+        let data = std::fs::read("resources/lookupregions.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        let fea = ff.as_fea("");
+        assert!(
+            fea.contains("pos a b (wght=100:-30 wght=500:-50 wght=900:-50);"),
+            "{fea}"
+        );
+        assert!(
+            fea.contains("pos a c (wght=100:-50 wght=500:-70 wght=900:-90);"),
+            "{fea}"
         );
     }
 
