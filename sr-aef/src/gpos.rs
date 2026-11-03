@@ -47,7 +47,22 @@ impl<'a> UncompileContext<'a> {
         for (i, lookup) in lookup_list.lookups().iter().flatten().enumerate() {
             self.assign_lookup_name(lookup.subtables()?.prefix(), i as u16, Pos);
         }
+        // the features each lookup is in: a compiler puts an anchor group in
+        // abvm or blwm by its name
+        if let Some(feature_list) = self.gpos.as_ref().and_then(|g| g.feature_list().ok()) {
+            for record in feature_list.feature_records() {
+                if let Ok(feature) = record.feature(feature_list.offset_data()) {
+                    for index in feature.lookup_list_indices() {
+                        self.gpos_lookup_features
+                            .entry(index.get())
+                            .or_default()
+                            .push(record.feature_tag());
+                    }
+                }
+            }
+        }
         for (i, lookup) in lookup_list.lookups().iter().flatten().enumerate() {
+            self.naming_lookup = Some((i as u16, lookup.lookup_type()));
             let subtables = lookup.subtables()?;
             // a pair lookup's varying values are stated at all of its regions
             let regions = match &subtables {
@@ -529,10 +544,11 @@ impl<'a> UncompileContext<'a> {
 
         let mut class_to_anchor_name: IndexMap<u16, SmolStr> = IndexMap::new();
         for (class_number, mark_class) in mark_classes {
-            let anchor_name = guessed_name_by_class
-                .get(&class_number)
-                .cloned()
-                .unwrap_or_else(|| self.mark_class_symbol(class_number));
+            // a class no glyph has an anchor for is named for nothing
+            let anchor_name = match guessed_name_by_class.get(&class_number) {
+                Some(name) => name.clone(),
+                None => self.group_name("anchor", &IndexMap::new(), Some(&mark_class)),
+            };
             self.register_mark_class(mark_class, &anchor_name);
             class_to_anchor_name.insert(class_number, anchor_name);
         }
@@ -648,7 +664,6 @@ impl<'a> UncompileContext<'a> {
                 ys.push(y_percentage);
             }
             // Now guess: if they're all majority in top, topright, topleft, bottom, bottomright, bottomleft, center, etc
-            // in order if not already registered in the "anchors" field.
             let zone = majority_in_quadrant(&xs, &ys);
             let ogonek = marks.is_some_and(|marks| {
                 !marks.is_empty()
@@ -657,20 +672,12 @@ impl<'a> UncompileContext<'a> {
                         _ => false,
                     })
             }) && matches!(zone, Some("bottom" | "bottomright") | None);
-            let name = if ogonek { Some("ogonek") } else { zone };
-            if let Some(name) = name
-                && self.anchors.get(name).is_none()
-                && self.mark_classes.get(name).is_none()
-            {
-                new_names.push(name.into());
-                if !ligature {
-                    self.anchors
-                        .insert(name.into(), base_glyphs_anchors.clone());
-                }
-                continue;
-            }
-            // Create one with a symbol
-            let name = self.mark_class_symbol(*class_number);
+            let guessed = if ogonek {
+                "ogonek"
+            } else {
+                zone.unwrap_or("anchor")
+            };
+            let name = self.group_name(guessed, base_glyphs_anchors, marks);
             if !ligature {
                 self.anchors
                     .insert(name.clone(), base_glyphs_anchors.clone());
@@ -678,6 +685,81 @@ impl<'a> UncompileContext<'a> {
             new_names.push(name);
         }
         new_names
+    }
+
+    /// A name for an anchor group, from where its anchors are, that a
+    /// compiler builds the group from as it was: in the feature it was in
+    /// (abvm or blwm, by the name: fontc's is_below_mark), and after the
+    /// groups of earlier lookups that attach the same marks to the same
+    /// glyphs (it writes a lookup per group, in the order of their names:
+    /// make_mark_to_base_groups). Taken names get a number.
+    fn group_name(
+        &mut self,
+        guessed: &str,
+        targets: &IndexMap<SmolStr, FeaAnchor>,
+        marks: Option<&Vec<(GlyphContainer, FeaAnchor)>>,
+    ) -> SmolStr {
+        let (lookup, kind) = self.naming_lookup.unwrap_or_default();
+        let features = self
+            .gpos_lookup_features
+            .get(&lookup)
+            .cloned()
+            .unwrap_or_default();
+        let in_feature = |tag: &[u8; 4]| features.contains(&skrifa::Tag::new(tag));
+        let base = if in_feature(b"blwm") && !is_below(guessed) {
+            "bottom".to_string()
+        } else if in_feature(b"abvm") && !in_feature(b"blwm") && is_below(guessed) {
+            match guessed.strip_prefix("bottom") {
+                Some(rest) => format!("below{rest}"),
+                None => "above".to_string(),
+            }
+        } else {
+            guessed.to_string()
+        };
+        let below = is_below(&base);
+        let target_glyphs: HashSet<SmolStr> = targets.keys().cloned().collect();
+        let mark_glyphs: HashSet<SmolStr> = marks
+            .into_iter()
+            .flatten()
+            .flat_map(|(glyphs, _)| glyph_names(glyphs))
+            .collect();
+        // the groups this one must come after
+        let floor: Option<SmolStr> = self
+            .named_groups
+            .iter()
+            .filter(|g| {
+                g.kind == kind
+                    && g.below == below
+                    && !g.targets.is_disjoint(&target_glyphs)
+                    && !g.marks.is_disjoint(&mark_glyphs)
+            })
+            .map(|g| g.name.clone())
+            .max();
+        let free =
+            |name: &str| self.anchors.get(name).is_none() && self.mark_classes.get(name).is_none();
+        let candidates = std::iter::once(base.clone())
+            .chain((2..100).map(|n| format!("{base}{n}")))
+            .chain(
+                floor
+                    .iter()
+                    .flat_map(|floor| (2..100).map(move |n| format!("{floor}{n}"))),
+            );
+        let name: SmolStr = candidates
+            .into_iter()
+            .find(|c| free(c) && floor.as_ref().is_none_or(|f| c.as_str() > f.as_str()))
+            .unwrap_or_else(|| format!("{base}{}", self.named_groups.len() + 100))
+            .into();
+        if name != guessed {
+            self.provisional_anchor_names.insert(name.clone());
+        }
+        self.named_groups.push(NamedGroup {
+            name: name.clone(),
+            kind,
+            below,
+            targets: target_glyphs,
+            marks: mark_glyphs,
+        });
+        name
     }
 
     /// The name of a mark class already defined with exactly these marks and anchors
@@ -958,6 +1040,37 @@ fn has_value(record: &ValueRecord) -> bool {
                 .device_offset(field)
                 .is_some_and(|offset| !offset.is_null())
         })
+}
+
+/// An anchor group as a compiler orders it: by name, among the lookups of one
+/// type in one feature
+pub(crate) struct NamedGroup {
+    name: SmolStr,
+    /// the lookup type
+    kind: u16,
+    /// in blwm rather than abvm
+    below: bool,
+    /// the bases, ligatures or marks attached to
+    targets: HashSet<SmolStr>,
+    marks: HashSet<SmolStr>,
+}
+
+/// Whether fontc puts an anchor group in blwm rather than abvm
+fn is_below(name: &str) -> bool {
+    name.starts_with("bottom") || name == "nukta"
+}
+
+/// The glyph names of a glyph or class
+fn glyph_names(glyphs: &GlyphContainer) -> Vec<SmolStr> {
+    match glyphs {
+        GlyphContainer::GlyphName(name) => vec![name.name.clone()],
+        other => other
+            .as_fea("")
+            .trim_matches(|c| c == '[' || c == ']')
+            .split_whitespace()
+            .map(SmolStr::from)
+            .collect(),
+    }
 }
 
 fn majority_in_quadrant(xs: &[f32], ys: &[f32]) -> Option<&'static str> {

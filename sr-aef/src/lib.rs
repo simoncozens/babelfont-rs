@@ -166,6 +166,19 @@ pub struct UncompileContext<'a> {
     #[cfg_attr(feature = "cli", serde(skip))]
     simple_locations:
         std::cell::RefCell<HashMap<Vec<skrifa::raw::types::F2Dot14>, SimpleUserLocation>>,
+    /// The GPOS lookup being read and its type, for naming its anchors
+    #[cfg_attr(feature = "cli", serde(skip))]
+    naming_lookup: Option<(u16, u16)>,
+    /// GPOS lookups by the features that refer to them
+    #[cfg_attr(feature = "cli", serde(skip))]
+    gpos_lookup_features: HashMap<u16, Vec<Tag>>,
+    /// The anchor groups named so far, as a compiler orders them
+    #[cfg_attr(feature = "cli", serde(skip))]
+    named_groups: Vec<gpos::NamedGroup>,
+    /// Anchor names made up where the anchors' place gave none, or the name
+    /// it gave was taken: a reader who knows what the marks are may rename them
+    #[cfg_attr(feature = "cli", serde(skip))]
+    pub provisional_anchor_names: IndexSet<SmolStr>,
     /// The variation regions the pair lookup being read uses
     #[cfg_attr(feature = "cli", serde(skip))]
     lookup_regions: std::cell::RefCell<Option<std::collections::BTreeSet<u16>>>,
@@ -228,6 +241,10 @@ impl<'a> UncompileContext<'a> {
             ligature_components: IndexMap::new(),
             simple_locations: Default::default(),
             lookup_regions: Default::default(),
+            naming_lookup: None,
+            gpos_lookup_features: HashMap::new(),
+            named_groups: vec![],
+            provisional_anchor_names: IndexSet::new(),
             pair_class_names: HashMap::new(),
         };
         slf.gather_language_systems(generated_scripts)?;
@@ -472,16 +489,6 @@ impl<'a> UncompileContext<'a> {
     pub(crate) fn gensym(&mut self, prefix: &str) -> SmolStr {
         let symbol_index = self.symbols.entry(prefix.into()).or_insert(1);
         let name = SmolStr::new(format!("{}_{}", prefix, symbol_index));
-        *symbol_index += 1;
-        name
-    }
-
-    /// A made-up name for a mark class's anchor. It must not end in `_<digits>`,
-    /// which denotes a ligature component's anchor.
-    pub(crate) fn mark_class_symbol(&mut self, class_number: u16) -> SmolStr {
-        let prefix = SmolStr::new(format!("mark_class_{}x", class_number));
-        let symbol_index = self.symbols.entry(prefix.clone()).or_insert(1);
-        let name = SmolStr::new(format!("{}{}", prefix, symbol_index));
         *symbol_index += 1;
         name
     }
@@ -1501,7 +1508,7 @@ GlyphClassDef [A], [], [grave acute dotbelowcomb], [];
 
 markClass grave <anchor 200 150> @bottomleft;
 markClass acute <anchor 350 0> @bottomleft;
-markClass dotbelowcomb <anchor 200 -200> @mark_class_1x1;
+markClass dotbelowcomb <anchor 200 -200> @bottomleft2;
 lookup gsub_single_1 {
     sub a by b;
 } gsub_single_1;
@@ -1556,7 +1563,7 @@ lookup gsub_single_6 {
 lookup gpos_mark_to_base_1 {
     pos base A
         <anchor 150 100> mark @bottomleft
-        <anchor -200 -200> mark @mark_class_1x1;
+        <anchor -200 -200> mark @bottomleft2;
 } gpos_mark_to_base_1;
 lookup gpos_single_1 {
     pos A 10;
@@ -2255,7 +2262,7 @@ GlyphClassDef [b], [a], [c d], [];
 } GDEF;
 
 markClass c <anchor 0 500> @left;
-markClass d <anchor 0 0> @mark_class_1x1;
+markClass d <anchor 0 0> @anchor;
 lookup gpos_mark_to_base_1 {
     pos base a
         <anchor 250 500> mark @left;
@@ -2265,10 +2272,10 @@ lookup gpos_mark_to_base_1 {
 lookup gpos_mark_to_ligature_1 {
     pos ligature a
         <anchor 100 500> mark @left
-        <anchor NULL> mark @mark_class_1x1
+        <anchor NULL> mark @anchor
         ligComponent
         <anchor 400 500> mark @left
-        <anchor NULL> mark @mark_class_1x1;
+        <anchor NULL> mark @anchor;
 } gpos_mark_to_ligature_1;
 lookup gpos_mark_to_mark_1 {
     pos mark c
