@@ -751,13 +751,13 @@ impl<'a> UncompileContext<'a> {
         marks: Option<&Vec<(GlyphContainer, FeaAnchor)>>,
     ) -> Option<SmolStr> {
         let (_, kind) = self.naming_lookup.unwrap_or_default();
-        let below = is_below(name);
+        let list = self.feature_list(name);
         let (target_glyphs, mark_glyphs) = group_glyphs(targets, marks);
         self.named_groups
             .iter()
             .filter(|g| {
                 g.kind == kind
-                    && g.below == below
+                    && g.list == list
                     && g.name != name
                     && !g.targets.is_disjoint(&target_glyphs)
                     && !g.marks.is_disjoint(&mark_glyphs)
@@ -783,14 +783,26 @@ impl<'a> UncompileContext<'a> {
         marks: Option<&Vec<(GlyphContainer, FeaAnchor)>>,
     ) {
         let (_, kind) = self.naming_lookup.unwrap_or_default();
+        let list = self.feature_list(name);
         let (targets, marks) = group_glyphs(targets, marks);
         self.named_groups.push(NamedGroup {
             name: name.into(),
             kind,
-            below: is_below(name),
+            list,
             targets,
             marks,
         });
+    }
+
+    /// Which list of lookups a compiler puts a group of the lookup being read
+    /// in: for abvm and blwm, below by its name; else one for all
+    fn feature_list(&self, name: &str) -> Option<bool> {
+        let (lookup, _) = self.naming_lookup.unwrap_or_default();
+        let features = self.gpos_lookup_features.get(&lookup);
+        let in_feature = |tag: &[u8; 4]| {
+            features.is_some_and(|features| features.contains(&skrifa::Tag::new(tag)))
+        };
+        (in_feature(b"abvm") || in_feature(b"blwm")).then(|| is_below(name))
     }
 
     /// The name of a mark class already defined with exactly these marks and anchors
@@ -1079,8 +1091,9 @@ pub(crate) struct NamedGroup {
     name: SmolStr,
     /// the lookup type
     kind: u16,
-    /// in blwm rather than abvm
-    below: bool,
+    /// the feature list its lookup is in: abvm or blwm (by its name), or
+    /// mark and mkmk, where a compiler orders all groups together
+    list: Option<bool>,
     /// the bases, ligatures or marks attached to
     targets: HashSet<SmolStr>,
     marks: HashSet<SmolStr>,
