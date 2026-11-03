@@ -2416,6 +2416,20 @@ mod tests {
     }
 
     #[test]
+    fn test_load_spacing_combining_marks() {
+        // a mark that attaches and advances is a mark, as glyphsLib and
+        // fontc have it
+        let glyphs_glyph = glyphslib::glyphs3::Glyph {
+            name: "matra".into(),
+            category: Some("Mark".into()),
+            subcategory: Some("Spacing Combining".into()),
+            ..Default::default()
+        };
+        let glyph = crate::glyph::glyphs::from_glyphs(&glyphs_glyph, &[]).unwrap();
+        assert_eq!(glyph.category, GlyphCategory::Mark);
+    }
+
+    #[test]
     fn test_save_classes_without_subcategory() {
         let to_glyphs = |category, width| {
             let glyph = crate::Glyph {

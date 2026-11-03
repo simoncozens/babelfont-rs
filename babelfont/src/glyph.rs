@@ -209,8 +209,13 @@ pub(crate) mod glyphs {
         let category = if let Some(cat) = &val.category {
             match cat.as_str() {
                 "Base" => GlyphCategory::Base,
+                // a mark only if it attaches, as glyphsLib and fontc have
+                // it: a spacing accent or a modifier letter is a base
                 "Mark" => {
-                    if val.subcategory == Some("Nonspacing".to_string()) {
+                    if matches!(
+                        val.subcategory.as_deref(),
+                        Some("Nonspacing" | "Spacing Combining")
+                    ) {
                         GlyphCategory::Mark
                     } else {
                         GlyphCategory::Base
