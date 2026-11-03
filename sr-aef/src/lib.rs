@@ -1946,6 +1946,20 @@ lookup gpos_single_1;
     }
 
     #[test]
+    fn test_anchor_names_from_the_default_location() {
+        // A's anchor is centred at the default weight, at its left edge at
+        // the lightest (resources/anchordefault.py)
+        let data = std::fs::read("resources/anchordefault.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let context = uncompile_context(&fontref).unwrap();
+        assert!(
+            context.anchors.contains_key("top"),
+            "{:?}",
+            context.anchors.keys()
+        );
+    }
+
+    #[test]
     fn test_uncompile_null_glyph() {
         let data = std::fs::read("resources/nullglyph.ttf").unwrap();
         let fontref = skrifa::FontRef::new(&data).unwrap();

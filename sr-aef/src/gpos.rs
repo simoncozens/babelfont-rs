@@ -633,7 +633,7 @@ impl<'a> UncompileContext<'a> {
                 let bounds = self.glyph_metrics.bounds(gid).unwrap_or_default();
                 let width = self.glyph_metrics.advance_width(gid).unwrap_or_default();
                 let height = bounds.y_max - bounds.y_min;
-                let (x, y) = anchor_location(anchor);
+                let (x, y) = self.anchor_location(anchor);
                 let x_percentage = if width > 0.0 {
                     (x - bounds.x_min) / width
                 } else {
@@ -738,6 +738,32 @@ impl<'a> UncompileContext<'a> {
                     .and_then(|existing| existing.get(glyph))
                     .is_none_or(|known| known.as_fea("") == anchor.as_fea(""))
             })
+    }
+
+    /// Where an anchor is at the default location, where the glyph bounds it
+    /// is placed in are taken (the first value a variable one states is at
+    /// the lowest location: Asap's A bottom at wdth=75 falls left of its
+    /// default bounds' centre)
+    fn anchor_location(&self, anchor: &FeaAnchor) -> (f32, f32) {
+        let at_default = |metric: &Metric| match metric {
+            Metric::Scalar(s) => *s as f32,
+            Metric::Variable(items) => items
+                .iter()
+                .find(|(location, _)| {
+                    self.axes.as_ref().is_none_or(|axes| {
+                        axes.iter().all(|axis| {
+                            location
+                                .get(axis.tag.to_string().as_str())
+                                .is_none_or(|c| (c.0 - axis.default.to_f64()).abs() < 1e-3)
+                        })
+                    })
+                })
+                .or(items.first())
+                .map(|(_, value)| *value as f32)
+                .unwrap_or(0.0),
+            Metric::GlyphsAppNumber(_) => 0.0,
+        };
+        (at_default(&anchor.x), at_default(&anchor.y))
     }
 
     /// Whether no glyph has an anchor of this name somewhere else already
@@ -932,26 +958,6 @@ fn has_value(record: &ValueRecord) -> bool {
                 .device_offset(field)
                 .is_some_and(|offset| !offset.is_null())
         })
-}
-
-fn anchor_location(anchor: &FeaAnchor) -> (f32, f32) {
-    let x = match &anchor.x {
-        Metric::Scalar(s) => *s as f32,
-        Metric::Variable(items) => items
-            .first()
-            .map(|(_loc, value)| *value as f32)
-            .unwrap_or(0.0),
-        Metric::GlyphsAppNumber(_) => 0.0, // You deserve to lose
-    };
-    let y = match &anchor.y {
-        Metric::Scalar(s) => *s as f32,
-        Metric::Variable(items) => items
-            .first()
-            .map(|(_loc, value)| *value as f32)
-            .unwrap_or(0.0),
-        Metric::GlyphsAppNumber(_) => 0.0,
-    };
-    (x, y)
 }
 
 fn majority_in_quadrant(xs: &[f32], ys: &[f32]) -> Option<&'static str> {
