@@ -23,6 +23,7 @@ use std::sync::Arc;
 
 mod avar2;
 mod color;
+mod curve_kinds;
 mod features;
 mod global_metrics;
 mod glyphs;
@@ -119,6 +120,9 @@ impl BabelfontIrSource {
         GlyphsData.apply(&mut font)?;
         GlyphsStylisticSetLabel.apply(&mut font)?;
         GlyphsBracketLayers::new(vec![]).apply(&mut font)?;
+        if let Some(message) = curve_kinds::mixed_curve_kinds(&font) {
+            log::warn!("{message}");
+        }
 
         // These really should be errors, not assertions
         // assert!(
@@ -340,6 +344,37 @@ mod tests {
                 .get(&crate::MetricType::ItalicAngle),
             Some(&22),
             "the TTF reader must convert post back to the internal convention"
+        );
+    }
+
+    #[test]
+    fn test_a_segment_cubic_in_one_master_only_is_an_error() {
+        use crate::{NodeType, Shape};
+        let mut font = crate::load("resources/RadioCanadaDisplay.glyphs").unwrap();
+        assert!(font.masters.len() > 1);
+        // make one cubic segment of O quadratic in the first master only
+        let first = font.masters[0].id.clone();
+        let glyph = font.glyphs.get_mut("O").unwrap();
+        let layer = glyph
+            .layers
+            .iter_mut()
+            .find(|l| l.master == crate::LayerType::DefaultForMaster(first.clone()))
+            .unwrap();
+        let Some(Shape::Path(path)) = layer.shapes.first_mut() else {
+            panic!("O has a path");
+        };
+        let index = path
+            .nodes
+            .iter()
+            .position(|n| n.nodetype == NodeType::Curve)
+            .unwrap();
+        path.nodes[index].nodetype = NodeType::QCurve;
+        let error = BabelfontIrSource::compile(font, CompilationOptions::default())
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains("cubic at one master and quadratic at another"),
+            "{error}"
         );
     }
 

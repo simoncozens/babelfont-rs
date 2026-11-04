@@ -122,6 +122,7 @@ declare_filters! {
         DecomposeComponentReferences(decomposecomponentreferences) => "decomposecomponents",
         CubicToQuadratic(cubic2quadratic) => "cubic2quadratic",
         QuadraticToCubic(quadratic2cubic) => "quadratic2cubic",
+        DropImpliedOnCurves(dropimpliedoncurves) => "dropimpliedoncurves",
         CleanupPaths(cleanuppaths) => "cleanuppaths",
         #[cfg(feature = "linesweeper")]
         RemoveOverlaps(removeoverlaps) => "removeoverlaps",
