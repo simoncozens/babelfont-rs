@@ -140,6 +140,9 @@ pub struct UncompileContext<'a> {
     num_glyphs: u16,
     /// Lookups whose rules were written into aalt
     aalt_lookups: IndexSet<SmolStr>,
+    /// Ogonek marks: the glyph U+0328 maps to, and glyphs named for an ogonek
+    #[cfg_attr(feature = "cli", serde(skip))]
+    ogonek_glyphs: HashSet<SmolStr>,
 }
 
 impl<'a> UncompileContext<'a> {
@@ -155,6 +158,14 @@ impl<'a> UncompileContext<'a> {
         let glyph_name_to_id = glyph_id_to_name
             .iter()
             .map(|(gid, name): (&GlyphId, &SmolStr)| (name.clone(), *gid))
+            .collect();
+        let ogonek = skrifa::MetadataProvider::charmap(font).map(0x0328_u32);
+        let ogonek_glyphs = glyph_id_to_name
+            .iter()
+            .filter(|(gid, name)| {
+                name.to_ascii_lowercase().contains("ogonek") || ogonek == Some(**gid)
+            })
+            .map(|(_, name)| name.clone())
             .collect();
         let mut slf = Self {
             lookups: IndexMap::new(),
@@ -174,6 +185,7 @@ impl<'a> UncompileContext<'a> {
             glyph_metrics,
             glyph_id_to_name,
             glyph_name_to_id,
+            ogonek_glyphs,
             axis_tags: font
                 .fvar()
                 .ok()
@@ -1968,9 +1980,7 @@ GlyphClassDef [b], [a], [c d], [];
 } GDEF;
 
 markClass c <anchor 0 500> @left;
-markClass c <anchor 0 500> @mark_class_0x1;
 markClass d <anchor 0 0> @mark_class_1x1;
-markClass c <anchor 0 500> @topleft;
 lookup gpos_mark_to_base_1 {
     pos base a
         <anchor 250 500> mark @left;
@@ -1979,17 +1989,17 @@ lookup gpos_mark_to_base_1 {
 } gpos_mark_to_base_1;
 lookup gpos_mark_to_ligature_1 {
     pos ligature a
-        <anchor 100 500> mark @mark_class_0x1
+        <anchor 100 500> mark @left
         <anchor NULL> mark @mark_class_1x1
         ligComponent
-        <anchor 400 500> mark @mark_class_0x1
+        <anchor 400 500> mark @left
         <anchor NULL> mark @mark_class_1x1;
 } gpos_mark_to_ligature_1;
 lookup gpos_mark_to_mark_1 {
     pos mark c
-        <anchor 0 800> mark @topleft;
+        <anchor 0 800> mark @left;
     pos mark d
-        <anchor NULL> mark @topleft;
+        <anchor NULL> mark @left;
 } gpos_mark_to_mark_1;
 feature mark {
 lookup gpos_mark_to_base_1;

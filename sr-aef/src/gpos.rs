@@ -1,5 +1,6 @@
 //! Un-compiling of GPOS lookups.
 
+use fea_rs_ast::AsFea;
 use std::collections::HashMap;
 
 use fea_rs_ast::{
@@ -378,17 +379,20 @@ impl<'a> UncompileContext<'a> {
             Self::build_class_anchor_map(resolved.iter().flat_map(|(_, name, rows)| {
                 rows.iter().map(|anchors| (name.clone(), anchors.clone()))
             }));
-        let class_names = self.prepare_guessed_mark_classes(mark_classes, &class_anchors);
+        // a ligature's anchors are named per component, as `top_1`, `top_2`
+        let ligature = !null_anchors_when_empty;
+        let class_names = self.prepare_guessed_mark_classes(mark_classes, &class_anchors, ligature);
 
         let mut statements = vec![];
         for (glyph, name, rows) in resolved {
             let mut components = vec![];
-            for anchors in rows {
+            for (component, anchors) in rows.into_iter().enumerate() {
                 let empty = anchors.iter().all(Option::is_none);
                 components.push(self.materialize_anchor_mark_classes(
                     &name,
                     &anchors,
                     &class_names,
+                    ligature.then_some(component + 1),
                     |class| {
                         (null_anchors_when_empty && empty) || !class_anchors.contains_key(&class)
                     },
@@ -403,8 +407,10 @@ impl<'a> UncompileContext<'a> {
         &mut self,
         mark_classes: IndexMap<u16, Vec<(GlyphContainer, FeaAnchor)>>,
         mark_class_to_target_glyph_anchor: &IndexMap<u16, IndexMap<SmolStr, FeaAnchor>>,
+        ligature: bool,
     ) -> IndexMap<u16, SmolStr> {
-        let guessed_names = self.guess_anchor_names(mark_class_to_target_glyph_anchor);
+        let guessed_names =
+            self.guess_anchor_names(&mark_classes, mark_class_to_target_glyph_anchor, ligature);
         let mut guessed_name_by_class: IndexMap<u16, SmolStr> = IndexMap::new();
         for (class_number, name) in mark_class_to_target_glyph_anchor
             .keys()
@@ -446,11 +452,14 @@ impl<'a> UncompileContext<'a> {
     }
 
     /// Omit NULL anchors unless `keep_null` selects their class; compilers fill in the rest.
+    /// `component` is the 1-based ligature component the anchors belong to: a
+    /// ligature's anchor is named for its component, as `top_1`, `top_2`.
     fn materialize_anchor_mark_classes(
         &mut self,
         target_glyph_name: &SmolStr,
         class_anchors: &[Option<FeaAnchor>],
         class_to_anchor_name: &IndexMap<u16, SmolStr>,
+        component: Option<usize>,
         keep_null: impl Fn(u16) -> bool,
     ) -> Vec<(Option<FeaAnchor>, MarkClass)> {
         let mut anchors_mark_classes = vec![];
@@ -458,8 +467,14 @@ impl<'a> UncompileContext<'a> {
             let Some(anchor_name) = class_to_anchor_name.get(&(class_number as u16)) else {
                 continue;
             };
+            let registered_name = match component {
+                Some(component) => SmolStr::new(format!("{anchor_name}_{component}")),
+                None => anchor_name.clone(),
+            };
             match anchor {
-                Some(anchor) => self.register_anchor(target_glyph_name, anchor, Some(anchor_name)),
+                Some(anchor) => {
+                    self.register_anchor(target_glyph_name, anchor, Some(&registered_name))
+                }
                 None if !keep_null(class_number as u16) => continue,
                 None => {}
             }
@@ -468,12 +483,35 @@ impl<'a> UncompileContext<'a> {
         anchors_mark_classes
     }
 
+    /// Names each mark class of a lookup, as its anchors are named on glyphs.
+    ///
+    /// A class of the same marks with the same anchors as a class an earlier
+    /// lookup named (as a mark-to-mark lookup's often is) takes that name. An
+    /// ogonek class is `ogonek`. Otherwise a class is named for where most of
+    /// its anchors sit on their glyphs, if that name is free, else for its
+    /// number.
     fn guess_anchor_names(
         &mut self,
+        mark_classes: &IndexMap<u16, Vec<(GlyphContainer, FeaAnchor)>>,
         mark_class_to_base_glyph_anchor: &IndexMap<u16, IndexMap<SmolStr, FeaAnchor>>,
+        ligature: bool,
     ) -> Vec<SmolStr> {
         let mut new_names = vec![];
         for (class_number, base_glyphs_anchors) in mark_class_to_base_glyph_anchor {
+            let marks = mark_classes.get(class_number);
+            if let Some(name) = marks.and_then(|marks| self.same_mark_class(marks)) {
+                // A ligature's anchors are named per component, never so
+                if ligature || self.anchors_agree(&name, base_glyphs_anchors) {
+                    if !ligature {
+                        self.anchors
+                            .entry(name.clone())
+                            .or_default()
+                            .extend(base_glyphs_anchors.clone());
+                    }
+                    new_names.push(name);
+                    continue;
+                }
+            }
             let mut xs = vec![];
             let mut ys = vec![];
             for (base_glyph, anchor) in base_glyphs_anchors {
@@ -499,21 +537,64 @@ impl<'a> UncompileContext<'a> {
             }
             // Now guess: if they're all majority in top, topright, topleft, bottom, bottomright, bottomleft, center, etc
             // in order if not already registered in the "anchors" field.
-            if let Some(name) = majority_in_quadrant(&xs, &ys)
+            let zone = majority_in_quadrant(&xs, &ys);
+            let ogonek = marks.is_some_and(|marks| {
+                !marks.is_empty()
+                    && marks.iter().all(|(glyphs, _)| match glyphs {
+                        GlyphContainer::GlyphName(name) => self.ogonek_glyphs.contains(&name.name),
+                        _ => false,
+                    })
+            }) && matches!(zone, Some("bottom" | "bottomright") | None);
+            let name = if ogonek { Some("ogonek") } else { zone };
+            if let Some(name) = name
                 && self.anchors.get(name).is_none()
+                && self.mark_classes.get(name).is_none()
             {
                 new_names.push(name.into());
-                self.anchors
-                    .insert(name.into(), base_glyphs_anchors.clone());
+                if !ligature {
+                    self.anchors
+                        .insert(name.into(), base_glyphs_anchors.clone());
+                }
                 continue;
             }
             // Create one with a symbol
             let name = self.mark_class_symbol(*class_number);
-            self.anchors
-                .insert(name.clone(), base_glyphs_anchors.clone());
+            if !ligature {
+                self.anchors
+                    .insert(name.clone(), base_glyphs_anchors.clone());
+            }
             new_names.push(name);
         }
         new_names
+    }
+
+    /// The name of a mark class already defined with exactly these marks and anchors
+    fn same_mark_class(&self, marks: &[(GlyphContainer, FeaAnchor)]) -> Option<SmolStr> {
+        let mut wanted: Vec<(String, String)> = marks
+            .iter()
+            .map(|(glyphs, anchor)| (glyphs.as_fea(""), anchor.as_fea("")))
+            .collect();
+        wanted.sort();
+        self.mark_classes.iter().find_map(|(name, definitions)| {
+            let mut defined: Vec<(String, String)> = definitions
+                .iter()
+                .map(|d| (d.glyphs.as_fea(""), d.anchor.as_fea("")))
+                .collect();
+            defined.sort();
+            (defined == wanted).then(|| name.clone())
+        })
+    }
+
+    /// Whether no glyph has an anchor of this name somewhere else already
+    fn anchors_agree(&self, name: &str, anchors: &IndexMap<SmolStr, FeaAnchor>) -> bool {
+        let Some(existing) = self.anchors.get(name) else {
+            return true;
+        };
+        anchors.iter().all(|(glyph, anchor)| {
+            existing
+                .get(glyph)
+                .is_none_or(|known| known.as_fea("") == anchor.as_fea(""))
+        })
     }
 }
 
