@@ -172,7 +172,10 @@ pub struct UncompileContext<'a> {
 }
 
 impl<'a> UncompileContext<'a> {
-    fn new(font: &'a skrifa::FontRef) -> Result<Self, ReadError> {
+    fn new(
+        font: &'a skrifa::FontRef,
+        generated_scripts: Option<&std::collections::HashSet<Tag>>,
+    ) -> Result<Self, ReadError> {
         let glyph_names = GlyphNames::new(font);
         let default = LocationRef::default();
         let glyph_metrics = GlyphMetrics::new(font, Size::unscaled(), default);
@@ -227,7 +230,7 @@ impl<'a> UncompileContext<'a> {
             lookup_regions: Default::default(),
             pair_class_names: HashMap::new(),
         };
-        slf.gather_language_systems()?;
+        slf.gather_language_systems(generated_scripts)?;
         slf.uncompile_gsub_lookups()?;
         slf.uncompile_gpos_lookups()?;
         slf.uncompile_feature_table()?;
@@ -285,7 +288,10 @@ impl<'a> UncompileContext<'a> {
         GlyphName::new(&str)
     }
 
-    fn gather_language_systems(&mut self) -> Result<(), ReadError> {
+    fn gather_language_systems(
+        &mut self,
+        generated_scripts: Option<&std::collections::HashSet<Tag>>,
+    ) -> Result<(), ReadError> {
         let gather = |script_list: Option<ScriptList>,
                       systems: &mut IndexMap<Tag, IndexSet<Tag>>|
          -> Result<(), ReadError> {
@@ -325,13 +331,54 @@ impl<'a> UncompileContext<'a> {
             &mut systems,
         )?;
         dflt_first(&mut systems);
-        let mut declared = IndexMap::new();
-        gather(
-            self.gpos.as_ref().and_then(|g| g.script_list().ok()),
-            &mut declared,
-        )?;
-        declared.retain(|_, languages: &mut IndexSet<Tag>| !languages.is_empty());
-        if declared.is_empty() {
+        // GPOS's language systems, but a script's that a compiler's kern
+        // writer adds for the characters it kerns (fontc's
+        // assign_lookups_to_scripts: under the default language, holding
+        // nothing but kern and dist): declared, it would take the mark
+        // attachment a compiler registers under every declared one
+        let mut declared: IndexMap<Tag, IndexSet<Tag>> = IndexMap::new();
+        if let Some(gpos) = self.gpos.as_ref() {
+            let dflt = Tag::new(b"dflt");
+            let script_list = gpos.script_list()?;
+            let feature_list = gpos.feature_list()?;
+            let generated_only = |lang_sys: &skrifa::raw::tables::layout::LangSys| {
+                lang_sys.feature_indices().iter().all(|index| {
+                    feature_list
+                        .feature_records()
+                        .get(index.get() as usize)
+                        .is_some_and(|record| {
+                            [Tag::new(b"kern"), Tag::new(b"dist")].contains(&record.feature_tag())
+                        })
+                }) && lang_sys.required_feature_index() == 0xFFFF
+            };
+            for script_record in script_list.script_records() {
+                let script = script_record.script(script_list.offset_data())?;
+                let mut languages = vec![];
+                if let Some(lang_sys) = script.default_lang_sys() {
+                    languages.push((Tag::new(b"dflt"), lang_sys?));
+                }
+                for record in script.lang_sys_records() {
+                    languages.push((
+                        record.lang_sys_tag(),
+                        record.lang_sys(script.offset_data())?,
+                    ));
+                }
+                let script_tag = script_record.script_tag();
+                let generated = generated_scripts.is_some_and(|scripts| {
+                    (script_tag == Tag::new(b"DFLT") || scripts.contains(&script_tag))
+                        && languages.iter().all(|(language, lang_sys)| {
+                            *language == dflt && generated_only(lang_sys)
+                        })
+                });
+                if !generated {
+                    declared
+                        .entry(script_tag)
+                        .or_default()
+                        .extend(languages.iter().map(|(language, _)| *language));
+                }
+            }
+        }
+        if self.gpos.is_none() {
             declared = systems.clone();
         } else {
             // in the order of all of them
@@ -1269,7 +1316,7 @@ pub fn uncompile(
     font: &skrifa::FontRef,
     do_gdef: bool,
 ) -> Result<fea_rs_ast::FeatureFile, ReadError> {
-    let mut context = UncompileContext::new(font)?;
+    let mut context = UncompileContext::new(font, None)?;
 
     let mut ff = fea_rs_ast::FeatureFile::new(vec![]);
     ff.statements.extend(context.dump_language_systems());
@@ -1332,7 +1379,17 @@ pub fn uncompile_bytes(
 /// put them where you want them. Useful for font editors and other tools that want the
 /// data but don't want to go all the way to a fea file.
 pub fn uncompile_context<'a>(font: &'a skrifa::FontRef) -> Result<UncompileContext<'a>, ReadError> {
-    UncompileContext::new(font)
+    UncompileContext::new(font, None)
+}
+
+/// [uncompile_context], knowing the scripts a compiler kerns the font's
+/// characters in (OpenType tags): a script record holding only the kerning
+/// it generates there is not declared
+pub fn uncompile_context_with_scripts<'a>(
+    font: &'a skrifa::FontRef,
+    generated_scripts: &std::collections::HashSet<Tag>,
+) -> Result<UncompileContext<'a>, ReadError> {
+    UncompileContext::new(font, Some(generated_scripts))
 }
 
 /// The glyph names the uncompiled features use: the post table's, valid in a
