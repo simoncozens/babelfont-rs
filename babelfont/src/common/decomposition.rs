@@ -69,9 +69,10 @@ impl DecomposedAffine {
         let translate = kurbo::Vec2::new(self.translation.0, self.translation.1);
 
         match self.order {
+            // skew is an angle; kurbo's skew takes the shear, its tangent
             TransformOrder::Glyphs => {
                 kurbo::Affine::translate(translate)
-                    * kurbo::Affine::skew(self.skew.0, self.skew.1)
+                    * kurbo::Affine::skew(self.skew.0.tan(), self.skew.1.tan())
                     * kurbo::Affine::rotate(self.rotation)
                     * kurbo::Affine::scale_non_uniform(self.scale.0, self.scale.1)
             }
@@ -79,92 +80,178 @@ impl DecomposedAffine {
                 kurbo::Affine::translate(translate)
                     * kurbo::Affine::rotate(self.rotation)
                     * kurbo::Affine::scale_non_uniform(self.scale.0, self.scale.1)
-                    * kurbo::Affine::skew(self.skew.0, self.skew.1)
+                    * kurbo::Affine::skew(self.skew.0.tan(), self.skew.1.tan())
             }
         }
     }
 }
 
-fn decompose<T: Into<f64>>(
-    scale_x: T,
-    scale_xy: T,
-    scale_yx: T,
-    scale_y: T,
-    t_x: T,
-    t_y: T,
-    order: TransformOrder,
-) -> DecomposedAffine {
-    let mut a: f64 = scale_x.into();
-    let mut b: f64 = scale_xy.into();
-    let c: f64 = scale_yx.into();
-    let d: f64 = scale_y.into();
-    let t_x: f64 = t_x.into();
-    let t_y: f64 = t_y.into();
-
-    // Remove a possible sign on a to mirror the reference decomposition.
-    let sx_sign = if a == 0.0 { 1.0_f64 } else { a.signum() };
-    if sx_sign < 0.0 {
-        a *= sx_sign;
-        b *= sx_sign;
+impl DecomposedAffine {
+    /// The same transform, decomposed in the given order
+    pub fn in_order(&self, order: TransformOrder) -> DecomposedAffine {
+        if self.order == order {
+            *self
+        } else {
+            Self::from_affine_in_order(self.as_affine(), order)
+        }
     }
 
-    let delta: f64 = a * d - b * c;
-    let translation = (t_x, t_y);
-    let (rotation, scale, skew) = if a != 0.0 || b != 0.0 {
-        let r = (a * a + b * b).sqrt();
-        // Use atan2 to keep rotation sign consistent with the matrix [[a, b], [c, d]]
-        let angle = if delta >= 0.0 {
-            (-b).atan2(a)
-        } else {
-            b.atan2(a)
+    /// An affine decomposed in the given order. In Glyphs order (a skew after
+    /// the rotation) some affines need a skew in both x and y, or have none;
+    /// those keep the other order, which every affine has.
+    pub fn from_affine_in_order(affine: kurbo::Affine, order: TransformOrder) -> DecomposedAffine {
+        match order {
+            TransformOrder::RestOfTheWorld => affine.into(),
+            TransformOrder::Glyphs => glyphs_order(affine).unwrap_or_else(|| {
+                log::warn!(
+                    "{:?} has no decomposition as Glyphs states transforms",
+                    affine.as_coeffs()
+                );
+                affine.into()
+            }),
+        }
+    }
+
+    /// The same transform turned half a turn more with both scales negated
+    /// (R(θ + π) = -R(θ)), the rotation within half a turn of `near`
+    fn nearest_rotation(&self, near: f64) -> DecomposedAffine {
+        use std::f64::consts::{PI, TAU};
+        let unwrap = |t: DecomposedAffine| DecomposedAffine {
+            rotation: t.rotation - ((t.rotation - near) / TAU).round() * TAU,
+            ..t
         };
-        let scale_x_out = r * sx_sign;
-        let scale_y_out = delta / r;
-        // Skew on X axis; skew_y is always zero in this decomposition.
-        let skew_x = ((a * c + b * d) / (r * r)).atan() * sx_sign;
-        (angle, (scale_x_out, scale_y_out), (skew_x, 0.0))
-    } else if c != 0.0 || d != 0.0 {
-        let s = (c * c + d * d).sqrt();
-        let angle = if delta >= 0.0 {
-            c.atan2(d)
+        let same = unwrap(*self);
+        let turned = unwrap(DecomposedAffine {
+            rotation: self.rotation + PI,
+            scale: (-self.scale.0, -self.scale.1),
+            ..*self
+        });
+        if (turned.rotation - near).abs() < (same.rotation - near).abs() {
+            turned
         } else {
-            (-c).atan2(d)
+            same
+        }
+    }
+
+    /// Masters' transforms as interpolation needs them: in one order, and with
+    /// rotations that do not jump half a turn between masters (an affine turned
+    /// 100° decomposes as one turned -80° with both scales negated)
+    pub fn compatible(transforms: &[DecomposedAffine]) -> Vec<DecomposedAffine> {
+        let Some(first) = transforms.first() else {
+            return vec![];
         };
-        let scale_x_out = delta / s;
-        let scale_y_out = s;
-        (angle, (scale_x_out, scale_y_out), (0.0, 0.0))
-    } else {
-        (0.0, (0.0, 0.0), (0.0, 0.0))
-    };
-    DecomposedAffine {
-        translation,
-        scale,
-        rotation,
-        skew,
-        order,
+        transforms
+            .iter()
+            .map(|t| t.in_order(first.order).nearest_rotation(first.rotation))
+            .collect()
     }
 }
 
+/// The roots of a k² + b k + c = 0, the smallest first
+fn quadratic_roots(a: f64, b: f64, c: f64) -> Vec<f64> {
+    let mut roots = if a.abs() < 1e-12 {
+        if b.abs() < 1e-12 {
+            vec![]
+        } else {
+            vec![-c / b]
+        }
+    } else {
+        let discriminant = b * b - 4.0 * a * c;
+        if discriminant < 0.0 {
+            vec![]
+        } else {
+            let root = discriminant.sqrt();
+            vec![(-b + root) / (2.0 * a), (-b - root) / (2.0 * a)]
+        }
+    };
+    roots.sort_by(|x, y| x.abs().total_cmp(&y.abs()));
+    roots
+}
+
+/// An affine as Glyphs states a component's transform: translate · skew ·
+/// rotate · scale. With a skew in x only, K⁻¹ · M must be a rotation times a
+/// scale, whose columns are perpendicular: that is a quadratic in the skew.
+/// Likewise in y; failing both, no rotation and a skew in both.
+fn glyphs_order(affine: kurbo::Affine) -> Option<DecomposedAffine> {
+    let [a, b, c, d, t_x, t_y] = affine.as_coeffs();
+    // a rotation times a scale, as R(θ) · S(sx, sy) with sx's sign the mirror's
+    let rotate_scale = |n: [f64; 4]| -> Option<(f64, (f64, f64))> {
+        let [na, nb, nc, nd] = n;
+        let sx = if na < 0.0 {
+            -na.hypot(nb)
+        } else {
+            na.hypot(nb)
+        };
+        if sx == 0.0 {
+            return None;
+        }
+        Some(((nb / sx).atan2(na / sx), (sx, (na * nd - nb * nc) / sx)))
+    };
+    let mut candidates = vec![];
+    for k in quadratic_roots(b * d, -(a * d + b * c), a * c + b * d) {
+        if let Some((rotation, scale)) = rotate_scale([a - k * b, b, c - k * d, d]) {
+            candidates.push((rotation, scale, (k.atan(), 0.0)));
+        }
+    }
+    for k in quadratic_roots(a * c, -(a * d + b * c), b * d + a * c) {
+        if let Some((rotation, scale)) = rotate_scale([a, b - k * a, c, d - k * c]) {
+            candidates.push((rotation, scale, (0.0, k.atan())));
+        }
+    }
+    if a != 0.0 && d != 0.0 {
+        candidates.push((0.0, (a, d), ((c / d).atan(), (b / a).atan())));
+    }
+    candidates
+        .into_iter()
+        .map(|(rotation, scale, skew)| DecomposedAffine {
+            translation: (t_x, t_y),
+            scale,
+            rotation,
+            skew,
+            order: TransformOrder::Glyphs,
+        })
+        .find(|t| {
+            t.as_affine()
+                .as_coeffs()
+                .iter()
+                .zip(affine.as_coeffs())
+                .all(|(x, y)| (x - y).abs() <= 1e-9 * (1.0 + y.abs()))
+        })
+}
+
 impl From<kurbo::Affine> for DecomposedAffine {
+    /// The affine as rotation · scale · skew in x (the order `as_affine` puts
+    /// them back in): x' = a x + c y, y' = b x + d y is
+    /// R(θ) · S(sx, sy) · K(k), with sx and θ from the first column, and k and
+    /// sy what the second column leaves.
     fn from(t: kurbo::Affine) -> Self {
-        let [
-            scale_x,
-            scale_yx, // No, really.
-            scale_xy,
-            scale_y,
-            t_x,
-            t_y,
-         ] = t.as_coeffs();
-        // Default to Fontra order when decomposing a raw affine
-        decompose(
-            scale_x,
-            scale_xy,
-            scale_yx,
-            scale_y,
-            t_x,
-            t_y,
-            TransformOrder::RestOfTheWorld,
-        )
+        let [a, b, c, d, t_x, t_y] = t.as_coeffs();
+        // a mirrored first column is a negative scale, not a half turn, so
+        // flips come back exact
+        let sx = if a < 0.0 { -a.hypot(b) } else { a.hypot(b) };
+        if sx == 0.0 {
+            // the first column is zero: R(θ) · S(0, sy) leaves the second column
+            // sy · (-sin θ, cos θ), so θ comes from it
+            let sy = c.hypot(d);
+            return DecomposedAffine {
+                translation: (t_x, t_y),
+                scale: (0.0, sy),
+                rotation: if sy == 0.0 { 0.0 } else { (-c).atan2(d) },
+                skew: (0.0, 0.0),
+                order: TransformOrder::RestOfTheWorld,
+            };
+        }
+        let rotation = (b / sx).atan2(a / sx);
+        let (sin, cos) = rotation.sin_cos();
+        let shear = (cos * c + sin * d) / sx;
+        let sy = cos * d - sin * c;
+        DecomposedAffine {
+            translation: (t_x, t_y),
+            scale: (sx, sy),
+            rotation,
+            skew: (shear.atan(), 0.0),
+            order: TransformOrder::RestOfTheWorld,
+        }
     }
 }
 
@@ -180,13 +267,8 @@ mod glyphs {
     use glyphslib::glyphs2;
     impl From<&glyphs2::Transform> for DecomposedAffine {
         fn from(t: &glyphs2::Transform) -> Self {
-            decompose(
-                t.m11,
-                t.m12,
-                t.m21,
-                t.m22,
-                t.t_x,
-                t.t_y,
+            DecomposedAffine::from_affine_in_order(
+                kurbo::Affine::new([t.m11, t.m12, t.m21, t.m22, t.t_x, t.t_y].map(|v| v as f64)),
                 TransformOrder::Glyphs,
             )
         }
@@ -222,5 +304,69 @@ mod fontra {
                 order: TransformOrder::RestOfTheWorld,
             }
         }
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_affines_survive_decomposition() {
+        // kurbo's order: [xx, yx, xy, yy, dx, dy], x' = xx x + xy y, y' = yx x + yy y
+        for coeffs in [
+            [1.0, 0.0, 0.0, 1.0, 5.0, 7.0],
+            [0.0, 1.0, -1.0, 0.0, 0.0, 0.0],
+            [-1.0, 0.0, 0.0, 1.0, 0.0, 0.0],
+            [-1.0, 0.0, 0.0, -1.0, 2.0, 0.0],
+            [-0.5, 0.4, 0.2, 1.1, 0.0, 0.0],
+            [0.8, 0.0, 0.3, 0.8, 10.0, 20.0],
+            [0.8, 0.3, 0.0, 0.8, 0.0, 0.0],
+            [1.2, 0.2, -0.4, 0.9, 3.0, 4.0],
+        ] {
+            let back = DecomposedAffine::from(kurbo::Affine::new(coeffs))
+                .as_affine()
+                .as_coeffs();
+            assert!(
+                back.iter().zip(coeffs).all(|(a, b)| (a - b).abs() < 1e-9),
+                "{coeffs:?} came back as {back:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_affines_survive_decomposition_in_glyphs_order() {
+        for coeffs in [
+            [1.0, 0.0, 0.0, 1.0, 5.0, 7.0],
+            [0.0, 1.0, -1.0, 0.0, 0.0, 0.0],
+            [-1.0, 0.0, 0.0, 1.0, 0.0, 0.0],
+            [-0.5, 0.4, 0.2, 1.1, 0.0, 0.0],
+            [0.8, 0.0, 0.3, 0.8, 10.0, 20.0],
+            [0.8, 0.3, 0.0, 0.8, 0.0, 0.0],
+            [1.2, 0.2, -0.4, 0.9, 3.0, 4.0],
+            [0.8, 0.2736, -0.1411, 0.7518, 0.0, 0.0],
+        ] {
+            let decomposed = DecomposedAffine::from_affine_in_order(
+                kurbo::Affine::new(coeffs),
+                TransformOrder::Glyphs,
+            );
+            assert_eq!(decomposed.order, TransformOrder::Glyphs, "{coeffs:?}");
+            let back = decomposed.as_affine().as_coeffs();
+            assert!(
+                back.iter().zip(coeffs).all(|(a, b)| (a - b).abs() < 1e-9),
+                "{coeffs:?} came back as {back:?}"
+            );
+        }
+        // Glyphs' own: angle 20, scale 0.8, slant 10
+        let decomposed = DecomposedAffine::from_affine_in_order(
+            kurbo::Affine::skew(10f64.to_radians().tan(), 0.0)
+                * kurbo::Affine::rotate(20f64.to_radians())
+                * kurbo::Affine::scale(0.8),
+            TransformOrder::Glyphs,
+        );
+        assert!((decomposed.rotation.to_degrees() - 20.0).abs() < 1e-9);
+        assert!((decomposed.skew.0.to_degrees() - 10.0).abs() < 1e-9);
+        assert!((decomposed.scale.0 - 0.8).abs() < 1e-9 && (decomposed.scale.1 - 0.8).abs() < 1e-9);
     }
 }

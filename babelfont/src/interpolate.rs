@@ -178,30 +178,36 @@ impl Shape {
                         reason: "Component references do not match".to_string(),
                     });
                 }
-                // Gather transform parameters
-                let mut position_lists: HashMap<Location<NormalizedSpace>, Vec<f64>> =
-                    HashMap::new();
-                for (shape, location) in shapes.iter().zip(locations.iter()) {
+                // Gather transform parameters, in one order and without a half
+                // turn between masters
+                let mut transforms = vec![];
+                for shape in shapes.iter() {
                     if let Shape::Component(comp) = shape {
-                        // comp.transform is already a DecomposedAffine
-                        position_lists.insert(
-                            location.clone(),
-                            vec![
-                                comp.transform.translation.0,
-                                comp.transform.translation.1,
-                                comp.transform.scale.0,
-                                comp.transform.scale.1,
-                                comp.transform.rotation,
-                                comp.transform.skew.0,
-                                comp.transform.skew.1,
-                            ],
-                        );
+                        transforms.push(comp.transform);
                     } else {
                         return Err(BabelfontError::GlyphNotInterpolatable {
                             glyph: glyph.to_string(),
                             reason: "Expected Component shape".to_string(),
                         });
                     }
+                }
+                let transforms = DecomposedAffine::compatible(&transforms);
+                let order = transforms.first().map_or(c.transform.order, |t| t.order);
+                let mut position_lists: HashMap<Location<NormalizedSpace>, Vec<f64>> =
+                    HashMap::new();
+                for (transform, location) in transforms.iter().zip(locations.iter()) {
+                    position_lists.insert(
+                        location.clone(),
+                        vec![
+                            transform.translation.0,
+                            transform.translation.1,
+                            transform.scale.0,
+                            transform.scale.1,
+                            transform.rotation,
+                            transform.skew.0,
+                            transform.skew.1,
+                        ],
+                    );
                 }
                 let deltas =
                     model.deltas_with_rounding(&position_lists, RoundingBehaviour::None)?;
@@ -213,7 +219,7 @@ impl Shape {
                         scale: (interpolated_params[2], interpolated_params[3]),
                         rotation: interpolated_params[4],
                         skew: (interpolated_params[5], interpolated_params[6]),
-                        order: c.transform.order, // Preserve the order from the source
+                        order,
                     },
                     format_specific: c.format_specific.clone(),
                     location: c.location.clone(), // for now
@@ -392,5 +398,93 @@ impl Glyph {
             }
         }
         errors
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use crate::{
+        common::decomposition::DecomposedAffine, Axis, Component, Font, Glyph, Layer, LayerType,
+        Master, Shape, Tag,
+    };
+    use fontdrasil::coords::{DesignCoord, DesignLocation, UserCoord};
+
+    /// A font whose glyph A is one component, its transform an affine in each of
+    /// two masters on a wght axis from 0 to 100
+    fn font_with_component(light: kurbo::Affine, bold: kurbo::Affine) -> Font {
+        let mut font = Font::new();
+        let mut axis = Axis::new("Weight", Tag::new(b"wght"));
+        axis.min = Some(UserCoord::new(0.0));
+        axis.default = Some(UserCoord::new(0.0));
+        axis.max = Some(UserCoord::new(100.0));
+        font.axes.push(axis);
+        let mut glyph = Glyph::new("A");
+        for (id, weight, affine) in [("light", 0.0, light), ("bold", 100.0, bold)] {
+            let location =
+                DesignLocation::from(vec![(Tag::new(b"wght"), DesignCoord::new(weight))]);
+            font.masters.push(Master::new(id, id, location));
+            let mut layer = Layer::new(500.0);
+            layer.master = LayerType::DefaultForMaster(id.to_string());
+            layer.shapes.push(Shape::Component(Component {
+                reference: "B".into(),
+                transform: DecomposedAffine::from(affine),
+                location: Default::default(),
+                format_specific: Default::default(),
+            }));
+            glyph.layers.push(layer);
+        }
+        font.glyphs.push(glyph);
+        font
+    }
+
+    fn midway(font: &Font) -> [f64; 6] {
+        let location = DesignLocation::from(vec![(Tag::new(b"wght"), DesignCoord::new(50.0))]);
+        let layer = font.interpolate_glyph("A", &location).unwrap();
+        let coeffs = layer
+            .components()
+            .next()
+            .unwrap()
+            .transform
+            .as_affine()
+            .as_coeffs();
+        coeffs
+    }
+
+    #[test]
+    fn test_component_turning_past_a_quarter_turn() {
+        // turned 80° decomposes as rotation 80°, scale (1, 1); turned 100° as
+        // rotation -80°, scale (-1, -1). Halfway is turned 90°, not collapsed.
+        let font = font_with_component(
+            kurbo::Affine::rotate(80f64.to_radians()),
+            kurbo::Affine::rotate(100f64.to_radians()),
+        );
+        let expected = kurbo::Affine::rotate(90f64.to_radians()).as_coeffs();
+        let got = midway(&font);
+        assert!(
+            got.iter().zip(expected).all(|(a, b)| (a - b).abs() < 1e-9),
+            "{got:?}"
+        );
+    }
+
+    #[test]
+    fn test_degenerate_affine_survives_decomposition() {
+        // x' = y, y' = 0: no first column to find a rotation in
+        let affine = kurbo::Affine::new([0.0, 0.0, 1.0, 0.0, 0.0, 0.0]);
+        let back = DecomposedAffine::from(affine).as_affine().as_coeffs();
+        assert!(
+            back.iter()
+                .zip(affine.as_coeffs())
+                .all(|(a, b)| (a - b).abs() < 1e-9),
+            "{back:?}"
+        );
+        let font = font_with_component(affine, affine);
+        let got = midway(&font);
+        assert!(
+            got.iter()
+                .zip(affine.as_coeffs())
+                .all(|(a, b)| (a - b).abs() < 1e-9),
+            "{got:?}"
+        );
     }
 }
