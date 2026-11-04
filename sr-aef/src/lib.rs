@@ -587,19 +587,19 @@ impl<'a> UncompileContext<'a> {
         Ok(vec![ToplevelItem::Gdef(Table { statements })])
     }
 
-    /// The font's GDEF as feature code but for its glyph classes (which a
-    /// font source states as glyph categories): attachment points and
-    /// ligature carets. None if it has neither.
-    pub fn gdef_without_glyph_classes(&mut self) -> Result<Option<String>, ReadError> {
-        let mut out = None;
+    /// The font's GDEF statements but for its glyph classes (which a font
+    /// source states as glyph categories): attachment points and ligature
+    /// carets
+    pub fn gdef_without_glyph_classes(&mut self) -> Result<Vec<GdefStatement>, ReadError> {
+        let mut out = vec![];
         for item in self.uncompile_gdef()? {
-            if let ToplevelItem::Gdef(mut table) = item {
-                table
-                    .statements
-                    .retain(|s| !matches!(s, GdefStatement::GlyphClassDef(_)));
-                if !table.statements.is_empty() {
-                    out = Some(ToplevelItem::Gdef(table).as_fea(""));
-                }
+            if let ToplevelItem::Gdef(table) = item {
+                out.extend(
+                    table
+                        .statements
+                        .into_iter()
+                        .filter(|s| !matches!(s, GdefStatement::GlyphClassDef(_))),
+                );
             }
         }
         Ok(out)
@@ -1592,9 +1592,12 @@ LigatureCaretByIndex b 3;
         let data = std::fs::read("resources/carets.ttf").unwrap();
         let fontref = skrifa::FontRef::new(&data).unwrap();
         let mut context = uncompile_context(&fontref).unwrap();
-        let gdef = context.gdef_without_glyph_classes().unwrap().unwrap();
-        assert!(gdef.contains("LigatureCaretByPos a 100 200;"), "{gdef}");
-        assert!(!gdef.contains("GlyphClassDef"), "{gdef}");
+        let gdef = context.gdef_without_glyph_classes().unwrap();
+        let gdef: Vec<String> = gdef.iter().map(|s| s.as_fea("")).collect();
+        assert_eq!(
+            gdef,
+            ["LigatureCaretByPos a 100 200;", "LigatureCaretByIndex b 3;"]
+        );
     }
 
     #[test]
