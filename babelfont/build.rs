@@ -8,7 +8,7 @@ struct GlyphInfo {
     // unicode_legacy: Option<String>,
     name: String,
     category: String,
-    // sub_category: Option<String>,
+    sub_category: Option<String>,
     // case: Option<String>,
     // direction: Option<String>,
     // script: Option<String>,
@@ -26,29 +26,26 @@ fn main() {
         },
     )
     .expect("Failed to parse XML");
-    let mut include = "[\n".to_string();
+    let mut entries = vec![];
     for node in doc.descendants() {
         let Some(name) = node.attribute("name") else {
             continue;
         };
-        include.push_str(&format!("{{\"name\": \"{}\", ", name));
-        // if let Some(unicode) = node.attribute("unicode") {
-        //     let codepoint = u32::from_str_radix(unicode, 16)
-        //         .expect(format!("Invalid unicode value: {}", unicode).as_str());
-        //     include.push_str(&format!("unicode: {},", codepoint));
-        // }
-        if let Some(category) = node.attribute("category") {
-            include.push_str(&format!("\"category\": \"{}\",", category));
+        let mut entry = serde_json::Map::new();
+        entry.insert("name".into(), name.into());
+        for (attribute, key) in [
+            ("category", "category"),
+            ("subCategory", "sub_category"),
+            ("production", "production"),
+            ("altNames", "alt_names"),
+        ] {
+            if let Some(value) = node.attribute(attribute) {
+                entry.insert(key.into(), value.into());
+            }
         }
-        if let Some(production_name) = node.attribute("production") {
-            include.push_str(&format!("\"production\": \"{}\",", production_name));
-        };
-        include.pop(); // Remove trailing comma
-        include.push_str("},\n");
+        entries.push(serde_json::Value::Object(entry));
     }
-    include.pop(); // Remove trailing newline
-    include.pop(); // Remove trailing comma
-    include.push_str("]\n");
+    let include = serde_json::to_string(&entries).expect("Failed to serialize glyphs data");
 
     let out_dir = std::env::var_os("OUT_DIR").unwrap();
     let dest_path = std::path::Path::new(&out_dir).join("glyphsdata.json");

@@ -182,6 +182,9 @@ pub(crate) mod glyphs {
     use glyphslib::glyphs3::Glyph as G3Glyph;
     use indexmap::IndexMap;
 
+    /// A ligature's Glyphs category where it is not Letter
+    const KEY_GLYPHS_CATEGORY: &str = "com.schriftgestalt.Glyphs.category";
+
     pub(crate) fn from_glyphs(val: &G3Glyph, axes_order: &[Tag]) -> Result<Glyph, BabelfontError> {
         let mut format_specific = FormatSpecific::default();
         format_specific.insert_json_non_null("case", &val.case);
@@ -209,8 +212,22 @@ pub(crate) mod glyphs {
         let category = if let Some(cat) = &val.category {
             match cat.as_str() {
                 "Base" => GlyphCategory::Base,
+                // a ligature by its subcategory, as glyphsLib and fontc have
+                // it (Letter, Ligature: fi); a category other than Letter is
+                // kept for writing it back (Number, Ligature: one_half)
+                _ if val.subcategory.as_deref() == Some("Ligature") => {
+                    if cat != "Letter" {
+                        format_specific.insert_json(KEY_GLYPHS_CATEGORY, cat);
+                    }
+                    GlyphCategory::Ligature
+                }
+                // a mark only if it attaches, as glyphsLib and fontc have
+                // it: a spacing accent or a modifier letter is a base
                 "Mark" => {
-                    if val.subcategory == Some("Nonspacing".to_string()) {
+                    if matches!(
+                        val.subcategory.as_deref(),
+                        Some("Nonspacing" | "Spacing Combining")
+                    ) {
                         GlyphCategory::Mark
                     } else {
                         GlyphCategory::Base
@@ -351,7 +368,19 @@ pub(crate) mod glyphs {
         }
 
         let subcategory = val.format_specific.get_optionstring("subcategory");
+        // a ligature of a category other than Letter, as it was read
+        let ligature_category =
+            GlyphCategory::Custom(val.format_specific.get_string(KEY_GLYPHS_CATEGORY));
         let category = match subcategory.as_deref() {
+            Some("Ligature")
+                if val.category == GlyphCategory::Ligature
+                    && !val
+                        .format_specific
+                        .get_string(KEY_GLYPHS_CATEGORY)
+                        .is_empty() =>
+            {
+                &ligature_category
+            }
             Some(s)
                 if (s == "Spacing" || s == "Spacing Combining")
                     && val.category == GlyphCategory::Base =>

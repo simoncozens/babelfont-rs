@@ -296,7 +296,9 @@ impl Font {
         result.into_iter().collect()
     }
 
-    /// Identify glyphs that participate in RTL kerning.
+    /// Identify glyphs that participate in RTL kerning: the glyphs and the
+    /// members of the groups its pairs name, either side (glyphsLib's
+    /// `_get_glyphs_with_rtl_kerning`, fontc's `get_glyphs_with_rtl_kerning`)
     pub(crate) fn rtl_kerning_glyphs(&self) -> HashSet<SmolStr> {
         let mut rtl_glyphs: HashSet<SmolStr> = HashSet::new();
 
@@ -304,34 +306,33 @@ impl Font {
             return rtl_glyphs;
         };
 
-        let mut rtl_left_groups: HashSet<String> = HashSet::new();
-        let mut rtl_right_groups: HashSet<String> = HashSet::new();
-
+        // groups by the side they kern on: @MMK_L_ names a right kerning
+        // group, @MMK_R_ a left one
+        let mut right_groups: HashSet<String> = HashSet::new();
+        let mut left_groups: HashSet<String> = HashSet::new();
+        let mut participant = |key: &str| {
+            if let Some(group) = key.strip_prefix("@MMK_L_") {
+                right_groups.insert(group.to_string());
+            } else if let Some(group) = key.strip_prefix("@MMK_R_") {
+                left_groups.insert(group.to_string());
+            } else {
+                rtl_glyphs.insert(SmolStr::from(key));
+            }
+        };
         for rtl_dict in rtl_kerning.values() {
             for (kern1, subtable) in rtl_dict {
-                if let Some(stripped) = kern1.strip_prefix("@MMK_R_") {
-                    rtl_left_groups.insert(stripped.to_string());
-                } else {
-                    rtl_glyphs.insert(SmolStr::from(kern1.as_str()));
-                }
+                participant(kern1);
                 for kern2 in subtable.keys() {
-                    if let Some(stripped) = kern2.strip_prefix("@MMK_L_") {
-                        rtl_right_groups.insert(stripped.to_string());
-                    } else {
-                        rtl_glyphs.insert(SmolStr::from(kern2.as_str()));
-                    }
+                    participant(kern2);
                 }
             }
         }
 
         for glyph in self.glyphs.iter() {
-            if rtl_glyphs.contains(&glyph.name) {
-                continue;
-            }
             let left_group = glyph.format_specific.get_string("kern_left");
             let right_group = glyph.format_specific.get_string("kern_right");
-            if (!left_group.is_empty() && rtl_left_groups.contains(left_group.as_str()))
-                || (!right_group.is_empty() && rtl_right_groups.contains(right_group.as_str()))
+            if (!left_group.is_empty() && left_groups.contains(left_group.as_str()))
+                || (!right_group.is_empty() && right_groups.contains(right_group.as_str()))
             {
                 rtl_glyphs.insert(glyph.name.clone());
             }
@@ -340,7 +341,10 @@ impl Font {
         rtl_glyphs
     }
 
-    /// Apply the glyphsLib RTL group-side swap to the kern groups.
+    /// Apply the glyphsLib RTL group-side swap to the kern groups: a glyph
+    /// in RTL kerning kerns first with its left kerning group (`@MMK_R_` in
+    /// kerningRTL) and second with its right one (glyphsLib's
+    /// `_glyph_kerning_attr`, fontc's `derive_kern_groups`)
     pub(crate) fn kern_groups_with_rtl_swaps(
         &self,
     ) -> (
@@ -357,32 +361,30 @@ impl Font {
 
         let mut first = self.first_kern_groups.clone();
         let mut second = self.second_kern_groups.clone();
-        for glyph_name in &rtl_glyphs {
-            for (_group, members) in first.iter_mut() {
-                members.retain(|member| member != glyph_name);
+        for members in first.values_mut().chain(second.values_mut()) {
+            members.retain(|member| !rtl_glyphs.contains(member));
+        }
+        for glyph in self.glyphs.iter() {
+            if !rtl_glyphs.contains(&glyph.name) {
+                continue;
             }
-            for (_group, members) in second.iter_mut() {
-                members.retain(|member| member != glyph_name);
+            let left_group = glyph.format_specific.get_string("kern_left");
+            let right_group = glyph.format_specific.get_string("kern_right");
+            if !left_group.is_empty() {
+                first
+                    .entry(SmolStr::from(left_group.as_str()))
+                    .or_default()
+                    .push(glyph.name.clone());
             }
-
-            if let Some(glyph) = self.glyphs.iter().find(|glyph| glyph.name == *glyph_name) {
-                let left_group = glyph.format_specific.get_string("kern_left");
-                let right_group = glyph.format_specific.get_string("kern_right");
-
-                if !right_group.is_empty() {
-                    first
-                        .entry(SmolStr::from(right_group.as_str()))
-                        .or_default()
-                        .push(glyph_name.clone());
-                }
-                if !left_group.is_empty() {
-                    second
-                        .entry(SmolStr::from(left_group.as_str()))
-                        .or_default()
-                        .push(glyph_name.clone());
-                }
+            if !right_group.is_empty() {
+                second
+                    .entry(SmolStr::from(right_group.as_str()))
+                    .or_default()
+                    .push(glyph.name.clone());
             }
         }
+        first.retain(|_, members| !members.is_empty());
+        second.retain(|_, members| !members.is_empty());
 
         (first, second)
     }

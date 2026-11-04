@@ -2415,6 +2415,121 @@ mod tests {
         assert_eq!(glyphs_glyph.subcategory, Some("Spacing".to_string()));
     }
 
+    /// G3RTLKerning.glyphs with these features
+    fn with_features(features: &str) -> Font {
+        let source = std::fs::read_to_string("resources/G3RTLKerning.glyphs").unwrap();
+        let source = source.replacen(
+            "fontMaster = (",
+            &format!("features = (\n{features}\n);\nfontMaster = ("),
+            1,
+        );
+        load_str(&source, "resources/G3RTLKerning.glyphs".into()).unwrap()
+    }
+
+    fn kern_code(font: &Font) -> String {
+        font.features
+            .features
+            .iter()
+            .find(|(tag, _)| tag == "kern")
+            .map(|(_, code)| code.code.clone())
+            .unwrap()
+    }
+
+    #[test]
+    fn test_a_kern_feature_of_its_own_gets_the_kerning_after_it() {
+        // Glyphs puts its kerning after a kern feature's code; glyphsLib and
+        // fontc put an insertion marker at its end (Estedad)
+        let font = with_features("{\ncode = \"pos A' 5 T;\";\ntag = kern;\n}");
+        assert_eq!(kern_code(&font), "pos A' 5 T;\n# Automatic Code");
+        // and it goes again on the way back
+        let glyphs = as_glyphs3(&font).unwrap();
+        let kern = glyphs.features.iter().find(|f| f.tag == "kern").unwrap();
+        assert_eq!(kern.code, "pos A' 5 T;");
+    }
+
+    #[test]
+    fn test_kern_features_with_a_marker_or_automatic_get_none() {
+        let font = with_features("{\ncode = \"# Automatic Code\npos A' 5 T;\";\ntag = kern;\n}");
+        assert_eq!(kern_code(&font), "# Automatic Code\npos A' 5 T;");
+        let font = with_features("{\nautomatic = 1;\ncode = \"pos A T -5;\";\ntag = kern;\n}");
+        assert_eq!(kern_code(&font), "pos A T -5;");
+    }
+
+    #[test]
+    #[cfg(feature = "fontir")]
+    fn test_a_kern_feature_of_its_own_compiles_with_the_kerning() {
+        use crate::convertors::fontir::{BabelfontIrSource, CompilationOptions};
+        use skrifa::raw::{tables::gpos::PositionSubtables, TableProvider};
+        let font = with_features("{\ncode = \"pos A' 5 T;\";\ntag = kern;\n}");
+        let binary = BabelfontIrSource::compile(font, CompilationOptions::default()).unwrap();
+        let gpos = skrifa::FontRef::new(&binary).unwrap().gpos().unwrap();
+        let lookups = gpos.lookup_list().unwrap();
+        let kinds: Vec<&str> = gpos
+            .feature_list()
+            .unwrap()
+            .feature_records()
+            .iter()
+            .filter(|r| r.feature_tag() == skrifa::Tag::new(b"kern"))
+            .take(1)
+            .flat_map(|r| {
+                r.feature(gpos.feature_list().unwrap().offset_data())
+                    .unwrap()
+                    .lookup_list_indices()
+                    .iter()
+                    .map(|i| {
+                        match lookups
+                            .lookups()
+                            .get(i.get() as usize)
+                            .unwrap()
+                            .subtables()
+                            .unwrap()
+                        {
+                            PositionSubtables::Pair(_) => "pair",
+                            PositionSubtables::ChainContextual(_) => "context",
+                            _ => "other",
+                        }
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        // the feature's own lookup, then the kerning
+        assert_eq!(kinds.first(), Some(&"context"), "{kinds:?}");
+        assert!(kinds[1..].contains(&"pair"), "{kinds:?}");
+    }
+
+    #[test]
+    fn test_load_ligatures() {
+        // a ligature by its subcategory, as glyphsLib and fontc have it; a
+        // category other than Letter goes back as it came
+        for category in ["Letter", "Number"] {
+            let glyphs_glyph = glyphslib::glyphs3::Glyph {
+                name: "one_half".into(),
+                category: Some(category.into()),
+                subcategory: Some("Ligature".into()),
+                ..Default::default()
+            };
+            let glyph = crate::glyph::glyphs::from_glyphs(&glyphs_glyph, &[]).unwrap();
+            assert_eq!(glyph.category, GlyphCategory::Ligature);
+            let back = glyph_to_glyphs(&glyph, &[], None, None);
+            assert_eq!(back.category, Some(category.to_string()));
+            assert_eq!(back.subcategory, Some("Ligature".to_string()));
+        }
+    }
+
+    #[test]
+    fn test_load_spacing_combining_marks() {
+        // a mark that attaches and advances is a mark, as glyphsLib and
+        // fontc have it
+        let glyphs_glyph = glyphslib::glyphs3::Glyph {
+            name: "matra".into(),
+            category: Some("Mark".into()),
+            subcategory: Some("Spacing Combining".into()),
+            ..Default::default()
+        };
+        let glyph = crate::glyph::glyphs::from_glyphs(&glyphs_glyph, &[]).unwrap();
+        assert_eq!(glyph.category, GlyphCategory::Mark);
+    }
+
     #[test]
     fn test_save_classes_without_subcategory() {
         let to_glyphs = |category, width| {
