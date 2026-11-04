@@ -1,4 +1,4 @@
-use crate::{Font, NodeType, Path};
+use crate::{Font, Path};
 
 /// The glyphs a font draws with cubic curves, and those it draws with
 /// quadratic ones, a few of each
@@ -8,25 +8,6 @@ pub(crate) struct CurveKinds {
 }
 
 const EXAMPLES: usize = 3;
-
-fn is_cubic(path: &Path) -> bool {
-    path.nodes
-        .iter()
-        .any(|node| node.nodetype == NodeType::Curve)
-}
-
-/// Quadratic: a quadratic on-curve, or off-curves with no cubic on-curve (a
-/// contour of off-curves only)
-fn is_quadratic(path: &Path) -> bool {
-    path.nodes
-        .iter()
-        .any(|node| node.nodetype == NodeType::QCurve)
-        || (!is_cubic(path)
-            && path
-                .nodes
-                .iter()
-                .any(|node| node.nodetype == NodeType::OffCurve))
-}
 
 /// Which glyphs are drawn with which curves, in layers that are compiled
 /// (masters and intermediate layers)
@@ -43,10 +24,10 @@ pub(crate) fn curve_kinds(font: &Font) -> CurveKinds {
                 .filter(|l| l.should_interpolate())
                 .flat_map(|l| l.paths())
         };
-        if paths().any(is_cubic) {
+        if paths().any(Path::is_cubic) {
             kinds.cubic.push(glyph.name.to_string());
         }
-        if paths().any(is_quadratic) {
+        if paths().any(Path::is_quadratic) {
             kinds.quadratic.push(glyph.name.to_string());
         }
     }

@@ -290,6 +290,27 @@ impl Path {
         })
     }
 
+    /// Whether the path has a cubic segment: a cubic on-curve point
+    pub fn is_cubic(&self) -> bool {
+        self.nodes
+            .iter()
+            .any(|node| node.nodetype == NodeType::Curve)
+    }
+
+    /// Whether the path has a quadratic segment: a quadratic on-curve point,
+    /// or off-curve points without a cubic on-curve (a contour of off-curves
+    /// only)
+    pub fn is_quadratic(&self) -> bool {
+        self.nodes
+            .iter()
+            .any(|node| node.nodetype == NodeType::QCurve)
+            || (!self.is_cubic()
+                && self
+                    .nodes
+                    .iter()
+                    .any(|node| node.nodetype == NodeType::OffCurve))
+    }
+
     /// Reverse the direction a closed path is drawn in, in place.
     pub fn reverse(&mut self) {
         if !self.closed || self.nodes.is_empty() {
@@ -1137,6 +1158,31 @@ mod tests {
             (bbox.x0, bbox.y0, bbox.x1, bbox.y1),
             (12.5, 12.5, 87.5, 87.5)
         );
+    }
+
+    #[test]
+    fn test_is_cubic_and_is_quadratic() {
+        let off_curves_only = path_of(vec![
+            Node::new_offcurve(0.0, 50.0),
+            Node::new_offcurve(50.0, 100.0),
+            Node::new_offcurve(100.0, 50.0),
+            Node::new_offcurve(50.0, 0.0),
+        ]);
+        assert!(off_curves_only.is_quadratic());
+        assert!(!off_curves_only.is_cubic());
+        let mut curve = Node::new_line(100.0, 0.0);
+        curve.nodetype = NodeType::Curve;
+        let cubic = path_of(vec![
+            Node::new_line(0.0, 0.0),
+            Node::new_offcurve(0.0, 100.0),
+            Node::new_offcurve(100.0, 100.0),
+            curve,
+        ]);
+        assert!(cubic.is_cubic());
+        assert!(!cubic.is_quadratic());
+        let lines = path_of(vec![Node::new_line(0.0, 0.0), Node::new_line(100.0, 0.0)]);
+        assert!(!lines.is_cubic());
+        assert!(!lines.is_quadratic());
     }
 
     #[test]

@@ -192,12 +192,7 @@ impl FontFilter for CubicToQuadratic {
                             .map(|shape| {
                                 shape
                                     .as_path()
-                                    .filter(|path| {
-                                        !path
-                                            .nodes
-                                            .iter()
-                                            .any(|node| node.nodetype == crate::NodeType::Curve)
-                                    })
+                                    .filter(|path| !path.is_cubic())
                                     .cloned()
                             })
                             .collect()
