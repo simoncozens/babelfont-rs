@@ -587,6 +587,24 @@ impl<'a> UncompileContext<'a> {
         Ok(vec![ToplevelItem::Gdef(Table { statements })])
     }
 
+    /// The font's GDEF as feature code but for its glyph classes (which a
+    /// font source states as glyph categories): attachment points and
+    /// ligature carets. None if it has neither.
+    pub fn gdef_without_glyph_classes(&mut self) -> Result<Option<String>, ReadError> {
+        let mut out = None;
+        for item in self.uncompile_gdef()? {
+            if let ToplevelItem::Gdef(mut table) = item {
+                table
+                    .statements
+                    .retain(|s| !matches!(s, GdefStatement::GlyphClassDef(_)));
+                if !table.statements.is_empty() {
+                    out = Some(ToplevelItem::Gdef(table).as_fea(""));
+                }
+            }
+        }
+        Ok(out)
+    }
+
     fn uncompile_feature_table(&mut self) -> Result<(), ReadError> {
         let mut registered_features = vec![];
         let mut unregistered_features = vec![];
@@ -1567,6 +1585,16 @@ LigatureCaretByIndex b 3;
 
 "
         );
+    }
+
+    #[test]
+    fn test_gdef_without_glyph_classes() {
+        let data = std::fs::read("resources/carets.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let mut context = uncompile_context(&fontref).unwrap();
+        let gdef = context.gdef_without_glyph_classes().unwrap().unwrap();
+        assert!(gdef.contains("LigatureCaretByPos a 100 200;"), "{gdef}");
+        assert!(!gdef.contains("GlyphClassDef"), "{gdef}");
     }
 
     #[test]
