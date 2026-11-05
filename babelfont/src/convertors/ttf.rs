@@ -890,6 +890,51 @@ fn read_shift(
     drawn_shift(fontref, glyf, gid, 0)
 }
 
+/// A simple glyph's stored contours, shifted as drawn (see drawn_shift), in
+/// stored order from the point a rasterizer starts each contour at: its first
+/// point, or its last when the first is off-curve and the last is not. Once
+/// reversed, that point is the path's last node, which a closed path starts at.
+fn stored_contours(simple: &glyf::SimpleGlyph<'_>, shift: f64) -> Vec<crate::Path> {
+    let points: Vec<glyf::CurvePoint> = simple.points().collect();
+    let mut paths = vec![];
+    let mut first = 0;
+    for end in simple.end_pts_of_contours() {
+        let end = end.get() as usize;
+        if end < first || end >= points.len() {
+            break;
+        }
+        let contour = &points[first..=end];
+        first = end + 1;
+        let len = contour.len();
+        let start = if !contour[0].on_curve && contour[len - 1].on_curve {
+            len - 1
+        } else {
+            0
+        };
+        let nodes = (0..len)
+            .map(|step| {
+                let ix = (start + step) % len;
+                let point = contour[ix];
+                let previous = contour[(ix + len - 1) % len];
+                let (x, y) = (f64::from(point.x) + shift, f64::from(point.y));
+                if !point.on_curve {
+                    crate::Node::new_offcurve(x, y)
+                } else if previous.on_curve {
+                    crate::Node::new_line(x, y)
+                } else {
+                    crate::Node::new_qcurve(x, y)
+                }
+            })
+            .collect();
+        paths.push(crate::Path {
+            nodes,
+            closed: true,
+            ..Default::default()
+        });
+    }
+    paths
+}
+
 const COMPOSITE_RECURSION_LIMIT: usize = 32;
 
 fn load_layer(
@@ -914,6 +959,20 @@ fn load_layer(
     };
 
     match glyph {
+        // TrueType instructions address a glyph's points by index, so a static
+        // glyph keeps the points it stores: implied on-curve points stay implied
+        // and each contour keeps its start point.
+        glyf::Glyph::Simple(simple) if fontref.gvar().is_err() => {
+            let shift = drawn_shift(fontref, &glyf, gid, 0)?;
+            // glyf contours run clockwise, a source's counter-clockwise
+            layer.shapes = stored_contours(&simple, shift)
+                .into_iter()
+                .map(|mut path| {
+                    path.reverse();
+                    crate::Shape::Path(path)
+                })
+                .collect();
+        }
         glyf::Glyph::Simple(_) => {
             if let Some(outline) = fontref.outline_glyphs().get(gid) {
                 let mut pen = PathBuilder::new();
@@ -1087,6 +1146,53 @@ mod tests {
         let bars = component_coeffs(&font, "bars");
         assert_close(&[bars[0][4], bars[1][4]], &[-5.0, 245.0]);
     }
+    #[test]
+    fn test_static_glyphs_keep_stored_points() {
+        // o is four off-curves; O has an implied on-curve and two explicit ones
+        // halfway between off-curves; u has one such explicit on-curve
+        let path = "resources/ttf/Quadratic.ttf";
+        let binary = std::fs::read(path).unwrap();
+        let fontref = skrifa::FontRef::new(&binary).unwrap();
+        let glyf = fontref.glyf().unwrap();
+        let loca = fontref.loca(None).unwrap();
+        let font = load(path).unwrap();
+        for name in ["o", "O", "u"] {
+            let gid = font.glyphs.iter().position(|g| g.name == name).unwrap();
+            let Some(glyf::Glyph::Simple(simple)) =
+                loca.get_glyf(GlyphId::new(gid as u32), &glyf).unwrap()
+            else {
+                panic!("{name} is not a simple glyph");
+            };
+            let shift = drawn_shift(&fontref, &glyf, GlyphId::new(gid as u32), 0).unwrap();
+            let points: Vec<glyf::CurvePoint> = simple.points().collect();
+            let mut first = 0;
+            let paths: Vec<_> = font.glyphs.get(name).unwrap().layers[0].paths().collect();
+            let ends = simple.end_pts_of_contours();
+            assert_eq!(paths.len(), ends.len(), "{name}");
+            for (path, end) in paths.iter().zip(ends) {
+                let end = end.get() as usize;
+                let contour = &points[first..=end];
+                first = end + 1;
+                // the same points, reversed, ending at the contour's start
+                let mut stored: Vec<(f64, f64, bool)> = contour
+                    .iter()
+                    .map(|p| (f64::from(p.x) + shift, f64::from(p.y), p.on_curve))
+                    .collect();
+                stored.reverse();
+                let read: Vec<(f64, f64, bool)> = path
+                    .nodes
+                    .iter()
+                    .map(|n| (n.x, n.y, n.nodetype != crate::NodeType::OffCurve))
+                    .collect();
+                if contour[0].on_curve {
+                    assert_eq!(read, stored, "{name}");
+                } else {
+                    assert_eq!(read.len(), stored.len(), "{name}");
+                }
+            }
+        }
+    }
+
     #[test]
     fn test_contours_read_counter_clockwise() {
         // x is a clockwise rectangle in the binary
