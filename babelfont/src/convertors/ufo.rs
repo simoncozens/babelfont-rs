@@ -210,6 +210,7 @@ pub fn as_norad(font: &Font, master_ix: usize) -> Result<norad::Font, BabelfontE
     }
 
     ufo.lib = serde_json::from_value::<norad::Plist>(lib.into())?;
+    save_uvs_sequences(font, &mut ufo.lib);
     let master = font
         .masters
         .get(master_ix)
@@ -583,14 +584,30 @@ pub(crate) fn save_info(info: &mut norad::FontInfo, font: &Font, master_ix: usiz
         .manufacturer_url
         .get_default()
         .map(|x| x.to_string());
+    // UFO's "preferred" names are the typographic ones (IDs 16 and 17)
     info.open_type_name_preferred_family_name = font
         .names
-        .wws_family_name
+        .typographic_family
         .get_default()
         .map(|x| x.to_string());
     info.open_type_name_preferred_subfamily_name = font
         .names
-        .preferred_subfamily_name
+        .typographic_subfamily
+        .get_default()
+        .map(|x| x.to_string());
+    info.open_type_name_wws_family_name = font
+        .names
+        .wws_family_name
+        .get_default()
+        .map(|x| x.to_string());
+    info.open_type_name_wws_subfamily_name = font
+        .names
+        .wws_subfamily_name
+        .get_default()
+        .map(|x| x.to_string());
+    info.open_type_name_compatible_full_name = font
+        .names
+        .compatible_full_name
         .get_default()
         .map(|x| x.to_string());
     info.open_type_name_sample_text = font.names.sample_text.get_default().map(|x| x.to_string());
@@ -918,9 +935,6 @@ pub(crate) fn load_font_info(
     if let Some(p) = &info.postscript_font_name {
         font.names.postscript_name = p.into();
     }
-    if let Some(p) = &info.open_type_name_preferred_subfamily_name {
-        font.names.preferred_subfamily_name = p.into();
-    }
     copy_name!(font, info, description);
     copy_name!(font, info, designer_url);
     copy_name!(font, info, designer);
@@ -953,11 +967,22 @@ pub(crate) fn load_font_info(
         font.format_specific
             .insert(KEY_STYLE_NAME.into(), stylename.clone().into());
     }
+    // UFO's "preferred" names are the typographic ones (IDs 16 and 17), not
+    // WWS names or the legacy subfamily (ID 2)
     if let Some(v) = info.open_type_name_preferred_family_name.as_ref() {
-        font.names.wws_family_name = v.into(); // Is this the right place?
+        font.names.typographic_family = v.into();
     }
     if let Some(v) = info.open_type_name_preferred_subfamily_name.as_ref() {
-        font.names.preferred_subfamily_name = v.into();
+        font.names.typographic_subfamily = v.into();
+    }
+    if let Some(v) = info.open_type_name_wws_family_name.as_ref() {
+        font.names.wws_family_name = v.into();
+    }
+    if let Some(v) = info.open_type_name_wws_subfamily_name.as_ref() {
+        font.names.wws_subfamily_name = v.into();
+    }
+    if let Some(v) = info.open_type_name_compatible_full_name.as_ref() {
+        font.names.compatible_full_name = v.into();
     }
     if let Some(panose) = &info.open_type_os2_panose {
         font.custom_ot_values.os2_panose = Some([
@@ -1115,6 +1140,32 @@ pub(crate) fn load_glyphs(font: &mut Font, ufo: &norad::Font) {
         }
     }
     add_uvs_sequences(font, ufo);
+}
+
+/// The font's Unicode variation sequences as UFO's lib states them: selector →
+/// codepoint → glyph name, the codepoints in hexadecimal
+fn save_uvs_sequences(font: &Font, lib: &mut norad::Plist) {
+    if font.variation_sequences.is_empty() {
+        return;
+    }
+    let mut nested = serde_json::Map::new();
+    for (&(selector, codepoint), glyph) in &font.variation_sequences {
+        if let serde_json::Value::Object(records) = nested
+            .entry(format!("{selector:04X}"))
+            .or_insert_with(|| serde_json::Value::Object(serde_json::Map::new()))
+        {
+            records.insert(
+                format!("{codepoint:04X}"),
+                serde_json::Value::String(glyph.to_string()),
+            );
+        }
+    }
+    let entry = serde_json::json!({ "public.unicodeVariationSequences": nested });
+    if let Ok(entry) = serde_json::from_value::<norad::Plist>(entry) {
+        for (key, value) in entry {
+            lib.insert(key, value);
+        }
+    }
 }
 
 fn add_uvs_sequences(font: &mut Font, ufo: &norad::Font) {
@@ -1310,6 +1361,68 @@ pub(crate) mod tests {
             Some(&22),
             "a UFO round-trip must preserve the angle"
         );
+    }
+
+    #[test]
+    fn test_preferred_names_are_typographic() {
+        let mut ufo = norad::Font::load("resources/IbarraRealNova-Italic.ufo").unwrap();
+        ufo.font_info.open_type_name_preferred_family_name = Some("Ibarra".into());
+        ufo.font_info.open_type_name_preferred_subfamily_name = Some("Real Italic".into());
+        ufo.font_info.open_type_name_wws_family_name = Some("Ibarra WWS".into());
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("names.ufo");
+        ufo.save(&path).unwrap();
+        let font = crate::load(&path).unwrap();
+        let name = |n: &crate::I18NDictionary| n.get_default().cloned();
+        assert_eq!(
+            name(&font.names.typographic_family).as_deref(),
+            Some("Ibarra")
+        );
+        assert_eq!(
+            name(&font.names.typographic_subfamily).as_deref(),
+            Some("Real Italic")
+        );
+        assert_eq!(
+            name(&font.names.wws_family_name).as_deref(),
+            Some("Ibarra WWS")
+        );
+        assert_eq!(name(&font.names.preferred_subfamily_name), None);
+        // and back
+        let info = as_norad(&font, 0).unwrap().font_info;
+        assert_eq!(
+            info.open_type_name_preferred_family_name.as_deref(),
+            Some("Ibarra")
+        );
+        assert_eq!(
+            info.open_type_name_preferred_subfamily_name.as_deref(),
+            Some("Real Italic")
+        );
+        assert_eq!(
+            info.open_type_name_wws_family_name.as_deref(),
+            Some("Ibarra WWS")
+        );
+    }
+
+    #[test]
+    fn test_variation_sequences_round_trip() {
+        let mut font = crate::load("resources/IbarraRealNova-Italic.ufo").unwrap();
+        font.variation_sequences
+            .insert((0xFE00, 0x41), smol_str::SmolStr::from("A"));
+        font.variation_sequences
+            .insert((0xE0100, 0x1F600), smol_str::SmolStr::from("B"));
+        let ufo = as_norad(&font, 0).unwrap();
+        let lib = ufo
+            .lib
+            .get("public.unicodeVariationSequences")
+            .and_then(|v| v.as_dictionary())
+            .unwrap();
+        let fe00 = lib.get("FE00").and_then(|v| v.as_dictionary()).unwrap();
+        assert_eq!(fe00.get("0041").and_then(|v| v.as_string()), Some("A"));
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("uvs.ufo");
+        font.save(out.clone()).unwrap();
+        let reloaded = crate::load(out).unwrap();
+        assert_eq!(reloaded.variation_sequences, font.variation_sequences);
     }
 
     #[test]
