@@ -1,6 +1,6 @@
 use babelfont::load;
 use clap::Parser;
-use fontmerge::{Args, fontmerge};
+use fontmerge::{fontmerge, Args};
 
 use std::path::PathBuf;
 
@@ -29,6 +29,7 @@ fn main() {
     // Check the output file is supported
     // File name should end with `.glyphs`, `.glyphspackage`, `.babelfont` or `.ttf`.
     // We can't save designspace or UFO files yet.
+    let can_save_as_ufo = font1.masters.len() == 1;
     {
         let output_path = PathBuf::from(&args.output);
         let output_ext = output_path
@@ -36,7 +37,12 @@ fn main() {
             .and_then(|s| s.to_str())
             .unwrap_or("");
         match output_ext {
-            "glyphs" | "glyphspackage" | "babelfont" | "ttf" | "otf" => {}
+            "glyphs" | "glyphspackage" | "babelfont" | "ttf" | "otf" | "designspace" => {}
+            "ufo" if can_save_as_ufo => {}
+            "ufo" if !can_save_as_ufo => {
+                log::error!("Cannot save as UFO because the font has multiple masters");
+                return;
+            }
             _ => {
                 log::error!(
                     "Output file extension '{}' is not supported. Please use .glyphs, .glyphspackage, .babelfont, .ttf or .otf",
