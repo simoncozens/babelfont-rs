@@ -1,6 +1,6 @@
 use babelfont::load;
 use clap::Parser;
-use fontmerge::{fontmerge, Args};
+use fontmerge::{Args, fontmerge};
 
 use std::path::PathBuf;
 

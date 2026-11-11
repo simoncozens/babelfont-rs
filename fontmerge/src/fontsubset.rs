@@ -1,4 +1,4 @@
-use babelfont::{load, Features, GlyphList};
+use babelfont::{Features, GlyphList, load};
 use clap::Parser;
 use fontmerge::args::{
     DuplicateLookupHandling, ExistingGlyphHandling, Fixups, GlyphSelection, LayoutHandling,
