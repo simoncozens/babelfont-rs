@@ -350,6 +350,7 @@ pub(crate) mod glyphs {
         axis_order: &[Tag],
         kern_left: Option<&SmolStr>,
         kern_right: Option<&SmolStr>,
+        format_version: i32,
     ) -> glyphslib::glyphs3::Glyph {
         let mut g3_layers = vec![];
         let sc_axes = glyph_specific_axes(&val.component_axes);
@@ -405,17 +406,20 @@ pub(crate) mod glyphs {
         G3Glyph {
             name: val.name.to_string(),
             production: val.production_name.as_ref().map(|p| p.to_string()),
-            axes: val
-                .component_axes
-                .iter()
-                .map(|x| glyphslib::glyphs3::Axis {
-                    hidden: x.hidden,
-                    name: x.name(),
-                    names: (&x.name).into(),
-                    tag: x.tag.to_string(),
-                    user_data: x.format_specific.get_json(KEY_USER_DATA),
-                })
-                .collect(),
+            axes: if format_version < 4 {
+                vec![]
+            } else {
+                val.component_axes
+                    .iter()
+                    .map(|x| glyphslib::glyphs3::Axis {
+                        hidden: x.hidden,
+                        name: x.name(),
+                        names: (&x.name).into(),
+                        tag: x.tag.to_string(),
+                        user_data: x.format_specific.get_json(KEY_USER_DATA),
+                    })
+                    .collect()
+            },
             unicode: val.codepoints.clone(),
             layers: g3_layers,
             export: val.exported,

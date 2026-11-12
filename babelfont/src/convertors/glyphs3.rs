@@ -1769,6 +1769,7 @@ pub(crate) fn as_glyphs3(font: &Font) -> Result<glyphs3::Glyphs3, BabelfontError
                     &axes_order,
                     glyph_to_second_kern_group.get(&g.name), // Glyph groups are backwards in Glyphs
                     glyph_to_first_kern_group.get(&g.name),
+                    format_version,
                 )
             })
             .collect(),
@@ -2410,6 +2411,7 @@ mod tests {
             &font.axes.iter().map(|a| a.tag).collect::<Vec<_>>(),
             None,
             None,
+            3,
         );
         assert_eq!(glyphs_glyph.category, Some("Mark".to_string()));
         assert_eq!(glyphs_glyph.subcategory, Some("Spacing".to_string()));
@@ -2510,7 +2512,7 @@ mod tests {
             };
             let glyph = crate::glyph::glyphs::from_glyphs(&glyphs_glyph, &[]).unwrap();
             assert_eq!(glyph.category, GlyphCategory::Ligature);
-            let back = glyph_to_glyphs(&glyph, &[], None, None);
+            let back = glyph_to_glyphs(&glyph, &[], None, None, 3);
             assert_eq!(back.category, Some(category.to_string()));
             assert_eq!(back.subcategory, Some("Ligature".to_string()));
         }
@@ -2542,7 +2544,7 @@ mod tests {
                 }],
                 ..Default::default()
             };
-            glyph_to_glyphs(&glyph, &[], None, None)
+            glyph_to_glyphs(&glyph, &[], None, None, 3)
         };
         let mark = to_glyphs(GlyphCategory::Mark, 0.0);
         assert_eq!(mark.category, Some("Mark".to_string()));
