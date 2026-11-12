@@ -15,7 +15,7 @@ pub(crate) fn interpolate_layer(
     target_location: &Location<NormalizedSpace>,
     extrapolate: bool,
 ) -> Result<Layer, BabelfontError> {
-    let mut new_layer = Layer::default();
+    let mut new_layer = Layer::new(0.0);
     let locations_in_order = layers_locations
         .iter()
         .map(|(loc, _)| loc.to_normalized(axes).map_err(|e| e.into()))
