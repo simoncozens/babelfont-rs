@@ -1,3 +1,6 @@
+#[cfg(feature = "cli")]
+use std::path::PathBuf;
+
 use crate::error::FontmergeError;
 use babelfont::SmolStr;
 
@@ -27,7 +30,7 @@ pub struct Args {
 
     /// Include directory for feature files
     #[arg(long)]
-    pub fea_include_dir: Option<String>,
+    pub fea_include_dir: Option<PathBuf>,
 
     #[command(flatten)]
     pub verbosity: clap_verbosity_flag::Verbosity,

@@ -41,6 +41,7 @@ fn merge(
         DuplicateLookupHandling::First,
         true,
         true,
+        None,
     )
     .expect("merge failed")
 }
@@ -77,6 +78,7 @@ fn merge_glyphs_with_duplicate_policy(
         duplicate_lookups,
         true,
         true,
+        None,
     )
     .expect("merge failed")
 }
@@ -89,7 +91,7 @@ fn subset(font: Font, include: Vec<&str>, layout_handling: LayoutHandling) -> Fo
     target.glyphs = babelfont::GlyphList::default();
     let filter =
         GlyphsetFilter::new_from_glyphs(include, &mut target, &donor, ExistingGlyphHandling::Skip);
-    fontsubset(font, filter, layout_handling, true, true).expect("subset failed")
+    fontsubset(font, filter, layout_handling, true, true, None).expect("subset failed")
 }
 
 fn width(font: &Font, glyph: &str) -> f32 {

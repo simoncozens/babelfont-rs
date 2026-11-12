@@ -1,10 +1,11 @@
 use babelfont::{Features, GlyphList, load};
 use clap::Parser;
-use fontmerge::args::{
-    DuplicateLookupHandling, ExistingGlyphHandling, Fixups, GlyphSelection, LayoutHandling,
+use fontmerge::{
+    args::{
+        DuplicateLookupHandling, ExistingGlyphHandling, Fixups, GlyphSelection, LayoutHandling,
+    },
+    fontmerge,
 };
-use fontmerge::fontmerge;
-
 use std::path::PathBuf;
 
 /// Font subsetter
@@ -22,7 +23,7 @@ pub struct Args {
 
     /// Include directory for feature files
     #[arg(long)]
-    pub fea_include_dir: Option<String>,
+    pub fea_include_dir: Option<PathBuf>,
 
     #[command(flatten)]
     pub verbosity: clap_verbosity_flag::Verbosity,
@@ -125,6 +126,7 @@ fn main() {
         args.duplicate_lookups,
         args.fixups.avar_masters,
         !args.fixups.no_dotted_circle,
+        args.fea_include_dir,
     ) {
         Ok(result) => {
             log::info!("Saving merged font to {}", args.output);

@@ -65,6 +65,7 @@ pub fn fontsubset(
     layout_handling: LayoutHandling,
     process_avar_mapping: bool,
     merge_dotted_circle_anchors: bool,
+    resolve_includes_path: Option<PathBuf>,
 ) -> Result<babelfont::Font, error::FontmergeError> {
     let mut target = font1.clone();
     target.features = Features::default();
@@ -78,6 +79,7 @@ pub fn fontsubset(
         DuplicateLookupHandling::First,
         process_avar_mapping,
         merge_dotted_circle_anchors,
+        resolve_includes_path,
     )
 }
 
@@ -89,6 +91,7 @@ pub fn fontmerge(
     duplicate_lookups: DuplicateLookupHandling,
     process_avar_mapping: bool,
     merge_dotted_circle_anchors: bool,
+    resolve_includes_path: Option<PathBuf>,
 ) -> Result<babelfont::Font, error::FontmergeError> {
     glyphset_filter.check_for_presence(&font2);
     let existing_handling = glyphset_filter.existing_glyph_handling;
@@ -134,7 +137,7 @@ pub fn fontmerge(
             .expect("Failed to drop features");
     } else {
         // Resolve feature includes
-        ResolveIncludes::new(None::<PathBuf>)
+        ResolveIncludes::new(resolve_includes_path)
             .apply(&mut font2)
             .expect("Failed to resolve includes");
     }

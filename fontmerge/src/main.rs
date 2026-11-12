@@ -76,6 +76,7 @@ fn main() {
         args.duplicate_lookups,
         args.fixups.avar_masters,
         !args.fixups.no_dotted_circle,
+        args.fea_include_dir,
     ) {
         Ok(result) => {
             log::info!("Saving merged font to {}", args.output);
