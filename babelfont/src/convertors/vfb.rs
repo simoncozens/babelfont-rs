@@ -388,7 +388,55 @@ fn load_glyph(font: &mut Font, items: Vec<GlyphEntry>) -> Result<(), BabelfontEr
                 }
             }
             GlyphEntry::Hints(_hints) => {}   // => todo!(),
-            GlyphEntry::Guides(_guides) => {} // => todo!(),
+            GlyphEntry::Guides(guides) => {
+                // Apply glyph-level guides to their corresponding master layers
+                // VFB guides are stored as one guide per master per guide position
+                // Skip mask and image layers (these come first if they exist)
+                let master_layer_start = glyph.layers.iter().position(|l| {
+                    l.name.as_deref() != Some("mask") && l.name.as_deref() != Some("img")
+                }).unwrap_or(0);
+                
+                // Apply horizontal guides
+                // Each guide_set contains one guide per master for that position
+                for guide_set in guides.horizontal() {
+                    for (master_index, vfb_guide) in guide_set.iter().enumerate() {
+                        let layer_index = master_layer_start + master_index;
+                        if let Some(layer) = glyph.layers.get_mut(layer_index) {
+                            let guide_obj = Guide {
+                                pos: crate::common::Position {
+                                    x: vfb_guide.position() as f32,
+                                    y: 0.0,
+                                    angle: vfb_guide.angle(),
+                                },
+                                name: Some("H-guide".to_string()),
+                                color: None,
+                                format_specific: FormatSpecific::default(),
+                            };
+                            layer.guides.push(guide_obj);
+                        }
+                    }
+                }
+                
+                // Apply vertical guides
+                for guide_set in guides.vertical() {
+                    for (master_index, vfb_guide) in guide_set.iter().enumerate() {
+                        let layer_index = master_layer_start + master_index;
+                        if let Some(layer) = glyph.layers.get_mut(layer_index) {
+                            let guide_obj = Guide {
+                                pos: crate::common::Position {
+                                    x: vfb_guide.position() as f32,
+                                    y: 0.0,
+                                    angle: vfb_guide.angle(),
+                                },
+                                name: Some("V-guide".to_string()),
+                                color: None,
+                                format_specific: FormatSpecific::default(),
+                            };
+                            layer.guides.push(guide_obj);
+                        }
+                    }
+                }
+            }
             GlyphEntry::Components(components) => {
                 for (index, layer) in glyph.layers.iter_mut().enumerate() {
                     for component in components.iter() {
