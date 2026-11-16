@@ -2,6 +2,7 @@
 /// Compares VFB→Babelfont→VFJ output against golden reference files
 use serde_json::Value;
 use std::path::PathBuf;
+use vfbreader::read_vfb;
 
 fn get_vfb_test_files() -> Vec<(PathBuf, PathBuf)> {
     vec![
@@ -92,45 +93,46 @@ fn test_vfb_to_vfj_conversion() {
 #[test]
 #[ignore]
 fn test_vfb_loader_coverage() {
-    let test_vfb = PathBuf::from("resources/IBMPlexSerif-Text.vfb");
-    if !test_vfb.exists() {
-        println!("Test file not found: {}", test_vfb.display());
-        return;
-    }
-
-    let font = babelfont::load(&test_vfb).expect("Failed to load VFB");
-
-    println!("\n=== VFB Loader Coverage ===");
-    println!("Font loaded: {:?}", font.names.family_name);
-    println!("UPM: {}", font.upm);
-    println!("Version: {:?}", font.version);
-    println!("Masters: {}", font.masters.len());
-    for (i, master) in font.masters.iter().enumerate() {
-        println!("  Master {}: {:?} ({})", i, master.name, master.id);
-        println!("    Location: {:?}", master.location);
-        println!("    Metrics: {} entries", master.metrics.len());
-        println!("    Kerning: {} pairs", master.kerning.len());
-    }
-
-    println!("Glyphs: {}", font.glyphs.len());
-    if let Some(first_glyph) = font.glyphs.get_by_index(0) {
-        println!("  First glyph: {} ({} layers)", first_glyph.name, first_glyph.layers.len());
-        for (i, layer) in first_glyph.layers.iter().enumerate() {
-            println!("    Layer {}: {} shapes", i, layer.shapes.len());
+    for (vfb_path, _) in get_vfb_test_files() {
+        if !vfb_path.exists() {
+            println!("Test file not found: {}", vfb_path.display());
+            continue;
         }
-    }
 
-    println!("Axes: {}", font.axes.len());
-    for axis in &font.axes {
-        println!("  {:?}: {:?} - {:?}", axis.name, axis.min, axis.max);
-    }
+        let font = babelfont::load(&vfb_path).expect("Failed to load VFB");
 
-    println!("Features: {} classes", font.features.classes.len());
-    println!(
-        "Kerning groups: {} first, {} second",
-        font.first_kern_groups.len(),
-        font.second_kern_groups.len()
-    );
+        println!("\n=== VFB Loader Coverage: {} ===", vfb_path.display());
+        println!("Font loaded: {:?}", font.names.family_name);
+        println!("UPM: {}", font.upm);
+        println!("Version: {:?}", font.version);
+        println!("Masters: {}", font.masters.len());
+        for (i, master) in font.masters.iter().enumerate() {
+            println!("  Master {}: {:?} ({})", i, master.name, master.id);
+            println!("    Location: {:?}", master.location);
+            println!("    Metrics: {} entries", master.metrics.len());
+            println!("    Kerning: {} pairs", master.kerning.len());
+        }
+
+        println!("Glyphs: {}", font.glyphs.len());
+        if let Some(first_glyph) = font.glyphs.get_by_index(0) {
+            println!("  First glyph: {} ({} layers)", first_glyph.name, first_glyph.layers.len());
+            for (i, layer) in first_glyph.layers.iter().enumerate() {
+                println!("    Layer {}: {} shapes", i, layer.shapes.len());
+            }
+        }
+
+        println!("Axes: {}", font.axes.len());
+        for axis in &font.axes {
+            println!("  {:?}: {:?} - {:?}", axis.name, axis.min, axis.max);
+        }
+
+        println!("Features: {} classes", font.features.classes.len());
+        println!(
+            "Kerning groups: {} first, {} second",
+            font.first_kern_groups.len(),
+            font.second_kern_groups.len()
+        );
+    }
 }
 
 /// Detailed comparison of VFB→Babelfont→VFJ output vs golden VFJ
@@ -315,5 +317,111 @@ fn test_glyph_layer_structure() {
 
         // Note: Layer count mismatches are expected due to FontLab's named layers (mask, Text, img)
         // vs Babelfont's master-based layers. This is not a bug - see VFB_IMPROVEMENT_LOOP.md
+    }
+}
+
+/// Analyze which VFB entries relate to masters and axes
+#[test]
+#[ignore]
+fn test_vfb_master_axis_entries() {
+    for (vfb_path, golden_vfj_path) in get_vfb_test_files() {
+        if !vfb_path.exists() {
+            continue;
+        }
+
+        println!("\n========================================================");
+        println!("File: {}", vfb_path.display());
+        println!("========================================================");
+
+        let vfb = match read_vfb(&vfb_path) {
+            Ok(v) => v,
+            Err(e) => {
+                println!("⚠ Failed to load VFB: {}", e);
+                continue;
+            }
+        };
+
+        // Count entries by type
+        let mut axis_count = 0;
+        let mut axis_names = vec![];
+        let mut master_count = 0;
+        let mut master_names = vec![];
+        let mut master_locations = vec![];
+        let mut weight_values = vec![];
+
+        for entry in &vfb.entries {
+            match entry {
+                vfbreader::VfbEntry::AxisCount(count) => {
+                    axis_count = *count;
+                    println!("AxisCount: {}", count);
+                }
+                vfbreader::VfbEntry::AxisName(name) => {
+                    axis_names.push(name.clone());
+                    println!("AxisName: {}", name);
+                }
+                vfbreader::VfbEntry::MasterCount(count) => {
+                    master_count = *count;
+                    println!("MasterCount: {}", count);
+                }
+                vfbreader::VfbEntry::MasterName(name) => {
+                    master_names.push(name.clone());
+                    println!("MasterName: {}", name);
+                }
+                vfbreader::VfbEntry::MasterLocation(_) => {
+                    master_locations.push("(binary data)".to_string());
+                    println!("MasterLocation: (binary data present)");
+                }
+                vfbreader::VfbEntry::Weight(w) => {
+                    weight_values.push(w.clone());
+                    println!("Weight: {}", w);
+                }
+                _ => {}
+            }
+        }
+
+        println!("\nSummary:");
+        println!("  Axes declared: {}", axis_count);
+        println!("  Axis names found: {}", axis_names.len());
+        for (i, name) in axis_names.iter().enumerate() {
+            println!("    [{}] {}", i, name);
+        }
+        println!("  Masters declared: {}", master_count);
+        println!("  Master names found: {}", master_names.len());
+        for (i, name) in master_names.iter().enumerate() {
+            println!("    [{}] {}", i, name);
+        }
+        println!("  Master locations found: {}", master_locations.len());
+        println!("  Weight entries: {}", weight_values.len());
+
+        // Compare against golden
+        println!("\n--- Golden VFJ ---");
+        if let Ok(golden_data) = std::fs::read_to_string(&golden_vfj_path) {
+            if let Ok(json) = serde_json::from_str::<Value>(&golden_data) {
+                if let Some(font) = json.get("font") {
+                    let golden_axes = font.get("axes").and_then(|a| a.as_array()).map(|a| a.len()).unwrap_or(0);
+                    let golden_masters = font.get("masters").and_then(|m| m.as_array()).map(|m| m.len()).unwrap_or(0);
+                    
+                    println!("  Golden axes: {}", golden_axes);
+                    if golden_axes > 0 {
+                        for (i, axis) in font["axes"].as_array().unwrap_or(&vec![]).iter().enumerate() {
+                            if let Some(name) = axis.get("name") {
+                                println!("    [{}] {}", i, name);
+                            }
+                        }
+                    }
+                    
+                    println!("  Golden masters: {}", golden_masters);
+                    if golden_masters > 0 {
+                        for (i, master) in font["masters"].as_array().unwrap_or(&vec![]).iter().enumerate() {
+                            if let Some(fm) = master.get("fontMaster") {
+                                if let Some(name) = fm.get("name") {
+                                    println!("    [{}] {}", i, name);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }

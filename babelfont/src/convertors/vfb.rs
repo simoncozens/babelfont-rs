@@ -16,21 +16,60 @@ use crate::{
 pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
     let vfb: Vfb = read_vfb(&path).map_err(|e| BabelfontError::VfbLoad(e.to_string()))?;
 
+    // First pass: collect metadata about axes and masters
+    let mut axis_count = 0;
+    let mut axis_names = vec![];
+    let mut master_count = 1; // Default to 1 master
+    let mut master_names = vec![];
+
+    for entry in &vfb.entries {
+        match entry {
+            VfbEntry::AxisCount(count) => axis_count = *count as usize,
+            VfbEntry::AxisName(name) => axis_names.push(name.clone()),
+            VfbEntry::MasterCount(count) => master_count = *count as usize,
+            VfbEntry::MasterName(name) => master_names.push(name.clone()),
+            _ => {}
+        }
+    }
+
     // Convert Vfb to Babelfont Font
     let mut font = Font::new();
-    let mut wght = Axis::new("Weight", Tag::from_be_bytes(*b"wght"));
-    wght.min = Some(UserCoord::new(100.0));
-    wght.max = Some(UserCoord::new(900.0));
-    wght.default = Some(UserCoord::new(400.0));
-    font.axes = vec![wght];
-    // Create a default master
-    font.masters = vec![Master::new(
-        "Default Master",
-        Uuid::new_v4().to_string(),
-        vec![(Tag::from_be_bytes(*b"wght"), DesignCoord::new(400.0))]
-            .into_iter()
-            .collect(),
-    )];
+    
+    // Set up axes - for now, only Weight axis if multi-master
+    if axis_count > 0 && master_count > 1 {
+        let mut wght = Axis::new("Weight", Tag::from_be_bytes(*b"wght"));
+        wght.min = Some(UserCoord::new(100.0));
+        wght.max = Some(UserCoord::new(900.0));
+        wght.default = Some(UserCoord::new(400.0));
+        font.axes = vec![wght];
+    }
+    
+    // Create masters
+    for i in 0..master_count {
+        let master_name = if i < master_names.len() {
+            master_names[i].trim().to_string()
+        } else {
+            format!("Master {}", i + 1)
+        };
+        
+        let location = if axis_count > 0 && master_count > 1 {
+            // For multi-master, use weight values: 0 for first master, 1000 for last
+            let weight_value = if master_count == 2 {
+                if i == 0 { 0.0 } else { 1000.0 }
+            } else {
+                (i as f64 / (master_count - 1) as f64) * 1000.0
+            };
+            vec![(Tag::from_be_bytes(*b"wght"), DesignCoord::new(weight_value))]
+                .into_iter()
+                .collect()
+        } else {
+            Location::default()
+        };
+
+        font.masters.push(Master::new(master_name, Uuid::new_v4().to_string(), location));
+    }
+
+    // Second pass: process other entries
     for entry in vfb.entries {
         match entry {
             VfbEntry::FlVersion(_) => {}               // => todo!(),
@@ -43,15 +82,8 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
             VfbEntry::FontName(s) => {
                 font.names.family_name = s.into();
             }
-            VfbEntry::MasterCount(masters) => {
-                // Make some more
-                for i in 1..masters {
-                    font.masters.push(Master::new(
-                        format!("Master {}", i + 1),
-                        Uuid::new_v4().to_string(),
-                        Location::default(),
-                    ));
-                }
+            VfbEntry::MasterCount(_) => {
+                // Already handled in first pass
             }
             VfbEntry::Version(v) => {
                 font.names.version = v.into();
@@ -128,9 +160,15 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
                         .insert(classname.into(), PossiblyAutomaticCode::new(contents));
                 }
             }
-            VfbEntry::AxisCount(_) => {}         // => todo!(),
-            VfbEntry::AxisName(_) => {}          // => todo!(),
-            VfbEntry::MasterName(_) => {}        // => todo!(),
+            VfbEntry::AxisCount(_) => {
+                // Already handled in first pass
+            }
+            VfbEntry::AxisName(_) => {
+                // Already handled in first pass
+            }
+            VfbEntry::MasterName(_) => {
+                // Already handled in first pass
+            }
             VfbEntry::DefaultCharacter(_) => {}  // => todo!(),
             VfbEntry::CustomDict(_) => {}        // => todo!(),
             VfbEntry::Mark(_) => {}              // => todo!(),

@@ -2830,8 +2830,6 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 [[package]]
 name = "vfb-macros"
 version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a8205cf27cfa516caf74fc529021db430b4690b23bbd0c5062e5cb400f796cbe"
 dependencies = [
  "error-stack",
  "proc-macro2",
@@ -2842,8 +2840,6 @@ dependencies = [
 [[package]]
 name = "vfbreader"
 version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32762d936cb3d7c732efc96c70ecf99b412656c17984f539251d608ee6f6b97c"
 dependencies = [
  "bitflags 2.13.2",
  "encoding_rs",
