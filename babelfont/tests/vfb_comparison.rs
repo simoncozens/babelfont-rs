@@ -425,3 +425,98 @@ fn test_vfb_master_axis_entries() {
         }
     }
 }
+
+/// Verify that VFB outline data is correctly preserved
+#[test]
+#[ignore]
+fn test_outline_data_integrity() {
+    for (vfb_path, golden_vfj_path) in get_vfb_test_files() {
+        if !vfb_path.exists() || !golden_vfj_path.exists() {
+            continue;
+        }
+
+        println!("\n========================================================");
+        println!("Outline integrity: {}", vfb_path.display());
+        println!("========================================================");
+
+        let font = match babelfont::load(&vfb_path) {
+            Ok(f) => f,
+            Err(e) => {
+                println!("Failed to load: {}", e);
+                continue;
+            }
+        };
+
+        let golden_data = match std::fs::read_to_string(&golden_vfj_path) {
+            Ok(d) => d,
+            Err(e) => {
+                println!("Failed to read golden: {}", e);
+                continue;
+            }
+        };
+
+        let golden_json: Value = match serde_json::from_str(&golden_data) {
+            Ok(j) => j,
+            Err(e) => {
+                println!("Failed to parse golden: {}", e);
+                continue;
+            }
+        };
+
+        if let Some(golden_glyphs) = golden_json["font"]["glyphs"].as_array() {
+            let mut matched = 0;
+            let mut total = 0;
+
+            for (glyph_idx, our_glyph) in font.glyphs.iter().enumerate().take(20) {
+                if glyph_idx >= golden_glyphs.len() {
+                    break;
+                }
+
+                let golden_glyph = &golden_glyphs[glyph_idx];
+
+                // Count our nodes across all layers
+                let mut our_nodes = 0;
+                for layer in &our_glyph.layers {
+                    for shape in &layer.shapes {
+                        if let babelfont::Shape::Path(path) = shape {
+                            our_nodes += path.nodes.len();
+                        }
+                    }
+                }
+
+                // Count golden nodes across all layers
+                let mut golden_nodes = 0;
+                if let Some(layers) = golden_glyph.get("layers").and_then(|l| l.as_array()) {
+                    for layer in layers {
+                        if let Some(elements) = layer.get("elements").and_then(|e| e.as_array()) {
+                            for elem in elements {
+                                if let Some(elem_data) = elem.get("elementData") {
+                                    if let Some(contours) = elem_data.get("contours").and_then(|c| c.as_array()) {
+                                        for contour in contours {
+                                            if let Some(nodes) = contour.get("nodes").and_then(|n| n.as_array()) {
+                                                golden_nodes += nodes.len();
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if our_nodes == golden_nodes {
+                    println!("  ✓ {}: {} nodes", our_glyph.name, our_nodes);
+                    matched += 1;
+                } else if our_nodes > 0 || golden_nodes > 0 {
+                    println!("  ✗ {}: our={}, golden={}", our_glyph.name, our_nodes, golden_nodes);
+                } else {
+                    println!("  · {}: 0 nodes", our_glyph.name);
+                    matched += 1;
+                }
+                total += 1;
+            }
+
+            println!("\nOutline integrity: {}/{} glyphs match", matched, total);
+        }
+    }
+}
