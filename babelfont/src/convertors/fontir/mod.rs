@@ -186,10 +186,6 @@ fn improve_ir_error(e: fontc::Error) -> BabelfontError {
 }
 
 impl Source for BabelfontIrSource {
-    fn new(_unused: &std::path::Path) -> Result<Self, Error> {
-        unimplemented!();
-    }
-
     fn create_static_metadata_work(&self) -> Result<Box<IrWork>, Error> {
         Ok(Box::new(static_metadata::StaticMetadataWork(self.clone())))
     }
@@ -291,10 +287,13 @@ impl Work<Context, WorkId, Error> for DummyWork {
             WorkId::Glyph(_glyph_name) => todo!(),
             WorkId::PreliminaryGlyphOrder => todo!(),
             WorkId::GlyphOrder => todo!(),
-            WorkId::Features => context.features.set(fontir::ir::FeaturesSource::Memory {
-                fea_content: String::new(),
-                include_dir: None,
-            }),
+            WorkId::Features => context.features.set(fontir::ir::FeatureSources::single(
+                fontir::ir::FeaturesSource::Memory {
+                    fea_content: String::new(),
+                    include_dir: None,
+                    path: None,
+                },
+            )),
             WorkId::KerningLocations => context.kerning_locations.set(KerningLocations::default()),
             WorkId::KernInstance(location) => context.kerning_at.set(fontir::ir::KerningInstance {
                 location: location.clone(),

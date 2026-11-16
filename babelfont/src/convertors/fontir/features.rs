@@ -3,7 +3,7 @@ use std::sync::Arc;
 use fontdrasil::orchestration::Work;
 use fontir::{
     error::Error,
-    ir::FeaturesSource,
+    ir::{FeatureSources, FeaturesSource},
     orchestration::{Context, WorkId},
 };
 
@@ -39,12 +39,13 @@ impl Work<Context, WorkId, Error> for FeatureWork {
 pub(crate) fn to_ir_features(
     features: &Option<String>,
     include_dir: Option<std::path::PathBuf>,
-) -> Result<FeaturesSource, Error> {
+) -> Result<FeatureSources, Error> {
     // Based on https://github.com/googlefonts/glyphsLib/blob/24b4d340e4c82948ba121dcfe563c1450a8e69c9/Lib/glyphsLib/builder/features.py#L74
     // TODO: token expansion
     // TODO: implement notes
-    Ok(FeaturesSource::Memory {
+    Ok(FeatureSources::single(FeaturesSource::Memory {
         fea_content: features.clone().unwrap_or_default(),
         include_dir,
-    })
+        path: None,
+    }))
 }

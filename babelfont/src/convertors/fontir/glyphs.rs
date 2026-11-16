@@ -337,10 +337,24 @@ fn to_ir_component(glyph_name: GlyphName, component: &Component) -> ir::Componen
         component.reference,
         component.transform
     );
+    // XXX TODO: normalize component location according to glyph's axes
+    /*
+    component
+            .location
+            .iter()
+            .flat_map(|(ax, value)| {
+                Tag::new_checked(ax.as_bytes()).map(|t|
+                (t,
+                 *value // Normalize value here
+                )))
+            .collect()
+    */
     ir::Component {
         base: component.reference.as_str().into(),
-        transform: component.transform.as_affine(),
+        transform: fontir::ir::ComponentTransform::Affine(component.transform.as_affine()),
         anchor: None,
+        location: Default::default(),
+        reset_unspecified_axes: false,
     }
 }
 

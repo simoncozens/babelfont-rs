@@ -285,3 +285,9 @@ impl From<std::io::Error> for BabelfontError {
         BabelfontError::IO(e.to_string()) // Can we do better?
     }
 }
+
+impl From<skrifa::raw::ReadError> for BabelfontError {
+    fn from(e: skrifa::raw::ReadError) -> Self {
+        BabelfontError::BinaryFontRead(e.to_string()) // Can we do better?
+    }
+}

@@ -36,6 +36,7 @@ fn make_glyph_categories(font: &Font) -> PreliminaryGdefCategories {
         categories,
         infer_from_anchors: false,
         mark_category_glyphs: Default::default(),
+        excluded: Default::default(),
     }
 }
 
@@ -76,7 +77,6 @@ fn names(font: &Font, flags: SelectionFlags) -> HashMap<NameKey, String> {
             .and_then(|f| f.name.get_default())
             .map(|f| f.as_str())
             .unwrap_or("Regular"),
-        true,
     );
     builder.add(NameId::FAMILY_NAME, family.clone());
 
