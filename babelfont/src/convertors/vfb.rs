@@ -6,11 +6,12 @@ use fontdrasil::{
 };
 use indexmap::IndexMap;
 use uuid::Uuid;
-use vfbreader::{read_vfb, GlyphEntry, Node as VFBNode, Vfb, VfbEntry};
+use vfbreader::{read_vfb, Anchor as VfbAnchor, GlyphEntry, Node as VFBNode, Vfb, VfbEntry};
 
 use crate::{
-    common::decomposition::DecomposedAffine, features::PossiblyAutomaticCode, Axis, BabelfontError,
-    Features, Font, FormatSpecific, Glyph, Layer, LayerType, Master, Node, NodeType, Path, Shape,
+    common::decomposition::DecomposedAffine, features::PossiblyAutomaticCode, Anchor, Axis,
+    BabelfontError, Features, Font, FormatSpecific, Glyph, Layer, LayerType, Master, Node,
+    NodeType, Path, Shape,
 };
 /// VFB convertor
 pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
@@ -69,7 +70,10 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
         font.masters.push(Master::new(master_name, Uuid::new_v4().to_string(), location));
     }
 
-    // Second pass: process other entries
+    // Second pass: collect anchor data - since anchors come after their glyph in VFB
+    let mut pending_anchors_mm: Option<Vec<Vec<VfbAnchor>>> = None;
+
+    // Third pass: process entries, applying anchors when we know the glyph
     for entry in vfb.entries {
         match entry {
             VfbEntry::FlVersion(_) => {}               // => todo!(),
@@ -253,7 +257,15 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
             VfbEntry::TrueTypeStemPpems1(_raw_data) => {}     // => todo!(),
             VfbEntry::TrueTypeZones(_raw_data) => {}          // => todo!(),
             VfbEntry::TrueTypeZoneDeltas(_raw_data) => {}     // => todo!(),
-            VfbEntry::Glyph(items) => load_glyph(&mut font, items)?,
+            VfbEntry::Glyph(items) => {
+                // Before processing new glyph, apply any pending anchors to the previous glyph
+                if let Some(glyph) = font.glyphs.last_mut() {
+                    if let Some(anchors_mm) = pending_anchors_mm.take() {
+                        apply_anchors_to_glyph(glyph, anchors_mm)?;
+                    }
+                }
+                load_glyph(&mut font, items)?;
+            }
             VfbEntry::Links(_links) => {}      // => todo!(),
             VfbEntry::Image(_raw_data) => {}   // => todo!(),
             VfbEntry::Bitmaps(_raw_data) => {} // => todo!(),
@@ -277,13 +289,22 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
                 }
             } // => todo!(),
             VfbEntry::GdefData(_raw_data) => {} // => todo!(),
-            VfbEntry::AnchorsProperties(_anchors_supplementals) => {} // => todo!(),
-            VfbEntry::AnchorsMm(_items) => {}   // => todo!(),
+            VfbEntry::AnchorsProperties(_anchors_supplementals) => {} // Skip for now
+            VfbEntry::AnchorsMm(items) => {
+                pending_anchors_mm = Some(items);
+            }
             VfbEntry::GuideProperties(_raw_data) => {} // => todo!(),
             VfbEntry::BlockFileDataStart(_) => {} // todo!(),
             VfbEntry::BlockFontStart(_) => {}   // todo!(),
             VfbEntry::BlockNamesStart(_) => {}  // todo!(),
             VfbEntry::BlockFontEnd(_) | VfbEntry::BlockFileDataEnd(_) => {}
+        }
+    }
+
+    // Apply any remaining anchors to the last glyph
+    if let Some(glyph) = font.glyphs.last_mut() {
+        if let Some(anchors_mm) = pending_anchors_mm {
+            apply_anchors_to_glyph(glyph, anchors_mm)?;
         }
     }
 
@@ -394,6 +415,26 @@ fn load_glyph(font: &mut Font, items: Vec<GlyphEntry>) -> Result<(), BabelfontEr
         }
     }
     font.glyphs.push(glyph);
+    Ok(())
+}
+
+/// Apply MM anchor data to a glyph's layers
+fn apply_anchors_to_glyph(
+    glyph: &mut Glyph,
+    anchors_per_master: Vec<Vec<VfbAnchor>>,
+) -> Result<(), BabelfontError> {
+    for (master_index, anchors) in anchors_per_master.iter().enumerate() {
+        if let Some(layer) = glyph.layers.get_mut(master_index) {
+            for anchor in anchors {
+                layer.anchors.push(Anchor {
+                    x: anchor.x as f64,
+                    y: anchor.y as f64,
+                    name: String::new(), // VFB doesn't store anchor names with coordinates
+                    format_specific: FormatSpecific::default(),
+                });
+            }
+        }
+    }
     Ok(())
 }
 
