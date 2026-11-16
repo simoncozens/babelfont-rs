@@ -275,10 +275,10 @@ fn load_glyph(font: &mut Font, items: Vec<GlyphEntry>) -> Result<(), BabelfontEr
     let mut glyph = Glyph::new("unnamed");
     glyph.exported = true;
     // Create a layer for each master
-    for i in 0..font.masters.len() {
+    for id in font.masters.iter().map(|x| &x.id) {
         let mut layer = Layer::new(0.0); // will fix up with metrics
-        layer.master = LayerType::DefaultForMaster(font.masters[i].id.clone());
-        layer.id = Some(font.masters[i].id.clone());
+        layer.master = LayerType::DefaultForMaster(id.clone());
+        layer.id = Some(id.clone());
         glyph.layers.push(layer);
     }
 
