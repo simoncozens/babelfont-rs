@@ -70,9 +70,11 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
         font.masters.push(Master::new(master_name, Uuid::new_v4().to_string(), location));
     }
 
-    // Second pass: collect anchor and guide data
+    // Second pass: collect anchor, guide, mask and image data
     let mut pending_anchors_mm: Option<Vec<Vec<VfbAnchor>>> = None;
     let mut pending_global_guides: Option<VfbGuides> = None;
+    let mut pending_mask: bool = false;
+    let mut pending_image: bool = false;
 
     // Third pass: process entries, applying anchors when we know the glyph
     for entry in vfb.entries {
@@ -261,21 +263,33 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
             VfbEntry::TrueTypeZones(_raw_data) => {}          // => todo!(),
             VfbEntry::TrueTypeZoneDeltas(_raw_data) => {}     // => todo!(),
             VfbEntry::Glyph(items) => {
-                // Before processing new glyph, apply any pending anchors to the previous glyph
+                // Before processing new glyph, apply any pending metadata to the previous glyph
                 if let Some(glyph) = font.glyphs.last_mut() {
                     if let Some(anchors_mm) = pending_anchors_mm.take() {
                         apply_anchors_to_glyph(glyph, anchors_mm)?;
+                    }
+                    if pending_mask {
+                        apply_mask_layer_to_glyph(glyph);
+                        pending_mask = false;
+                    }
+                    if pending_image {
+                        apply_image_layer_to_glyph(glyph);
+                        pending_image = false;
                     }
                 }
                 load_glyph(&mut font, items)?;
             }
             VfbEntry::Links(_links) => {}      // => todo!(),
-            VfbEntry::Image(_raw_data) => {}   // => todo!(),
+            VfbEntry::Image(_raw_data) => {
+                pending_image = true;
+            }
             VfbEntry::Bitmaps(_raw_data) => {} // => todo!(),
             VfbEntry::VSB(_raw_data) => {}     // => todo!(),
             VfbEntry::Sketch(_raw_data) => {}  // => todo!(),
             VfbEntry::HintingOptions(_post_script_glyph_hinting_options) => {} // => todo!(),
-            VfbEntry::Mask(_raw_data) => {}    // => todo!(),
+            VfbEntry::Mask(_raw_data) => {
+                pending_mask = true;
+            }
             VfbEntry::MaskMetrics(_raw_data) => {} // => todo!(),
             VfbEntry::MaskMetricsMm(_raw_data) => {} // => todo!(),
             VfbEntry::Origin(_) => {}          // => todo!(),
@@ -304,10 +318,16 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
         }
     }
 
-    // Apply any remaining anchors to the last glyph
+    // Apply any remaining anchors and layers to the last glyph
     if let Some(glyph) = font.glyphs.last_mut() {
         if let Some(anchors_mm) = pending_anchors_mm {
             apply_anchors_to_glyph(glyph, anchors_mm)?;
+        }
+        if pending_mask {
+            apply_mask_layer_to_glyph(glyph);
+        }
+        if pending_image {
+            apply_image_layer_to_glyph(glyph);
         }
     }
 
@@ -341,11 +361,17 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
 fn load_glyph(font: &mut Font, items: Vec<GlyphEntry>) -> Result<(), BabelfontError> {
     let mut glyph = Glyph::new("unnamed");
     glyph.exported = true;
-    // Create a layer for each master
-    for id in font.masters.iter().map(|x| &x.id) {
+    // Create a layer for each master, with master name as layer name
+    for master in &font.masters {
         let mut layer = Layer::new(0.0); // will fix up with metrics
-        layer.master = LayerType::DefaultForMaster(id.clone());
-        layer.id = Some(id.clone());
+        layer.master = LayerType::DefaultForMaster(master.id.clone());
+        layer.id = Some(master.id.clone());
+        // Set layer name to master name or master ID as fallback
+        if let Some(master_name) = master.name.get_default() {
+            layer.name = Some(master_name.clone());
+        } else {
+            layer.name = Some(master.id.clone());
+        }
         glyph.layers.push(layer);
     }
 
@@ -444,6 +470,28 @@ fn apply_anchors_to_glyph(
         }
     }
     Ok(())
+}
+
+/// Add a mask layer to a glyph (for FontLab mask support)
+fn apply_mask_layer_to_glyph(glyph: &mut Glyph) {
+    let mut mask_layer = Layer::new(0.0);
+    mask_layer.name = Some("mask".to_string());
+    mask_layer.master = LayerType::FreeFloating; // Not associated with any master
+    // Note: We don't have the actual mask outline data as it's stored as RawData in vfbreader
+    // This creates an empty mask layer for now. Full mask support would require parsing the binary format.
+    glyph.layers.insert(0, mask_layer); // Insert at the start so mask comes first
+}
+
+/// Add an image/background layer to a glyph (for FontLab image support)
+fn apply_image_layer_to_glyph(glyph: &mut Glyph) {
+    let mut image_layer = Layer::new(0.0);
+    image_layer.name = Some("img".to_string());
+    image_layer.master = LayerType::FreeFloating; // Not associated with any master
+    // Note: We don't have the actual image data as it's stored as RawData in vfbreader
+    // This creates an empty image layer for now. Full image support would require parsing the binary format.
+    if !glyph.layers.iter().any(|l| l.name.as_deref() == Some("img")) {
+        glyph.layers.insert(0, image_layer); // Insert at the start so img comes first
+    }
 }
 
 /// Apply global guides to font masters
