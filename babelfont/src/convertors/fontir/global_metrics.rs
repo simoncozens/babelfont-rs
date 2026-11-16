@@ -145,37 +145,23 @@ impl Work<Context, WorkId, Error> for GlobalMetricWork {
             set_metric!(UnderlineThickness, UnderlineThickness, 50.0);
             // -100.0 is the Glyphs default <https://github.com/googlefonts/glyphsLib/blob/9d5828d874110c42dfc5f542db8eb84f88641eb5/Lib/glyphsLib/builder/custom_params.py#L1136-L1156>
             set_metric!(UnderlinePosition, UnderlinePosition, -100.0);
-            // set_metric!(VheaCaretSlopeRise, VheaCaretSlopeRise);
-            // set_metric!(VheaCaretSlopeRun, VheaCaretSlopeRun);
-            // set_metric!(VheaCaretOffset, VheaCaretOffset);
-
-            // // https://github.com/googlefonts/glyphsLib/blob/c4db6b981d577f456d64ebe9993818770e170454/Lib/glyphsLib/builder/masters.py#L74-L92
-            // metrics.set(
-            //     GlobalMetric::VheaAscender,
-            //     pos.clone(),
-            //     master
-            //         .custom_parameters
-            //         .vhea_ascender
-            //         .or(font.custom_parameters.vhea_ascender)
-            //         .map(|v| v as f64)
-            //         .unwrap_or(font.upm as f64 / 2.0),
-            // );
-            // metrics.set(
-            //     GlobalMetric::VheaDescender,
-            //     pos.clone(),
-            //     master
-            //         .custom_parameters
-            //         .vhea_descender
-            //         .or(font.custom_parameters.vhea_descender)
-            //         .map(|v| v as f64)
-            //         .unwrap_or(-(font.upm as f64 / 2.0)),
-            // );
+            set_metric!(VheaCaretSlopeRise, VheaCaretSlopeRise);
+            set_metric!(VheaCaretSlopeRun, VheaCaretSlopeRun);
+            set_metric!(VheaCaretOffset, VheaCaretOffset);
+            // the compiler's defaults otherwise: half the em above and below
+            set_metric!(VheaAscender, VheaAscender);
+            set_metric!(VheaDescender, VheaDescender);
             metrics.set(
                 GlobalMetric::VheaLineGap,
                 pos.clone(),
                 master
                     .metrics
-                    .get(&MetricType::Custom("vheaLineGap".into()))
+                    .get(&MetricType::VheaLineGap)
+                    .or_else(|| {
+                        master
+                            .metrics
+                            .get(&MetricType::Custom("vheaLineGap".into()))
+                    })
                     .map(|v| *v as f64)
                     .unwrap_or(self.0.upm as f64),
             );

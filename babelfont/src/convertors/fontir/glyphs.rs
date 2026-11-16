@@ -265,19 +265,6 @@ fn process_layer(
     layer: &Layer,
     options: &CompilationOptions,
 ) -> Result<(NormalizedLocation, GlyphInstance), Error> {
-    // See https://github.com/googlefonts/glyphsLib/blob/c4db6b98/Lib/glyphsLib/builder/glyph.py#L359-L389
-    // let local_metrics = global_metrics.at(location);
-    // let height = instance
-    //     .vert_width
-    //     .unwrap_or_else(|| local_metrics.os2_typo_ascender - local_metrics.os2_typo_descender)
-    //     .into_inner();
-    // let vertical_origin = instance
-    //     .vert_origin
-    //     .map(|origin| local_metrics.os2_typo_ascender - origin)
-    //     .unwrap_or(local_metrics.os2_typo_ascender)
-    //     .into_inner();
-
-    // TODO populate width and height properly
     let (contours, components) = if options.skip_outlines {
         (vec![], vec![])
     } else {
@@ -293,10 +280,10 @@ fn process_layer(
     let glyph_instance = GlyphInstance {
         // XXX https://github.com/googlefonts/fontmake-rs/issues/285 glyphs non-spacing marks are 0-width
         width: layer.width.into(),
-        height: None,
-        vertical_origin: None,
-        // height: Some(height),
-        // vertical_origin: Some(vertical_origin),
+        // where a layer has none, the compiler falls back to the typo ascender
+        // and descender
+        height: layer.vertical_advance.map(f64::from),
+        vertical_origin: layer.vertical_origin.map(f64::from),
         contours,
         components,
     };

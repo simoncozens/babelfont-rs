@@ -202,6 +202,13 @@ export interface CustomOTValues {
    * A bit field; see OpenType spec for bit meanings
    */
   os2_code_page_range2?: number;
+  /** post table `isFixedPitch` field: whether the font is monospaced */
+  post_is_fixed_pitch?: boolean;
+  /**
+   * post table `italicAngle` field, in counter-clockwise degrees from the
+   * vertical (negative for a right lean), as precisely as the source states it
+   */
+  post_italic_angle?: number;
   /** CFF table BlueValues field */
   cff_blue_values?: number[];
   /** CFF table OtherBlues field */
@@ -542,7 +549,7 @@ export interface Font {
    */
   custom_ot_values?: CustomOTValues;
   /** A map of Unicode Variation Sequences to glyph names */
-  variation_sequences?: Record<string, string>;
+  variation_sequences?: Record<number, Record<number, string>>;
   /** A representation of the font's OpenType features */
   features: Features;
   /**
