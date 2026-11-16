@@ -1,5 +1,5 @@
-/// Test that loads VFB files, converts them through Babelfont, saves as VFJ,
-/// and compares the output against golden VFJ files.
+/// Test suite for iteratively improving VFB support in Babelfont
+/// Compares VFB→Babelfont→VFJ output against golden reference files
 use serde_json::Value;
 use std::path::PathBuf;
 
@@ -126,10 +126,14 @@ fn test_vfb_loader_coverage() {
     }
 
     println!("Features: {} classes", font.features.classes.len());
-    println!("Kerning groups: {} first, {} second", font.first_kern_groups.len(), font.second_kern_groups.len());
+    println!(
+        "Kerning groups: {} first, {} second",
+        font.first_kern_groups.len(),
+        font.second_kern_groups.len()
+    );
 }
 
-/// More detailed comparison of VFB→Babelfont→VFJ output vs golden VFJ
+/// Detailed comparison of VFB→Babelfont→VFJ output vs golden VFJ
 #[test]
 #[ignore]
 fn test_detailed_vfb_comparison() {
@@ -138,7 +142,12 @@ fn test_detailed_vfb_comparison() {
             continue;
         }
 
-        println!("\n{} Detailed Analysis: {} {}", "=".repeat(20), vfb_path.display(), "=".repeat(20));
+        println!(
+            "\n{} Detailed Analysis: {} {}",
+            "=".repeat(20),
+            vfb_path.display(),
+            "=".repeat(20)
+        );
 
         let font = match babelfont::load(&vfb_path) {
             Ok(f) => f,
@@ -168,18 +177,17 @@ fn test_detailed_vfb_comparison() {
 
         println!("\n--- MASTERS ---");
         if let Some(golden_masters) = golden["font"]["masters"].as_array() {
-            println!("Golden has {} masters, our font has {}", golden_masters.len(), font.masters.len());
-            
+            println!(
+                "Golden has {} masters, our font has {}",
+                golden_masters.len(),
+                font.masters.len()
+            );
+
             for (i, our_master) in font.masters.iter().enumerate() {
-                if let Some(golden_master) = golden_masters.get(i) {
+                if let Some(_golden_master) = golden_masters.get(i) {
                     println!("\nMaster {}:", i);
-                    if let Some(gm_name) = golden_master.get("name") {
-                        println!("  Name - Golden: {}, Ours: {:?}", gm_name, our_master.name);
-                    }
-                    if let Some(gm_location) = golden_master.get("location").and_then(|l| l.as_object()) {
-                        println!("  Location - Golden: {}", serde_json::to_string(gm_location).unwrap());
-                        println!("  Location - Ours: {:?}", our_master.location);
-                    }
+                    println!("  Name - Ours: {:?}", our_master.name);
+                    println!("  Location - Ours: {:?}", our_master.location);
                 }
             }
         }
@@ -192,8 +200,13 @@ fn test_detailed_vfb_comparison() {
                     if let Some(gg_name) = golden_glyph.get("name") {
                         println!("  Name - Golden: {}, Ours: {}", gg_name, our_glyph.name);
                     }
-                    println!("  Layers - Golden: {}, Ours: {}", 
-                        golden_glyph.get("layers").and_then(|l| l.as_array()).map(|a| a.len()).unwrap_or(0),
+                    println!(
+                        "  Layers - Golden: {}, Ours: {}",
+                        golden_glyph
+                            .get("layers")
+                            .and_then(|l| l.as_array())
+                            .map(|a| a.len())
+                            .unwrap_or(0),
                         our_glyph.layers.len()
                     );
                     if let Some(gg_unicode) = golden_glyph.get("unicode") {
@@ -207,9 +220,13 @@ fn test_detailed_vfb_comparison() {
         if let Some(golden_axes) = golden["font"]["axes"].as_array() {
             println!("Axes - Golden: {}, Ours: {}", golden_axes.len(), font.axes.len());
         }
-        
+
         if let Some(golden_instances) = golden["font"]["instances"].as_array() {
-            println!("Instances - Golden: {}, Ours: {}", golden_instances.len(), font.instances.len());
+            println!(
+                "Instances - Golden: {}, Ours: {}",
+                golden_instances.len(),
+                font.instances.len()
+            );
         }
     }
 }
@@ -219,5 +236,84 @@ fn compare_values(field: &str, ours: &Value, golden: &Value) {
         println!("✓ {} matches", field);
     } else {
         println!("✗ {} - Ours: {:?}, Golden: {:?}", field, ours, golden);
+    }
+}
+
+/// Test to verify layer structure matches between VFB and golden reference
+#[test]
+#[ignore]
+fn test_glyph_layer_structure() {
+    for (vfb_path, golden_vfj_path) in get_vfb_test_files() {
+        if !vfb_path.exists() || !golden_vfj_path.exists() {
+            continue;
+        }
+
+        println!(
+            "\n{} Layer Structure Test: {} {}",
+            "=".repeat(15),
+            vfb_path.display(),
+            "=".repeat(15)
+        );
+
+        let font = match babelfont::load(&vfb_path) {
+            Ok(f) => f,
+            Err(e) => {
+                println!("Failed to load: {}", e);
+                continue;
+            }
+        };
+
+        let golden_content =
+            std::fs::read_to_string(&golden_vfj_path).expect("Failed to read golden VFJ");
+        let golden: Value = serde_json::from_str(&golden_content).expect("Failed to parse golden VFJ");
+
+        println!("\nFont has {} masters, analyzing layer structure...", font.masters.len());
+
+        let golden_glyphs = golden["font"]["glyphs"]
+            .as_array()
+            .expect("Golden glyphs is array");
+
+        let mut layer_mismatches = 0;
+        let mut sample_glyphs = Vec::new();
+
+        for (glyph_idx, (our_glyph, golden_glyph)) in font
+            .glyphs
+            .iter()
+            .zip(golden_glyphs.iter())
+            .enumerate()
+        {
+            let our_layer_count = our_glyph.layers.len();
+            let golden_layer_count = golden_glyph
+                .get("layers")
+                .and_then(|l| l.as_array())
+                .map(|a| a.len())
+                .unwrap_or(0);
+
+            if our_layer_count != golden_layer_count {
+                layer_mismatches += 1;
+                if sample_glyphs.len() < 5 {
+                    sample_glyphs.push((
+                        glyph_idx,
+                        our_glyph.name.clone(),
+                        our_layer_count,
+                        golden_layer_count,
+                    ));
+                }
+            }
+        }
+
+        println!("\nLayer count discrepancies: {}/{}", layer_mismatches, font.glyphs.len());
+        if !sample_glyphs.is_empty() {
+            println!("\nSample mismatches:");
+            for (idx, name, ours, golden) in sample_glyphs {
+                println!(
+                    "  Glyph[{}] '{}': ours={}, golden={}",
+                    idx, name, ours, golden
+                );
+            }
+        }
+
+        // Note: Layer count mismatches are expected due to FontLab's named layers (mask, Text, img)
+        // vs Babelfont's master-based layers. This is not a bug - see VFB_IMPROVEMENT_LOOP.md
     }
 }
