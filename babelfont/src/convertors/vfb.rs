@@ -6,12 +6,12 @@ use fontdrasil::{
 };
 use indexmap::IndexMap;
 use uuid::Uuid;
-use vfbreader::{read_vfb, Anchor as VfbAnchor, GlyphEntry, Node as VFBNode, Vfb, VfbEntry};
+use vfbreader::{read_vfb, Anchor as VfbAnchor, GlyphEntry, Guides as VfbGuides, Node as VFBNode, Vfb, VfbEntry};
 
 use crate::{
     common::decomposition::DecomposedAffine, features::PossiblyAutomaticCode, Anchor, Axis,
-    BabelfontError, Features, Font, FormatSpecific, Glyph, Layer, LayerType, Master, Node,
-    NodeType, Path, Shape,
+    BabelfontError, Features, Font, FormatSpecific, Glyph, Guide, Layer, LayerType, Master,
+    Node, NodeType, Path, Shape,
 };
 /// VFB convertor
 pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
@@ -70,8 +70,9 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
         font.masters.push(Master::new(master_name, Uuid::new_v4().to_string(), location));
     }
 
-    // Second pass: collect anchor data - since anchors come after their glyph in VFB
+    // Second pass: collect anchor and guide data
     let mut pending_anchors_mm: Option<Vec<Vec<VfbAnchor>>> = None;
+    let mut pending_global_guides: Option<VfbGuides> = None;
 
     // Third pass: process entries, applying anchors when we know the glyph
     for entry in vfb.entries {
@@ -218,8 +219,10 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
             VfbEntry::PrimaryInstanceLocations(_items) => {}            // => todo!(),
             VfbEntry::PrimaryInstances(_raw_data) => {}                 // => todo!(),
             VfbEntry::BlockMMFontInfoEnd(_raw_data) => {}
-            VfbEntry::GlobalGuides(_guides) => {} // => todo!(),
-            VfbEntry::GlobalGuideProperties(_raw_data) => {} // => todo!(),
+            VfbEntry::GlobalGuides(guides) => {
+                pending_global_guides = Some(guides);
+            }
+            VfbEntry::GlobalGuideProperties(_raw_data) => {} // Skip properties for now,
             VfbEntry::GlobalMask(_raw_data) => {} // => todo!(),
             // VfbEntry::OpenTypeExportOptions(_raw_data) => {} // => todo!(),
             VfbEntry::ExportOptions(_export_options) => {} // => todo!(),
@@ -306,6 +309,11 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
         if let Some(anchors_mm) = pending_anchors_mm {
             apply_anchors_to_glyph(glyph, anchors_mm)?;
         }
+    }
+
+    // Apply global guides to masters
+    if let Some(guides) = pending_global_guides {
+        apply_global_guides_to_masters(&mut font, guides)?;
     }
 
     // Fix up component ID->name references
@@ -435,6 +443,55 @@ fn apply_anchors_to_glyph(
             }
         }
     }
+    Ok(())
+}
+
+/// Apply global guides to font masters
+fn apply_global_guides_to_masters(font: &mut Font, guides: VfbGuides) -> Result<(), BabelfontError> {
+    // VFB guides are organized as: Vec of guides, each with one entry per master
+    // We need to apply each guide entry to the corresponding master
+
+    for (master_index, master) in font.masters.iter_mut().enumerate() {
+        // Collect guides for this master from both horizontal and vertical guides
+        let mut guides_for_master = Vec::new();
+
+        // Add horizontal guides
+        for guide_set in guides.horizontal() {
+            if let Some(vfb_guide) = guide_set.get(master_index) {
+                let guide = Guide {
+                    pos: crate::common::Position {
+                        x: vfb_guide.position() as f32,
+                        y: 0.0,
+                        angle: vfb_guide.angle(),
+                    },
+                    name: Some("H-guide".to_string()),
+                    color: None,
+                    format_specific: FormatSpecific::default(),
+                };
+                guides_for_master.push(guide);
+            }
+        }
+
+        // Add vertical guides
+        for guide_set in guides.vertical() {
+            if let Some(vfb_guide) = guide_set.get(master_index) {
+                let guide = Guide {
+                    pos: crate::common::Position {
+                        x: vfb_guide.position() as f32,
+                        y: 0.0,
+                        angle: vfb_guide.angle(),
+                    },
+                    name: Some("V-guide".to_string()),
+                    color: None,
+                    format_specific: FormatSpecific::default(),
+                };
+                guides_for_master.push(guide);
+            }
+        }
+
+        master.guides.extend(guides_for_master);
+    }
+
     Ok(())
 }
 
