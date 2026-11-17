@@ -10,7 +10,9 @@
 //! the entry points.
 use babelfont::{
     Features, GlyphList, close_layout,
-    filters::{DropFeatures, FontFilter as _, ResolveIncludes, RetainGlyphs, SubsetVisitor},
+    filters::{
+        DropAxis, DropFeatures, FontFilter as _, ResolveIncludes, RetainGlyphs, SubsetVisitor,
+    },
 };
 use fea_rs_ast::{
     AsFea as _, LayoutVisitor as _,
@@ -140,6 +142,21 @@ pub fn fontmerge(
         ResolveIncludes::new(resolve_includes_path)
             .apply(&mut font2)
             .expect("Failed to resolve includes");
+    }
+
+    // Let's early on remove any axes from font2 that are not relevant to font1
+    let font1_axes: HashSet<_> = font1.axes.iter().map(|a| &a.tag).collect();
+    let to_drop = font2
+        .axes
+        .iter()
+        .filter(|a| !font1_axes.contains(&a.tag))
+        .map(|a| a.tag)
+        .collect::<Vec<_>>();
+    for axis in to_drop {
+        log::info!("Dropping irrelevant axis: {}", axis);
+        DropAxis::new(axis)
+            .apply(&mut font2)
+            .expect("Failed to drop irrelevant axis");
     }
 
     let final_glyphset = glyphset_filter.final_glyphset();
