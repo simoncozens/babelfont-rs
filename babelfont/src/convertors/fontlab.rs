@@ -255,12 +255,14 @@ impl From<FontlabPath> for Vec<Shape> {
 enum FontlabShape {
     ComponentShape { component: FontlabComponent },
     PathShape(FontlabPath),
+    ImageShape { image: serde_json::Value }
 }
 impl From<FontlabShape> for Vec<Shape> {
     fn from(val: FontlabShape) -> Self {
         match val {
             FontlabShape::ComponentShape { component } => vec![component.into()],
             FontlabShape::PathShape(p) => p.into(),
+            FontlabShape::ImageShape { image: _ } => vec![] // XXX
         }
     }
 }

@@ -6,12 +6,14 @@ use fontdrasil::{
 };
 use indexmap::IndexMap;
 use uuid::Uuid;
-use vfbreader::{read_vfb, Anchor as VfbAnchor, GlyphEntry, Guides as VfbGuides, Node as VFBNode, Vfb, VfbEntry};
+use vfbreader::{
+    read_vfb, Anchor as VfbAnchor, GlyphEntry, Guides as VfbGuides, Node as VFBNode, Vfb, VfbEntry,
+};
 
 use crate::{
     common::decomposition::DecomposedAffine, features::PossiblyAutomaticCode, Anchor, Axis,
-    BabelfontError, Features, Font, FormatSpecific, Glyph, Guide, Layer, LayerType, Master,
-    Node, NodeType, Path, Shape,
+    BabelfontError, Features, Font, FormatSpecific, Glyph, Guide, Layer, LayerType, Master, Node,
+    NodeType, Path, Shape,
 };
 /// VFB convertor
 pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
@@ -35,7 +37,7 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
 
     // Convert Vfb to Babelfont Font
     let mut font = Font::new();
-    
+
     // Set up axes - for now, only Weight axis if multi-master
     if axis_count > 0 && master_count > 1 {
         let mut wght = Axis::new("Weight", Tag::from_be_bytes(*b"wght"));
@@ -44,7 +46,7 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
         wght.default = Some(UserCoord::new(400.0));
         font.axes = vec![wght];
     }
-    
+
     // Create masters
     for i in 0..master_count {
         let master_name = if i < master_names.len() {
@@ -52,11 +54,15 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
         } else {
             format!("Master {}", i + 1)
         };
-        
+
         let location = if axis_count > 0 && master_count > 1 {
             // For multi-master, use weight values: 0 for first master, 1000 for last
             let weight_value = if master_count == 2 {
-                if i == 0 { 0.0 } else { 1000.0 }
+                if i == 0 {
+                    0.0
+                } else {
+                    1000.0
+                }
             } else {
                 (i as f64 / (master_count - 1) as f64) * 1000.0
             };
@@ -67,7 +73,11 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
             Location::default()
         };
 
-        font.masters.push(Master::new(master_name, Uuid::new_v4().to_string(), location));
+        font.masters.push(Master::new(
+            master_name,
+            Uuid::new_v4().to_string(),
+            location,
+        ));
     }
 
     // Second pass: collect anchor, guide, mask and image data
@@ -135,27 +145,27 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
             VfbEntry::Upm(u) => {
                 font.upm = u;
             }
-            VfbEntry::FondId(_) => {}              // => todo!(),
-            VfbEntry::BlueValuesNum(_) => {}       // => todo!(),
-            VfbEntry::OtherBluesNum(_) => {}       // => todo!(),
-            VfbEntry::FamilyBluesNum(_) => {}      // => todo!(),
+            VfbEntry::FondId(_id) => {} // This is a Mac FondId, *not* an OpenType vendor ID
+            VfbEntry::BlueValuesNum(_) => {} // => todo!(),
+            VfbEntry::OtherBluesNum(_) => {} // => todo!(),
+            VfbEntry::FamilyBluesNum(_) => {} // => todo!(),
             VfbEntry::FamilyOtherBluesNum(_) => {} // => todo!(),
-            VfbEntry::StemSnapHNum(_) => {}        // => todo!(),
-            VfbEntry::StemSnapVNum(_) => {}        // => todo!(),
-            VfbEntry::FontStyle(_) => {}           // => todo!(),
-            VfbEntry::PclId(_) => {}               // => todo!(),
-            VfbEntry::VpId(_) => {}                // => todo!(),
-            VfbEntry::MsId(_) => {}                // => todo!(),
-            VfbEntry::PclCharsSet(_) => {}         // => todo!(),
-            VfbEntry::HheaLineGap(_) => {}         // => todo!(),
-            VfbEntry::StemSnapLimit(_) => {}       // => todo!(),
-            VfbEntry::ZonePpm(_) => {}             // => todo!(),
-            VfbEntry::CodePpm(_) => {}             // => todo!(),
-            VfbEntry::DropoutPpm(_) => {}          // => todo!(),
-            VfbEntry::MeasurementLine(_) => {}     // => todo!(),
-            VfbEntry::ExportPcltTable(_) => {}     // => todo!(),
-            VfbEntry::Note(_) => {}                // => todo!(),
-            VfbEntry::CustomData(_) => {}          // => todo!(),
+            VfbEntry::StemSnapHNum(_) => {} // => todo!(),
+            VfbEntry::StemSnapVNum(_) => {} // => todo!(),
+            VfbEntry::FontStyle(_) => {} // => todo!(),
+            VfbEntry::PclId(_) => {}   // => todo!(),
+            VfbEntry::VpId(_) => {}    // => todo!(),
+            VfbEntry::MsId(_) => {}    // => todo!(),
+            VfbEntry::PclCharsSet(_) => {} // => todo!(),
+            VfbEntry::HheaLineGap(_) => {} // => todo!(),
+            VfbEntry::StemSnapLimit(_) => {} // => todo!(),
+            VfbEntry::ZonePpm(_) => {} // => todo!(),
+            VfbEntry::CodePpm(_) => {} // => todo!(),
+            VfbEntry::DropoutPpm(_) => {} // => todo!(),
+            VfbEntry::MeasurementLine(_) => {} // => todo!(),
+            VfbEntry::ExportPcltTable(_) => {} // => todo!(),
+            VfbEntry::Note(_) => {}    // => todo!(),
+            VfbEntry::CustomData(_) => {} // => todo!(),
             VfbEntry::OpenTypeClass(s) => {
                 let splits = s.splitn(2, ":").collect::<Vec<_>>();
                 if splits.len() == 2 {
@@ -225,7 +235,7 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
                 pending_global_guides = Some(guides);
             }
             VfbEntry::GlobalGuideProperties(_raw_data) => {} // Skip properties for now,
-            VfbEntry::GlobalMask(_raw_data) => {} // => todo!(),
+            VfbEntry::GlobalMask(_raw_data) => {}            // => todo!(),
             // VfbEntry::OpenTypeExportOptions(_raw_data) => {} // => todo!(),
             VfbEntry::ExportOptions(_export_options) => {} // => todo!(),
             VfbEntry::MappingMode(_raw_data) => {}         // => todo!(),
@@ -279,7 +289,7 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
                 }
                 load_glyph(&mut font, items)?;
             }
-            VfbEntry::Links(_links) => {}      // => todo!(),
+            VfbEntry::Links(_links) => {} // => todo!(),
             VfbEntry::Image(_raw_data) => {
                 pending_image = true;
             }
@@ -292,7 +302,7 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
             }
             VfbEntry::MaskMetrics(_raw_data) => {} // => todo!(),
             VfbEntry::MaskMetricsMm(_raw_data) => {} // => todo!(),
-            VfbEntry::Origin(_) => {}          // => todo!(),
+            VfbEntry::Origin(_) => {}              // => todo!(),
             VfbEntry::Unicodes(codepoints) => {
                 // Set codepoints for last glyph
                 if let Some(glyph) = font.glyphs.last_mut() {
@@ -311,9 +321,9 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
                 pending_anchors_mm = Some(items);
             }
             VfbEntry::GuideProperties(_raw_data) => {} // => todo!(),
-            VfbEntry::BlockFileDataStart(_) => {} // todo!(),
-            VfbEntry::BlockFontStart(_) => {}   // todo!(),
-            VfbEntry::BlockNamesStart(_) => {}  // todo!(),
+            VfbEntry::BlockFileDataStart(_) => {}      // todo!(),
+            VfbEntry::BlockFontStart(_) => {}          // todo!(),
+            VfbEntry::BlockNamesStart(_) => {}         // todo!(),
             VfbEntry::BlockFontEnd(_) | VfbEntry::BlockFileDataEnd(_) => {}
         }
     }
@@ -387,15 +397,19 @@ fn load_glyph(font: &mut Font, items: Vec<GlyphEntry>) -> Result<(), BabelfontEr
                     }
                 }
             }
-            GlyphEntry::Hints(_hints) => {}   // => todo!(),
+            GlyphEntry::Hints(_hints) => {} // => todo!(),
             GlyphEntry::Guides(guides) => {
                 // Apply glyph-level guides to their corresponding master layers
                 // VFB guides are stored as one guide per master per guide position
                 // Skip mask and image layers (these come first if they exist)
-                let master_layer_start = glyph.layers.iter().position(|l| {
-                    l.name.as_deref() != Some("mask") && l.name.as_deref() != Some("img")
-                }).unwrap_or(0);
-                
+                let master_layer_start = glyph
+                    .layers
+                    .iter()
+                    .position(|l| {
+                        l.name.as_deref() != Some("mask") && l.name.as_deref() != Some("img")
+                    })
+                    .unwrap_or(0);
+
                 // Apply horizontal guides
                 // Each guide_set contains one guide per master for that position
                 for guide_set in guides.horizontal() {
@@ -416,7 +430,7 @@ fn load_glyph(font: &mut Font, items: Vec<GlyphEntry>) -> Result<(), BabelfontEr
                         }
                     }
                 }
-                
+
                 // Apply vertical guides
                 for guide_set in guides.vertical() {
                     for (master_index, vfb_guide) in guide_set.iter().enumerate() {
@@ -524,9 +538,10 @@ fn apply_anchors_to_glyph(
 fn apply_mask_layer_to_glyph(glyph: &mut Glyph) {
     let mut mask_layer = Layer::new(0.0);
     mask_layer.name = Some("mask".to_string());
+    mask_layer.id = Some("mask".to_string());
     mask_layer.master = LayerType::FreeFloating; // Not associated with any master
-    // Note: We don't have the actual mask outline data as it's stored as RawData in vfbreader
-    // This creates an empty mask layer for now. Full mask support would require parsing the binary format.
+                                                 // Note: We don't have the actual mask outline data as it's stored as RawData in vfbreader
+                                                 // This creates an empty mask layer for now. Full mask support would require parsing the binary format.
     glyph.layers.insert(0, mask_layer); // Insert at the start so mask comes first
 }
 
@@ -534,16 +549,24 @@ fn apply_mask_layer_to_glyph(glyph: &mut Glyph) {
 fn apply_image_layer_to_glyph(glyph: &mut Glyph) {
     let mut image_layer = Layer::new(0.0);
     image_layer.name = Some("img".to_string());
+    image_layer.id = Some("img".to_string());
     image_layer.master = LayerType::FreeFloating; // Not associated with any master
-    // Note: We don't have the actual image data as it's stored as RawData in vfbreader
-    // This creates an empty image layer for now. Full image support would require parsing the binary format.
-    if !glyph.layers.iter().any(|l| l.name.as_deref() == Some("img")) {
+                                                  // Note: We don't have the actual image data as it's stored as RawData in vfbreader
+                                                  // This creates an empty image layer for now. Full image support would require parsing the binary format.
+    if !glyph
+        .layers
+        .iter()
+        .any(|l| l.name.as_deref() == Some("img"))
+    {
         glyph.layers.insert(0, image_layer); // Insert at the start so img comes first
     }
 }
 
 /// Apply global guides to font masters
-fn apply_global_guides_to_masters(font: &mut Font, guides: VfbGuides) -> Result<(), BabelfontError> {
+fn apply_global_guides_to_masters(
+    font: &mut Font,
+    guides: VfbGuides,
+) -> Result<(), BabelfontError> {
     // VFB guides are organized as: Vec of guides, each with one entry per master
     // We need to apply each guide entry to the corresponding master
 

@@ -115,7 +115,11 @@ fn test_vfb_loader_coverage() {
 
         println!("Glyphs: {}", font.glyphs.len());
         if let Some(first_glyph) = font.glyphs.get_by_index(0) {
-            println!("  First glyph: {} ({} layers)", first_glyph.name, first_glyph.layers.len());
+            println!(
+                "  First glyph: {} ({} layers)",
+                first_glyph.name,
+                first_glyph.layers.len()
+            );
             for (i, layer) in first_glyph.layers.iter().enumerate() {
                 println!("    Layer {}: {} shapes", i, layer.shapes.len());
             }
@@ -161,15 +165,12 @@ fn test_detailed_vfb_comparison() {
 
         let golden_content =
             std::fs::read_to_string(&golden_vfj_path).expect("Failed to read golden VFJ");
-        let golden: Value = serde_json::from_str(&golden_content).expect("Failed to parse golden VFJ");
+        let golden: Value =
+            serde_json::from_str(&golden_content).expect("Failed to parse golden VFJ");
 
         // Detailed comparison
         println!("\n--- FONT-LEVEL PROPERTIES ---");
-        compare_values(
-            "upm",
-            &serde_json::json!(font.upm),
-            &golden["font"]["upm"],
-        );
+        compare_values("upm", &serde_json::json!(font.upm), &golden["font"]["upm"]);
 
         compare_values(
             "version",
@@ -212,7 +213,10 @@ fn test_detailed_vfb_comparison() {
                         our_glyph.layers.len()
                     );
                     if let Some(gg_unicode) = golden_glyph.get("unicode") {
-                        println!("  Unicode - Golden: {}, Ours: {:?}", gg_unicode, our_glyph.codepoints);
+                        println!(
+                            "  Unicode - Golden: {}, Ours: {:?}",
+                            gg_unicode, our_glyph.codepoints
+                        );
                     }
                 }
             }
@@ -220,7 +224,11 @@ fn test_detailed_vfb_comparison() {
 
         println!("\n--- STRUCTURE CHECK ---");
         if let Some(golden_axes) = golden["font"]["axes"].as_array() {
-            println!("Axes - Golden: {}, Ours: {}", golden_axes.len(), font.axes.len());
+            println!(
+                "Axes - Golden: {}, Ours: {}",
+                golden_axes.len(),
+                font.axes.len()
+            );
         }
 
         if let Some(golden_instances) = golden["font"]["instances"].as_array() {
@@ -267,9 +275,13 @@ fn test_glyph_layer_structure() {
 
         let golden_content =
             std::fs::read_to_string(&golden_vfj_path).expect("Failed to read golden VFJ");
-        let golden: Value = serde_json::from_str(&golden_content).expect("Failed to parse golden VFJ");
+        let golden: Value =
+            serde_json::from_str(&golden_content).expect("Failed to parse golden VFJ");
 
-        println!("\nFont has {} masters, analyzing layer structure...", font.masters.len());
+        println!(
+            "\nFont has {} masters, analyzing layer structure...",
+            font.masters.len()
+        );
 
         let golden_glyphs = golden["font"]["glyphs"]
             .as_array()
@@ -278,11 +290,8 @@ fn test_glyph_layer_structure() {
         let mut layer_mismatches = 0;
         let mut sample_glyphs = Vec::new();
 
-        for (glyph_idx, (our_glyph, golden_glyph)) in font
-            .glyphs
-            .iter()
-            .zip(golden_glyphs.iter())
-            .enumerate()
+        for (glyph_idx, (our_glyph, golden_glyph)) in
+            font.glyphs.iter().zip(golden_glyphs.iter()).enumerate()
         {
             let our_layer_count = our_glyph.layers.len();
             let golden_layer_count = golden_glyph
@@ -304,7 +313,11 @@ fn test_glyph_layer_structure() {
             }
         }
 
-        println!("\nLayer count discrepancies: {}/{}", layer_mismatches, font.glyphs.len());
+        println!(
+            "\nLayer count discrepancies: {}/{}",
+            layer_mismatches,
+            font.glyphs.len()
+        );
         if !sample_glyphs.is_empty() {
             println!("\nSample mismatches:");
             for (idx, name, ours, golden) in sample_glyphs {
@@ -398,21 +411,39 @@ fn test_vfb_master_axis_entries() {
         if let Ok(golden_data) = std::fs::read_to_string(&golden_vfj_path) {
             if let Ok(json) = serde_json::from_str::<Value>(&golden_data) {
                 if let Some(font) = json.get("font") {
-                    let golden_axes = font.get("axes").and_then(|a| a.as_array()).map(|a| a.len()).unwrap_or(0);
-                    let golden_masters = font.get("masters").and_then(|m| m.as_array()).map(|m| m.len()).unwrap_or(0);
-                    
+                    let golden_axes = font
+                        .get("axes")
+                        .and_then(|a| a.as_array())
+                        .map(|a| a.len())
+                        .unwrap_or(0);
+                    let golden_masters = font
+                        .get("masters")
+                        .and_then(|m| m.as_array())
+                        .map(|m| m.len())
+                        .unwrap_or(0);
+
                     println!("  Golden axes: {}", golden_axes);
                     if golden_axes > 0 {
-                        for (i, axis) in font["axes"].as_array().unwrap_or(&vec![]).iter().enumerate() {
+                        for (i, axis) in font["axes"]
+                            .as_array()
+                            .unwrap_or(&vec![])
+                            .iter()
+                            .enumerate()
+                        {
                             if let Some(name) = axis.get("name") {
                                 println!("    [{}] {}", i, name);
                             }
                         }
                     }
-                    
+
                     println!("  Golden masters: {}", golden_masters);
                     if golden_masters > 0 {
-                        for (i, master) in font["masters"].as_array().unwrap_or(&vec![]).iter().enumerate() {
+                        for (i, master) in font["masters"]
+                            .as_array()
+                            .unwrap_or(&vec![])
+                            .iter()
+                            .enumerate()
+                        {
                             if let Some(fm) = master.get("fontMaster") {
                                 if let Some(name) = fm.get("name") {
                                     println!("    [{}] {}", i, name);
@@ -491,9 +522,13 @@ fn test_outline_data_integrity() {
                         if let Some(elements) = layer.get("elements").and_then(|e| e.as_array()) {
                             for elem in elements {
                                 if let Some(elem_data) = elem.get("elementData") {
-                                    if let Some(contours) = elem_data.get("contours").and_then(|c| c.as_array()) {
+                                    if let Some(contours) =
+                                        elem_data.get("contours").and_then(|c| c.as_array())
+                                    {
                                         for contour in contours {
-                                            if let Some(nodes) = contour.get("nodes").and_then(|n| n.as_array()) {
+                                            if let Some(nodes) =
+                                                contour.get("nodes").and_then(|n| n.as_array())
+                                            {
                                                 golden_nodes += nodes.len();
                                             }
                                         }
@@ -508,7 +543,10 @@ fn test_outline_data_integrity() {
                     println!("  ✓ {}: {} nodes", our_glyph.name, our_nodes);
                     matched += 1;
                 } else if our_nodes > 0 || golden_nodes > 0 {
-                    println!("  ✗ {}: our={}, golden={}", our_glyph.name, our_nodes, golden_nodes);
+                    println!(
+                        "  ✗ {}: our={}, golden={}",
+                        our_glyph.name, our_nodes, golden_nodes
+                    );
                 } else {
                     println!("  · {}: 0 nodes", our_glyph.name);
                     matched += 1;
@@ -519,4 +557,124 @@ fn test_outline_data_integrity() {
             println!("\nOutline integrity: {}/{} glyphs match", matched, total);
         }
     }
+}
+
+/// Load VFB, save as VFJ, and compare *all* structures
+#[test]
+#[ignore] // Run with `cargo test -- --ignored` to execute
+fn test_vfb_to_vfj_structural_diff() {
+    let mut passed = true;
+    for (vfb_path, golden_vfj_path) in get_vfb_test_files() {
+        if !vfb_path.exists() {
+            println!("Skipping {} - file not found", vfb_path.display());
+            continue;
+        }
+
+        println!("\n=== Testing {} ===", vfb_path.display());
+
+        // Load VFB into Babelfont
+        let font = match babelfont::load(&vfb_path) {
+            Ok(f) => f,
+            Err(e) => {
+                panic!("⚠ Failed to load VFB: {}", e);
+            }
+        };
+
+        // Serialize to JSON value with detailed error path
+        let font_json: serde_json::Value = match serde_json::to_value(&font) {
+            Ok(json) => json,
+            Err(e) => {
+                eprintln!("❌ Failed to serialize VFB font to JSON: {}", e);
+                eprintln!("Error details: {}", e.to_string());
+                // Try to get more details by serializing to string
+                match serde_json::to_string_pretty(&font) {
+                    Ok(_) => eprintln!("✓ String serialization worked"),
+                    Err(e2) => eprintln!("❌ String serialization also failed: {}", e2),
+                }
+                panic!("⚠ Failed to serialize VFB font: {}", e);
+            }
+        };
+
+        // Load golden VFJ as Babelfont
+        let golden_font = match babelfont::load(&golden_vfj_path) {
+            Ok(f) => f,
+            Err(e) => {
+                eprintln!("⚠ Failed to load golden VFJ: {}", e);
+                passed = false;
+                continue;
+            }
+        };
+        let golden_vfj_json: serde_json::Value = match serde_json::to_value(&golden_font) {
+            Ok(json) => json,
+            Err(e) => {
+                eprintln!("⚠ Failed to serialize golden font to JSON: {}", e);
+                passed = false;
+                continue;
+            }
+        };
+        // Compare the two JSON structures
+        if !structural_diff(&golden_vfj_json, &font_json, vec![]).0 {
+            passed = false;
+        }
+    }
+    assert!(passed, "Some VFB to VFJ structural comparisons failed");
+}
+
+fn structural_diff(
+    value_a: &serde_json::Value,
+    value_b: &serde_json::Value,
+    stack: Vec<String>,
+) -> (bool, Vec<String>) {
+    match (value_a, value_b) {
+        (serde_json::Value::Object(map_a), serde_json::Value::Object(map_b)) => {
+            for (key, val_a) in map_a {
+                if key == "date" {
+                    continue; // Generated dates will reliably differ
+                }
+                if let Some(val_b) = map_b.get(key) {
+                    let new_stack = {
+                        let mut s = stack.clone();
+                        s.push(key.to_string());
+                        s
+                    };
+                    let (res, new_stack) = structural_diff(val_a, val_b, new_stack);
+                    if !res {
+                        return (false, new_stack);
+                    }
+                } else {
+                    println!("Key {} missing in second JSON at {:?}", key, stack);
+                    return (false, stack);
+                }
+            }
+        }
+        (serde_json::Value::Array(arr_a), serde_json::Value::Array(arr_b)) => {
+            if arr_a.len() != arr_b.len() {
+                println!(
+                    "Array length mismatch: {} vs {} at {:?}",
+                    arr_a.len(),
+                    arr_b.len(),
+                    stack
+                );
+                return (false, stack);
+            } else {
+                for (i, (val_a, val_b)) in arr_a.iter().zip(arr_b.iter()).enumerate() {
+                    let mut newstack = stack.clone();
+                    newstack.push(i.to_string());
+                    if !structural_diff(val_a, val_b, newstack.clone()).0 {
+                        return (false, newstack);
+                    }
+                }
+            }
+        }
+        _ => {
+            if value_a != value_b {
+                println!(
+                    "Value mismatch: {:?} vs {:?} at {:?}",
+                    value_a, value_b, stack
+                );
+                return (false, stack);
+            }
+        }
+    }
+    (true, stack)
 }

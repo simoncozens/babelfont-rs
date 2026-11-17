@@ -112,6 +112,7 @@ pretty_assertions = "1.4.1"
 rstest = "0.26.1"
 similar = "2.7.0"
 tempfile = "3.27.0"
+serde_json_path_to_error = "0.1.5"
 
 [build-dependencies]
 roxmltree = "0.21.0"
