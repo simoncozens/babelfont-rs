@@ -701,7 +701,8 @@ pub fn load_str(contents: &str) -> Result<Font, BabelfontError> {
             .push(master.fontMaster.into(&axes_short_name_to_tag));
     }
     if let Some(default_master) = fontlab.defaultMaster.and_then(|name| font.master(&name)) {
-        let new_loc = default_master.location.to_user(&Axes::new(vec![]))?; // XXX Mapping
+        let axes: Result<Vec<fontdrasil::types::Axis>, _> = font.axes.iter().map(|a| a.try_into()).collect();
+        let new_loc = default_master.location.to_user(&Axes::from(axes?))?;
         for axis in font.axes.iter_mut() {
             if let Some(val) = new_loc.get(axis.tag) {
                 axis.default = Some(val);
