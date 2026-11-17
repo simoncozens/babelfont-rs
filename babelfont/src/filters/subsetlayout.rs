@@ -441,6 +441,16 @@ impl<'a> SubsetVisitor<'a> {
         if !self.filter_container(&mut statement.ligatures) {
             return Some(DELETION_COMMENT.clone());
         }
+        // Each ligature component has its own list of mark classes. A component
+        // which loses all of them is emitted as a null anchor, which keeps the
+        // remaining components' positioning intact; once every component is empty
+        // there is nothing left for the rule to do.
+        for marks in statement.marks.iter_mut() {
+            marks.retain(|(_, mark_class)| !self.dropped_mark_classes.contains(&mark_class.name));
+        }
+        if statement.marks.iter().all(|marks| marks.is_empty()) {
+            return Some(DELETION_COMMENT.clone());
+        }
         None
     }
     fn subset_mark_mark_pos(
@@ -448,6 +458,14 @@ impl<'a> SubsetVisitor<'a> {
         statement: &mut fea_rs_ast::MarkMarkPosStatement,
     ) -> Option<Statement> {
         if !self.filter_container(&mut statement.base_marks) {
+            return Some(DELETION_COMMENT.clone());
+        }
+        // As for mark-to-base: drop the pairs whose mark class has emptied, and the
+        // rule with them if none are left.
+        statement
+            .marks
+            .retain(|(_, mark_class)| !self.dropped_mark_classes.contains(&mark_class.name));
+        if statement.marks.is_empty() {
             return Some(DELETION_COMMENT.clone());
         }
         None
@@ -622,21 +640,26 @@ impl<'a> SubsetVisitor<'a> {
     ) -> Option<Statement> {
         let empty_class =
             GlyphContainer::GlyphClass(GlyphClass::new(vec![], lookupflag.location.clone()));
-        for container in [
+        for slot in [
             &mut lookupflag.mark_attachment,
             &mut lookupflag.mark_filtering_set,
-        ]
-        .into_iter()
-        .flatten()
-        {
+        ] {
+            let Some(container) = slot else { continue };
             match container {
                 GlyphContainer::GlyphClass(_) => {
                     self.filter_container(container);
                 }
-                GlyphContainer::GlyphClassName(name)
-                    if self.empty_classes.contains(name.as_str()) =>
-                {
-                    *container = empty_class.clone();
+                GlyphContainer::GlyphClassName(name) => {
+                    if self
+                        .dropped_mark_classes
+                        .contains(name.strip_prefix('@').unwrap_or(name.as_str()))
+                    {
+                        // The mark class it names has gone; keeping the clause would
+                        // leave the lookupflag referring to an undefined mark class.
+                        *slot = None;
+                    } else if self.empty_classes.contains(name.as_str()) {
+                        *container = empty_class.clone();
+                    }
                 }
                 _ => {}
             }
@@ -1316,6 +1339,112 @@ sub [heh-ar.isol heh-ar.fina]' hamzaabove-ar by [heh-ar.isol.1 heh-ar.fina.1];
         assert!(
             !fea.contains("markClass"),
             "the emptied mark class definition must go:\n{fea}"
+        );
+    }
+
+    #[test]
+    fn test_drop_mark_class_from_mark_mark_pos() {
+        // Mark-to-mark rules attach marks to *marks*; they reference a mark class
+        // just like mark-to-base does, and must be dropped when it empties.
+        let mut font = dummy_font_with_glyphs(vec!["acutecomb", "dieresiscomb"]);
+        font.features = Features::from_fea(
+            "markClass [acutecomb] <anchor 100 200> @MC_above;\n\
+             feature mark {\n\
+             lookup MARK_MARK_above {\n\
+             pos mark [dieresiscomb] <anchor 0 200> mark @MC_above;\n\
+             } MARK_MARK_above;\n\
+             } mark;\n",
+        );
+        SubsetLayout::new(vec!["dieresiscomb"])
+            .apply(&mut font)
+            .expect("Feature subsetting failed");
+        let fea = font.features.to_fea();
+        assert!(
+            !fea.contains("pos mark"),
+            "the rule's mark class emptied, so the rule must go:\n{fea}"
+        );
+        assert!(
+            !fea.contains("markClass"),
+            "the emptied mark class definition must go:\n{fea}"
+        );
+    }
+
+    #[test]
+    fn test_drop_mark_class_from_mark_lig_pos() {
+        // Mark-to-ligature rules carry one mark list per ligature component. A
+        // component whose mark class emptied keeps its place as a null anchor, so
+        // that the other components' positioning survives.
+        let mut font = dummy_font_with_glyphs(vec!["acutecomb", "dotbelowcomb", "f_i"]);
+        font.features = Features::from_fea(
+            "markClass [acutecomb] <anchor 100 200> @MC_above;\n\
+             markClass [dotbelowcomb] <anchor 100 -200> @MC_below;\n\
+             feature mark {\n\
+             pos ligature f_i <anchor 0 200> mark @MC_above\n\
+             ligComponent <anchor 0 -200> mark @MC_below;\n\
+             } mark;\n",
+        );
+        SubsetLayout::new(vec!["dotbelowcomb", "f_i"])
+            .apply(&mut font)
+            .expect("Feature subsetting failed");
+        let fea = font.features.to_fea();
+        assert!(
+            !fea.contains("@MC_above"),
+            "the emptied mark class must not be referenced:\n{fea}"
+        );
+        assert!(
+            !fea.contains("markClass [acutecomb]"),
+            "the emptied mark class definition must go:\n{fea}"
+        );
+        assert!(
+            fea.contains("mark @MC_below"),
+            "the surviving component's rule must stay:\n{fea}"
+        );
+
+        // With every class emptied there is nothing left to position at all.
+        let mut font = dummy_font_with_glyphs(vec!["acutecomb", "dotbelowcomb", "f_i"]);
+        font.features = Features::from_fea(
+            "markClass [acutecomb] <anchor 100 200> @MC_above;\n\
+             markClass [dotbelowcomb] <anchor 100 -200> @MC_below;\n\
+             feature mark {\n\
+             pos ligature f_i <anchor 0 200> mark @MC_above\n\
+             ligComponent <anchor 0 -200> mark @MC_below;\n\
+             } mark;\n",
+        );
+        SubsetLayout::new(vec!["f_i"])
+            .apply(&mut font)
+            .expect("Feature subsetting failed");
+        let fea = font.features.to_fea();
+        assert!(
+            !fea.contains("pos ligature"),
+            "a rule with no marks left must go:\n{fea}"
+        );
+    }
+
+    #[test]
+    fn test_drop_mark_class_from_lookupflag() {
+        // `lookupflag MarkAttachmentType @MC` names a mark class too; keeping the
+        // flag once the class is gone would be an undefined reference.
+        let mut font = dummy_font_with_glyphs(vec!["acutecomb", "dieresiscomb"]);
+        font.features = Features::from_fea(
+            "markClass [acutecomb] <anchor 100 200> @MC_above;\n\
+             feature kern {\n\
+             lookup USE_MC {\n\
+             lookupflag MarkAttachmentType @MC_above;\n\
+             pos [dieresiscomb] -50;\n\
+             } USE_MC;\n\
+             } kern;\n",
+        );
+        SubsetLayout::new(vec!["dieresiscomb"])
+            .apply(&mut font)
+            .expect("Feature subsetting failed");
+        let fea = font.features.to_fea();
+        assert!(
+            !fea.contains("@MC_above"),
+            "the emptied mark class must not be referenced by a lookupflag:\n{fea}"
+        );
+        assert!(
+            fea.contains("pos [dieresiscomb] -50") || fea.contains("pos dieresiscomb -50"),
+            "the lookup's rule should survive:\n{fea}"
         );
     }
 
