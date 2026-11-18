@@ -37,7 +37,6 @@ fontdrasil = { workspace = true }
 regex = { workspace = true }
 itertools = "0.14.0"
 indicatif = { version = "0.18.2", optional = true }
-log-once = "0.4.1"
 uuid = "1.18.1"
 fea-rs-ast = { workspace = true }
 

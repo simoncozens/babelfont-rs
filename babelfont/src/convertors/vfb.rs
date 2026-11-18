@@ -96,23 +96,19 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
                     })
                     .collect();
             }
-            VfbEntry::MasterLocation(raw) => {
-                if raw.0.len() >= 36 {
-                    let index =
-                        u32::from_le_bytes(raw.0[0..4].try_into().unwrap_or([0; 4])) as usize;
-                    let mut location = [0.0f64; 4];
-                    for (axis, coord) in location.iter_mut().enumerate() {
-                        let start = 4 + axis * 8;
-                        *coord = f64::from_le_bytes(
-                            raw.0[start..start + 8].try_into().unwrap_or([0; 8]),
-                        );
+            VfbEntry::MasterLocation(raw) if raw.0.len() >= 36 => {
+                let index = u32::from_le_bytes(raw.0[0..4].try_into().unwrap_or([0; 4])) as usize;
+                let mut location = [0.0f64; 4];
+                for (axis, coord) in location.iter_mut().enumerate() {
+                    let start = 4 + axis * 8;
+                    *coord =
+                        f64::from_le_bytes(raw.0[start..start + 8].try_into().unwrap_or([0; 8]));
+                }
+                if index > 0 {
+                    if master_locations.len() < index {
+                        master_locations.resize(index, [0.0; 4]);
                     }
-                    if index > 0 {
-                        if master_locations.len() < index {
-                            master_locations.resize(index, [0.0; 4]);
-                        }
-                        master_locations[index - 1] = location;
-                    }
+                    master_locations[index - 1] = location;
                 }
             }
             _ => {}
@@ -139,7 +135,7 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
             map.push((UserCoord::new(*user), DesignCoord::new(design * 1000.0)));
         }
         if !map.is_empty() {
-            map.sort_by(|a, b| a.0.cmp(&b.0));
+            map.sort_by_key(|a| a.0);
             let min = map
                 .iter()
                 .map(|(user, _)| user.to_f64())
@@ -247,9 +243,7 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
             VfbEntry::License(s) => set_optional_name(&mut font.names.license, s),
             VfbEntry::LicenseUrl(s) => set_optional_name(&mut font.names.license_url, s),
             VfbEntry::Copyright(s) => set_optional_name(&mut font.names.copyright, s),
-            VfbEntry::Trademark(serde) => {
-                set_optional_name(&mut font.names.trademark, serde.into())
-            }
+            VfbEntry::Trademark(serde) => set_optional_name(&mut font.names.trademark, serde),
             VfbEntry::Designer(s) => set_optional_name(&mut font.names.designer, s),
             VfbEntry::DesignerUrl(s) => set_optional_name(&mut font.names.designer_url, s),
             VfbEntry::VendorUrl(s) => set_optional_name(&mut font.names.manufacturer_url, s),
