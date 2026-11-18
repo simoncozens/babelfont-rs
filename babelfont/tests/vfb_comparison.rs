@@ -585,7 +585,7 @@ fn test_vfb_to_vfj_structural_diff() {
             Ok(json) => json,
             Err(e) => {
                 eprintln!("❌ Failed to serialize VFB font to JSON: {}", e);
-                eprintln!("Error details: {}", e.to_string());
+                eprintln!("Error details: {}", e);
                 // Try to get more details by serializing to string
                 match serde_json::to_string_pretty(&font) {
                     Ok(_) => eprintln!("✓ String serialization worked"),
@@ -725,9 +725,7 @@ fn normalize_path(path: &str) -> String {
 fn format_path(stack: &[String]) -> String {
     let mut out = String::new();
     for part in stack {
-        if part.starts_with('[') {
-            out.push_str(part);
-        } else if out.is_empty() {
+        if part.starts_with('[') || out.is_empty() {
             out.push_str(part);
         } else {
             out.push('.');
