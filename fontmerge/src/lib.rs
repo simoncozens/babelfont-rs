@@ -85,6 +85,7 @@ pub fn fontsubset(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn fontmerge(
     mut font1: babelfont::Font,
     font2: babelfont::Font,
@@ -190,18 +191,50 @@ pub fn fontmerge(
         }
     }
 
-    // This performs the layout subsetting. We retain not just the incoming glyphset but also
+    // We retain not just the incoming glyphset but also
     // font1's existing glyphset, so that layout rules and kerning pairs which cross-reference a
     // glyph already present in the host font are not stripped out by babelfont (which otherwise
     // has no visibility of the host font's glyphset).
-    RetainGlyphs::new(
-        final_glyphset
-            .iter()
-            .map(|x| x.to_string())
-            .collect::<Vec<_>>(),
-    )
-    .apply(&mut font2)
-    .expect("Failed to retain selected glyphs in font 2");
+    //
+    // There are, though, glyphs which the donor must contribute nothing about, because its
+    // version of the glyph is never going to be merged:
+    //
+    //  * glyphs the host has but does not export, and which we are not importing: the host's
+    //    own copy stays put and the donor's is never wanted;
+    //  * glyphs we *were* asked for, but whose host copy we are keeping because it already
+    //    exists (ExistingGlyphHandling::Skip).
+    //
+    // Retaining any of these in font2 would only leave the donor's layout rules and kerning
+    // pairs about them behind, referring to a glyph which is not coming across from the donor
+    // at all. So we drop them here instead, along with everything the donor's feature code and
+    // kerning has to say about them.
+    let font1_glyphs = font1
+        .glyphs
+        .iter()
+        .map(|g| &g.name)
+        .collect::<HashSet<&SmolStr>>();
+    let font1_unexported = font1
+        .glyphs
+        .iter()
+        .filter(|g| !g.exported)
+        .map(|g| &g.name)
+        .collect::<HashSet<&SmolStr>>();
+    let retain = final_glyphset
+        .iter()
+        .filter(|name| {
+            if glyphset_filter.incoming_glyphset.contains(*name) {
+                // Asked for, so it is only excluded if we are keeping the host's copy instead.
+                existing_handling != ExistingGlyphHandling::Skip || !font1_glyphs.contains(*name)
+            } else {
+                // Only in the retain set because the host has it as well.
+                !font1_unexported.contains(*name)
+            }
+        })
+        .map(|name| name.to_string())
+        .collect::<Vec<_>>();
+    RetainGlyphs::new(retain)
+        .apply(&mut font2)
+        .expect("Failed to retain selected glyphs in font 2");
 
     if layout_handling != LayoutHandling::Ignore {
         sanity_check_features(&font2);
@@ -591,6 +624,7 @@ pub(crate) fn create_test_font(glyphs: Vec<SmolStr>, feature_code: &str) -> babe
         font.glyphs.push(babelfont::Glyph {
             name: glyph_name,
             layers: vec![layer],
+            exported: true,
             ..Default::default()
         });
     }

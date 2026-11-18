@@ -173,6 +173,150 @@ fn test_existing_handling() {
     assert_eq!(width(&replaced, "B"), 200.0);
 }
 
+/// A host font which has a non-exported glyph, as Glyphs sources often do for
+/// glyphs which only exist to be referenced by layout.
+fn host_with_unexported_glyph() -> Font {
+    let mut font1 = create_test_font(vec!["A".into()], "");
+    let mut hidden = babelfont::Glyph::new("hidden");
+    hidden.exported = false;
+    hidden.layers.push(babelfont::Layer::new(500.0));
+    font1.glyphs.push(hidden);
+    font1
+}
+
+fn donor_with_layout_for_hidden() -> Font {
+    let mut font2 = create_test_font(
+        vec!["A".into(), "B".into(), "hidden".into()],
+        "lookup viaHost { sub A by hidden; } viaHost;\n\
+         lookup viaDonor { sub B by hidden; } viaDonor;\n\
+         feature ccmp { lookup viaHost; lookup viaDonor; } ccmp;",
+    );
+    font2.glyphs.get_mut("hidden").unwrap().layers[0].width = 321.0;
+    font2
+}
+
+#[test]
+fn test_unexported_host_glyph_is_not_imported() {
+    // `hidden` exists in the host but is not exported and is not requested from the donor, so
+    // nothing about the donor's `hidden` should survive: not the glyph, and not the donor's
+    // layout rules which mention it.
+    let merged = merge_glyphs(
+        host_with_unexported_glyph(),
+        donor_with_layout_for_hidden(),
+        vec!["B"],
+        ExistingGlyphHandling::Replace,
+    );
+    assert_glyphset(&merged, &["A", "B", "hidden"]);
+    assert_eq!(
+        width(&merged, "hidden"),
+        500.0,
+        "the host's non-exported glyph must not be replaced by the donor's"
+    );
+    let text = fea(&merged);
+    assert!(
+        !text.contains("sub A by hidden"),
+        "donor layout referring to a non-exported host glyph should be dropped:\n{text}"
+    );
+    assert!(
+        !text.contains("sub B by hidden"),
+        "donor layout referring to a non-exported host glyph should be dropped:\n{text}"
+    );
+}
+
+#[test]
+fn test_unexported_host_glyph_can_still_be_explicitly_imported() {
+    // The same setup, but here the caller explicitly asks for `hidden`; the donor's glyph and
+    // the donor's rules about it should both come across.
+    let merged = merge_glyphs(
+        host_with_unexported_glyph(),
+        donor_with_layout_for_hidden(),
+        vec!["B", "hidden"],
+        ExistingGlyphHandling::Replace,
+    );
+    assert_glyphset(&merged, &["A", "B", "hidden"]);
+    assert_eq!(width(&merged, "hidden"), 321.0);
+    let text = fea(&merged);
+    assert!(
+        text.contains("sub A by hidden"),
+        "donor layout should survive when the glyph is explicitly imported:\n{text}"
+    );
+    assert!(
+        text.contains("sub B by hidden"),
+        "donor layout should survive when the glyph is explicitly imported:\n{text}"
+    );
+}
+
+#[test]
+fn test_unexported_host_glyph_does_not_pull_in_kerning() {
+    let mut font2 = create_test_font(vec!["C".into(), "D".into(), "hidden".into()], "");
+    font2.masters[0]
+        .kerning
+        .insert(("C".into(), "D".into()), 20);
+    font2.masters[0]
+        .kerning
+        .insert(("C".into(), "hidden".into()), 30);
+
+    let mut font1 = create_test_font(vec!["A".into()], "");
+    let mut hidden = babelfont::Glyph::new("hidden");
+    hidden.exported = false;
+    hidden.layers.push(babelfont::Layer::new(500.0));
+    font1.glyphs.push(hidden);
+
+    let merged = merge_glyphs(font1, font2, vec!["C", "D"], ExistingGlyphHandling::Replace);
+    let kerning = &merged.masters[0].kerning;
+    assert_eq!(
+        kerning.get(&(SmolStr::from("C"), SmolStr::from("D"))),
+        Some(&20)
+    );
+    assert_eq!(
+        kerning.len(),
+        1,
+        "kerning to the hidden glyph should be dropped"
+    );
+}
+
+#[test]
+fn test_skipped_existing_glyph_does_not_bring_its_rules() {
+    // `B` exists in both fonts and the caller asks for it, but the "skip" policy keeps the
+    // host's copy. Nothing of the donor's `B` comes across, so the donor's rules which mention
+    // it should not either.
+    let font1 = create_test_font(vec!["A".into(), "B".into()], "");
+    let mut font2 = create_test_font(
+        vec!["B".into(), "C".into()],
+        "lookup donorRule { sub C by B; } donorRule;\nfeature ccmp { lookup donorRule; } ccmp;",
+    );
+    font2.glyphs.get_mut("B").unwrap().layers[0].width = 200.0;
+
+    let merged = merge_glyphs(font1, font2, vec!["B", "C"], ExistingGlyphHandling::Skip);
+    assert_glyphset(&merged, &["A", "B", "C"]);
+    assert_eq!(width(&merged, "B"), 500.0, "the host's B should be kept");
+    let text = fea(&merged);
+    assert!(
+        !text.contains("sub C by B"),
+        "donor rules about a skipped glyph should be dropped:\n{text}"
+    );
+}
+
+#[test]
+fn test_replaced_existing_glyph_keeps_its_rules() {
+    // The mirror image of the test above: under the "replace" policy the donor's glyph does
+    // come across, so the donor's rules about it must survive too.
+    let font1 = create_test_font(vec!["A".into(), "B".into()], "");
+    let mut font2 = create_test_font(
+        vec!["B".into(), "C".into()],
+        "lookup donorRule { sub C by B; } donorRule;\nfeature ccmp { lookup donorRule; } ccmp;",
+    );
+    font2.glyphs.get_mut("B").unwrap().layers[0].width = 200.0;
+
+    let merged = merge_glyphs(font1, font2, vec!["B", "C"], ExistingGlyphHandling::Replace);
+    assert_eq!(width(&merged, "B"), 200.0, "the donor's B should be used");
+    let text = fea(&merged);
+    assert!(
+        text.contains("sub C by B"),
+        "donor rules about a replaced glyph should survive:\n{text}"
+    );
+}
+
 #[test]
 fn test_kerning_groups() {
     let mut font1 = create_test_font(vec!["A".into(), "B".into()], "");
