@@ -1,7 +1,7 @@
 use crate::{
     common::{decomposition::TransformOrder, tag_from_string},
-    Anchor, Axis, BabelfontError, Component, Font, Glyph, GlyphCategory, Layer, LayerType, Master,
-    MetricType, Node, NodeType, Path, Shape, Tag,
+    Anchor, Axis, BabelfontError, Component, Font, Glyph, GlyphCategory, Guide, Layer, LayerType,
+    Master, MetricType, Node, NodeType, Path, Shape, Tag,
 };
 use fontdrasil::{
     coords::{DesignCoord, DesignLocation, Location, UserCoord},
@@ -10,6 +10,7 @@ use fontdrasil::{
 use indexmap::IndexMap;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use smol_str::SmolStr;
 use std::{collections::HashMap, convert::TryInto, fs, path::PathBuf, sync::LazyLock};
 
 fn to_point(s: String) -> Result<(f64, f64), BabelfontError> {
@@ -159,6 +160,8 @@ impl From<FontlabContour> for Shape {
         let is_cubic = val.nodes.iter().any(|s| s.contains("  "));
         let ends_with_c = val.nodes.last().is_some_and(|s| s.trim().ends_with(" c"));
 
+        // `nodes` is built in the same point-pen order FontLab stores them,
+        // i.e. starting at the contour's start point.
         let mut path = Path {
             nodes: val
                 .nodes
@@ -202,16 +205,16 @@ impl From<FontlabContour> for Shape {
                     .last()
                     .is_some_and(|n| n.nodetype == NodeType::OffCurve)
             {
-                // Quadratic VFJ contour wraps: the last entry is an off-curve whose
-                // implied endpoint is the first point. Rotate so the start point
-                // moves to the end (Glyphs.app convention).
+                // Quadratic VFJ contour wraps: the last entry is an off-curve
+                // whose implied endpoint is the first point. Rotate so the
+                // start point moves to the end (Glyphs.app convention).
                 path.nodes.rotate_left(1);
             }
 
             if has_offcurves {
                 // In a quadratic contour, a QCurve node is an on-curve point
-                // between quadratic segments when preceded by an OffCurve, or a
-                // smooth/plain Line when preceded by another on-curve.
+                // between quadratic segments when preceded by an OffCurve, or
+                // a smooth/plain Line when preceded by another on-curve.
                 for ix in 0..path.nodes.len() {
                     let prev_ix = if ix == 0 {
                         path.nodes.len() - 1
@@ -255,14 +258,14 @@ impl From<FontlabPath> for Vec<Shape> {
 enum FontlabShape {
     ComponentShape { component: FontlabComponent },
     PathShape(FontlabPath),
-    ImageShape { image: serde_json::Value }
+    ImageShape { image: serde_json::Value },
 }
 impl From<FontlabShape> for Vec<Shape> {
     fn from(val: FontlabShape) -> Self {
         match val {
             FontlabShape::ComponentShape { component } => vec![component.into()],
             FontlabShape::PathShape(p) => p.into(),
-            FontlabShape::ImageShape { image: _ } => vec![] // XXX
+            FontlabShape::ImageShape { image: _ } => vec![], // XXX
         }
     }
 }
@@ -346,19 +349,107 @@ struct FontlabAnchor {
     point: Option<String>,
 }
 
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize, Debug, Default)]
+struct FontlabGuide {
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    horizontal: bool,
+    #[serde(default)]
+    vertical: bool,
+    position: Option<f64>,
+    angle: Option<f64>,
+    x: Option<f64>,
+    y: Option<f64>,
+    center: Option<String>,
+    vector: Option<String>,
+    color: Option<String>,
+}
+
+fn parse_point(value: &str) -> Option<(f64, f64)> {
+    let mut parts = value.split_whitespace();
+    let x = parts.next()?.parse().ok()?;
+    let y = parts.next()?.parse().ok()?;
+    Some((x, y))
+}
+
+/// Parse a FontLab colour value (`#rrggbb` or a small set of named colours).
+fn parse_color(value: &str) -> Option<crate::common::Color> {
+    let hex = value.trim().trim_start_matches('#');
+    if hex.len() == 6 {
+        let r = i32::from_str_radix(&hex[0..2], 16).ok()?;
+        let g = i32::from_str_radix(&hex[2..4], 16).ok()?;
+        let b = i32::from_str_radix(&hex[4..6], 16).ok()?;
+        return Some(crate::common::Color { r, g, b, a: 255 });
+    }
+    let (r, g, b) = match value.trim().to_ascii_lowercase().as_str() {
+        "silver" => (192, 192, 192),
+        "red" => (255, 0, 0),
+        "green" => (0, 128, 0),
+        "blue" => (0, 0, 255),
+        "yellow" => (255, 255, 0),
+        "orange" => (255, 165, 0),
+        "purple" => (128, 0, 128),
+        "black" => (0, 0, 0),
+        _ => return None,
+    };
+    Some(crate::common::Color { r, g, b, a: 255 })
+}
+
+impl From<&FontlabGuide> for Guide {
+    fn from(val: &FontlabGuide) -> Self {
+        let position = val.position.unwrap_or(0.0) as f32;
+        let pos = if val.horizontal {
+            crate::common::Position {
+                x: 0.0,
+                y: position,
+                angle: 0.0,
+            }
+        } else if val.vertical {
+            crate::common::Position {
+                x: position,
+                y: 0.0,
+                angle: 90.0,
+            }
+        } else if let (Some(center), Some(vector)) = (&val.center, &val.vector) {
+            let (x, y) = parse_point(center).unwrap_or((0.0, 0.0));
+            let (dx, dy) = parse_point(vector).unwrap_or((0.0, 0.0));
+            crate::common::Position {
+                x: x as f32,
+                y: y as f32,
+                angle: dy.atan2(dx).to_degrees() as f32,
+            }
+        } else {
+            crate::common::Position {
+                x: val.x.unwrap_or(0.0) as f32,
+                y: val.y.unwrap_or(0.0) as f32,
+                angle: val.angle.unwrap_or(0.0) as f32,
+            }
+        };
+        Guide {
+            pos,
+            name: val.name.clone(),
+            color: val.color.as_deref().and_then(parse_color),
+            format_specific: Default::default(),
+        }
+    }
+}
+
 impl TryInto<Option<Anchor>> for FontlabAnchor {
     fn try_into(self) -> Result<Option<Anchor>, BabelfontError> {
-        if let Some(point) = self.point {
-            let (x, y) = to_point(point)?;
-            Ok(Some(Anchor {
-                x,
-                y,
-                name: self.name,
-                format_specific: Default::default(),
-            }))
-        } else {
-            Ok(None)
-        }
+        // An anchor without a point is placed at the origin (FontLab's
+        // convention for an anchor which has not been positioned yet).
+        let (x, y) = match self.point {
+            Some(point) => to_point(point)?,
+            None => (0.0, 0.0),
+        };
+        Ok(Some(Anchor {
+            x,
+            y,
+            name: self.name,
+            format_specific: Default::default(),
+        }))
     }
 
     type Error = BabelfontError;
@@ -372,22 +463,38 @@ struct FontlabLayer {
     #[serde(default)]
     anchors: Vec<FontlabAnchor>,
     #[serde(default)]
+    guidelines: Vec<FontlabGuide>,
+    #[serde(default)]
+    active: Option<bool>,
+    color: Option<String>,
+    #[serde(default)]
     elements: Vec<FontlabElement>,
 }
 
 impl FontlabLayer {
-    fn try_into_babel(self, _font: &Font) -> Result<Layer, BabelfontError> {
+    fn try_into_babel(self, font: &Font) -> Result<Layer, BabelfontError> {
         let anchors: Result<Vec<Option<Anchor>>, BabelfontError> =
             self.anchors.into_iter().map(|x| x.try_into()).collect();
+        // FontLab names each non-background layer after a master.
+        let master = self
+            .name
+            .as_ref()
+            .and_then(|layer_name| {
+                font.masters.iter().find(|master| {
+                    master.name.get_default().map(|name| name.as_str()) == Some(layer_name.as_str())
+                })
+            })
+            .map(|master| LayerType::DefaultForMaster(master.id.clone()))
+            .unwrap_or(LayerType::FreeFloating);
         Ok(Layer {
             width: self.advanceWidth as f32,
             vertical_advance: None,
             vertical_origin: None,
             name: self.name.clone(),
             id: self.name,
-            active: true,
-            master: LayerType::FreeFloating,
-            guides: vec![],
+            active: self.active.unwrap_or(true),
+            master,
+            guides: self.guidelines.iter().map(Guide::from).collect(),
             shapes: self
                 .elements
                 .into_iter()
@@ -397,7 +504,7 @@ impl FontlabLayer {
                 })
                 .collect(),
             anchors: anchors?.into_iter().flatten().collect(),
-            color: None,
+            color: self.color.as_deref().and_then(parse_color),
             layer_index: None,
             is_background: false,
             background_layer_id: None,
@@ -425,29 +532,37 @@ impl FontlabGlyph {
         } else {
             vec![]
         };
-        let layers: Result<Vec<Layer>, BabelfontError> = self
+        let mut layers: Vec<Layer> = self
             .layers
             .into_iter()
             .map(|x| x.try_into_babel(font))
-            .collect();
+            .collect::<Result<_, _>>()?;
+        // FontLab writes glyph layers in reverse master order (plus any
+        // mask/image layer first). Put the master layers back into master
+        // order so they line up with every other Babelfont format.
+        layers.sort_by_key(|layer| match &layer.master {
+            LayerType::DefaultForMaster(id) => (
+                1usize,
+                font.masters
+                    .iter()
+                    .position(|master| &master.id == id)
+                    .unwrap_or(usize::MAX),
+            ),
+            _ => (0, 0),
+        });
 
         Ok(Glyph {
             name: self.name.into(),
             production_name: None,
             category: GlyphCategory::Unknown,
             codepoints,
-            layers: layers?,
+            layers,
             exported: true,
             direction: None,
             format_specific: Default::default(),
             component_axes: Default::default(),
         })
     }
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct FontlabKerning {
-    // XXX
 }
 
 #[allow(non_snake_case)]
@@ -466,8 +581,18 @@ struct FontlabAxis {
 
 impl From<FontlabAxis> for Axis {
     fn from(val: FontlabAxis) -> Self {
+        // FontLab stores axis names in a lower-case, tag-like form
+        // ("weight"); use the conventional human-readable name where known.
+        let name = match val.tag.as_str() {
+            "wght" => "Weight".to_string(),
+            "wdth" => "Width".to_string(),
+            "opsz" => "Optical Size".to_string(),
+            "ital" => "Italic".to_string(),
+            "slnt" => "Slant".to_string(),
+            _ => val.name,
+        };
         let mut ax = Axis::new(
-            val.name,
+            name,
             tag_from_string(&val.tag).unwrap_or(Tag::new(&[0, 0, 0, 0])),
         );
         ax.min = val.minimum.map(UserCoord::new);
@@ -509,6 +634,7 @@ struct FontlabFontInfo {
     manufacturerURL: Option<String>,
     description: Option<String>,
     license: Option<String>,
+    licenseURL: Option<String>,
     vendorID: Option<String>,
     versionMajor: Option<u16>,
     versionMinor: Option<u16>,
@@ -528,15 +654,20 @@ struct FontlabMaster {
     xHeight: Option<i32>,
     capsHeight: Option<i32>,
     lineGap: Option<i32>,
+    safeTop: Option<i32>,
+    safeBottom: Option<i32>,
     underlineThickness: Option<i32>,
     underlinePosition: Option<i32>,
     #[serde(default)]
     location: HashMap<String, f64>,
     #[serde(default)]
     otherData: HashMap<String, serde_json::Value>, // coward
-    kerning: FontlabKerning,
+    #[serde(default)]
+    kerning: serde_json::Value,
     #[serde(default)]
     measurements: Option<HashMap<String, String>>,
+    #[serde(default)]
+    guidelines: Vec<FontlabGuide>,
 }
 
 impl FontlabMaster {
@@ -555,6 +686,12 @@ impl FontlabMaster {
         // Direct vertical metrics from the top-level master fields
         master.metrics.insert(MetricType::Ascender, self.ascender);
         master.metrics.insert(MetricType::Descender, self.descender);
+        master
+            .metrics
+            .insert(MetricType::TypoAscender, self.ascender);
+        master
+            .metrics
+            .insert(MetricType::TypoDescender, self.descender);
         if let Some(xh) = self.xHeight {
             master.metrics.insert(MetricType::XHeight, xh);
         }
@@ -568,7 +705,13 @@ impl FontlabMaster {
             master.metrics.insert(MetricType::UnderlinePosition, up);
         }
         if let Some(lg) = self.lineGap {
-            master.metrics.insert(MetricType::HheaLineGap, lg);
+            master.metrics.insert(MetricType::TypoLineGap, lg);
+        }
+        if let Some(top) = self.safeTop {
+            master.metrics.insert(MetricType::WinAscent, top);
+        }
+        if let Some(bottom) = self.safeBottom {
+            master.metrics.insert(MetricType::WinDescent, bottom.abs());
         }
 
         // Helper to extract an i32 from otherData
@@ -639,6 +782,7 @@ impl FontlabMaster {
             }
         }
 
+        master.guides = self.guidelines.iter().map(Guide::from).collect();
         master
     }
 }
@@ -681,6 +825,171 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
     load_str(&s)
 }
 
+fn kerning_value(value: &serde_json::Value) -> Option<i16> {
+    if let Some(number) = value.as_i64() {
+        Some(number as i16)
+    } else if let Some(number) = value.as_f64() {
+        Some(number.round() as i16)
+    } else if let Some(text) = value.as_str() {
+        text.parse::<i16>()
+            .ok()
+            .or_else(|| text.parse::<f64>().ok().map(|number| number.round() as i16))
+    } else {
+        None
+    }
+}
+
+fn normalize_kerning_key(key: &str) -> SmolStr {
+    if let Some(name) = key.strip_prefix("@MMK_L_") {
+        format!("@{}", name).into()
+    } else if let Some(name) = key.strip_prefix("@MMK_R_") {
+        format!("@{}", name).into()
+    } else {
+        key.into()
+    }
+}
+
+fn merge_kerning_group(
+    groups: &mut IndexMap<SmolStr, Vec<SmolStr>>,
+    name: &str,
+    glyphs: &[String],
+) {
+    let entry = groups.entry(name.into()).or_default();
+    for glyph in glyphs {
+        let glyph: SmolStr = glyph.as_str().into();
+        if !entry.contains(&glyph) {
+            entry.push(glyph);
+        }
+    }
+}
+
+/// Load FontLab VFJ kerning. Each master carries its own copy of the class
+/// definitions and kerning pairs.
+fn apply_vfj_kerning(font: &mut Font, master_kerning: &[serde_json::Value]) {
+    // Collect class definitions from every master, merging duplicates.
+    for value in master_kerning {
+        let Some(classes) = value.get("kerningClasses").and_then(|v| v.as_array()) else {
+            continue;
+        };
+        for class in classes {
+            let Some(name) = class.get("name").and_then(|v| v.as_str()) else {
+                continue;
+            };
+            let glyphs: Vec<String> = class
+                .get("names")
+                .and_then(|v| v.as_array())
+                .map(|names| {
+                    names
+                        .iter()
+                        .filter_map(|name| name.as_str().map(|name| name.to_string()))
+                        .collect()
+                })
+                .unwrap_or_default();
+            if glyphs.is_empty() {
+                continue;
+            }
+            let first = class.get("1st").and_then(|v| v.as_bool()).unwrap_or(false);
+            let second = class.get("2nd").and_then(|v| v.as_bool()).unwrap_or(false);
+            if first || (!first && !second) {
+                merge_kerning_group(&mut font.first_kern_groups, name, &glyphs);
+            }
+            if second {
+                merge_kerning_group(&mut font.second_kern_groups, name, &glyphs);
+            }
+        }
+    }
+
+    // The pair map may either live under `pairs` or be the kerning object itself.
+    for (master_index, value) in master_kerning.iter().enumerate() {
+        let Some(pairs) = value.get("pairs").and_then(|v| v.as_object()).or_else(|| {
+            if value.is_object() && value.get("kerningClasses").is_none() {
+                value.as_object()
+            } else {
+                None
+            }
+        }) else {
+            continue;
+        };
+        for (left, right_map) in pairs {
+            let Some(right_map) = right_map.as_object() else {
+                continue;
+            };
+            for (right, kern) in right_map {
+                let Some(kern) = kerning_value(kern) else {
+                    continue;
+                };
+                if let Some(master) = font.masters.get_mut(master_index) {
+                    master.kerning.insert(
+                        (normalize_kerning_key(left), normalize_kerning_key(right)),
+                        kern,
+                    );
+                }
+            }
+        }
+    }
+}
+
+/// Copy the font-level names from the VFJ `info` block into the Babelfont
+/// name table.
+fn apply_font_info(
+    font: &mut Font,
+    info: &FontlabFontInfo,
+    default_master: Option<&str>,
+    postscript_name: Option<&str>,
+) {
+    fn set_name(target: &mut crate::i18ndictionary::I18NDictionary, value: &str) {
+        if !value.is_empty() {
+            *target = value.to_string().into();
+        }
+    }
+
+    // `tfn` is the typographic family name; `sgn` is the style-group family
+    // name, which FontLab also uses as the full font name.
+    set_name(&mut font.names.family_name, &info.tfn);
+    set_name(&mut font.names.typographic_family, &info.tfn);
+    set_name(&mut font.names.full_name, &info.sgn);
+    if let Some(value) = &info.copyright {
+        set_name(&mut font.names.copyright, value);
+    }
+    if let Some(value) = &info.trademark {
+        set_name(&mut font.names.trademark, value);
+    }
+    if let Some(value) = &info.designer {
+        set_name(&mut font.names.designer, value);
+    }
+    if let Some(value) = &info.designerURL {
+        set_name(&mut font.names.designer_url, value);
+    }
+    if let Some(value) = &info.manufacturer {
+        set_name(&mut font.names.manufacturer, value);
+    }
+    if let Some(value) = &info.manufacturerURL {
+        set_name(&mut font.names.manufacturer_url, value);
+    }
+    if let Some(value) = &info.description {
+        set_name(&mut font.names.description, value);
+    }
+    if let Some(value) = &info.license {
+        set_name(&mut font.names.license, value);
+    }
+    if let Some(value) = &info.licenseURL {
+        set_name(&mut font.names.license_url, value);
+    }
+    if let Some(value) = &info.version {
+        set_name(&mut font.names.version, value);
+    }
+    if let (Some(major), Some(minor)) = (info.versionMajor, info.versionMinor) {
+        font.version = (major, minor);
+    }
+    if let Some(name) = default_master {
+        set_name(&mut font.names.preferred_subfamily_name, name);
+        set_name(&mut font.names.typographic_subfamily, name);
+    }
+    if let Some(psn) = postscript_name {
+        set_name(&mut font.names.postscript_name, psn);
+    }
+}
+
 /// Load a Fontlab VFJ font from string contents
 pub fn load_str(contents: &str) -> Result<Font, BabelfontError> {
     let mut axes_short_name_to_tag: HashMap<String, _> = HashMap::new();
@@ -690,18 +999,36 @@ pub fn load_str(contents: &str) -> Result<Font, BabelfontError> {
         .map_err(|e| BabelfontError::General(format!("Couldn't parse VFJ: {:}", e)))?;
     let fontlab = p.font;
     // log::debug!("{:#?}", fontlab);
+    let default_master_name = fontlab.defaultMaster.clone();
+    let default_postscript_name = default_master_name.as_ref().and_then(|name| {
+        fontlab
+            .masters
+            .iter()
+            .find(|master| &master.fontMaster.name == name)
+            .map(|master| master.fontMaster.psn.clone())
+    });
     for axis in fontlab.axes {
         let sn = axis.shortName.clone();
         let new_axis: Axis = axis.into();
         axes_short_name_to_tag.insert(sn, new_axis.tag);
         font.axes.push(new_axis);
     }
+    let mut master_kerning = Vec::new();
     for master in fontlab.masters {
+        master_kerning.push(master.fontMaster.kerning.clone());
         font.masters
             .push(master.fontMaster.into(&axes_short_name_to_tag));
     }
-    if let Some(default_master) = fontlab.defaultMaster.and_then(|name| font.master(&name)) {
-        let axes: Result<Vec<fontdrasil::types::Axis>, _> = font.axes.iter().map(|a| a.try_into()).collect();
+    apply_vfj_kerning(&mut font, &master_kerning);
+    apply_font_info(
+        &mut font,
+        &fontlab.info,
+        default_master_name.as_deref(),
+        default_postscript_name.as_deref(),
+    );
+    if let Some(default_master) = default_master_name.and_then(|name| font.master(&name).cloned()) {
+        let axes: Result<Vec<fontdrasil::types::Axis>, _> =
+            font.axes.iter().map(|a| a.try_into()).collect();
         let new_loc = default_master.location.to_user(&Axes::from(axes?))?;
         for axis in font.axes.iter_mut() {
             if let Some(val) = new_loc.get(axis.tag) {
@@ -966,5 +1293,40 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn test_sepehr_kerning() {
+        let font = crate::load("resources/fontlab/Sepehr-Bold.vfj").expect("Failed to load VFJ");
+
+        // Classes from the first master's `kerningClasses` list.
+        assert_eq!(
+            font.first_kern_groups.get("A").map(|glyphs| glyphs.len()),
+            Some(2)
+        );
+        assert!(font.second_kern_groups.contains_key("C"));
+        assert_eq!(
+            font.second_kern_groups.get("C").map(|glyphs| glyphs.len()),
+            Some(4)
+        );
+
+        let master = &font.masters[0];
+        assert_eq!(
+            master
+                .kerning
+                .get(&(SmolStr::new("@A"), SmolStr::new("@C"))),
+            Some(&-21)
+        );
+        assert_eq!(
+            master
+                .kerning
+                .get(&(SmolStr::new("A"), SmolStr::new("question"))),
+            Some(&-81)
+        );
+        assert!(
+            master.kerning.len() > 600,
+            "expected >600 kerning pairs, got {}",
+            master.kerning.len()
+        );
     }
 }

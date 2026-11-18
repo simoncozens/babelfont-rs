@@ -95,7 +95,7 @@ serde_json_path_to_error = { version = "0.1.5", optional = true }
 fea-rs-ast = { workspace = true }
 typeshare = { version = "1.0.4", optional = true }
 num-traits = "0.2.19"
-vfbreader = { version = "0.1.5", optional = true, path = "vfbLib-rust/vfb-reader" }
+vfbreader = { version = "0.1.7", optional = true }
 skrifa = { workspace = true, optional = true }
 icu_properties = { version = "=2.1", optional = true }
 sr-aef = { version = "0.1.2", path = "../sr-aef" }
