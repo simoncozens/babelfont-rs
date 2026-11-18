@@ -26,7 +26,7 @@ required-features = ["cli"]
 cli = ["indicatif", "clap", "env_logger", "clap-verbosity-flag"]
 
 [dependencies]
-babelfont = { version = "0.2.5", path = "../babelfont" }
+babelfont = { version = "0.2.6", path = "../babelfont" }
 clap = { workspace = true, features = ["derive"], optional = true }
 log = { workspace = true }
 env_logger = { workspace = true, optional = true }
