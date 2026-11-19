@@ -1529,6 +1529,24 @@ fn vertical_metric_extents(font: &Font) -> HashMap<String, (f64, f64)> {
         .collect()
 }
 
+/// Attach every free-floating layer to the default master (else the first).
+fn attach_free_floating_layers(font: &mut Font) {
+    let Some(master_id) = font
+        .default_master()
+        .or(font.masters.first())
+        .map(|m| m.id.clone())
+    else {
+        return;
+    };
+    for glyph in font.glyphs.iter_mut() {
+        for layer in glyph.layers.iter_mut() {
+            if layer.master == LayerType::FreeFloating {
+                layer.master = LayerType::AssociatedWithMaster(master_id.clone());
+            }
+        }
+    }
+}
+
 /// The master a layer belongs to, if it has one.
 fn layer_master_id(layer: &Layer) -> &str {
     match &layer.master {
@@ -1585,6 +1603,10 @@ pub(crate) fn as_glyphs3(font: &Font) -> Result<glyphs3::Glyphs3, BabelfontError
         .max(3);
     // Express the native vertical metrics in Glyphs terms.
     babelfont_vertical_metrics_to_glyphs(&mut font);
+    // A Glyphs layer with no associated master is that master's layer, so its
+    // id must be a master id. Glyphs has no free-floating layers: attach them
+    // to the default master.
+    attach_free_floating_layers(&mut font);
     // #[allow(clippy::unwrap_used)] // Surely this can't fail
     // DropSparseMasters.apply(&mut font).unwrap();
     // println!("Exporting {} masters", font.masters.len());
@@ -1902,6 +1924,26 @@ fn save_master(
 #[allow(clippy::unwrap_used, clippy::indexing_slicing)]
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn free_floating_layers_name_a_master() -> Result<(), crate::BabelfontError> {
+        let mut font = crate::Font::new();
+        font.masters
+            .push(crate::Master::new("Regular", "m01", Default::default()));
+        let mut glyph = crate::Glyph::new("a");
+        let mut master_layer = crate::Layer::new(500.0);
+        master_layer.master = crate::LayerType::DefaultForMaster("m01".to_string());
+        let mut mask = crate::Layer::new(500.0);
+        mask.id = Some("mask".to_string());
+        mask.master = crate::LayerType::FreeFloating;
+        glyph.layers = vec![master_layer, mask];
+        font.glyphs.push(glyph);
+        let glyphs = super::as_glyphs3(&font)?;
+        let layers = &glyphs.glyphs[0].layers;
+        assert_eq!(layers[1].layer_id, "mask");
+        assert_eq!(layers[1].associated_master_id.as_deref(), Some("m01"));
+        Ok(())
+    }
+
     #[test]
     fn english_only_singular_properties_are_not_dropped() {
         // An SFD's LangName strings populate the names under the ENG tag,
