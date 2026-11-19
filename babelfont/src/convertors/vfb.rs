@@ -47,6 +47,19 @@ fn set_optional_name(target: &mut crate::i18ndictionary::I18NDictionary, value: 
 }
 
 /// Set a metric on every master.
+/// Make an OpenType vendor tag from a VFB vendor string.
+///
+/// `achVendID` is four printable ASCII bytes, and once a space appears the rest
+/// must be spaces too. FontLab pads short strings with NULs; a shorter vendor
+/// is padded with spaces. Returns `None` for a string that cannot be a tag.
+fn vendor_tag(vendor: &str) -> Option<Tag> {
+    let trimmed = vendor.trim_matches(|c: char| c == '\0' || c.is_whitespace());
+    if trimmed.is_empty() || trimmed.len() > 4 || !trimmed.chars().all(|c| c.is_ascii_graphic()) {
+        return None;
+    }
+    Tag::new_checked(format!("{trimmed:<4}").as_bytes()).ok()
+}
+
 fn set_metric_all_masters(font: &mut Font, metric: MetricType, value: i32) {
     for master in font.masters.iter_mut() {
         master.metrics.insert(metric.clone(), value);
@@ -257,7 +270,11 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
                 }
             }
             VfbEntry::MsCharset(_) => {} // => todo!(),
-            VfbEntry::Panose(_) => {}    // => todo!(),
+            // The PANOSE the export writes is this font-level entry, not the
+            // one in the TrueType block.
+            VfbEntry::Panose(p) => {
+                font.custom_ot_values.os2_panose = Some(p.map(|b| b as u8));
+            }
             VfbEntry::TtVersion(s) => set_optional_name(&mut font.names.version, s),
             VfbEntry::TtUId(_) => {} // => todo!(),
             VfbEntry::StyleName(s) => {
@@ -267,8 +284,17 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
                 set_optional_name(&mut font.names.typographic_subfamily, s)
             }
             VfbEntry::MacCompatible(_) => {} // => todo!(),
-            VfbEntry::Vendor(_) => {}        // => todo!(),
-            VfbEntry::Year(_) => {}          // => todo!(),
+            VfbEntry::Vendor(s) => match vendor_tag(&s) {
+                Some(tag) => font.custom_ot_values.os2_vendor_id = Some(tag),
+                None if !s
+                    .trim_matches(|c: char| c == '\0' || c.is_whitespace())
+                    .is_empty() =>
+                {
+                    log::warn!("Ignoring vendor ID {s:?}: not a legal OpenType tag")
+                }
+                None => {}
+            },
+            VfbEntry::Year(_) => {} // => todo!(),
             VfbEntry::VersionMajor(v) => {
                 font.version = (v, font.version.1);
             }
@@ -325,7 +351,12 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
             VfbEntry::GlyphNote(_) => {}         // => todo!(),
             VfbEntry::WeightVector(_items) => {} // => todo!(),
             VfbEntry::UniqueId(_) => {}          // => todo!(),
-            VfbEntry::WeightCode(_) => {}        // => todo!(),
+            // The export writes the weight code as usWeightClass, not the
+            // TrueType block's value.
+            VfbEntry::WeightCode(w) if w > 0 => {
+                font.custom_ot_values.os2_us_weight_class = Some(w as u16);
+            }
+            VfbEntry::WeightCode(_) => {}
             VfbEntry::ItalicAngle(angle) => {
                 for master in font.masters.iter_mut() {
                     master
@@ -350,6 +381,21 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
             VfbEntry::Collection(_items) => {} // => todo!(_),
             VfbEntry::TtInfo(values) => {
                 for value in values {
+                    match value {
+                        TrueTypeValue::Os2UsWidthClass(v) => {
+                            font.custom_ot_values.os2_us_width_class = Some(v as u16);
+                            continue;
+                        }
+                        TrueTypeValue::Os2FsType(v) => {
+                            font.custom_ot_values.os2_fs_type = Some(v as u16);
+                            continue;
+                        }
+                        TrueTypeValue::HeadLowestRecPpem(v) => {
+                            font.custom_ot_values.head_lowest_rec_ppem = Some(v as u16);
+                            continue;
+                        }
+                        _ => {}
+                    }
                     let (metric, number) = match value {
                         TrueTypeValue::Os2YSubscriptXSize(v) => (MetricType::SubscriptXSize, v),
                         TrueTypeValue::Os2YSubscriptYSize(v) => (MetricType::SubscriptYSize, v),
@@ -1299,6 +1345,32 @@ fn finish_contour(contour: &mut Vec<Node>, is_open: bool, paths: &mut Vec<Path>)
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_vfb_os2_values() -> Result<(), BabelfontError> {
+        let font = load(PathBuf::from("resources/IBMPlexSerif-Text.vfb"))?;
+        let ot = &font.custom_ot_values;
+        // The weight code, not the TrueType block's 400.
+        assert_eq!(ot.os2_us_weight_class, Some(450));
+        assert_eq!(ot.os2_us_width_class, Some(5));
+        assert_eq!(ot.os2_fs_type, Some(0));
+        assert_eq!(ot.head_lowest_rec_ppem, Some(9));
+        assert_eq!(ot.os2_panose, Some([2, 6, 5, 3, 5, 4, 6, 0, 2, 3]));
+        assert_eq!(ot.os2_vendor_id, Some(Tag::new(b"IBM ")));
+        Ok(())
+    }
+
+    #[test]
+    fn test_vfb_vendor_tag() {
+        assert_eq!(vendor_tag("IBM"), Some(Tag::new(b"IBM ")));
+        assert_eq!(vendor_tag("STC\0"), Some(Tag::new(b"STC ")));
+        assert_eq!(vendor_tag("GOOG"), Some(Tag::new(b"GOOG")));
+        assert_eq!(vendor_tag(""), None);
+        assert_eq!(vendor_tag("   "), None);
+        // A non-space after a space is not a legal tag.
+        assert_eq!(vendor_tag("Ek T"), None);
+        assert_eq!(vendor_tag("TOOLONG"), None);
+    }
 
     #[test]
     fn test_vfb_kerning_classes_and_pairs() {
