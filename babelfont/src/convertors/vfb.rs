@@ -60,6 +60,12 @@ fn vendor_tag(vendor: &str) -> Option<Tag> {
     Tag::new_checked(format!("{trimmed:<4}").as_bytes()).ok()
 }
 
+/// The top of an underline FontLab stores by its middle: FontLab's export adds
+/// half the thickness, halved with integer division.
+fn underline_top(position: i32, thickness: i32) -> i32 {
+    position + thickness / 2
+}
+
 fn set_metric_all_masters(font: &mut Font, metric: MetricType, value: i32) {
     for master in font.masters.iter_mut() {
         master.metrics.insert(metric.clone(), value);
@@ -589,7 +595,7 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
     }
 
     // VFB stores the *middle* of the underline, whereas OpenType stores its
-    // top. Adjust the position by half the thickness.
+    // top. Adjust the position by half the thickness, as FontLab's export does.
     for master in font.masters.iter_mut() {
         let position = master
             .metrics
@@ -602,7 +608,7 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
         if let (Some(position), Some(thickness)) = (position, thickness) {
             master.metrics.insert(
                 crate::MetricType::UnderlinePosition,
-                position + (thickness as f64 * 0.5).round() as i32,
+                underline_top(position, thickness),
             );
         }
     }
@@ -1345,6 +1351,13 @@ fn finish_contour(contour: &mut Vec<Node>, is_open: bool, paths: &mut Vec<Path>)
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_vfb_underline_top() {
+        // An odd thickness: FontLab's export writes -102 + 51 / 2 = -77.
+        assert_eq!(underline_top(-102, 51), -77);
+        assert_eq!(underline_top(-100, 50), -75);
+    }
 
     #[test]
     fn test_vfb_os2_values() -> Result<(), BabelfontError> {
