@@ -128,3 +128,23 @@ impl From<&I18NDictionary> for Vec<glyphslib::glyphs3::LocalizedValue> {
             .collect()
     }
 }
+
+#[cfg(feature = "ufo")]
+impl From<&I18NDictionary> for Vec<norad::designspace::LocalizedString> {
+    fn from(val: &I18NDictionary) -> Self {
+        val.0
+            .iter()
+            // Skip default
+            .filter(|(lang, _)| lang != &DFLT)
+            .map(|(lang, value)| {
+                // No! Convert it from OpenType language tag to BCP 47!
+                let lang_tag = lang.clone();
+
+                norad::designspace::LocalizedString {
+                    language: lang_tag,
+                    string: value.clone(),
+                }
+            })
+            .collect()
+    }
+}

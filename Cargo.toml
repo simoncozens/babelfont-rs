@@ -10,7 +10,7 @@ fontir = { version = "2.0.0" }
 fontbe = { version = "2.0.0" }
 fontc = { version = "2.0.0", default-features = false }                      # Must use version fondrasil uses
 write-fonts = { version = "0.55.0", features = ["serde", "read", "tables"] }
-skrifa = { version = "0.46.2", features = ["traversal"] }
+skrifa = { version = "0.50.0" }
 kurbo = "0.13"                                                               # Must use same version as norad / fontir /etc.
 fea-rs-ast = { version = "0.4.1" }
 regex = "1.12.2"

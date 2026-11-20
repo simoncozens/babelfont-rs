@@ -424,31 +424,29 @@ pub(crate) mod fontra {
 }
 
 #[cfg(feature = "ufo")]
-mod ufo {
+pub(crate) mod ufo {
+    use std::collections::HashMap;
+
+    use crate::Tag;
     use fontdrasil::coords::{DesignCoord, UserCoord};
 
-    use crate::{common::tag_from_string, BabelfontError};
+    use crate::{axis::CrossAxisMapping, common::tag_from_string, BabelfontError};
 
     use super::Axis;
     impl TryFrom<&norad::designspace::Axis> for Axis {
         type Error = BabelfontError;
         fn try_from(dsax: &norad::designspace::Axis) -> Result<Self, BabelfontError> {
             let mut ax = Axis::new(dsax.name.clone(), tag_from_string(&dsax.tag)?);
-            ax.min = dsax.minimum.map(|x| x as f64).map(UserCoord::new);
-            ax.max = dsax.maximum.map(|x| x as f64).map(UserCoord::new);
-            ax.default = Some(UserCoord::new(dsax.default as f64));
+            ax.min = dsax.minimum.map(UserCoord::new);
+            ax.max = dsax.maximum.map(UserCoord::new);
+            ax.default = Some(UserCoord::new(dsax.default));
             if let Some(values) = &dsax.values {
-                ax.values = values.iter().map(|x| UserCoord::new(*x as f64)).collect();
+                ax.values = values.iter().map(|x| UserCoord::new(*x)).collect();
             }
             if let Some(map) = &dsax.map {
                 ax.map = Some(
                     map.iter()
-                        .map(|x| {
-                            (
-                                UserCoord::new(x.input as f64),
-                                DesignCoord::new(x.output as f64),
-                            )
-                        })
+                        .map(|x| (UserCoord::new(x.input), DesignCoord::new(x.output)))
                         .collect(),
                 );
             }
@@ -466,23 +464,54 @@ mod ufo {
                     .unwrap_or(&"Unnamed axis".to_string())
                     .clone(),
                 tag: ax.tag.to_string(),
-                minimum: ax.min.map(|x| x.to_f64() as f32),
-                maximum: ax.max.map(|x| x.to_f64() as f32),
-                default: ax.default.map(|x| x.to_f64() as f32).unwrap_or(0.0),
+                minimum: ax.min.map(|x| x.to_f64()),
+                maximum: ax.max.map(|x| x.to_f64()),
+                default: ax.default.map(|x| x.to_f64()).unwrap_or(0.0),
                 map: ax.map.as_ref().map(|mapping| {
                     mapping
                         .iter()
                         .map(|(input, output)| norad::designspace::AxisMapping {
-                            input: input.to_f64() as f32,
-                            output: output.to_f64() as f32,
+                            input: input.to_f64(),
+                            output: output.to_f64(),
                         })
                         .collect()
                 }),
                 hidden: ax.hidden,
                 values: (!ax.values.is_empty())
-                    .then(|| ax.values.iter().map(|v| v.to_f64() as f32).collect()),
+                    .then(|| ax.values.iter().map(|v| v.to_f64()).collect()),
                 label_names: vec![],
+                axis_ordering: None,
+                axis_labels: vec![],
             }
+        }
+    }
+
+    pub(crate) fn location_to_dimensions(
+        location: &fontdrasil::coords::DesignLocation,
+        axis_tag_name_map: &HashMap<Tag, String>,
+    ) -> Vec<norad::designspace::Dimension> {
+        location
+            .iter()
+            .map(|(tag, coord)| norad::designspace::Dimension {
+                name: axis_tag_name_map
+                    .get(tag)
+                    .cloned()
+                    .unwrap_or_else(|| tag.to_string()),
+                xvalue: Some(coord.to_f64()),
+                uservalue: None,
+                yvalue: None,
+            })
+            .collect()
+    }
+
+    pub(crate) fn make_cross_axis_mapping_entry(
+        mapping: &CrossAxisMapping,
+        axes_tags_to_names: &HashMap<Tag, String>,
+    ) -> norad::designspace::AxisMappingEntry {
+        norad::designspace::AxisMappingEntry {
+            description: mapping.description.clone(),
+            input: location_to_dimensions(&mapping.input, axes_tags_to_names),
+            output: location_to_dimensions(&mapping.output, axes_tags_to_names),
         }
     }
 }

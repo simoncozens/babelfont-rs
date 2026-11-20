@@ -239,7 +239,7 @@ impl<'a> UncompileContext<'a> {
                         })
                         .collect();
 
-                    (simple_user_loc, (default as i32 + delta) as i16)
+                    (simple_user_loc, (default as i32 + delta.to_i32()) as i16)
                 })
                 .collect();
         }

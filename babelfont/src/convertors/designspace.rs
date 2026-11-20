@@ -6,7 +6,9 @@ use crate::{
 };
 use fontdrasil::coords::{DesignCoord, DesignLocation};
 use norad::{
-    designspace::{DesignSpaceDocument, Instance as DSInstance, RuleProcessing, Rules, Source},
+    designspace::{
+        AxisMappings, DesignSpaceDocument, Instance as DSInstance, RuleProcessing, Rules, Source,
+    },
     Plist,
 };
 use std::collections::{BTreeMap, HashMap};
@@ -72,7 +74,7 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
     #[allow(clippy::unwrap_used)] // It's a number
     font.format_specific.insert(
         FORMAT_KEY.to_string(),
-        serde_json::Value::Number(serde_json::Number::from_f64(ds.format as f64).unwrap()),
+        serde_json::Value::Number(serde_json::Number::from_f64(ds.format.into()).unwrap()),
     );
     Ok(font)
 }
@@ -119,9 +121,7 @@ pub(crate) fn load_instances(
                             *axis_name_tag_map
                                 .get(&dimension.name)
                                 .unwrap_or(&Tag::new(b"unkn")),
-                            DesignCoord::new(
-                                dimension.xvalue.map(|x| x as f64).unwrap_or_default(),
-                            ),
+                            DesignCoord::new(dimension.xvalue.unwrap_or_default()),
                         )
                     })
                     .collect::<Vec<_>>(),
@@ -158,7 +158,7 @@ fn load_master(
                     *axis_name_tag_map
                         .get(dimension.name.as_str())
                         .unwrap_or_else(|| panic!("Axis name not found: {}", dimension.name)),
-                    DesignCoord::new(dimension.xvalue.map(|x| x as f64).unwrap_or_default()),
+                    DesignCoord::new(dimension.xvalue.unwrap_or_default()),
                 )
             })
             .collect::<Vec<_>>(),
@@ -254,9 +254,7 @@ fn default_master<'a>(ds: &'a DesignSpaceDocument, axes: &[Axis]) -> Option<&'a 
     for source in ds.sources.iter() {
         let mut maybe = true;
         for loc in source.location.iter() {
-            if defaults.get(&loc.name)
-                != loc.xvalue.map(|x| x as f64).map(DesignCoord::new).as_ref()
-            {
+            if defaults.get(&loc.name) != loc.xvalue.map(DesignCoord::new).as_ref() {
                 maybe = false;
                 break;
             }
@@ -314,6 +312,11 @@ pub fn save_designspace(font: &Font, path: &PathBuf) -> Result<(), BabelfontErro
         .flat_map(|ax| ax.name.get_default())
         .map(|x| x.as_str())
         .collect::<Vec<_>>();
+    let cross_axis_mappings: Vec<_> = font
+        .cross_axis_mappings
+        .iter()
+        .map(|m| crate::axis::ufo::make_cross_axis_mapping_entry(m, &axis_tag_name_map))
+        .collect();
     let ds = DesignSpaceDocument {
         format: font
             .format_specific
@@ -337,6 +340,17 @@ pub fn save_designspace(font: &Font, path: &PathBuf) -> Result<(), BabelfontErro
             .map(|i| to_norad_instance(i, &axis_tag_name_map, &axis_order))
             .collect(),
         lib: Plist::new(),
+        axis_mappings: if cross_axis_mappings.is_empty() {
+            None
+        } else {
+            Some(AxisMappings {
+                description: None,
+                mappings: cross_axis_mappings,
+            })
+        },
+        elided_fallback_name: None, // XXX
+        location_labels: vec![],
+        variable_fonts: vec![], // XXX
     };
     // Now save all the UFOs
     for (ix, master_filename) in master_filenames.iter().enumerate() {
@@ -356,19 +370,8 @@ pub(crate) fn to_norad_instance(
     axis_order: &[&str],
 ) -> norad::designspace::Instance {
     let name_to_option_string = |x: &I18NDictionary| x.get_default().map(|y| y.to_string());
-    let mut location: Vec<_> = instance
-        .location
-        .iter()
-        .map(|(tag, coord)| norad::designspace::Dimension {
-            name: axis_tag_name_map
-                .get(tag)
-                .cloned()
-                .unwrap_or_else(|| tag.to_string()),
-            xvalue: Some(coord.to_f64() as f32),
-            uservalue: None,
-            yvalue: None,
-        })
-        .collect();
+    let mut location: Vec<_> =
+        crate::axis::ufo::location_to_dimensions(&instance.location, axis_tag_name_map);
     // Sort them based on the font's axis order
     location.sort_by(|a, b| {
         axis_order
@@ -404,6 +407,11 @@ pub(crate) fn to_norad_instance(
         )
         .ok()
         .unwrap_or_default(),
+        location_label: None,
+        localised_style_names: (&instance.custom_names.preferred_subfamily_name).into(),
+        localised_family_names: (&instance.custom_names.family_name).into(),
+        localised_style_map_style_names: (&instance.custom_names.typographic_subfamily).into(),
+        localised_style_map_family_names: (&instance.custom_names.typographic_family).into(),
     }
 }
 
@@ -422,7 +430,7 @@ fn to_source(
                 .get(tag)
                 .cloned()
                 .unwrap_or_else(|| tag.to_string()),
-            xvalue: Some(coord.to_f64() as f32),
+            xvalue: Some(coord.to_f64()),
             uservalue: None,
             yvalue: None,
         })
@@ -453,6 +461,7 @@ fn to_source(
         filename: filename.to_string(),
         location,
         layer: None, // XXX
+        localised_family_names: (&font.names.family_name).into(),
     }
 }
 

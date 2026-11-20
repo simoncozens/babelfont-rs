@@ -46,7 +46,7 @@ use indexmap::{IndexMap, IndexSet};
 /// A handle to the version of Skrifa that sr-eaf is using. Pass a skrifa::FontRef to uncompile()
 pub use skrifa;
 use skrifa::{
-    GlyphId, GlyphId16, GlyphNames, Tag,
+    GlyphId, GlyphNames, Tag,
     metrics::GlyphMetrics,
     prelude::{LocationRef, Size},
     raw::{
@@ -68,6 +68,7 @@ use smol_str::SmolStr;
 mod contextual;
 mod gpos;
 mod gsub;
+mod layout;
 #[cfg(feature = "cli")]
 mod serialize;
 mod variations;
@@ -192,7 +193,12 @@ impl<'a> UncompileContext<'a> {
         Ok(slf)
     }
 
-    fn register_anchor(&mut self, glyphname: &SmolStr, anchor: &Anchor, anchor_name: Option<&str>) {
+    pub(crate) fn register_anchor(
+        &mut self,
+        glyphname: &SmolStr,
+        anchor: &Anchor,
+        anchor_name: Option<&str>,
+    ) {
         if let Some(anchor_name) = anchor_name {
             self.anchors
                 .entry(anchor_name.to_string().into())
@@ -206,7 +212,7 @@ impl<'a> UncompileContext<'a> {
         }
     }
 
-    fn register_mark_class(
+    pub(crate) fn register_mark_class(
         &mut self,
         anchors: Vec<(GlyphContainer, Anchor)>,
         class_name: &SmolStr,
@@ -224,7 +230,7 @@ impl<'a> UncompileContext<'a> {
         self.mark_classes.insert(class_name.clone(), definitions);
     }
 
-    fn get_name(&self, id: GlyphId16) -> GlyphName {
+    pub(crate) fn get_name(&self, id: GlyphId) -> GlyphName {
         let str: SmolStr = self
             .glyph_id_to_name
             .get(&GlyphId::new(id.to_u32()))
@@ -281,13 +287,13 @@ impl<'a> UncompileContext<'a> {
         items
     }
 
-    fn resolve_coverage(&self, coverage: &CoverageTable) -> Vec<GlyphContainer> {
+    pub(crate) fn resolve_coverage(&self, coverage: &CoverageTable) -> Vec<GlyphContainer> {
         coverage
             .iter()
             .map(|g| GlyphContainer::GlyphName(self.get_name(g)))
             .collect()
     }
-    fn resolve_coverage_to_class(
+    pub(crate) fn resolve_coverage_to_class(
         &mut self,
         coverage: &CoverageTable,
         collapse_single: bool,
@@ -318,11 +324,14 @@ impl<'a> UncompileContext<'a> {
         }
     }
 
-    fn resolve_classes(&self, class_def: Option<&ClassDef>) -> HashMap<u16, Vec<GlyphContainer>> {
-        let mut classes: HashMap<u16, Vec<GlyphContainer>> = HashMap::new();
+    pub(crate) fn resolve_classes(
+        &self,
+        class_def: Option<&ClassDef>,
+    ) -> HashMap<u32, Vec<GlyphContainer>> {
+        let mut classes: HashMap<u32, Vec<GlyphContainer>> = HashMap::new();
         let mut used_glyphs = HashSet::new();
         for (glyph_id, class_id) in class_def.into_iter().flat_map(|class_def| class_def.iter()) {
-            used_glyphs.insert(glyph_id.to_u16());
+            used_glyphs.insert(glyph_id);
             classes
                 .entry(class_id)
                 .or_default()
@@ -330,14 +339,12 @@ impl<'a> UncompileContext<'a> {
         }
 
         // Class 0 is all glyphs that are not explicitly assigned by the ClassDef.
-        for gid in 0..self.num_glyphs {
-            if !used_glyphs.contains(&gid) {
+        for gid in 0..self.num_glyphs as u32 {
+            if !used_glyphs.contains(&GlyphId::new(gid)) {
                 classes
                     .entry(0)
                     .or_default()
-                    .push(GlyphContainer::GlyphName(
-                        self.get_name(GlyphId16::new(gid)),
-                    ));
+                    .push(GlyphContainer::GlyphName(self.get_name(GlyphId::new(gid))));
             }
         }
         classes
@@ -360,16 +367,16 @@ impl<'a> UncompileContext<'a> {
         name
     }
 
-    fn assign_lookup_name<T: SubOrPos>(&mut self, prefix: &str, index: u16, phase: T) {
+    pub(crate) fn assign_lookup_name<T: SubOrPos>(&mut self, prefix: &str, index: u16, phase: T) {
         let name = self.gensym(prefix);
         self.lookup_map.insert((phase.to_string(), index), name);
     }
 
-    fn create_lookup_block<T: SubOrPos>(&self, index: u16, phase: T) -> LookupBlock {
+    pub(crate) fn create_lookup_block<T: SubOrPos>(&self, index: u16, phase: T) -> LookupBlock {
         LookupBlock::new(self.get_lookup_name(index, phase), vec![], false, 0..0)
     }
 
-    fn get_lookup_name<T: SubOrPos>(&self, lookup_list_index: u16, phase: T) -> SmolStr {
+    pub(crate) fn get_lookup_name<T: SubOrPos>(&self, lookup_list_index: u16, phase: T) -> SmolStr {
         self.lookup_map
             .get(&(phase.to_string(), lookup_list_index))
             .cloned()
@@ -1047,7 +1054,11 @@ impl<'a> UncompileContext<'a> {
         });
         let mark_attachment_class = flags.mark_attachment_class().map(|class| {
             let classes = mark_attachment_classes
-                .and_then(|mac| self.resolve_classes(Some(&mac)).get(&class).cloned())
+                .and_then(|mac| {
+                    self.resolve_classes(Some(&mac))
+                        .get(&(class as u32))
+                        .cloned()
+                })
                 .unwrap_or_default();
             GlyphContainer::GlyphClass(GlyphClass::new(classes, 0..0))
         });
