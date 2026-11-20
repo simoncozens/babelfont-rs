@@ -871,7 +871,7 @@ fn drawn_shift(
                 .flags
                 .contains(glyf::CompositeGlyphFlags::USE_MY_METRICS)
             {
-                shift = drawn_shift(fontref, glyf, component.glyph.into(), depth + 1)?;
+                shift = drawn_shift(fontref, glyf, component.glyph, depth + 1)?;
             }
         }
     }
@@ -1015,7 +1015,7 @@ fn load_layer(
                 let yx = component.transform.yx.to_f32() as f64;
                 let xy = component.transform.xy.to_f32() as f64;
                 let yy = component.transform.yy.to_f32() as f64;
-                let component_shift = read_shift(fontref, &glyf, gid.into())?;
+                let component_shift = read_shift(fontref, &glyf, gid)?;
                 // XXX apply deltas
                 // kurbo::Affine::new expects [xx, yx, xy, yy, dx, dy]
                 let our_affine = kurbo::Affine::new([

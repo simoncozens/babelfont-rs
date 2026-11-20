@@ -538,8 +538,8 @@ mod tests {
             .iter()
             .map(|a| a.name.get_default().unwrap_or(&"".to_string()).to_string())
             .collect();
-        assert!(axis_names.contains(&"weight".to_string()));
-        assert!(axis_names.contains(&"width".to_string()));
+        assert!(axis_names.iter().any(|i| i == "weight"));
+        assert!(axis_names.iter().any(|i| i == "width"));
     }
 
     #[test]
