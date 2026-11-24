@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use super::BabelfontIrSource;
 use crate::{Font, MetricType};
@@ -241,6 +241,19 @@ fn selection_flags(font: &Font, italic_angle: f64) -> SelectionFlags {
 
 /// OS/2, head and post values the font states, where they differ from what a
 /// compiler would choose
+/// The font's Unicode variation sequences as fontc takes them, selector → base
+/// codepoint → glyph name, to write cmap format 14 from
+fn unicode_variation_sequences(font: &Font) -> BTreeMap<u32, BTreeMap<u32, GlyphName>> {
+    let mut sequences: BTreeMap<u32, BTreeMap<u32, GlyphName>> = BTreeMap::new();
+    for (&(selector, codepoint), glyph) in &font.variation_sequences {
+        sequences
+            .entry(selector)
+            .or_default()
+            .insert(codepoint, GlyphName::new(glyph));
+    }
+    sequences
+}
+
 fn set_stated_values(font: &Font, misc: &mut fontir::ir::MiscMetadata) {
     let ot = &font.custom_ot_values;
     if ot.os2_fs_type.is_some() {
@@ -458,6 +471,7 @@ impl Work<Context, WorkId, Error> for StaticMetadataWork {
         // }
 
         static_metadata.misc.created = Some(font.date.to_utc());
+        static_metadata.misc.unicode_variation_sequences = unicode_variation_sequences(font);
 
         // if let Some(meta_table) = default_instance
         //     .and_then(|di| di.custom_parameters.meta_table.as_ref())
