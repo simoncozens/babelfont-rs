@@ -1,6 +1,7 @@
 //! Un-compiling of GPOS lookups.
 
-use std::collections::HashMap;
+use fea_rs_ast::AsFea;
+use std::collections::{HashMap, HashSet};
 
 use fea_rs_ast::{
     Anchor as FeaAnchor, CursivePosStatement, GlyphClass, GlyphContainer, LookupBlock,
@@ -15,7 +16,7 @@ use skrifa::{
         tables::gpos::{
             AnchorTable, CursivePos, ExtensionPosFormat1, MarkBasePos, MarkLigPos, MarkMarkPos,
             PairPos, PositionChainContext, PositionLookup, PositionSequenceContext,
-            PositionSubtables, SinglePos, ValueRecord,
+            PositionSubtables, SinglePos, ValueFormat, ValueRecord,
         },
     },
 };
@@ -46,8 +47,33 @@ impl<'a> UncompileContext<'a> {
         for (i, lookup) in lookup_list.lookups().iter().flatten().enumerate() {
             self.assign_lookup_name(lookup.subtables()?.prefix(), i as u16, Pos);
         }
+        // the features each lookup is in: a compiler puts an anchor group in
+        // abvm or blwm by its name
+        if let Some(feature_list) = self.gpos.as_ref().and_then(|g| g.feature_list().ok()) {
+            for record in feature_list.feature_records() {
+                if let Ok(feature) = record.feature(feature_list.offset_data()) {
+                    for index in feature.lookup_list_indices() {
+                        self.gpos_lookup_features
+                            .entry(index.get())
+                            .or_default()
+                            .push(record.feature_tag());
+                    }
+                }
+            }
+        }
         for (i, lookup) in lookup_list.lookups().iter().flatten().enumerate() {
-            let mut block = lookup.subtables()?.uncompile(self, i as u16, Pos)?;
+            self.naming_lookup = Some((i as u16, lookup.lookup_type()));
+            let subtables = lookup.subtables()?;
+            // a pair lookup's varying values are stated at all of its regions
+            let regions = match &subtables {
+                PositionSubtables::Pair(pairs) => {
+                    Some(self.pair_lookup_regions(pairs.iter().flatten())?)
+                }
+                _ => None,
+            };
+            *self.lookup_regions.borrow_mut() = regions;
+            let mut block = subtables.uncompile(self, i as u16, Pos)?;
+            *self.lookup_regions.borrow_mut() = None;
             if let Some(Statement::Subtable(_)) = block.statements.last() {
                 block.statements.pop();
             }
@@ -185,19 +211,71 @@ impl<'a> UncompileContext<'a> {
                             .push(GlyphContainer::GlyphName(self.get_name(glyph)));
                     }
                 }
+                // Class 0 of the second glyphs is every glyph no other class
+                // has: a value against it kerns a first glyph with all of them
+                let class_zero_kerns = records.iter().any(|record| {
+                    record
+                        .as_ref()
+                        .and_then(|record| record.first())
+                        .and_then(|zero| zero.as_ref())
+                        .is_some_and(|zero| has_value(&zero.first) || has_value(&zero.second))
+                });
+                if class_zero_kerns {
+                    let classed: HashSet<u32> = class_def2
+                        .iter()
+                        .filter(|(_, class)| *class != 0)
+                        .map(|(glyph, _)| glyph.to_u32())
+                        .collect();
+                    let rest: Vec<GlyphContainer> = (0..self.num_glyphs as u32)
+                        .filter(|gid| !classed.contains(gid))
+                        .map(|gid| GlyphContainer::GlyphName(self.get_name(GlyphId::new(gid))))
+                        .collect();
+                    if !rest.is_empty() {
+                        classes2.insert(0, rest);
+                    }
+                }
+                // each class written once, by name where large
+                let mut keys1: Vec<u32> = classes1.keys().copied().collect();
+                keys1.sort();
+                let mut containers1: HashMap<u32, GlyphContainer> = HashMap::new();
+                for class in keys1 {
+                    containers1.insert(class, self.pair_class(classes1.get(&class)));
+                }
+                let mut keys2: Vec<u32> = classes2.keys().copied().collect();
+                keys2.sort();
+                let mut containers2: HashMap<u32, GlyphContainer> = HashMap::new();
+                for class in keys2 {
+                    containers2.insert(class, self.pair_class(classes2.get(&class)));
+                }
                 for (class1, record) in records.iter().enumerate() {
                     let Some(record) = record else { continue };
-                    let Some(first) = classes1.get(&(class1 as u32)) else {
+                    let Some(first) = containers1.get(&(class1 as u32)) else {
                         continue;
                     };
+                    // pairs that adjust nothing say nothing a missing pair does
+                    // not, but one keeps the row's first glyphs covered (later
+                    // subtables never see them); a dense class matrix is mostly
+                    // zeros
+                    let any_value = record.iter().enumerate().any(|(class2, value)| {
+                        containers2.contains_key(&(class2 as u32))
+                            && value.as_ref().is_some_and(|value| {
+                                has_value(&value.first) || has_value(&value.second)
+                            })
+                    });
+                    let mut row_written = false;
                     for (class2, value) in record.iter().enumerate() {
                         let Some(value) = value else { continue };
-                        let Some(second) = classes2.get(&(class2 as u32)) else {
+                        let Some(second) = containers2.get(&(class2 as u32)) else {
                             continue;
                         };
+                        let zero = !has_value(&value.first) && !has_value(&value.second);
+                        if zero && (any_value || row_written) {
+                            continue;
+                        }
+                        row_written = true;
                         block.statements.push(self.pair_statement(
-                            GlyphContainer::GlyphClass(GlyphClass::new(first.clone(), 0..0)),
-                            GlyphContainer::GlyphClass(GlyphClass::new(second.clone(), 0..0)),
+                            first.clone(),
+                            second.clone(),
                             &value.first,
                             &value.second,
                         )?);
@@ -206,6 +284,33 @@ impl<'a> UncompileContext<'a> {
             }
         }
         Ok(())
+    }
+
+    /// The variation regions any value of a pair lookup uses
+    fn pair_lookup_regions(
+        &self,
+        subtables: impl Iterator<Item = PairPos<'a>>,
+    ) -> Result<std::collections::BTreeSet<u16>, ReadError> {
+        let mut regions = std::collections::BTreeSet::new();
+        for subtable in subtables {
+            match subtable.positioning()? {
+                PairPositioning::Pairs { pair_sets, .. } => {
+                    for pair in pair_sets.iter().flatten() {
+                        for record in [&pair.first, &pair.first_is_next] {
+                            regions.extend(self.value_record_regions(record)?);
+                        }
+                    }
+                }
+                PairPositioning::Classes { records, .. } => {
+                    for value in records.iter().flatten().flatten().flatten() {
+                        for record in [&value.first, &value.second] {
+                            regions.extend(self.value_record_regions(record)?);
+                        }
+                    }
+                }
+            }
+        }
+        Ok(regions)
     }
 
     fn pair_statement(
@@ -378,17 +483,38 @@ impl<'a> UncompileContext<'a> {
             Self::build_class_anchor_map(resolved.iter().flat_map(|(_, name, rows)| {
                 rows.iter().map(|anchors| (name.clone(), anchors.clone()))
             }));
-        let class_names = self.prepare_guessed_mark_classes(mark_classes, &class_anchors);
+        // a ligature's anchors are named per component, as `top_1`, `top_2`
+        let ligature = !null_anchors_when_empty;
+        let mut ligature_components: IndexMap<u16, Vec<(SmolStr, usize, FeaAnchor)>> =
+            IndexMap::new();
+        if ligature {
+            for (_, name, rows) in &resolved {
+                for (component, anchors) in rows.iter().enumerate() {
+                    for (class, anchor) in anchors.iter().enumerate() {
+                        if let Some(anchor) = anchor {
+                            ligature_components.entry(class as u16).or_default().push((
+                                name.clone(),
+                                component + 1,
+                                anchor.clone(),
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+        self.ligature_components = ligature_components;
+        let class_names = self.prepare_guessed_mark_classes(mark_classes, &class_anchors, ligature);
 
         let mut statements = vec![];
         for (glyph, name, rows) in resolved {
             let mut components = vec![];
-            for anchors in rows {
+            for (component, anchors) in rows.into_iter().enumerate() {
                 let empty = anchors.iter().all(Option::is_none);
                 components.push(self.materialize_anchor_mark_classes(
                     &name,
                     &anchors,
                     &class_names,
+                    ligature.then_some(component + 1),
                     |class| {
                         (null_anchors_when_empty && empty) || !class_anchors.contains_key(&class)
                     },
@@ -403,8 +529,10 @@ impl<'a> UncompileContext<'a> {
         &mut self,
         mark_classes: IndexMap<u16, Vec<(GlyphContainer, FeaAnchor)>>,
         mark_class_to_target_glyph_anchor: &IndexMap<u16, IndexMap<SmolStr, FeaAnchor>>,
+        ligature: bool,
     ) -> IndexMap<u16, SmolStr> {
-        let guessed_names = self.guess_anchor_names(mark_class_to_target_glyph_anchor);
+        let guessed_names =
+            self.guess_anchor_names(&mark_classes, mark_class_to_target_glyph_anchor, ligature);
         let mut guessed_name_by_class: IndexMap<u16, SmolStr> = IndexMap::new();
         for (class_number, name) in mark_class_to_target_glyph_anchor
             .keys()
@@ -416,10 +544,11 @@ impl<'a> UncompileContext<'a> {
 
         let mut class_to_anchor_name: IndexMap<u16, SmolStr> = IndexMap::new();
         for (class_number, mark_class) in mark_classes {
-            let anchor_name = guessed_name_by_class
-                .get(&class_number)
-                .cloned()
-                .unwrap_or_else(|| self.mark_class_symbol(class_number));
+            // a class no glyph has an anchor for is named for nothing
+            let anchor_name = match guessed_name_by_class.get(&class_number) {
+                Some(name) => name.clone(),
+                None => self.group_name("anchor", &IndexMap::new(), Some(&mark_class)),
+            };
             self.register_mark_class(mark_class, &anchor_name);
             class_to_anchor_name.insert(class_number, anchor_name);
         }
@@ -446,11 +575,14 @@ impl<'a> UncompileContext<'a> {
     }
 
     /// Omit NULL anchors unless `keep_null` selects their class; compilers fill in the rest.
+    /// `component` is the 1-based ligature component the anchors belong to: a
+    /// ligature's anchor is named for its component, as `top_1`, `top_2`.
     fn materialize_anchor_mark_classes(
         &mut self,
         target_glyph_name: &SmolStr,
         class_anchors: &[Option<FeaAnchor>],
         class_to_anchor_name: &IndexMap<u16, SmolStr>,
+        component: Option<usize>,
         keep_null: impl Fn(u16) -> bool,
     ) -> Vec<(Option<FeaAnchor>, MarkClass)> {
         let mut anchors_mark_classes = vec![];
@@ -458,8 +590,14 @@ impl<'a> UncompileContext<'a> {
             let Some(anchor_name) = class_to_anchor_name.get(&(class_number as u16)) else {
                 continue;
             };
+            let registered_name = match component {
+                Some(component) => SmolStr::new(format!("{anchor_name}_{component}")),
+                None => anchor_name.clone(),
+            };
             match anchor {
-                Some(anchor) => self.register_anchor(target_glyph_name, anchor, Some(anchor_name)),
+                Some(anchor) => {
+                    self.register_anchor(target_glyph_name, anchor, Some(&registered_name))
+                }
                 None if !keep_null(class_number as u16) => continue,
                 None => {}
             }
@@ -468,12 +606,43 @@ impl<'a> UncompileContext<'a> {
         anchors_mark_classes
     }
 
+    /// Names each mark class of a lookup, as its anchors are named on glyphs.
+    ///
+    /// A class of the same marks with the same anchors as a class an earlier
+    /// lookup named (as a mark-to-mark lookup's often is) takes that name. An
+    /// ogonek class is `ogonek`. Otherwise a class is named for where most of
+    /// its anchors sit on their glyphs, if that name is free, else for its
+    /// number.
     fn guess_anchor_names(
         &mut self,
+        mark_classes: &IndexMap<u16, Vec<(GlyphContainer, FeaAnchor)>>,
         mark_class_to_base_glyph_anchor: &IndexMap<u16, IndexMap<SmolStr, FeaAnchor>>,
+        ligature: bool,
     ) -> Vec<SmolStr> {
         let mut new_names = vec![];
         for (class_number, base_glyphs_anchors) in mark_class_to_base_glyph_anchor {
+            let marks = mark_classes.get(class_number);
+            if let Some(name) = marks.and_then(|marks| self.same_mark_class(marks)) {
+                // A ligature's anchors are named per component
+                let agree = if ligature {
+                    self.ligature_anchors_agree(&name, *class_number)
+                } else {
+                    self.anchors_agree(&name, base_glyphs_anchors)
+                };
+                // and the name keeps the group after the earlier ones it must
+                // follow
+                if agree && self.keeps_order(&name, base_glyphs_anchors, marks) {
+                    if !ligature {
+                        self.anchors
+                            .entry(name.clone())
+                            .or_default()
+                            .extend(base_glyphs_anchors.clone());
+                    }
+                    self.record_group(&name, base_glyphs_anchors, marks);
+                    new_names.push(name);
+                    continue;
+                }
+            }
             let mut xs = vec![];
             let mut ys = vec![];
             for (base_glyph, anchor) in base_glyphs_anchors {
@@ -483,7 +652,7 @@ impl<'a> UncompileContext<'a> {
                 let bounds = self.glyph_metrics.bounds(gid).unwrap_or_default();
                 let width = self.glyph_metrics.advance_width(gid).unwrap_or_default();
                 let height = bounds.y_max - bounds.y_min;
-                let (x, y) = anchor_location(anchor);
+                let (x, y) = self.anchor_location(anchor);
                 let x_percentage = if width > 0.0 {
                     (x - bounds.x_min) / width
                 } else {
@@ -498,22 +667,240 @@ impl<'a> UncompileContext<'a> {
                 ys.push(y_percentage);
             }
             // Now guess: if they're all majority in top, topright, topleft, bottom, bottomright, bottomleft, center, etc
-            // in order if not already registered in the "anchors" field.
-            if let Some(name) = majority_in_quadrant(&xs, &ys)
-                && self.anchors.get(name).is_none()
-            {
-                new_names.push(name.into());
+            let zone = majority_in_quadrant(&xs, &ys);
+            let ogonek = marks.is_some_and(|marks| {
+                !marks.is_empty()
+                    && marks.iter().all(|(glyphs, _)| match glyphs {
+                        GlyphContainer::GlyphName(name) => self.ogonek_glyphs.contains(&name.name),
+                        _ => false,
+                    })
+            }) && matches!(zone, Some("bottom" | "bottomright") | None);
+            let guessed = if ogonek {
+                "ogonek"
+            } else {
+                zone.unwrap_or("anchor")
+            };
+            let name = self.group_name(guessed, base_glyphs_anchors, marks);
+            if !ligature {
                 self.anchors
-                    .insert(name.into(), base_glyphs_anchors.clone());
-                continue;
+                    .insert(name.clone(), base_glyphs_anchors.clone());
             }
-            // Create one with a symbol
-            let name = self.mark_class_symbol(*class_number);
-            self.anchors
-                .insert(name.clone(), base_glyphs_anchors.clone());
             new_names.push(name);
         }
         new_names
+    }
+
+    /// A name for an anchor group, from where its anchors are, that a
+    /// compiler builds the group from as it was: in the feature it was in
+    /// (abvm or blwm, by the name: fontc's is_below_mark), and after the
+    /// groups of earlier lookups that attach the same marks to the same
+    /// glyphs (it writes a lookup per group, in the order of their names:
+    /// make_mark_to_base_groups). Taken names get a number.
+    fn group_name(
+        &mut self,
+        guessed: &str,
+        targets: &IndexMap<SmolStr, FeaAnchor>,
+        marks: Option<&Vec<(GlyphContainer, FeaAnchor)>>,
+    ) -> SmolStr {
+        let (lookup, _) = self.naming_lookup.unwrap_or_default();
+        let features = self
+            .gpos_lookup_features
+            .get(&lookup)
+            .cloned()
+            .unwrap_or_default();
+        let in_feature = |tag: &[u8; 4]| features.contains(&skrifa::Tag::new(tag));
+        let base = if in_feature(b"blwm") && !is_below(guessed) {
+            "bottom".to_string()
+        } else if in_feature(b"abvm") && !in_feature(b"blwm") && is_below(guessed) {
+            match guessed.strip_prefix("bottom") {
+                Some(rest) => format!("below{rest}"),
+                None => "above".to_string(),
+            }
+        } else {
+            guessed.to_string()
+        };
+        let floor = self.floor(&base, targets, marks);
+        let free =
+            |name: &str| self.anchors.get(name).is_none() && self.mark_classes.get(name).is_none();
+        let candidates = std::iter::once(base.clone())
+            .chain((2..100).map(|n| format!("{base}{n}")))
+            .chain(
+                floor
+                    .iter()
+                    .flat_map(|floor| (2..100).map(move |n| format!("{floor}{n}"))),
+            );
+        let name: SmolStr = candidates
+            .into_iter()
+            .find(|c| free(c) && floor.as_ref().is_none_or(|f| c.as_str() > f.as_str()))
+            .unwrap_or_else(|| format!("{base}{}", self.named_groups.len() + 100))
+            .into();
+        if name != guessed {
+            self.provisional_anchor_names.insert(name.clone());
+        }
+        self.record_group(&name, targets, marks);
+        name
+    }
+
+    /// The last name of the groups of earlier lookups of this one's type and
+    /// feature that attach the same marks to the same glyphs: a name for this
+    /// group comes after it
+    fn floor(
+        &self,
+        name: &str,
+        targets: &IndexMap<SmolStr, FeaAnchor>,
+        marks: Option<&Vec<(GlyphContainer, FeaAnchor)>>,
+    ) -> Option<SmolStr> {
+        let (_, kind) = self.naming_lookup.unwrap_or_default();
+        let list = self.feature_list(name);
+        let (target_glyphs, mark_glyphs) = group_glyphs(targets, marks);
+        self.named_groups
+            .iter()
+            .filter(|g| {
+                g.kind == kind
+                    && g.list == list
+                    && g.name != name
+                    && !g.targets.is_disjoint(&target_glyphs)
+                    && !g.marks.is_disjoint(&mark_glyphs)
+            })
+            .map(|g| g.name.clone())
+            .max()
+    }
+
+    fn keeps_order(
+        &self,
+        name: &str,
+        targets: &IndexMap<SmolStr, FeaAnchor>,
+        marks: Option<&Vec<(GlyphContainer, FeaAnchor)>>,
+    ) -> bool {
+        self.floor(name, targets, marks)
+            .is_none_or(|floor| name > floor.as_str())
+    }
+
+    fn record_group(
+        &mut self,
+        name: &str,
+        targets: &IndexMap<SmolStr, FeaAnchor>,
+        marks: Option<&Vec<(GlyphContainer, FeaAnchor)>>,
+    ) {
+        let (_, kind) = self.naming_lookup.unwrap_or_default();
+        let list = self.feature_list(name);
+        let (targets, marks) = group_glyphs(targets, marks);
+        self.named_groups.push(NamedGroup {
+            name: name.into(),
+            kind,
+            list,
+            targets,
+            marks,
+        });
+    }
+
+    /// Which list of lookups a compiler puts a group of the lookup being read
+    /// in: for abvm and blwm, below by its name; else one for all
+    fn feature_list(&self, name: &str) -> Option<bool> {
+        let (lookup, _) = self.naming_lookup.unwrap_or_default();
+        let features = self.gpos_lookup_features.get(&lookup);
+        let in_feature = |tag: &[u8; 4]| {
+            features.is_some_and(|features| features.contains(&skrifa::Tag::new(tag)))
+        };
+        (in_feature(b"abvm") || in_feature(b"blwm")).then(|| is_below(name))
+    }
+
+    /// The name of a mark class already defined with exactly these marks and anchors
+    fn same_mark_class(&self, marks: &[(GlyphContainer, FeaAnchor)]) -> Option<SmolStr> {
+        let mut wanted: Vec<(String, String)> = marks
+            .iter()
+            .map(|(glyphs, anchor)| (glyphs.as_fea(""), anchor.as_fea("")))
+            .collect();
+        wanted.sort();
+        self.mark_classes.iter().find_map(|(name, definitions)| {
+            let mut defined: Vec<(String, String)> = definitions
+                .iter()
+                .map(|d| (d.glyphs.as_fea(""), d.anchor.as_fea("")))
+                .collect();
+            defined.sort();
+            (defined == wanted).then(|| name.clone())
+        })
+    }
+
+    /// A class of a pair positioning class definition: by name where it is
+    /// large, so that every pair it is in does not write it out again (class
+    /// kerning of hundreds of classes otherwise writes gigabytes)
+    fn pair_class(&mut self, glyphs: Option<&Vec<GlyphContainer>>) -> GlyphContainer {
+        let glyphs = glyphs.cloned().unwrap_or_default();
+        if glyphs.len() < crate::PROMOTE_TO_NAMED_CLASS_THRESHOLD {
+            return GlyphContainer::GlyphClass(GlyphClass::new(glyphs, 0..0));
+        }
+        let key = glyphs
+            .iter()
+            .map(|g| g.as_fea(""))
+            .collect::<Vec<_>>()
+            .join(" ");
+        if let Some(name) = self.pair_class_names.get(&key) {
+            return GlyphContainer::GlyphClassName(format!("@{name}").into());
+        }
+        let name: SmolStr = format!(
+            "{}{}",
+            crate::PAIR_CLASS_PREFIX,
+            self.pair_class_names.len() + 1
+        )
+        .into();
+        self.pair_class_names.insert(key, name.clone());
+        self.named_classes
+            .insert(name.clone(), GlyphClass::new(glyphs, 0..0));
+        GlyphContainer::GlyphClassName(format!("@{name}").into())
+    }
+
+    /// Whether no ligature has an anchor of this name and its component
+    /// somewhere else already, for the anchors of a mark class
+    fn ligature_anchors_agree(&self, name: &str, class_number: u16) -> bool {
+        self.ligature_components
+            .get(&class_number)
+            .into_iter()
+            .flatten()
+            .all(|(glyph, component, anchor)| {
+                self.anchors
+                    .get(format!("{name}_{component}").as_str())
+                    .and_then(|existing| existing.get(glyph))
+                    .is_none_or(|known| known.as_fea("") == anchor.as_fea(""))
+            })
+    }
+
+    /// Where an anchor is at the default location, where the glyph bounds it
+    /// is placed in are taken (the first value a variable one states is at
+    /// the lowest location: Asap's A bottom at wdth=75 falls left of its
+    /// default bounds' centre)
+    fn anchor_location(&self, anchor: &FeaAnchor) -> (f32, f32) {
+        let at_default = |metric: &Metric| match metric {
+            Metric::Scalar(s) => *s as f32,
+            Metric::Variable(items) => items
+                .iter()
+                .find(|(location, _)| {
+                    self.axes.as_ref().is_none_or(|axes| {
+                        axes.iter().all(|axis| {
+                            location
+                                .get(axis.tag.to_string().as_str())
+                                .is_none_or(|c| (c.0 - axis.default.to_f64()).abs() < 1e-3)
+                        })
+                    })
+                })
+                .or(items.first())
+                .map(|(_, value)| *value as f32)
+                .unwrap_or(0.0),
+            Metric::GlyphsAppNumber(_) => 0.0,
+        };
+        (at_default(&anchor.x), at_default(&anchor.y))
+    }
+
+    /// Whether no glyph has an anchor of this name somewhere else already
+    fn anchors_agree(&self, name: &str, anchors: &IndexMap<SmolStr, FeaAnchor>) -> bool {
+        let Some(existing) = self.anchors.get(name) else {
+            return true;
+        };
+        anchors.iter().all(|(glyph, anchor)| {
+            existing
+                .get(glyph)
+                .is_none_or(|known| known.as_fea("") == anchor.as_fea(""))
+        })
     }
 }
 
@@ -674,24 +1061,75 @@ impl_uncompile_subtables!(PositionSubtables, empty = "gpos_extension", {
     ChainContextual => ChainContextualKind,
 });
 
-fn anchor_location(anchor: &FeaAnchor) -> (f32, f32) {
-    let x = match &anchor.x {
-        Metric::Scalar(s) => *s as f32,
-        Metric::Variable(items) => items
-            .first()
-            .map(|(_loc, value)| *value as f32)
-            .unwrap_or(0.0),
-        Metric::GlyphsAppNumber(_) => 0.0, // You deserve to lose
-    };
-    let y = match &anchor.y {
-        Metric::Scalar(s) => *s as f32,
-        Metric::Variable(items) => items
-            .first()
-            .map(|(_loc, value)| *value as f32)
-            .unwrap_or(0.0),
-        Metric::GlyphsAppNumber(_) => 0.0,
-    };
-    (x, y)
+/// Whether a value record moves anything, in its values or its devices
+fn has_value(record: &ValueRecord) -> bool {
+    [
+        record.x_placement(),
+        record.y_placement(),
+        record.x_advance(),
+        record.y_advance(),
+    ]
+    .iter()
+    .any(|value| value.is_some_and(|value| value != 0))
+        || [
+            ValueFormat::X_PLACEMENT_DEVICE,
+            ValueFormat::Y_PLACEMENT_DEVICE,
+            ValueFormat::X_ADVANCE_DEVICE,
+            ValueFormat::Y_ADVANCE_DEVICE,
+        ]
+        .into_iter()
+        .any(|field| {
+            record
+                .device_offset(field)
+                .is_some_and(|offset| !offset.is_null())
+        })
+}
+
+/// An anchor group as a compiler orders it: by name, among the lookups of one
+/// type in one feature
+pub(crate) struct NamedGroup {
+    name: SmolStr,
+    /// the lookup type
+    kind: u16,
+    /// the feature list its lookup is in: abvm or blwm (by its name), or
+    /// mark and mkmk, where a compiler orders all groups together
+    list: Option<bool>,
+    /// the bases, ligatures or marks attached to
+    targets: HashSet<SmolStr>,
+    marks: HashSet<SmolStr>,
+}
+
+/// Whether fontc puts an anchor group in blwm rather than abvm
+fn is_below(name: &str) -> bool {
+    name.starts_with("bottom") || name == "nukta"
+}
+
+/// The glyphs a group attaches to, and its marks
+fn group_glyphs(
+    targets: &IndexMap<SmolStr, FeaAnchor>,
+    marks: Option<&Vec<(GlyphContainer, FeaAnchor)>>,
+) -> (HashSet<SmolStr>, HashSet<SmolStr>) {
+    (
+        targets.keys().cloned().collect(),
+        marks
+            .into_iter()
+            .flatten()
+            .flat_map(|(glyphs, _)| glyph_names(glyphs))
+            .collect(),
+    )
+}
+
+/// The glyph names of a glyph or class
+fn glyph_names(glyphs: &GlyphContainer) -> Vec<SmolStr> {
+    match glyphs {
+        GlyphContainer::GlyphName(name) => vec![name.name.clone()],
+        other => other
+            .as_fea("")
+            .trim_matches(|c| c == '[' || c == ']')
+            .split_whitespace()
+            .map(SmolStr::from)
+            .collect(),
+    }
 }
 
 fn majority_in_quadrant(xs: &[f32], ys: &[f32]) -> Option<&'static str> {

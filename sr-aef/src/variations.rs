@@ -102,6 +102,42 @@ impl<'a> UncompileContext<'a> {
             .transpose()
     }
 
+    /// The variation regions a value record's deltas use
+    pub(crate) fn value_record_regions(
+        &self,
+        value_record: &skrifa::raw::tables::gpos::ValueRecord,
+    ) -> Result<Vec<u16>, ReadError> {
+        let Some(variations) = self.variation_store()? else {
+            return Ok(vec![]);
+        };
+        let mut out = vec![];
+        for device in [
+            value_record.x_placement_device(),
+            value_record.y_placement_device(),
+            value_record.x_advance_device(),
+            value_record.y_advance_device(),
+        ] {
+            let Some(Ok(DeviceOrVariationIndex::VariationIndex(varix))) = device else {
+                continue;
+            };
+            let Some(data) = variations
+                .item_variation_data()
+                .get(varix.delta_set_outer_index() as usize)
+            else {
+                continue;
+            };
+            let data = data?;
+            out.extend(
+                data.region_indexes()
+                    .iter()
+                    .zip(data.delta_set(varix.delta_set_inner_index()))
+                    .filter(|(_, delta)| *delta != 0)
+                    .map(|(region, _)| region.get()),
+            );
+        }
+        Ok(out)
+    }
+
     fn variation_locations(
         &self,
         index: DeltaSetIndex,
@@ -114,15 +150,25 @@ impl<'a> UncompileContext<'a> {
             && let Some(data) = variations.item_variation_data().get(index.outer as usize)
         {
             let data = data?;
-            for (region_index, delta) in data
+            let own: Vec<u16> = data
                 .region_indexes()
                 .iter()
                 .zip(data.delta_set(index.inner))
-            {
-                if delta == 0 {
-                    continue;
-                }
-                let region_axes = regions.get(region_index.get() as usize)?.region_axes();
+                .filter(|(_, delta)| *delta != 0)
+                .map(|(region, _)| region.get())
+                .collect();
+            // A kerning value that varies is stated wherever its lookup's
+            // values vary: a compiler kerns from one set of locations, and
+            // stated only where its own deltas are not zero, a reader would
+            // interpolate between fewer of them than the compiler did, and
+            // differently (Big Shoulders' intermediate weight master)
+            let lookup_regions = self.lookup_regions.borrow().clone();
+            let used: Vec<u16> = match lookup_regions {
+                Some(lookup) if !own.is_empty() => lookup.into_iter().collect(),
+                _ => own,
+            };
+            for region_index in used {
+                let region_axes = regions.get(region_index as usize)?.region_axes();
                 let peak: Vec<F2Dot14> = region_axes
                     .iter()
                     .map(|region_axis| region_axis.peak_coord())
@@ -178,21 +224,26 @@ impl<'a> UncompileContext<'a> {
     ) -> Option<(String, f32, f32)> {
         let tag = self.axis_tags.get(condition.axis_index() as usize)?;
         let axis = self.axes.as_ref()?.get(&to_fd_tag(*tag))?;
+        // A feature file states a condition in whole user units (and fea-rs-ast
+        // reads no other), so the whole number that stores as the same value,
+        // or failing one, the nearest
         let to_user = |value: F2Dot14| {
             let user = NormalizedCoord::new(value.to_f32() as f64)
                 .to_user(&axis.converter)
                 .to_f64();
-            let rounded = UserCoord::new(user.round());
-            if rounded
-                .to_normalized(&axis.converter)
-                .to_f2dot14()
-                .to_bits()
-                == value.to_bits()
-            {
-                rounded.to_f64() as f32
-            } else {
-                user as f32
-            }
+            let exact = |candidate: f64| {
+                UserCoord::new(candidate)
+                    .to_normalized(&axis.converter)
+                    .to_f2dot14()
+                    .to_bits()
+                    == value.to_bits()
+            };
+            let nearest = user.round();
+            [0.0, -1.0, 1.0, -2.0, 2.0]
+                .into_iter()
+                .map(|offset| nearest + offset)
+                .find(|candidate| exact(*candidate))
+                .unwrap_or(nearest) as f32
         };
         Some((
             tag.to_string(),
@@ -219,6 +270,9 @@ impl<'a> UncompileContext<'a> {
                 .iter()
                 .map(|(user_loc, coords)| {
                     let delta = ivs.compute_delta(index, coords).unwrap_or_default();
+                    if let Some(simple) = self.simple_locations.borrow().get(coords) {
+                        return (simple.clone(), (default as i32 + delta.to_i32()) as i16);
+                    }
                     let simple_user_loc: SimpleUserLocation = user_loc
                         .iter()
                         .map(|(tag, coord)| {
@@ -238,7 +292,9 @@ impl<'a> UncompileContext<'a> {
                             (tag.to_string().into(), OrderedFloat(coord.to_f64()))
                         })
                         .collect();
-
+                    self.simple_locations
+                        .borrow_mut()
+                        .insert(coords.clone(), simple_user_loc.clone());
                     (simple_user_loc, (default as i32 + delta.to_i32()) as i16)
                 })
                 .collect();

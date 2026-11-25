@@ -1,0 +1,8 @@
+# two mark-to-ligature lookups attach one mark class at different places
+languagesystem DFLT dflt;
+table GDEF { GlyphClassDef , [f_f], [acutecomb], ; } GDEF;
+markClass acutecomb <anchor 0 500> @TOP;
+lookup one { pos ligature f_f <anchor 100 700> mark @TOP ligComponent <anchor 400 700> mark @TOP; } one;
+lookup two { pos ligature f_f <anchor 150 750> mark @TOP ligComponent <anchor 450 750> mark @TOP; } two;
+feature mark { lookup one; } mark;
+feature ss01 { lookup two; } ss01;

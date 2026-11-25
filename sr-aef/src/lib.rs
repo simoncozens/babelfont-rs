@@ -79,6 +79,9 @@ type FeatureLanguageSystems = Vec<(LanguageSystem, bool)>; // and whether the fe
 
 const PROMOTE_TO_NAMED_CLASS_THRESHOLD: usize = 5;
 
+/// The prefix of the names of pair positioning classes
+pub const PAIR_CLASS_PREFIX: &str = "pair_class_";
+
 /// The context object that holds all the information we need when uncompiling a font.
 #[cfg_attr(feature = "cli", derive(serde::Serialize))]
 pub struct UncompileContext<'a> {
@@ -96,6 +99,15 @@ pub struct UncompileContext<'a> {
         serde(serialize_with = "crate::serialize::serialize_language_systems")
     )]
     pub language_systems: IndexMap<Tag, IndexSet<Tag>>,
+    /// The language systems to declare: those of GPOS, where a compiler
+    /// generates kerning and mark attachment (it registers them under every
+    /// declared language system), or all of them for a font without GPOS.
+    /// A feature registered elsewhere states its scripts and languages.
+    #[cfg_attr(
+        feature = "cli",
+        serde(serialize_with = "crate::serialize::serialize_language_systems")
+    )]
+    pub declared_language_systems: IndexMap<Tag, IndexSet<Tag>>,
     /// Anchors on a glyph which we haven't worked out what they should be called.
     /// class -> glyphname -> anchor
     pub unnamed_anchors: IndexMap<SmolStr, Vec<Anchor>>,
@@ -140,10 +152,43 @@ pub struct UncompileContext<'a> {
     num_glyphs: u16,
     /// Lookups whose rules were written into aalt
     aalt_lookups: IndexSet<SmolStr>,
+    /// Ogonek marks: the glyph U+0328 maps to, and glyphs named for an ogonek
+    #[cfg_attr(feature = "cli", serde(skip))]
+    ogonek_glyphs: HashSet<SmolStr>,
+    /// While a mark-to-ligature lookup is named: each mark class's anchors
+    /// on ligatures, by glyph and 1-based component
+    #[cfg_attr(feature = "cli", serde(skip))]
+    ligature_components: IndexMap<u16, Vec<(SmolStr, usize, Anchor)>>,
+    /// Variation locations as metrics state them, by normalized coordinates
+    /// Pair positioning classes written by name, by their members
+    #[cfg_attr(feature = "cli", serde(skip))]
+    pair_class_names: HashMap<String, SmolStr>,
+    #[cfg_attr(feature = "cli", serde(skip))]
+    simple_locations:
+        std::cell::RefCell<HashMap<Vec<skrifa::raw::types::F2Dot14>, SimpleUserLocation>>,
+    /// The GPOS lookup being read and its type, for naming its anchors
+    #[cfg_attr(feature = "cli", serde(skip))]
+    naming_lookup: Option<(u16, u16)>,
+    /// GPOS lookups by the features that refer to them
+    #[cfg_attr(feature = "cli", serde(skip))]
+    gpos_lookup_features: HashMap<u16, Vec<Tag>>,
+    /// The anchor groups named so far, as a compiler orders them
+    #[cfg_attr(feature = "cli", serde(skip))]
+    named_groups: Vec<gpos::NamedGroup>,
+    /// Anchor names made up where the anchors' place gave none, or the name
+    /// it gave was taken: a reader who knows what the marks are may rename them
+    #[cfg_attr(feature = "cli", serde(skip))]
+    pub provisional_anchor_names: IndexSet<SmolStr>,
+    /// The variation regions the pair lookup being read uses
+    #[cfg_attr(feature = "cli", serde(skip))]
+    lookup_regions: std::cell::RefCell<Option<std::collections::BTreeSet<u16>>>,
 }
 
 impl<'a> UncompileContext<'a> {
-    fn new(font: &'a skrifa::FontRef) -> Result<Self, ReadError> {
+    fn new(
+        font: &'a skrifa::FontRef,
+        generated_scripts: Option<&std::collections::HashSet<Tag>>,
+    ) -> Result<Self, ReadError> {
         let glyph_names = GlyphNames::new(font);
         let default = LocationRef::default();
         let glyph_metrics = GlyphMetrics::new(font, Size::unscaled(), default);
@@ -156,6 +201,14 @@ impl<'a> UncompileContext<'a> {
             .iter()
             .map(|(gid, name): (&GlyphId, &SmolStr)| (name.clone(), *gid))
             .collect();
+        let ogonek = skrifa::MetadataProvider::charmap(font).map(0x0328_u32);
+        let ogonek_glyphs = glyph_id_to_name
+            .iter()
+            .filter(|(gid, name)| {
+                name.to_ascii_lowercase().contains("ogonek") || ogonek == Some(**gid)
+            })
+            .map(|(_, name)| name.clone())
+            .collect();
         let mut slf = Self {
             lookups: IndexMap::new(),
             lookup_map: HashMap::new(),
@@ -165,6 +218,7 @@ impl<'a> UncompileContext<'a> {
             gdef: font.gdef().ok(),
             name: font.name().ok(),
             language_systems: IndexMap::new(),
+            declared_language_systems: IndexMap::new(),
             unnamed_anchors: IndexMap::new(),
             anchors: IndexMap::new(),
             mark_classes: IndexMap::new(),
@@ -174,6 +228,7 @@ impl<'a> UncompileContext<'a> {
             glyph_metrics,
             glyph_id_to_name,
             glyph_name_to_id,
+            ogonek_glyphs,
             axis_tags: font
                 .fvar()
                 .ok()
@@ -183,8 +238,16 @@ impl<'a> UncompileContext<'a> {
             axes: variations::fontdrasil_axes(font)?,
             num_glyphs: glyph_names.num_glyphs() as u16,
             aalt_lookups: IndexSet::new(),
+            ligature_components: IndexMap::new(),
+            simple_locations: Default::default(),
+            lookup_regions: Default::default(),
+            naming_lookup: None,
+            gpos_lookup_features: HashMap::new(),
+            named_groups: vec![],
+            provisional_anchor_names: IndexSet::new(),
+            pair_class_names: HashMap::new(),
         };
-        slf.gather_language_systems()?;
+        slf.gather_language_systems(generated_scripts)?;
         slf.uncompile_gsub_lookups()?;
         slf.uncompile_gpos_lookups()?;
         slf.uncompile_feature_table()?;
@@ -242,15 +305,16 @@ impl<'a> UncompileContext<'a> {
         GlyphName::new(&str)
     }
 
-    fn gather_language_systems(&mut self) -> Result<(), ReadError> {
-        let mut systems = IndexMap::new();
-        for script_list in [
-            self.gsub.as_ref().and_then(|g| g.script_list().ok()),
-            self.gpos.as_ref().and_then(|g| g.script_list().ok()),
-        ]
-        .into_iter()
-        .flatten()
-        {
+    fn gather_language_systems(
+        &mut self,
+        generated_scripts: Option<&std::collections::HashSet<Tag>>,
+    ) -> Result<(), ReadError> {
+        let gather = |script_list: Option<ScriptList>,
+                      systems: &mut IndexMap<Tag, IndexSet<Tag>>|
+         -> Result<(), ReadError> {
+            let Some(script_list) = script_list else {
+                return Ok(());
+            };
             for script_record in script_list.script_records() {
                 let script_tag = script_record.script_tag();
                 let languages: &mut IndexSet<Tag> = systems.entry(script_tag).or_default();
@@ -263,21 +327,93 @@ impl<'a> UncompileContext<'a> {
                     languages.insert(lang_sys_tag);
                 }
             }
+            Ok(())
+        };
+        let dflt_first = |systems: &mut IndexMap<Tag, IndexSet<Tag>>| {
+            if let Some(index) = systems.get_index_of(&Tag::new(b"DFLT")) {
+                systems.move_index(index, 0);
+                let languages = &mut systems[0];
+                if let Some(index) = languages.get_index_of(&Tag::new(b"dflt")) {
+                    languages.move_index(index, 0);
+                }
+            }
+        };
+        let mut systems = IndexMap::new();
+        gather(
+            self.gsub.as_ref().and_then(|g| g.script_list().ok()),
+            &mut systems,
+        )?;
+        gather(
+            self.gpos.as_ref().and_then(|g| g.script_list().ok()),
+            &mut systems,
+        )?;
+        dflt_first(&mut systems);
+        // GPOS's language systems, but a script's that a compiler's kern
+        // writer adds for the characters it kerns (fontc's
+        // assign_lookups_to_scripts: under the default language, holding
+        // nothing but kern and dist): declared, it would take the mark
+        // attachment a compiler registers under every declared one
+        let mut declared: IndexMap<Tag, IndexSet<Tag>> = IndexMap::new();
+        if let Some(gpos) = self.gpos.as_ref() {
+            let dflt = Tag::new(b"dflt");
+            let script_list = gpos.script_list()?;
+            let feature_list = gpos.feature_list()?;
+            let generated_only = |lang_sys: &skrifa::raw::tables::layout::LangSys| {
+                lang_sys.feature_indices().iter().all(|index| {
+                    feature_list
+                        .feature_records()
+                        .get(index.get() as usize)
+                        .is_some_and(|record| {
+                            [Tag::new(b"kern"), Tag::new(b"dist")].contains(&record.feature_tag())
+                        })
+                }) && lang_sys.required_feature_index() == 0xFFFF
+            };
+            for script_record in script_list.script_records() {
+                let script = script_record.script(script_list.offset_data())?;
+                let mut languages = vec![];
+                if let Some(lang_sys) = script.default_lang_sys() {
+                    languages.push((Tag::new(b"dflt"), lang_sys?));
+                }
+                for record in script.lang_sys_records() {
+                    languages.push((
+                        record.lang_sys_tag(),
+                        record.lang_sys(script.offset_data())?,
+                    ));
+                }
+                let script_tag = script_record.script_tag();
+                let generated = generated_scripts.is_some_and(|scripts| {
+                    (script_tag == Tag::new(b"DFLT") || scripts.contains(&script_tag))
+                        && languages.iter().all(|(language, lang_sys)| {
+                            *language == dflt && generated_only(lang_sys)
+                        })
+                });
+                if !generated {
+                    declared
+                        .entry(script_tag)
+                        .or_default()
+                        .extend(languages.iter().map(|(language, _)| *language));
+                }
+            }
         }
-        if let Some(index) = systems.get_index_of(&Tag::new(b"DFLT")) {
-            systems.move_index(index, 0);
-            let languages = &mut systems[0];
-            if let Some(index) = languages.get_index_of(&Tag::new(b"dflt")) {
-                languages.move_index(index, 0);
+        if self.gpos.is_none() {
+            declared = systems.clone();
+        } else {
+            // in the order of all of them
+            declared.sort_by(|a, _, b, _| systems.get_index_of(a).cmp(&systems.get_index_of(b)));
+            for (script, languages) in declared.iter_mut() {
+                if let Some(all) = systems.get(script) {
+                    languages.sort_by(|a, b| all.get_index_of(a).cmp(&all.get_index_of(b)));
+                }
             }
         }
         self.language_systems = systems;
+        self.declared_language_systems = declared;
         Ok(())
     }
 
     fn dump_language_systems(&self) -> Vec<ToplevelItem> {
         let mut items = vec![];
-        for (script_tag, lang_sys_tags) in &self.language_systems {
+        for (script_tag, lang_sys_tags) in &self.declared_language_systems {
             for lang_sys_tag in lang_sys_tags {
                 let lss =
                     LanguageSystemStatement::new(script_tag.to_string(), lang_sys_tag.to_string());
@@ -353,16 +489,6 @@ impl<'a> UncompileContext<'a> {
     pub(crate) fn gensym(&mut self, prefix: &str) -> SmolStr {
         let symbol_index = self.symbols.entry(prefix.into()).or_insert(1);
         let name = SmolStr::new(format!("{}_{}", prefix, symbol_index));
-        *symbol_index += 1;
-        name
-    }
-
-    /// A made-up name for a mark class's anchor. It must not end in `_<digits>`,
-    /// which denotes a ligature component's anchor.
-    pub(crate) fn mark_class_symbol(&mut self, class_number: u16) -> SmolStr {
-        let prefix = SmolStr::new(format!("mark_class_{}x", class_number));
-        let symbol_index = self.symbols.entry(prefix.clone()).or_insert(1);
-        let name = SmolStr::new(format!("{}{}", prefix, symbol_index));
         *symbol_index += 1;
         name
     }
@@ -556,6 +682,24 @@ impl<'a> UncompileContext<'a> {
             return Ok(vec![]);
         }
         Ok(vec![ToplevelItem::Gdef(Table { statements })])
+    }
+
+    /// The font's GDEF statements but for its glyph classes (which a font
+    /// source states as glyph categories): attachment points and ligature
+    /// carets
+    pub fn gdef_without_glyph_classes(&mut self) -> Result<Vec<GdefStatement>, ReadError> {
+        let mut out = vec![];
+        for item in self.uncompile_gdef()? {
+            if let ToplevelItem::Gdef(table) = item {
+                out.extend(
+                    table
+                        .statements
+                        .into_iter()
+                        .filter(|s| !matches!(s, GdefStatement::GlyphClassDef(_))),
+                );
+            }
+        }
+        Ok(out)
     }
 
     fn uncompile_feature_table(&mut self) -> Result<(), ReadError> {
@@ -839,9 +983,16 @@ impl<'a> UncompileContext<'a> {
         systems: &IndexMap<LanguageSystem, (bool, Vec<Statement>)>,
     ) -> Option<Vec<Statement>> {
         let dflt = Tag::new(b"dflt");
-        let system_count: usize = self.language_systems.values().map(|l| l.len()).sum();
+        // a feature with no script statement is registered under every
+        // declared language system
+        let declared: Vec<LanguageSystem> = self
+            .declared_language_systems
+            .iter()
+            .flat_map(|(script, languages)| languages.iter().map(|l| (*script, *l)))
+            .collect();
         let (_, first) = &systems[0];
-        let everywhere = systems.len() == system_count
+        let everywhere = systems.len() == declared.len()
+            && declared.iter().all(|system| systems.contains_key(system))
             && systems.values().all(|(required, lookups)| {
                 !required
                     && lookups.len() == first.len()
@@ -1172,7 +1323,7 @@ pub fn uncompile(
     font: &skrifa::FontRef,
     do_gdef: bool,
 ) -> Result<fea_rs_ast::FeatureFile, ReadError> {
-    let mut context = UncompileContext::new(font)?;
+    let mut context = UncompileContext::new(font, None)?;
 
     let mut ff = fea_rs_ast::FeatureFile::new(vec![]);
     ff.statements.extend(context.dump_language_systems());
@@ -1235,17 +1386,45 @@ pub fn uncompile_bytes(
 /// put them where you want them. Useful for font editors and other tools that want the
 /// data but don't want to go all the way to a fea file.
 pub fn uncompile_context<'a>(font: &'a skrifa::FontRef) -> Result<UncompileContext<'a>, ReadError> {
-    UncompileContext::new(font)
+    UncompileContext::new(font, None)
+}
+
+/// [uncompile_context], knowing the scripts a compiler kerns the font's
+/// characters in (OpenType tags): a script record holding only the kerning
+/// it generates there is not declared
+pub fn uncompile_context_with_scripts<'a>(
+    font: &'a skrifa::FontRef,
+    generated_scripts: &std::collections::HashSet<Tag>,
+) -> Result<UncompileContext<'a>, ReadError> {
+    UncompileContext::new(font, Some(generated_scripts))
 }
 
 /// The glyph names the uncompiled features use: the post table's, valid in a
 /// feature file and unique.
 pub fn unique_glyph_names(font: &skrifa::FontRef) -> Vec<SmolStr> {
     let glyph_names = GlyphNames::new(font);
+    // in one pass: looking each name up walks the post table's names from
+    // the start, which for tens of thousands of glyphs takes seconds
+    let mut names: Vec<Option<SmolStr>> = vec![None; glyph_names.num_glyphs() as usize];
+    for (gid, name) in glyph_names.iter() {
+        if let Some(slot) = names.get_mut(gid.to_u32() as usize) {
+            let name = match name {
+                name if !name.is_synthesized() => name.to_string(),
+                _ if gid.to_u32() == 0 => ".notdef".to_string(),
+                _ => format!("glyph{:05}", gid.to_u32()),
+            };
+            *slot = Some(fea_glyph_name(&name));
+        }
+    }
     unique_names(
-        (0..glyph_names.num_glyphs())
-            .map(GlyphId::new)
-            .map(|gid| fea_glyph_name(&glyph_name(&glyph_names, gid)))
+        names
+            .into_iter()
+            .enumerate()
+            .map(|(gid, name)| {
+                name.unwrap_or_else(|| {
+                    fea_glyph_name(&glyph_name(&glyph_names, GlyphId::new(gid as u32)))
+                })
+            })
             .collect(),
     )
 }
@@ -1284,6 +1463,9 @@ fn fea_glyph_name(name: &str) -> SmolStr {
 fn unique_names(names: Vec<SmolStr>) -> Vec<SmolStr> {
     let all: HashSet<SmolStr> = names.iter().cloned().collect();
     let mut taken: HashSet<SmolStr> = HashSet::new();
+    // the next suffix to try for each base: every one before it is taken, so
+    // thousands of glyphs of one name do not each count up from 1
+    let mut next: HashMap<String, usize> = HashMap::new();
     names
         .into_iter()
         .map(|name| {
@@ -1294,10 +1476,14 @@ fn unique_names(names: Vec<SmolStr>) -> Vec<SmolStr> {
                 Some(rest) => format!("_{rest}"),
                 None => name.to_string(),
             };
-            (1..)
-                .map(|n| SmolStr::new(format!("{base}.{n}")))
-                .find(|candidate| !all.contains(candidate) && taken.insert(candidate.clone()))
-                .unwrap_or(name)
+            let n = next.entry(base.clone()).or_insert(1);
+            loop {
+                let candidate = SmolStr::new(format!("{base}.{n}"));
+                *n += 1;
+                if !all.contains(&candidate) && taken.insert(candidate.clone()) {
+                    return candidate;
+                }
+            }
         })
         .collect()
 }
@@ -1322,7 +1508,7 @@ GlyphClassDef [A], [], [grave acute dotbelowcomb], [];
 
 markClass grave <anchor 200 150> @bottomleft;
 markClass acute <anchor 350 0> @bottomleft;
-markClass dotbelowcomb <anchor 200 -200> @mark_class_1x1;
+markClass dotbelowcomb <anchor 200 -200> @bottomleft2;
 lookup gsub_single_1 {
     sub a by b;
 } gsub_single_1;
@@ -1377,7 +1563,7 @@ lookup gsub_single_6 {
 lookup gpos_mark_to_base_1 {
     pos base A
         <anchor 150 100> mark @bottomleft
-        <anchor -200 -200> mark @mark_class_1x1;
+        <anchor -200 -200> mark @bottomleft2;
 } gpos_mark_to_base_1;
 lookup gpos_single_1 {
     pos A 10;
@@ -1516,6 +1702,19 @@ LigatureCaretByIndex b 3;
     }
 
     #[test]
+    fn test_gdef_without_glyph_classes() {
+        let data = std::fs::read("resources/carets.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let mut context = uncompile_context(&fontref).unwrap();
+        let gdef = context.gdef_without_glyph_classes().unwrap();
+        let gdef: Vec<String> = gdef.iter().map(|s| s.as_fea("")).collect();
+        assert_eq!(
+            gdef,
+            ["LigatureCaretByPos a 100 200;", "LigatureCaretByIndex b 3;"]
+        );
+    }
+
+    #[test]
     fn test_uncompile_empty_mark_attachment_class() {
         let data = std::fs::read("resources/markattach.ttf").unwrap();
         let fontref = skrifa::FontRef::new(&data).unwrap();
@@ -1610,6 +1809,56 @@ lookup gpos_pair_1;
     }
 
     #[test]
+    fn test_uncompile_class_zero_kerning() {
+        // class 0 of the second glyphs is every glyph no other class has
+        let data = std::fs::read("resources/class0.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let fea = uncompile(&fontref, true).unwrap().as_fea("");
+        assert!(
+            fea.contains("@pair_class_1 = [.notdef a b d e];")
+                && fea.contains("pos [a b] @pair_class_1 -20;"),
+            "{fea}"
+        );
+        assert!(fea.contains("pos [a b] [c] -10;"), "{fea}");
+    }
+
+    #[test]
+    fn test_ligature_anchors_of_one_class_differ() {
+        // the second lookup's ligature anchors are not the first's: they
+        // take another name rather than overwrite topleft_1 and topleft_2
+        let data = std::fs::read("resources/ligconflict.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let context = uncompile_context(&fontref).unwrap();
+        let names: Vec<&SmolStr> = context
+            .anchors
+            .iter()
+            .filter(|(_, glyphs)| glyphs.contains_key("f_f"))
+            .map(|(name, _)| name)
+            .collect();
+        assert_eq!(names.len(), 4, "{names:?}");
+        let first = context
+            .anchors
+            .get("topleft_1")
+            .unwrap()
+            .get("f_f")
+            .unwrap();
+        assert_eq!(first.as_fea(""), "<anchor 100 700>");
+    }
+
+    #[test]
+    fn test_shadowed_ligature_is_left_out() {
+        let data = std::fs::read("resources/ligdup.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let fea = uncompile(&fontref, true).unwrap().as_fea("");
+        assert!(fea.contains("sub f f by f_f;"), "{fea}");
+        assert!(
+            !fea.lines().any(|l| l.trim() == "sub f f by f_f.alt;"),
+            "{fea}"
+        );
+        assert!(fea.contains("# sub f f by f_f.alt; is shadowed"), "{fea}");
+    }
+
+    #[test]
     fn test_uncompile_feature_names() {
         let data = std::fs::read("resources/featurenames.ttf").unwrap();
         let fontref = skrifa::FontRef::new(&data).unwrap();
@@ -1681,6 +1930,39 @@ feature kern {
 lookup gpos_single_1;
 } kern;
 "
+        );
+    }
+
+    #[test]
+    fn test_uncompile_pair_values_at_their_lookups_regions() {
+        // a c varies over one region of the two its lookup's values vary
+        // over: it is stated at both, as a compiler kerns from one set of
+        // locations (resources/lookupregions.py)
+        let data = std::fs::read("resources/lookupregions.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let ff = uncompile(&fontref, true).unwrap();
+        let fea = ff.as_fea("");
+        assert!(
+            fea.contains("pos a b (wght=100:-30 wght=500:-50 wght=900:-50);"),
+            "{fea}"
+        );
+        assert!(
+            fea.contains("pos a c (wght=100:-50 wght=500:-70 wght=900:-90);"),
+            "{fea}"
+        );
+    }
+
+    #[test]
+    fn test_anchor_names_from_the_default_location() {
+        // A's anchor is centred at the default weight, at its left edge at
+        // the lightest (resources/anchordefault.py)
+        let data = std::fs::read("resources/anchordefault.ttf").unwrap();
+        let fontref = skrifa::FontRef::new(&data).unwrap();
+        let context = uncompile_context(&fontref).unwrap();
+        assert!(
+            context.anchors.contains_key("top"),
+            "{:?}",
+            context.anchors.keys()
         );
     }
 
@@ -1800,6 +2082,18 @@ lookup gpos_pair_1;
             unique_names(names.to_vec()),
             [".notdef", "_notdef.1", "a", "a.2", "a.1"]
         );
+    }
+
+    #[test]
+    fn test_many_glyphs_of_one_name() {
+        // AquaKana names 16,579 glyphs .notdef: each takes the next suffix
+        // without counting up from 1 again (which took minutes)
+        let names = vec![SmolStr::new(".notdef"); 50_000];
+        let start = std::time::Instant::now();
+        let unique = unique_names(names);
+        assert!(start.elapsed() < std::time::Duration::from_secs(2));
+        assert_eq!(unique[49_999], "_notdef.49999");
+        assert_eq!(unique.iter().collect::<HashSet<_>>().len(), 50_000);
     }
 
     #[test]
@@ -1968,9 +2262,7 @@ GlyphClassDef [b], [a], [c d], [];
 } GDEF;
 
 markClass c <anchor 0 500> @left;
-markClass c <anchor 0 500> @mark_class_0x1;
-markClass d <anchor 0 0> @mark_class_1x1;
-markClass c <anchor 0 500> @topleft;
+markClass d <anchor 0 0> @anchor;
 lookup gpos_mark_to_base_1 {
     pos base a
         <anchor 250 500> mark @left;
@@ -1979,17 +2271,17 @@ lookup gpos_mark_to_base_1 {
 } gpos_mark_to_base_1;
 lookup gpos_mark_to_ligature_1 {
     pos ligature a
-        <anchor 100 500> mark @mark_class_0x1
-        <anchor NULL> mark @mark_class_1x1
+        <anchor 100 500> mark @left
+        <anchor NULL> mark @anchor
         ligComponent
-        <anchor 400 500> mark @mark_class_0x1
-        <anchor NULL> mark @mark_class_1x1;
+        <anchor 400 500> mark @left
+        <anchor NULL> mark @anchor;
 } gpos_mark_to_ligature_1;
 lookup gpos_mark_to_mark_1 {
     pos mark c
-        <anchor 0 800> mark @topleft;
+        <anchor 0 800> mark @left;
     pos mark d
-        <anchor NULL> mark @topleft;
+        <anchor NULL> mark @left;
 } gpos_mark_to_mark_1;
 feature mark {
 lookup gpos_mark_to_base_1;

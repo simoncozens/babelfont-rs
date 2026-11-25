@@ -1,0 +1,7 @@
+# kerning against class 0 of the second glyphs: d e and every glyph
+# not in another class get -20 (built by feaLib, ClassDef2 edited)
+languagesystem DFLT dflt;
+feature kern {
+    pos [a b] [c] -10;
+    pos [a b] [d e] -20;
+} kern;
