@@ -29,6 +29,7 @@ mod global_metrics;
 mod glyphs;
 mod kerning;
 mod static_metadata;
+mod symbol_cmap;
 mod varc;
 
 /// Options for compiling a Babelfont Font to FontIR
@@ -150,6 +151,9 @@ impl BabelfontIrSource {
             .map_err(improve_ir_error)?;
         if !source.font.cross_axis_mappings.is_empty() {
             binary = avar2::insert_avar2_table(&binary, &source.font)?;
+        }
+        if symbol_cmap::is_symbol_encoded(&source.font) {
+            binary = symbol_cmap::encode_as_symbol(&binary)?;
         }
         if source.options.produce_varc_table {
             insert_varc_table(&binary, &source.font)
@@ -375,6 +379,41 @@ mod tests {
             error.contains("cubic at one master and quadratic at another"),
             "{error}"
         );
+    }
+
+    #[test]
+    fn test_variation_sequences_compile_into_cmap_format_14() {
+        use skrifa::raw::{
+            tables::cmap::{CmapSubtable, MapVariant},
+            TableProvider,
+        };
+        use skrifa::MetadataProvider;
+        let mut font = crate::load("resources/IbarraRealNova-Italic.ufo").unwrap();
+        // U+0041 FE00 is A's own glyph (a default sequence); U+0042 FE00 shows A
+        font.variation_sequences
+            .insert((0xFE00, 0x41), smol_str::SmolStr::from("A"));
+        font.variation_sequences
+            .insert((0xFE00, 0x42), smol_str::SmolStr::from("A"));
+        let binary = BabelfontIrSource::compile(font, CompilationOptions::default()).unwrap();
+        let fontref = skrifa::FontRef::new(&binary).unwrap();
+        let a = fontref.charmap().map('A').unwrap();
+        let cmap = fontref.cmap().unwrap();
+        let format_14 = cmap
+            .encoding_records()
+            .iter()
+            .find_map(|record| match record.subtable(cmap.offset_data()) {
+                Ok(CmapSubtable::Format14(subtable)) => Some(subtable),
+                _ => None,
+            })
+            .unwrap();
+        assert!(matches!(
+            format_14.map_variant(0x41u32, 0xFE00u32),
+            Some(MapVariant::UseDefault)
+        ));
+        assert!(matches!(
+            format_14.map_variant(0x42u32, 0xFE00u32),
+            Some(MapVariant::Variant(gid)) if gid == a
+        ));
     }
 
     #[test]
