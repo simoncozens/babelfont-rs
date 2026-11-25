@@ -433,6 +433,12 @@ pub(crate) mod ufo {
     use crate::{axis::CrossAxisMapping, common::tag_from_string, BabelfontError};
 
     use super::Axis;
+
+    /// Key to store the STAT axis ordering in the axis's format_specific
+    const KEY_AXIS_ORDERING: &str = "norad.designspace.axisOrdering";
+    /// Key to store the STAT axis labels in the axis's format_specific
+    const KEY_AXIS_LABELS: &str = "norad.designspace.axisLabels";
+
     impl TryFrom<&norad::designspace::Axis> for Axis {
         type Error = BabelfontError;
         fn try_from(dsax: &norad::designspace::Axis) -> Result<Self, BabelfontError> {
@@ -451,6 +457,16 @@ pub(crate) mod ufo {
                 );
             }
             ax.hidden = dsax.hidden;
+            if let Some(ordering) = dsax.axis_ordering {
+                ax.format_specific
+                    .insert(KEY_AXIS_ORDERING.into(), ordering.into());
+            }
+            if !dsax.axis_labels.is_empty() {
+                ax.format_specific.insert(
+                    KEY_AXIS_LABELS.into(),
+                    serde_json::to_value(&dsax.axis_labels).unwrap_or_default(),
+                );
+            }
             Ok(ax)
         }
     }
@@ -480,8 +496,16 @@ pub(crate) mod ufo {
                 values: (!ax.values.is_empty())
                     .then(|| ax.values.iter().map(|v| v.to_f64()).collect()),
                 label_names: vec![],
-                axis_ordering: None,
-                axis_labels: vec![],
+                axis_ordering: ax
+                    .format_specific
+                    .get(KEY_AXIS_ORDERING)
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as u32),
+                axis_labels: ax
+                    .format_specific
+                    .get(KEY_AXIS_LABELS)
+                    .and_then(|v| serde_json::from_value(v.clone()).ok())
+                    .unwrap_or_default(),
             }
         }
     }
