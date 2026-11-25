@@ -4,10 +4,11 @@ use crate::{
     names::Names,
     I18NDictionary, Instance, Layer, Tag,
 };
-use fontdrasil::coords::{DesignCoord, DesignLocation};
+use fontdrasil::coords::{DesignCoord, DesignLocation, UserCoord};
 use norad::{
     designspace::{
-        AxisMappings, DesignSpaceDocument, Instance as DSInstance, RuleProcessing, Rules, Source,
+        AxisMappings, AxisSubset, DesignSpaceDocument, Instance as DSInstance, RuleProcessing,
+        Rules, Source, SubsetValue, VariableFont,
     },
     Plist,
 };
@@ -23,6 +24,12 @@ pub const FORMAT_KEY: &str = "norad.designspace.format";
 pub const FILENAME_KEY: &str = "norad.designspace.filename";
 /// Key to store the master style name in the master's format_specific
 pub const STYLENAME_KEY: &str = "norad.designspace.style";
+/// Key to store a variable font's axis subsets in the instance's format_specific
+///
+/// The values are in user space coordinates, as they are in the designspace file.
+pub const AXIS_SUBSETS_KEY: &str = "norad.designspace.axisSubsets";
+/// Key to store the elided fallback name in the font's format_specific
+pub const ELIDED_FALLBACK_NAME_KEY: &str = "norad.designspace.elidedFallbackName";
 
 use crate::{
     convertors::ufo::{load_master_info, norad_glyph_to_babelfont_layer},
@@ -53,6 +60,7 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
     font.axes = axes;
 
     load_instances(&mut font, &axis_name_tag_map, &ds.instances);
+    load_variable_fonts(&mut font, &ds.variable_fonts);
     let res: Vec<(Master, Vec<Vec<Layer>>)> = ds
         .sources
         .iter()
@@ -76,6 +84,12 @@ pub fn load(path: PathBuf) -> Result<Font, BabelfontError> {
         FORMAT_KEY.to_string(),
         serde_json::Value::Number(serde_json::Number::from_f64(ds.format.into()).unwrap()),
     );
+    if let Some(elided_fallback_name) = &ds.elided_fallback_name {
+        font.format_specific.insert(
+            ELIDED_FALLBACK_NAME_KEY.to_string(),
+            elided_fallback_name.as_str().into(),
+        );
+    }
     Ok(font)
 }
 
@@ -139,6 +153,52 @@ pub(crate) fn load_instances(
             );
         }
         font.instances.push(inst);
+    }
+}
+
+/// Load the variable fonts described by a designspace document as variable instances
+pub(crate) fn load_variable_fonts(font: &mut Font, variable_fonts: &[VariableFont]) {
+    for vf in variable_fonts {
+        let location = DesignLocation::from(
+            vf.axis_subsets
+                .iter()
+                .filter_map(|subset| {
+                    let axis = font
+                        .axes
+                        .iter()
+                        .find(|ax| ax.name.get_default() == Some(&subset.name))?;
+                    let user_value = match subset.value {
+                        SubsetValue::Discrete(value) => value,
+                        SubsetValue::Range { default, .. } => default?,
+                    };
+                    // Axis subset values are in user coordinates.
+                    let design = axis
+                        .userspace_to_designspace(UserCoord::new(user_value))
+                        .unwrap_or_else(|_| DesignCoord::new(user_value));
+                    Some((axis.tag, design))
+                })
+                .collect::<Vec<_>>(),
+        );
+        let mut format_specific = stash_lib(Some(&vf.lib));
+        format_specific.insert(
+            AXIS_SUBSETS_KEY.to_string(),
+            serde_json::to_value(&vf.axis_subsets).unwrap_or_default(),
+        );
+        if let Some(filename) = &vf.filename {
+            format_specific.insert(
+                FILENAME_KEY.to_string(),
+                serde_json::Value::String(filename.clone()),
+            );
+        }
+        font.instances.push(Instance {
+            id: vf.name.clone(),
+            name: vf.name.as_str().into(),
+            location,
+            custom_names: Names::new(),
+            variable: true,
+            linked_style: None,
+            format_specific,
+        });
     }
 }
 
@@ -317,12 +377,21 @@ pub fn save_designspace(font: &Font, path: &PathBuf) -> Result<(), BabelfontErro
         .iter()
         .map(|m| crate::axis::ufo::make_cross_axis_mapping_entry(m, &axis_tag_name_map))
         .collect();
+    let (variable_instances, static_instances): (Vec<&Instance>, Vec<&Instance>) = font
+        .instances
+        .iter()
+        .partition(|instance| instance.variable);
+    // Variable fonts and cross-axis mappings both require designspace format 5.
+    let mut format = font
+        .format_specific
+        .get(FORMAT_KEY)
+        .and_then(|v| v.as_f64())
+        .unwrap_or(5.0) as f32;
+    if !variable_instances.is_empty() || !cross_axis_mappings.is_empty() {
+        format = format.max(5.0);
+    }
     let ds = DesignSpaceDocument {
-        format: font
-            .format_specific
-            .get(FORMAT_KEY)
-            .and_then(|v| v.as_f64())
-            .unwrap_or(5.0) as f32,
+        format,
         axes: font.axes.iter().map(|x| x.into()).collect(),
         rules: Rules {
             processing: RuleProcessing::First,
@@ -334,8 +403,7 @@ pub fn save_designspace(font: &Font, path: &PathBuf) -> Result<(), BabelfontErro
             .zip(master_filenames.iter())
             .map(|(m, f)| to_source(font, m, f, &axis_tag_name_map, &axis_order))
             .collect(),
-        instances: font
-            .instances
+        instances: static_instances
             .iter()
             .map(|i| to_norad_instance(i, &axis_tag_name_map, &axis_order))
             .collect(),
@@ -348,9 +416,16 @@ pub fn save_designspace(font: &Font, path: &PathBuf) -> Result<(), BabelfontErro
                 mappings: cross_axis_mappings,
             })
         },
-        elided_fallback_name: None, // XXX
+        elided_fallback_name: font
+            .format_specific
+            .get(ELIDED_FALLBACK_NAME_KEY)
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
         location_labels: vec![],
-        variable_fonts: vec![], // XXX
+        variable_fonts: variable_instances
+            .iter()
+            .map(|i| to_norad_variable_font(i, &font.axes))
+            .collect(),
     };
     // Now save all the UFOs
     for (ix, master_filename) in master_filenames.iter().enumerate() {
@@ -412,6 +487,59 @@ pub(crate) fn to_norad_instance(
         localised_family_names: (&instance.custom_names.family_name).into(),
         localised_style_map_style_names: (&instance.custom_names.typographic_subfamily).into(),
         localised_style_map_family_names: (&instance.custom_names.typographic_family).into(),
+    }
+}
+
+/// Convert a variable instance to a designspace variable font
+pub(crate) fn to_norad_variable_font(instance: &Instance, axes: &[Axis]) -> VariableFont {
+    let axis_subsets = instance
+        .format_specific
+        .get(AXIS_SUBSETS_KEY)
+        .and_then(|value| serde_json::from_value::<Vec<AxisSubset>>(value.clone()).ok())
+        .unwrap_or_else(|| {
+            // No stored subsets (the instance didn't come from a designspace);
+            // any axis named in the location is pinned to that value, and all
+            // other axes are included in full.
+            axes.iter()
+                .map(|axis| {
+                    let value = instance
+                        .location
+                        .get(axis.tag)
+                        .and_then(|coord| axis.designspace_to_userspace(coord).ok())
+                        .map(|user| SubsetValue::Discrete(user.to_f64()))
+                        .unwrap_or_default();
+                    AxisSubset {
+                        name: axis
+                            .name
+                            .get_default()
+                            .map(|x| x.to_string())
+                            .unwrap_or_else(|| axis.tag.to_string()),
+                        value,
+                    }
+                })
+                .collect()
+        });
+    VariableFont {
+        name: instance
+            .name
+            .get_default()
+            .map(|x| x.to_string())
+            .unwrap_or_default(),
+        filename: instance
+            .format_specific
+            .get(FILENAME_KEY)
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
+        axis_subsets,
+        lib: serde_json::from_value(
+            instance
+                .format_specific
+                .get(KEY_LIB)
+                .cloned()
+                .unwrap_or_default(),
+        )
+        .ok()
+        .unwrap_or_default(),
     }
 }
 
@@ -517,6 +645,34 @@ mod tests {
             let font2 = norad::Font::load(relative_path_to_master2).unwrap();
             ufo_semantic_test(&font1, &font2, ix == index_of_default);
         }
+    }
+
+    #[test]
+    fn test_variable_fonts_roundtrip() {
+        let mut font = crate::load("resources/IbarraRealNova.designspace").unwrap();
+        assert_eq!(font.instances.len(), 8);
+        let variable: Vec<_> = font.instances.iter().filter(|i| i.variable).collect();
+        assert_eq!(variable.len(), 2);
+        assert_eq!(
+            variable[0].name.get_default().unwrap(),
+            "IbarraRealNova[wght]"
+        );
+
+        // A font containing variable instances must be saved as format 5,
+        // even if it was loaded from an older format.
+        font.format_specific
+            .insert(FORMAT_KEY.to_string(), serde_json::json!(4.0));
+        let tempdir = tempfile::tempdir().unwrap();
+        let temp_path = tempdir.path().join("temp.designspace");
+        save_designspace(&font, &temp_path).unwrap();
+
+        let ds = norad::designspace::DesignSpaceDocument::load(&temp_path).unwrap();
+        assert_eq!(ds.format, 5.0);
+        // Variable and static instances are split into separate elements.
+        assert_eq!(ds.variable_fonts.len(), 2);
+        assert_eq!(ds.instances.len(), 6);
+        assert_eq!(ds.variable_fonts[0].name, "IbarraRealNova[wght]");
+        assert_eq!(ds.variable_fonts[0].axis_subsets.len(), 2);
     }
 
     #[test]
