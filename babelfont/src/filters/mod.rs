@@ -117,6 +117,7 @@ declare_filters! {
         FontForgeUnderlinePosition(fontforgeunderlineposition) => "fontforgeunderlineposition",
         FontForgeHeightGlyphCountMean(fontforgeheightglyphcountmean) => "fontforgeheightglyphcountmean",
         FontForgeOs2Defaults(fontforgeos2defaults) => "fontforgeos2defaults",
+        FontForgeLegacyOs2Version(fontforgelegacyos2version) => "fontforgelegacyos2version",
     }
     group "Filters for manipulating outlines" {
         DecomposeComponentReferences(decomposecomponentreferences) => "decomposecomponents",
